@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isStaff() {
+      return signedIn() && request.auth.token.role in ['moderator', 'admin'];
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /venues/{venueId} {
+      allow read: if signedIn() && (resource.data.status == 'active' || isStaff());
+      allow write: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if signedIn()
+        && (resource.data.status == 'published' || resource.data.authorId == request.auth.uid || isStaff());
+      allow write: if false;
+
+      match /comments/{commentId} {
+        allow read: if signedIn() && resource.data.status == 'published';
+        allow write: if false;
+      }
+
+      match /reactions/{uid} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example
+.firebase/
+.firebase-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+**/lib/
+**/dist/
+**/.expo/
+coverage/
+pnpm-debug.log*

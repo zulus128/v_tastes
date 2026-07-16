@@ -1,0 +1,26 @@
+{
+  "name": "@tastes/firebase-client",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "react-native": "src/index.ts",
+  "exports": {
+    ".": {
+      "react-native": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@tastes/contracts": "workspace:*",
+    "firebase": "^12.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
