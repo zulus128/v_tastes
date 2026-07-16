@@ -9,6 +9,8 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "dev": "pnpm build && concurrently -k --handle-input --default-input-target mobile -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile start\"",
+    "dev:ios": "pnpm build && concurrently -k -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile ios\"",
+    "dev:android": "pnpm build && concurrently -k -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile android\"",
     "dev:emulators": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data",
     "dev:emulators:restore": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --import=.firebase-data --export-on-exit=.firebase-data",
     "dev:mobile": "pnpm --filter @tastes/mobile start",

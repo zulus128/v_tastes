@@ -19,6 +19,8 @@ This starts the Functions compiler, Firebase Emulator Suite, Emulator UI at `htt
 
 After Expo prints `Waiting on http://localhost:8081`, press `i` in the same terminal for iOS Simulator or `a` for Android Emulator. Input is routed to the mobile process.
 
+Alternatively, use `pnpm dev:ios` or `pnpm dev:android` to open the simulator/emulator automatically without keyboard shortcuts.
+
 The workspace pins a local Node 22 runtime for Firebase Functions and automatically selects Java 21 on macOS, so global Node/Java defaults do not control the emulators.
 
 Seed venues after the emulators are running:
@@ -34,6 +36,8 @@ Useful focused commands:
 pnpm dev:emulators
 pnpm dev:emulators:restore
 pnpm dev:mobile
+pnpm dev:ios
+pnpm dev:android
 pnpm lint
 pnpm typecheck
 pnpm test
