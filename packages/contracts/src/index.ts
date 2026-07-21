@@ -49,6 +49,20 @@ export const reactToReviewInputSchema = z.object({
   reaction: z.enum(['like']),
 });
 
+export const phoneNumberSchema = z.string().trim().regex(
+  /^\+[1-9]\d{7,14}$/,
+  'The phone number must use E.164 format, for example +905551234567.',
+);
+
+export const requestPhoneOtpInputSchema = z.object({
+  phoneNumber: phoneNumberSchema,
+});
+
+export const verifyPhoneOtpInputSchema = z.object({
+  challengeId: z.string().min(16).max(128),
+  code: z.string().regex(/^\d{4}$/, 'The verification code must contain 4 digits.'),
+});
+
 export const healthCheckResultSchema = z.object({
   status: z.literal('ok'),
   service: z.literal('tastes-backend'),
@@ -63,6 +77,20 @@ export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
+export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
+export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
+
+export interface RequestPhoneOtpResult {
+  challengeId: string;
+  resendAvailableAt: string;
+  expiresAt: string;
+  localCode?: string;
+}
+
+export interface VerifyPhoneOtpResult {
+  customToken: string;
+  isNewUser: boolean;
+}
 
 export type ApiErrorCode =
   | 'unauthenticated'

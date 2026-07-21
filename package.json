@@ -14,6 +14,8 @@
     "dev:emulators": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data",
     "dev:emulators:restore": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --import=.firebase-data --export-on-exit=.firebase-data",
     "dev:mobile": "pnpm --filter @tastes/mobile start",
+    "mobile:build:ios": "pnpm --filter @tastes/mobile build:ios",
+    "mobile:build:android": "pnpm --filter @tastes/mobile build:android",
     "seed": "pnpm --filter @tastes/functions seed",
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",

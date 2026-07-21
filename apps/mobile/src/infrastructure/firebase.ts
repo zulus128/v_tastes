@@ -1,8 +1,12 @@
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
+import * as FirebaseAuth from 'firebase/auth';
 import {
   connectAuthEmulator,
   getAuth,
+  initializeAuth,
   type Auth,
+  type Persistence,
 } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
@@ -31,7 +35,26 @@ const app =
         appId: '1:1234567890:web:demo-tastes',
       });
 
-export const auth: Auth = getAuth(app);
+function initializePersistentAuth(): Auth {
+  // The React Native export is selected by Metro at runtime, while Firebase's
+  // top-level TypeScript declaration currently exposes only its web surface.
+  const getReactNativePersistence = (FirebaseAuth as typeof FirebaseAuth & {
+    getReactNativePersistence: (storage: typeof ReactNativeAsyncStorage) => Persistence;
+  }).getReactNativePersistence;
+
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === 'auth/already-initialized') {
+      return getAuth(app);
+    }
+    throw error;
+  }
+}
+
+export const auth: Auth = initializePersistentAuth();
 export const firestore: Firestore = getFirestore(app);
 export const functions: Functions = getFunctions(app, 'europe-west1');
 export const storage: FirebaseStorage = getStorage(app);

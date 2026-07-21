@@ -2,14 +2,17 @@
   "expo": {
     "name": "Tastes Local",
     "slug": "tastes-local",
+    "scheme": "tastes",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.digitalityagency.tastes",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.digitalityagency.tastes",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +23,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#560E0B",
+          "image": "./assets/onboarding/logo.png",
+          "imageWidth": 189,
+          "resizeMode": "contain"
+        }
+      ]
+    ]
   }
 }

@@ -1,30 +1,9 @@
 import type { Review, Venue } from '@tastes/contracts';
 import { createTastesApi } from '@tastes/firebase-client';
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  type User,
-} from 'firebase/auth';
-import {
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-} from 'firebase/firestore';
+import { signOut, type User } from 'firebase/auth';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Button,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { auth, firestore, functions } from '../../infrastructure/firebase';
 
 type DocumentData = Record<string, unknown>;
@@ -58,12 +37,8 @@ function toReview(id: string, data: DocumentData): Review {
   };
 }
 
-export function DemoScreen() {
+export function DemoScreen({ user }: { user: User }) {
   const api = useMemo(() => createTastesApi(functions), []);
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [email, setEmail] = useState('demo@tastes.local');
-  const [password, setPassword] = useState('password123');
   const [displayName, setDisplayName] = useState('Demo User');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -73,19 +48,7 @@ export function DemoScreen() {
   const [message, setMessage] = useState('Ready');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() =>
-    onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setAuthReady(true);
-    }), []);
-
   useEffect(() => {
-    if (!user) {
-      setVenues([]);
-      setReviews([]);
-      return undefined;
-    }
-
     const venuesQuery = query(collection(firestore, 'venues'), where('status', '==', 'active'));
     const reviewsQuery = query(
       collection(firestore, 'reviews'),
@@ -97,9 +60,11 @@ export function DemoScreen() {
     const unsubscribeVenues = onSnapshot(venuesQuery, (snapshot) => {
       const items = snapshot.docs.map((document) => toVenue(document.id, document.data()));
       setVenues(items);
-      if (items[0] && !items.some((venue) => venue.id === selectedVenueId)) {
-        setSelectedVenueId(items[0].id);
-      }
+      setSelectedVenueId((currentVenueId) =>
+        items[0] && !items.some((venue) => venue.id === currentVenueId)
+          ? items[0].id
+          : currentVenueId,
+      );
     }, (error) => setMessage(errorMessage(error)));
 
     const unsubscribeReviews = onSnapshot(reviewsQuery, (snapshot) => {
@@ -110,7 +75,7 @@ export function DemoScreen() {
       unsubscribeVenues();
       unsubscribeReviews();
     };
-  }, [selectedVenueId, user]);
+  }, []);
 
   async function run(label: string, operation: () => Promise<unknown>) {
     setBusy(true);
@@ -125,112 +90,61 @@ export function DemoScreen() {
     }
   }
 
-  if (!authReady) {
-    return <ActivityIndicator style={styles.loader} />;
-  }
-
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Tastes Local</Text>
-      <Text style={styles.subtitle}>Firebase emulator test client</Text>
+      <Text style={styles.subtitle}>Firebase emulator diagnostic client</Text>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Backend</Text>
-        <Button
-          title="Health check"
-          disabled={busy}
-          onPress={() => run('Health check', () => api.healthCheck())}
-        />
+        <Button title="Health check" disabled={busy} onPress={() => run('Health check', () => api.healthCheck())} />
         <Text style={styles.message}>{message}</Text>
       </View>
 
-      {!user ? (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Local authentication</Text>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" />
-          <TextInput style={styles.input} value={password} onChangeText={setPassword} secureTextEntry />
-          <TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} />
-          <View style={styles.row}>
-            <Button
-              title="Sign up"
-              disabled={busy}
-              onPress={() => run('Sign up', async () => {
-                await createUserWithEmailAndPassword(auth, email, password);
-                await api.createUserProfile({ displayName });
-              })}
-            />
-            <Button
-              title="Sign in"
-              disabled={busy}
-              onPress={() => run('Sign in', () => signInWithEmailAndPassword(auth, email, password))}
-            />
-          </View>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Profile</Text>
+        <Text>{user.phoneNumber ?? user.email ?? user.uid}</Text>
+        <TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} />
+        <View style={styles.row}>
+          <Button title="Save profile" disabled={busy} onPress={() => run('Save profile', () => api.createUserProfile({ displayName }))} />
+          <Button title="Sign out" disabled={busy} onPress={() => run('Sign out', () => signOut(auth))} />
         </View>
-      ) : (
-        <>
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Profile</Text>
-            <Text>{user.email}</Text>
-            <TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Create review</Text>
+        <Text style={styles.label}>Venue ID</Text>
+        <TextInput style={styles.input} value={selectedVenueId} onChangeText={setSelectedVenueId} />
+        <Text style={styles.hint}>{venues.map((venue) => `${venue.name} (${venue.id})`).join(', ') || 'Run pnpm seed.'}</Text>
+        <TextInput style={[styles.input, styles.multiline]} value={reviewText} onChangeText={setReviewText} multiline />
+        <Button
+          title="Create 5-star review"
+          disabled={busy || !selectedVenueId}
+          onPress={() => run('Create review', () => api.createReview({ venueId: selectedVenueId, rating: 5, text: reviewText }))}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Published feed</Text>
+        <TextInput style={styles.input} value={commentText} onChangeText={setCommentText} />
+        {reviews.length === 0 ? <Text>No reviews yet.</Text> : reviews.map((review) => (
+          <View key={review.id} style={styles.review}>
+            <Text style={styles.reviewTitle}>{review.venueName} · {review.rating}/5</Text>
+            <Text>{review.text}</Text>
+            <Text style={styles.hint}>by {review.authorDisplayName} · {review.reactionCount} likes · {review.commentCount} comments</Text>
             <View style={styles.row}>
-              <Button
-                title="Save profile"
-                disabled={busy}
-                onPress={() => run('Save profile', () => api.createUserProfile({ displayName }))}
-              />
-              <Button title="Sign out" disabled={busy} onPress={() => run('Sign out', () => signOut(auth))} />
+              <Button title="Toggle like" disabled={busy} onPress={() => run('Reaction', () => api.reactToReview({ reviewId: review.id, reaction: 'like' }))} />
+              <Button title="Comment" disabled={busy} onPress={() => run('Comment', () => api.addComment({ reviewId: review.id, text: commentText }))} />
             </View>
           </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Create review</Text>
-            <Text style={styles.label}>Venue ID</Text>
-            <TextInput style={styles.input} value={selectedVenueId} onChangeText={setSelectedVenueId} />
-            <Text style={styles.hint}>{venues.map((venue) => `${venue.name} (${venue.id})`).join(', ') || 'Run pnpm seed.'}</Text>
-            <TextInput style={[styles.input, styles.multiline]} value={reviewText} onChangeText={setReviewText} multiline />
-            <Button
-              title="Create 5-star review"
-              disabled={busy || !selectedVenueId}
-              onPress={() => run('Create review', () => api.createReview({
-                venueId: selectedVenueId,
-                rating: 5,
-                text: reviewText,
-              }))}
-            />
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Published feed</Text>
-            <TextInput style={styles.input} value={commentText} onChangeText={setCommentText} />
-            {reviews.length === 0 ? <Text>No reviews yet.</Text> : reviews.map((review) => (
-              <View key={review.id} style={styles.review}>
-                <Text style={styles.reviewTitle}>{review.venueName} · {review.rating}/5</Text>
-                <Text>{review.text}</Text>
-                <Text style={styles.hint}>by {review.authorDisplayName} · {review.reactionCount} likes · {review.commentCount} comments</Text>
-                <View style={styles.row}>
-                  <Button
-                    title="Toggle like"
-                    disabled={busy}
-                    onPress={() => run('Reaction', () => api.reactToReview({ reviewId: review.id, reaction: 'like' }))}
-                  />
-                  <Button
-                    title="Comment"
-                    disabled={busy}
-                    onPress={() => run('Comment', () => api.addComment({ reviewId: review.id, text: commentText }))}
-                  />
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+        ))}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  loader: { flex: 1 },
-  content: { padding: 20, gap: 14 },
+  content: { padding: 20, gap: 14, backgroundColor: '#f6f4ef' },
   title: { fontSize: 30, fontWeight: '700', color: '#1c1917' },
   subtitle: { color: '#6b625b', marginBottom: 4 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 10 },

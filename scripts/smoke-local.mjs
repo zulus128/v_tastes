@@ -26,15 +26,19 @@ async function callFunction(name, data, token) {
   return payload.result;
 }
 
-const email = `smoke-${Date.now()}@tastes.local`;
-const auth = await post(`${authBaseUrl}/accounts:signUp?key=demo-api-key`, {
-  email,
-  password: 'password123',
+const phoneNumber = `+90555${String(Date.now()).slice(-7)}`;
+const otpRequest = await callFunction('requestPhoneOtp', { phoneNumber });
+const otpVerification = await callFunction('verifyPhoneOtp', {
+  challengeId: otpRequest.challengeId,
+  code: otpRequest.localCode,
+});
+const auth = await post(`${authBaseUrl}/accounts:signInWithCustomToken?key=demo-api-key`, {
+  token: otpVerification.customToken,
   returnSecureToken: true,
 });
 const token = auth.idToken;
 const health = await callFunction('healthCheck', {});
-const profile = await callFunction('createUserProfile', { displayName: 'Smoke Test User' }, token);
+const profile = await callFunction('createUserProfile', { displayName: 'Phone Smoke Test User' }, token);
 const review = await callFunction('createReview', {
   venueId: 'demo-cafe',
   rating: 5,
@@ -51,7 +55,9 @@ const reaction = await callFunction('reactToReview', {
 
 console.log(JSON.stringify({
   health: health.status,
-  email,
+  phoneNumber,
+  otp: 'approved',
+  isNewUser: otpVerification.isNewUser,
   profileId: profile.id,
   reviewId: review.id,
   commentId: comment.id,

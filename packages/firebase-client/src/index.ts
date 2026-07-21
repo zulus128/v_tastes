@@ -4,6 +4,10 @@ import type {
   CreateUserProfileInput,
   HealthCheckResult,
   ReactToReviewInput,
+  RequestPhoneOtpInput,
+  RequestPhoneOtpResult,
+  VerifyPhoneOtpInput,
+  VerifyPhoneOtpResult,
 } from '@tastes/contracts';
 import type { Functions } from 'firebase/functions';
 import { httpsCallable } from 'firebase/functions';
@@ -21,6 +25,10 @@ export function createTastesApi(functions: Functions) {
   return {
     healthCheck: () =>
       httpsCallable<Record<string, never>, HealthCheckResult>(functions, 'healthCheck')({}),
+    requestPhoneOtp: (input: RequestPhoneOtpInput) =>
+      httpsCallable<RequestPhoneOtpInput, RequestPhoneOtpResult>(functions, 'requestPhoneOtp')(input),
+    verifyPhoneOtp: (input: VerifyPhoneOtpInput) =>
+      httpsCallable<VerifyPhoneOtpInput, VerifyPhoneOtpResult>(functions, 'verifyPhoneOtp')(input),
     createUserProfile: (input: CreateUserProfileInput) =>
       httpsCallable<CreateUserProfileInput, IdResult>(functions, 'createUserProfile')(input),
     createReview: (input: CreateReviewInput) =>

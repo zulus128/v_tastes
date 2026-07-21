@@ -19,6 +19,10 @@ Subcollections:
 - `comments/{commentId}` — published comments with author snapshot.
 - `reactions/{uid}` — at most one reaction per user.
 
+### `_otpChallenges/{challengeId}`
+
+Private, short-lived backend state for phone verification. It contains the normalized phone number, provider reference, resend and expiry timestamps, status, and failed-attempt count. Clients have no direct access. Production retention cleanup will be handled with a Firestore TTL policy.
+
 ## Write policy
 
 Client writes are denied for the initial collections. Mutations are performed by Callable Functions using Admin SDK transactions. This protects ownership fields, counters, statuses, and server timestamps.
