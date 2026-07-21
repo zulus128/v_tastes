@@ -21,7 +21,11 @@ Subcollections:
 
 ### `_otpChallenges/{challengeId}`
 
-Private, short-lived backend state for phone verification. It contains the normalized phone number, provider reference, resend and expiry timestamps, status, and failed-attempt count. Clients have no direct access. Production retention cleanup will be handled with a Firestore TTL policy.
+Private, short-lived backend state for phone verification with a random document ID. It contains the normalized phone number, provider reference, expiry timestamp, status, and failed-attempt count. Successful challenges are deleted before token issuance; expired documents are removed by the `expiresAt` Firestore TTL policy. Clients have no direct access.
+
+### `_otpRateLimits/{hashedScope}`
+
+Private rolling counters and cooldown state keyed by a one-way hash of phone number or source IP. The `expiresAt` Firestore TTL policy removes stale counters. Clients have no direct access.
 
 ## Write policy
 

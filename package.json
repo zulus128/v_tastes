@@ -8,9 +8,9 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "dev": "pnpm build && concurrently -k --handle-input --default-input-target mobile -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile start\"",
-    "dev:ios": "pnpm build && concurrently -k -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile ios\"",
-    "dev:android": "pnpm build && concurrently -k -n functions,emulators,mobile \"pnpm --filter @tastes/functions build:watch\" \"node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data\" \"pnpm --filter @tastes/mobile android\"",
+    "dev": "sh scripts/dev-local.sh start",
+    "dev:ios": "sh scripts/dev-local.sh ios",
+    "dev:android": "sh scripts/dev-local.sh android",
     "dev:emulators": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data",
     "dev:emulators:restore": "pnpm build && node scripts/run-firebase.mjs emulators:start --project demo-tastes --import=.firebase-data --export-on-exit=.firebase-data",
     "dev:mobile": "pnpm --filter @tastes/mobile start",
@@ -20,9 +20,10 @@
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm test:unit && pnpm test:rules",
-    "test:unit": "vitest run --exclude tests/rules/**",
-    "test:rules": "node scripts/run-firebase.mjs emulators:exec --project demo-tastes --only firestore \"vitest run tests/rules\""
+    "test": "pnpm test:unit && pnpm test:rules && pnpm test:auth",
+    "test:unit": "vitest run --exclude tests/rules/** --exclude tests/auth/**",
+    "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore \"vitest run tests/rules\"",
+    "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run tests/auth\""
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -33,7 +34,6 @@
     "eslint-config-prettier": "^10.1.8",
     "firebase": "^12.16.0",
     "firebase-tools": "^15.23.0",
-    "node": "22.13.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.10"

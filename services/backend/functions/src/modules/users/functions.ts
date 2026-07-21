@@ -21,7 +21,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         uid,
         displayName: input.displayName,
         bio: input.bio ?? '',
-        photoUrl: null,
+        photoUrl: existing.exists ? existing.get('photoUrl') ?? null : null,
         status: 'active',
         createdAt: existing.exists ? existing.get('createdAt') : now,
         updatedAt: now,

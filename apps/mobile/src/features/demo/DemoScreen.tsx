@@ -39,7 +39,7 @@ function toReview(id: string, data: DocumentData): Review {
 
 export function DemoScreen({ user }: { user: User }) {
   const api = useMemo(() => createTastesApi(functions), []);
-  const [displayName, setDisplayName] = useState('Demo User');
+  const [displayName, setDisplayName] = useState(user.displayName ?? '');
   const [venues, setVenues] = useState<Venue[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [selectedVenueId, setSelectedVenueId] = useState('demo-cafe');

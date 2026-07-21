@@ -5,6 +5,7 @@ node_modules/
 !.env.example
 .firebase/
 .firebase-data/
+firebase-export-*/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log

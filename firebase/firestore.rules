@@ -30,7 +30,7 @@ service cloud.firestore {
       allow write: if false;
 
       match /comments/{commentId} {
-        allow read: if signedIn() && resource.data.status == 'published';
+        allow read: if signedIn() && (resource.data.status == 'published' || isStaff());
         allow write: if false;
       }
 

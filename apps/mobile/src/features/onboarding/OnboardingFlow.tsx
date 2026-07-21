@@ -49,7 +49,7 @@ export function OnboardingFlow() {
   const [screen, setScreen] = useState<Screen>('entry');
   const [country, setCountry] = useState(countries[0]);
   const [countrySearch, setCountrySearch] = useState('');
-  const [phoneDigits, setPhoneDigits] = useState('9876543210');
+  const [phoneDigits, setPhoneDigits] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [otpCode, setOtpCode] = useState('');
@@ -333,7 +333,7 @@ function OtpScreen(props: {
   onResend: () => void;
 }) {
   const error = props.state === 'incorrect' ? 'Incorrect code. Try again.' : props.state === 'expired' ? 'Your code has expired' : props.state === 'locked' ? 'Too many attempts. Resend code.' : '';
-  const canResend = props.resendSeconds === 0 && props.state !== 'incorrect';
+  const canResend = props.resendSeconds === 0;
   return (
     <PatternScreen>
       <BackButton onPress={props.onBack} />
