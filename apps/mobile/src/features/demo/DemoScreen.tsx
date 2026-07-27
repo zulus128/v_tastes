@@ -4,6 +4,7 @@ import { signOut, type User } from 'firebase/auth';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { HomePreviewState } from '../home/HomeFlow';
 import { auth, firestore, functions } from '../../infrastructure/firebase';
 
 type DocumentData = Record<string, unknown>;
@@ -41,10 +42,12 @@ export function DemoScreen({
   user,
   onOpenRecap,
   onOpenLeaderboard,
+  onOpenHome,
 }: {
   user: User;
   onOpenRecap: (mode: 'ready' | 'lowData') => void;
   onOpenLeaderboard: (mode: 'content' | 'empty') => void;
+  onOpenHome: (mode: HomePreviewState) => void;
 }) {
   const api = useMemo(() => createTastesApi(functions), []);
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
@@ -113,6 +116,21 @@ export function DemoScreen({
         <Text style={styles.sectionTitle}>Leaderboard</Text>
         <Button title="Open leaderboard" onPress={() => onOpenLeaderboard('content')} />
         <Button title="Preview no-friends state" onPress={() => onOpenLeaderboard('empty')} />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Home · Section 5</Text>
+        <Button title="1. Friends empty" onPress={() => onOpenHome('friendsEmpty')} />
+        <Button title="2. Local empty" onPress={() => onOpenHome('localEmpty')} />
+        <Button title="3. Offline" onPress={() => onOpenHome('offline')} />
+        <Button title="4. Loading" onPress={() => onOpenHome('loading')} />
+        <Button title="5. Post menu" onPress={() => onOpenHome('postMenu')} />
+        <Button title="6. New posts tag" onPress={() => onOpenHome('newPosts')} />
+        <Button title="7. Recommendation menu" onPress={() => onOpenHome('recommendationMenu')} />
+        <Button title="8. Comments empty" onPress={() => onOpenHome('commentsEmpty')} />
+        <Button title="9. Comment menu" onPress={() => onOpenHome('commentMenu')} />
+        <Button title="10. Report" onPress={() => onOpenHome('report')} />
+        <Button title="11. Report sent" onPress={() => onOpenHome('reportSent')} />
       </View>
 
       <View style={styles.card}>

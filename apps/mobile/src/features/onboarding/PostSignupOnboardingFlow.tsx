@@ -91,7 +91,7 @@ type Screen =
 
 interface PostSignupOnboardingFlowProps {
   onAuthenticationRequired: () => Promise<void>;
-  onComplete: () => void;
+  onComplete: () => Promise<void>;
 }
 
 function isUnauthenticated(error: unknown): boolean {
@@ -252,7 +252,11 @@ export function PostSignupOnboardingFlow({
     }
     setBusy(true);
     try {
-      await api.createUserProfile({ displayName: displayName.trim() });
+      await api.createUserProfile({
+        displayName: displayName.trim(),
+        username: username.trim(),
+        city,
+      });
       navigate('dish');
     } catch (error) {
       if (isUnauthenticated(error)) {
@@ -315,6 +319,21 @@ export function PostSignupOnboardingFlow({
 
   async function shareInvite() {
     await Share.share({ message: 'Join me on Tastes: https://tastes.app/invite' });
+  }
+
+  async function finishOnboarding() {
+    setBusy(true);
+    try {
+      await onComplete();
+    } catch (error) {
+      if (isUnauthenticated(error)) {
+        await onAuthenticationRequired();
+        return;
+      }
+      Alert.alert('Could not finish onboarding', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   const commonSubtitle = 'Can be changed later in Settings';
@@ -481,7 +500,7 @@ export function PostSignupOnboardingFlow({
   return <LinearGradient colors={['#560E0B', '#080808']} style={styles.ready}>
     <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
     <View style={styles.readyCopy}><Text style={styles.title}>You're ready!</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
-    <PrimaryButton icon={startRating} label="Start rating" onPress={onComplete} style={styles.readyButton} />
+    <PrimaryButton icon={startRating} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
   </LinearGradient>;
 }
 

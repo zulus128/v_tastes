@@ -1,6 +1,10 @@
 import {
+  completeOnboardingInputSchema,
   createReviewInputSchema,
   createUserProfileInputSchema,
+  getCommentsInputSchema,
+  getFeedInputSchema,
+  getLeaderboardInputSchema,
   reactToReviewInputSchema,
   requestPhoneOtpInputSchema,
   verifyPhoneOtpInputSchema,
@@ -49,5 +53,19 @@ describe('public API contracts', () => {
       challengeId: 'challenge-1234567890',
       code: '123456',
     }).success).toBe(false);
+  });
+
+  it('normalizes and bounds cursor pagination inputs', () => {
+    expect(getFeedInputSchema.parse({ scope: 'friends' })).toEqual({
+      scope: 'friends',
+      limit: 20,
+    });
+    expect(getCommentsInputSchema.parse({ reviewId: 'review-1', cursor: 'cursor', limit: 50 })).toEqual({
+      reviewId: 'review-1',
+      cursor: 'cursor',
+      limit: 50,
+    });
+    expect(getLeaderboardInputSchema.safeParse({ period: 'month', limit: 51 }).success).toBe(false);
+    expect(completeOnboardingInputSchema.safeParse({ version: 0 }).success).toBe(false);
   });
 });

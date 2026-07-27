@@ -1,83 +1,92 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { DemoScreen } from './src/features/demo/DemoScreen';
-import { LeaderboardScreen } from './src/features/leaderboard/LeaderboardScreen';
+import { useEffect } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
-import { MonthlyRecapFlow } from './src/features/recap/MonthlyRecapFlow';
-import { auth } from './src/infrastructure/firebase';
+import { queryClient } from './src/infrastructure/query';
+import { ProductNavigator } from './src/navigation/ProductNavigator';
+import { rememberPendingDeepLink } from './src/navigation/pendingDeepLink';
+import { SessionProvider, useSession } from './src/session/SessionProvider';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [postSignupDone, setPostSignupDone] = useState<boolean | null>(null);
-  const [recapMode, setRecapMode] = useState<'ready' | 'lowData' | null>(null);
-  const [leaderboardMode, setLeaderboardMode] = useState<'content' | 'empty' | null>(null);
-
-  useEffect(() => onAuthStateChanged(auth, (nextUser) => {
-    setUser(nextUser);
-    setAuthReady(true);
-  }), []);
+function AppGate() {
+  const { state, completeOnboarding, logout, refresh } = useSession();
 
   useEffect(() => {
-    if (authReady) SplashScreen.hide();
-  }, [authReady]);
+    if (state.status !== 'booting') SplashScreen.hide();
+  }, [state.status]);
 
   useEffect(() => {
-    let active = true;
-    if (!user) {
-      setPostSignupDone(null);
-      return () => { active = false; };
-    }
-    setPostSignupDone(null);
-    AsyncStorage.getItem(`tastes:post-signup-onboarding:${user.uid}`).then((value) => {
-      if (active) setPostSignupDone(value === 'complete');
-    });
-    return () => { active = false; };
-  }, [user]);
+    if (state.status === 'authenticated') return undefined;
+    const subscription = Linking.addEventListener('url', ({ url }) => rememberPendingDeepLink(url));
+    return () => subscription.remove();
+  }, [state.status]);
 
-  if (!authReady) {
-    return null;
-  }
+  if (state.status === 'booting') return null;
 
-  if (!user) {
+  if (state.status === 'anonymous') {
     return <View style={styles.dark}><StatusBar style="light" /><OnboardingFlow /></View>;
   }
 
-  if (postSignupDone === null) return <View style={styles.dark} />;
-
-  if (!postSignupDone) {
-    return <View style={styles.dark}><StatusBar style="light" /><PostSignupOnboardingFlow
-      onAuthenticationRequired={async () => {
-        setUser(null);
-        await signOut(auth);
-      }}
-      onComplete={() => {
-        AsyncStorage.setItem(`tastes:post-signup-onboarding:${user.uid}`, 'complete');
-        setPostSignupDone(true);
-      }}
-    /></View>;
+  if (state.status === 'error') {
+    return (
+      <View style={styles.error}>
+        <StatusBar style="light" />
+        <Text style={styles.errorTitle}>Could not load your account</Text>
+        <Text style={styles.errorBody}>{state.error.message}</Text>
+        <Pressable onPress={() => void refresh()} style={styles.button}>
+          <Text style={styles.buttonText}>Try again</Text>
+        </Pressable>
+        <Pressable onPress={() => void logout()}>
+          <Text style={styles.signOut}>Sign out</Text>
+        </Pressable>
+      </View>
+    );
   }
 
-  if (recapMode) {
-    return <View style={styles.dark}><StatusBar style="light" /><MonthlyRecapFlow mode={recapMode} onClose={() => setRecapMode(null)} /></View>;
+  if (state.status === 'onboarding') {
+    return (
+      <View style={styles.dark}>
+        <StatusBar style="light" />
+        <PostSignupOnboardingFlow
+          onAuthenticationRequired={logout}
+          onComplete={completeOnboarding}
+        />
+      </View>
+    );
   }
 
-  if (leaderboardMode) {
-    return <View style={styles.dark}><StatusBar style="light" /><LeaderboardScreen initialState={leaderboardMode} onBack={() => setLeaderboardMode(null)} /></View>;
-  }
+  return (
+    <View style={styles.dark}>
+      <StatusBar style="light" />
+      <ProductNavigator user={state.user} />
+    </View>
+  );
+}
 
-  return <View style={styles.product}><StatusBar style="dark" /><DemoScreen user={user} onOpenRecap={setRecapMode} onOpenLeaderboard={setLeaderboardMode} /></View>;
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <AppGate />
+        </SessionProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({
   dark: { flex: 1, backgroundColor: '#080808' },
-  product: { flex: 1, paddingTop: 54, backgroundColor: '#f6f4ef' },
+  error: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, backgroundColor: '#161616' },
+  errorTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  errorBody: { color: 'rgba(255,255,255,0.58)', textAlign: 'center' },
+  button: { marginTop: 8, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24, backgroundColor: '#B82F29' },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  signOut: { color: 'rgba(255,255,255,0.65)', padding: 10 },
 });

@@ -10,6 +10,8 @@ export const userProfileSchema = z.object({
 
 export const createUserProfileInputSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
+  username: z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9._]+$/).optional(),
+  city: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).optional(),
 });
 
@@ -49,6 +51,27 @@ export const reactToReviewInputSchema = z.object({
   reaction: z.enum(['like']),
 });
 
+export const pageInputSchema = z.object({
+  cursor: z.string().min(1).max(4_096).nullable().optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+export const getFeedInputSchema = pageInputSchema.extend({
+  scope: z.enum(['friends', 'local']).default('friends'),
+});
+
+export const getCommentsInputSchema = pageInputSchema.extend({
+  reviewId: z.string().min(1),
+});
+
+export const getLeaderboardInputSchema = pageInputSchema.extend({
+  period: z.enum(['month', 'allTime']).default('month'),
+});
+
+export const completeOnboardingInputSchema = z.object({
+  version: z.number().int().positive(),
+});
+
 export const phoneNumberSchema = z.string().trim().regex(
   /^\+[1-9]\d{7,14}$/,
   'The phone number must use E.164 format, for example +905551234567.',
@@ -76,6 +99,11 @@ export type Review = z.infer<typeof reviewSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
+export type PageInput = z.infer<typeof pageInputSchema>;
+export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
+export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
+export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
+export type CompleteOnboardingInput = z.infer<typeof completeOnboardingInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
 export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
@@ -92,6 +120,38 @@ export interface VerifyPhoneOtpResult {
   isNewUser: boolean;
 }
 
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface FeedItem extends Review {
+  createdAt: string;
+}
+
+export interface Comment {
+  id: string;
+  reviewId: string;
+  authorId: string;
+  authorDisplayName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  displayName: string;
+  photoUrl: string | null;
+  xp: number;
+  rank: number;
+}
+
+export interface SessionStatus {
+  profileExists: boolean;
+  onboardingVersion: number;
+  onboardingComplete: boolean;
+}
+
 export type ApiErrorCode =
   | 'unauthenticated'
   | 'permission-denied'
@@ -99,4 +159,6 @@ export type ApiErrorCode =
   | 'not-found'
   | 'failed-precondition'
   | 'resource-exhausted'
+  | 'unavailable'
+  | 'deadline-exceeded'
   | 'internal';

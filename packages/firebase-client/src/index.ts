@@ -1,16 +1,26 @@
 import type {
   AddCommentInput,
+  ApiErrorCode,
+  Comment,
+  CompleteOnboardingInput,
   CreateReviewInput,
   CreateUserProfileInput,
+  FeedItem,
+  GetCommentsInput,
+  GetFeedInput,
+  GetLeaderboardInput,
   HealthCheckResult,
+  LeaderboardEntry,
+  Page,
   ReactToReviewInput,
   RequestPhoneOtpInput,
   RequestPhoneOtpResult,
+  SessionStatus,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
 } from '@tastes/contracts';
 import type { Functions } from 'firebase/functions';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 
 export interface IdResult {
   id: string;
@@ -21,22 +31,93 @@ export interface ReactionResult {
   reactionCount: number;
 }
 
-export function createTastesApi(functions: Functions) {
+export class TastesApiError extends Error {
+  readonly retryable: boolean;
+
+  constructor(
+    readonly code: ApiErrorCode,
+    message: string,
+    readonly details?: unknown,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'TastesApiError';
+    this.retryable = code === 'unavailable' || code === 'deadline-exceeded' || code === 'internal';
+  }
+}
+
+export function normalizeApiError(error: unknown): TastesApiError {
+  if (error instanceof TastesApiError) return error;
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
+  const rawCode = typeof candidate?.code === 'string'
+    ? candidate.code.replace(/^functions\//, '')
+    : 'internal';
+  const supportedCodes: ApiErrorCode[] = [
+    'unauthenticated',
+    'permission-denied',
+    'invalid-argument',
+    'not-found',
+    'failed-precondition',
+    'resource-exhausted',
+    'unavailable',
+    'deadline-exceeded',
+    'internal',
+  ];
+  const code = supportedCodes.includes(rawCode as ApiErrorCode)
+    ? rawCode as ApiErrorCode
+    : 'internal';
+  const message = typeof candidate?.message === 'string' && candidate.message.length > 0
+    ? candidate.message
+    : 'Something went wrong. Please try again.';
+  return new TastesApiError(code, message, candidate?.details, { cause: error });
+}
+
+export interface TastesApiOptions {
+  onUnauthenticated?: (error: TastesApiError) => void | Promise<void>;
+  onError?: (error: TastesApiError, operation: string) => void;
+}
+
+export function createTastesApi(functions: Functions, options: TastesApiOptions = {}) {
+  async function invoke<Input, Output>(
+    operation: string,
+    input: Input,
+  ): Promise<HttpsCallableResult<Output>> {
+    try {
+      return await httpsCallable<Input, Output>(functions, operation)(input);
+    } catch (error) {
+      const normalized = normalizeApiError(error);
+      options.onError?.(normalized, operation);
+      if (normalized.code === 'unauthenticated') {
+        await options.onUnauthenticated?.(normalized);
+      }
+      throw normalized;
+    }
+  }
+
   return {
-    healthCheck: () =>
-      httpsCallable<Record<string, never>, HealthCheckResult>(functions, 'healthCheck')({}),
+    healthCheck: () => invoke<Record<string, never>, HealthCheckResult>('healthCheck', {}),
     requestPhoneOtp: (input: RequestPhoneOtpInput) =>
-      httpsCallable<RequestPhoneOtpInput, RequestPhoneOtpResult>(functions, 'requestPhoneOtp')(input),
+      invoke<RequestPhoneOtpInput, RequestPhoneOtpResult>('requestPhoneOtp', input),
     verifyPhoneOtp: (input: VerifyPhoneOtpInput) =>
-      httpsCallable<VerifyPhoneOtpInput, VerifyPhoneOtpResult>(functions, 'verifyPhoneOtp')(input),
+      invoke<VerifyPhoneOtpInput, VerifyPhoneOtpResult>('verifyPhoneOtp', input),
+    getSessionStatus: () =>
+      invoke<Record<string, never>, SessionStatus>('getSessionStatus', {}),
+    completeOnboarding: (input: CompleteOnboardingInput) =>
+      invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
     createUserProfile: (input: CreateUserProfileInput) =>
-      httpsCallable<CreateUserProfileInput, IdResult>(functions, 'createUserProfile')(input),
+      invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
+    getFeed: (input: GetFeedInput) =>
+      invoke<GetFeedInput, Page<FeedItem>>('getFeed', input),
     createReview: (input: CreateReviewInput) =>
-      httpsCallable<CreateReviewInput, IdResult>(functions, 'createReview')(input),
+      invoke<CreateReviewInput, IdResult>('createReview', input),
+    getComments: (input: GetCommentsInput) =>
+      invoke<GetCommentsInput, Page<Comment>>('getComments', input),
     addComment: (input: AddCommentInput) =>
-      httpsCallable<AddCommentInput, IdResult>(functions, 'addComment')(input),
+      invoke<AddCommentInput, IdResult>('addComment', input),
     reactToReview: (input: ReactToReviewInput) =>
-      httpsCallable<ReactToReviewInput, ReactionResult>(functions, 'reactToReview')(input),
+      invoke<ReactToReviewInput, ReactionResult>('reactToReview', input),
+    getLeaderboard: (input: GetLeaderboardInput) =>
+      invoke<GetLeaderboardInput, Page<LeaderboardEntry>>('getLeaderboard', input),
   };
 }
 

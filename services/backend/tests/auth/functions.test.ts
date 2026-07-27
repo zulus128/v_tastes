@@ -28,10 +28,13 @@ function rateLimitId(phoneNumber: string): string {
   return createHash('sha256').update(`phone:${phoneNumber}`).digest('hex');
 }
 
-async function callFunction<T>(name: string, data: unknown): Promise<T> {
+async function callFunction<T>(name: string, data: unknown, token?: string): Promise<T> {
   const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ data }),
   });
   const payload = await response.json() as { result?: T; error?: CallableFailure };
@@ -40,6 +43,24 @@ async function callFunction<T>(name: string, data: unknown): Promise<T> {
     throw payload.error ?? new Error(`Callable ${name} failed with HTTP ${response.status}`);
   }
   return payload.result as T;
+}
+
+async function authenticatedUser() {
+  const challenge = await requestOtp(uniquePhone());
+  const verified = await callFunction<{ customToken: string }>('verifyPhoneOtp', {
+    challengeId: challenge.challengeId,
+    code: challenge.localCode,
+  });
+  const response = await fetch(
+    `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: verified.customToken, returnSecureToken: true }),
+    },
+  );
+  const result = await response.json() as { idToken: string; localId: string };
+  return { token: result.idToken, uid: result.localId };
 }
 
 async function expectReason(promise: Promise<unknown>, reason: string): Promise<CallableFailure> {
@@ -162,5 +183,134 @@ describe('phone OTP callables', () => {
     expect(reasons.every((reason) => reason === 'incorrect-code' || reason === 'verification-in-progress')).toBe(true);
     expect(snapshot.get('failedAttempts')).toBe(incorrectChecks);
     expect(incorrectChecks).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('authenticated session and paginated reads', () => {
+  it('uses the server profile as the onboarding source of truth', async () => {
+    const { token } = await authenticatedUser();
+
+    expect(await callFunction('getSessionStatus', {}, token)).toEqual({
+      profileExists: false,
+      onboardingVersion: 0,
+      onboardingComplete: false,
+    });
+    await callFunction('createUserProfile', {
+      displayName: 'Demo User',
+      username: 'demo.user',
+      city: 'Istanbul',
+    }, token);
+    expect(await callFunction('getSessionStatus', {}, token)).toMatchObject({
+      profileExists: true,
+      onboardingComplete: false,
+    });
+    await callFunction('completeOnboarding', { version: 1 }, token);
+    expect(await callFunction('getSessionStatus', {}, token)).toMatchObject({
+      onboardingVersion: 1,
+      onboardingComplete: true,
+    });
+  });
+
+  it('returns stable, non-overlapping cursors for feed, comments, and leaderboard', async () => {
+    const { token } = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Demo User',
+      username: 'demo.user',
+      city: 'Istanbul',
+    }, token);
+    const currentUser = (await db.collection('users').where('username', '==', 'demo.user').limit(1).get()).docs[0];
+    if (!currentUser) throw new Error('Expected the authenticated profile to exist.');
+
+    const batch = db.batch();
+    const base = Date.now();
+    for (let index = 0; index < 45; index += 1) {
+      const authorId = `author-${String(index).padStart(2, '0')}`;
+      const review = db.collection('reviews').doc(`review-${String(index).padStart(2, '0')}`);
+      batch.set(review, {
+        authorId,
+        authorDisplayName: 'Demo User',
+        venueId: 'demo-cafe',
+        venueName: 'Demo Cafe',
+        venueCity: 'Istanbul',
+        rating: 5,
+        text: `Review ${index}`,
+        status: 'published',
+        commentCount: 0,
+        reactionCount: 0,
+        createdAt: Timestamp.fromMillis(base - index),
+      });
+      batch.set(currentUser.ref.collection('following').doc(authorId), {
+        followedAt: Timestamp.fromMillis(base - index),
+      });
+    }
+    for (let index = 0; index < 35; index += 1) {
+      batch.set(db.collection('reviews').doc('review-00').collection('comments').doc(`comment-${index}`), {
+        authorId: 'seed-author',
+        authorDisplayName: 'Demo User',
+        text: `Comment ${index}`,
+        status: 'published',
+        createdAt: Timestamp.fromMillis(base - index),
+      });
+      batch.set(db.collection('users').doc(`ranked-${String(index).padStart(2, '0')}`), {
+        displayName: `Ranked ${index}`,
+        status: 'active',
+        xp: 1_000 - index,
+        monthlyXp: 500 - index,
+      });
+    }
+    await batch.commit();
+
+    const feedFirst = await callFunction<{ items: Array<{ id: string }>; nextCursor: string }>(
+      'getFeed',
+      { scope: 'local', limit: 20 },
+      token,
+    );
+    const feedSecond = await callFunction<{ items: Array<{ id: string }>; nextCursor: string | null }>(
+      'getFeed',
+      { scope: 'local', limit: 20, cursor: feedFirst.nextCursor },
+      token,
+    );
+    expect(feedFirst.items).toHaveLength(20);
+    expect(feedSecond.items).toHaveLength(20);
+    expect(new Set([...feedFirst.items, ...feedSecond.items].map((item) => item.id)).size).toBe(40);
+
+    const friendsFirst = await callFunction<{ items: Array<{ id: string }>; nextCursor: string }>(
+      'getFeed',
+      { scope: 'friends', limit: 20 },
+      token,
+    );
+    const friendsSecond = await callFunction<{ items: Array<{ id: string }> }>(
+      'getFeed',
+      { scope: 'friends', limit: 20, cursor: friendsFirst.nextCursor },
+      token,
+    );
+    expect(new Set([...friendsFirst.items, ...friendsSecond.items].map((item) => item.id)).size).toBe(40);
+
+    const commentsFirst = await callFunction<{ items: Array<{ id: string }>; nextCursor: string }>(
+      'getComments',
+      { reviewId: 'review-00', limit: 20 },
+      token,
+    );
+    const commentsSecond = await callFunction<{ items: Array<{ id: string }> }>(
+      'getComments',
+      { reviewId: 'review-00', limit: 20, cursor: commentsFirst.nextCursor },
+      token,
+    );
+    expect(commentsFirst.items).toHaveLength(20);
+    expect(commentsSecond.items).toHaveLength(15);
+
+    const leadersFirst = await callFunction<{ items: Array<{ userId: string; rank: number }>; nextCursor: string }>(
+      'getLeaderboard',
+      { period: 'month', limit: 20 },
+      token,
+    );
+    const leadersSecond = await callFunction<{ items: Array<{ rank: number }> }>(
+      'getLeaderboard',
+      { period: 'month', limit: 20, cursor: leadersFirst.nextCursor },
+      token,
+    );
+    expect(leadersFirst.items[0]?.rank).toBe(1);
+    expect(leadersSecond.items[0]?.rank).toBe(21);
   });
 });
