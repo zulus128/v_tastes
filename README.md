@@ -67,7 +67,7 @@ The local `FakeOtpProvider` never sends an SMS. Production deployment is intenti
 ## Architecture boundary
 
 - `apps/mobile` is a disposable test consumer.
-- `services/backend/functions`, `firebase`, `packages/contracts`, tests, and documentation form the transferable backend deliverable.
+- `services/backend`, `packages/contracts`, and backend documentation form the transferable backend deliverable.
 - Clients read allowed Firestore data under Security Rules.
 - Business mutations use Callable Functions.
 - Domain contracts do not depend on React Native.

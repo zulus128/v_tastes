@@ -16,14 +16,15 @@
     "dev:mobile": "pnpm --filter @tastes/mobile start",
     "mobile:build:ios": "pnpm --filter @tastes/mobile build:ios",
     "mobile:build:android": "pnpm --filter @tastes/mobile build:android",
+    "reset:ios": "xcrun simctl uninstall booted com.digitalityagency.tastes || true; pnpm mobile:build:ios && pnpm dev:ios",
     "seed": "pnpm --filter @tastes/functions seed",
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm test:unit && pnpm test:rules && pnpm test:auth",
-    "test:unit": "vitest run --exclude tests/rules/** --exclude tests/auth/**",
-    "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore \"vitest run tests/rules\"",
-    "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run tests/auth\""
+    "test:unit": "vitest run --exclude services/backend/tests/rules/** --exclude services/backend/tests/auth/**",
+    "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore \"vitest run services/backend/tests/rules\"",
+    "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run services/backend/tests/auth\""
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

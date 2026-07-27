@@ -23,16 +23,22 @@ import { Platform } from 'react-native';
 
 const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'demo-tastes';
 const useEmulators = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false';
+const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'demo-api-key';
+const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${projectId}.firebaseapp.com`;
+const storageBucket = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? `${projectId}.appspot.com`;
+const appId = process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '1:1234567890:web:demo-tastes';
+const messagingSenderId = process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 
 const app =
   getApps().length > 0
     ? getApp()
     : initializeApp({
-        apiKey: 'demo-api-key',
-        authDomain: `${projectId}.firebaseapp.com`,
+        apiKey,
+        authDomain,
         projectId,
-        storageBucket: `${projectId}.appspot.com`,
-        appId: '1:1234567890:web:demo-tastes',
+        storageBucket,
+        appId,
+        ...(messagingSenderId ? { messagingSenderId } : {}),
       });
 
 function initializePersistentAuth(): Auth {

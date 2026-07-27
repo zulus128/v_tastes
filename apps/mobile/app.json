@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.digitalityagency.tastes",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSContactsUsageDescription": "Tastes uses your contacts to help you find and invite friends."
+      }
     },
     "android": {
       "package": "com.digitalityagency.tastes",
@@ -32,6 +35,31 @@
           "image": "./assets/onboarding/logo.png",
           "imageWidth": 189,
           "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Tastes to use your location to show nearby places."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Tastes to access your photos for your profile picture.",
+          "cameraPermission": "Allow Tastes to use your camera for your profile picture."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Tastes to access your contacts to find and invite friends."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#B82F29"
         }
       ]
     ]
