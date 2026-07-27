@@ -7,6 +7,7 @@
     "@tastes/contracts": "workspace:*",
     "@tastes/firebase-client": "workspace:*",
     "expo": "~57.0.7",
+    "expo-clipboard": "~57.0.1",
     "expo-contacts": "~57.0.2",
     "expo-dev-client": "~57.0.7",
     "expo-image-picker": "~57.0.5",

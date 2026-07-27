@@ -5,8 +5,10 @@ import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { DemoScreen } from './src/features/demo/DemoScreen';
+import { LeaderboardScreen } from './src/features/leaderboard/LeaderboardScreen';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
+import { MonthlyRecapFlow } from './src/features/recap/MonthlyRecapFlow';
 import { auth } from './src/infrastructure/firebase';
 
 SplashScreen.preventAutoHideAsync();
@@ -16,6 +18,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [postSignupDone, setPostSignupDone] = useState<boolean | null>(null);
+  const [recapMode, setRecapMode] = useState<'ready' | 'lowData' | null>(null);
+  const [leaderboardMode, setLeaderboardMode] = useState<'content' | 'empty' | null>(null);
 
   useEffect(() => onAuthStateChanged(auth, (nextUser) => {
     setUser(nextUser);
@@ -62,7 +66,15 @@ export default function App() {
     /></View>;
   }
 
-  return <View style={styles.product}><StatusBar style="dark" /><DemoScreen user={user} /></View>;
+  if (recapMode) {
+    return <View style={styles.dark}><StatusBar style="light" /><MonthlyRecapFlow mode={recapMode} onClose={() => setRecapMode(null)} /></View>;
+  }
+
+  if (leaderboardMode) {
+    return <View style={styles.dark}><StatusBar style="light" /><LeaderboardScreen initialState={leaderboardMode} onBack={() => setLeaderboardMode(null)} /></View>;
+  }
+
+  return <View style={styles.product}><StatusBar style="dark" /><DemoScreen user={user} onOpenRecap={setRecapMode} onOpenLeaderboard={setLeaderboardMode} /></View>;
 }
 
 const styles = StyleSheet.create({

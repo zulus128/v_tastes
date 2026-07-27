@@ -37,7 +37,15 @@ function toReview(id: string, data: DocumentData): Review {
   };
 }
 
-export function DemoScreen({ user }: { user: User }) {
+export function DemoScreen({
+  user,
+  onOpenRecap,
+  onOpenLeaderboard,
+}: {
+  user: User;
+  onOpenRecap: (mode: 'ready' | 'lowData') => void;
+  onOpenLeaderboard: (mode: 'content' | 'empty') => void;
+}) {
   const api = useMemo(() => createTastesApi(functions), []);
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -94,6 +102,18 @@ export function DemoScreen({ user }: { user: User }) {
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Tastes Local</Text>
       <Text style={styles.subtitle}>Firebase emulator diagnostic client</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Monthly recap</Text>
+        <Button title="Open June recap" onPress={() => onOpenRecap('ready')} />
+        <Button title="Preview low-activity state" onPress={() => onOpenRecap('lowData')} />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Leaderboard</Text>
+        <Button title="Open leaderboard" onPress={() => onOpenLeaderboard('content')} />
+        <Button title="Preview no-friends state" onPress={() => onOpenLeaderboard('empty')} />
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Backend</Text>
