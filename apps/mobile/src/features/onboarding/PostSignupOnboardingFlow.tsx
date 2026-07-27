@@ -481,7 +481,7 @@ export function PostSignupOnboardingFlow({
   return <LinearGradient colors={['#560E0B', '#080808']} style={styles.ready}>
     <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
     <View style={styles.readyCopy}><Text style={styles.title}>You're ready!</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
-    <PrimaryButton icon={startRating} label="Start rating" onPress={onComplete} style={styles.bottomButton} />
+    <PrimaryButton icon={startRating} label="Start rating" onPress={onComplete} style={styles.readyButton} />
   </LinearGradient>;
 }
 
@@ -616,4 +616,5 @@ const styles = StyleSheet.create({
   ready: { flex: 1 },
   reviewCollage: { width: 402, height: 288, marginTop: 170, alignSelf: 'center' },
   readyCopy: { alignItems: 'center', paddingHorizontal: 32, marginTop: 24 },
+  readyButton: { marginHorizontal: 36, marginTop: 24 },
 });
