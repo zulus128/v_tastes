@@ -40,15 +40,18 @@ const token = auth.idToken;
 const health = await callFunction('healthCheck', {});
 const profile = await callFunction('createUserProfile', { displayName: 'Phone Smoke Test User' }, token);
 const review = await callFunction('createReview', {
+  idempotencyKey: `smoke-review-${Date.now()}`,
   venueId: 'demo-cafe',
   rating: 5,
   text: 'Verified by the local smoke test.',
 }, token);
 const comment = await callFunction('addComment', {
+  idempotencyKey: `smoke-comment-${Date.now()}`,
   reviewId: review.id,
   text: 'Smoke test comment.',
 }, token);
 const reaction = await callFunction('reactToReview', {
+  idempotencyKey: `smoke-reaction-${Date.now()}`,
   reviewId: review.id,
   reaction: 'like',
 }, token);

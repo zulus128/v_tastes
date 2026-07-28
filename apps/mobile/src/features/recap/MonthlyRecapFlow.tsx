@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -22,9 +22,10 @@ import copyIcon from '../../../assets/recap/copy.png';
 import followersIcon from '../../../assets/recap/followers.png';
 import instagramIcon from '../../../assets/recap/instagram.png';
 import lockIcon from '../../../assets/recap/lock.png';
-import logo from '../../../assets/recap/logo.png';
 import placesIcon from '../../../assets/recap/places.png';
 import saveIcon from '../../../assets/recap/save.png';
+import { TastesLogo } from '../../ui/FigmaIcons';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 
 type RecapStep = 'loading' | 'lowData' | 'followers' | 'comparison' | 'share';
 
@@ -36,6 +37,8 @@ type MonthlyRecapFlowProps = {
 const shareMessage = 'My June Tastes recap: 15 places visited, 2 new areas explored, and 132 new followers.';
 
 export function MonthlyRecapFlow({ mode = 'ready', onClose }: MonthlyRecapFlowProps) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [step, setStep] = useState<RecapStep>('loading');
   const [confirmingClose, setConfirmingClose] = useState(false);
 
@@ -59,7 +62,11 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose }: MonthlyRecapFlowPr
 
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={['#560E0B', '#260706', '#080808']} locations={[0, 0.52, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={isDark ? ['#560E0B', '#260706', '#080808'] : ['#F7E8E4', '#F2EFEA', '#F2EFEA']}
+        locations={[0, 0.52, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.pattern} style={StyleSheet.absoluteFill}>
         {(step === 'followers' || step === 'comparison') ? (
           <StoryProgress completed={step === 'followers' ? 6 : 7} />
@@ -92,6 +99,8 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose }: MonthlyRecapFlowPr
 }
 
 function StoryProgress({ completed }: { completed: number }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.progress}>
       {Array.from({ length: 7 }, (_, index) => (
@@ -102,9 +111,11 @@ function StoryProgress({ completed }: { completed: number }) {
 }
 
 function LoadingScreen() {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.centerContent}>
-      <ActivityIndicator color="#FFFFFF" size="large" style={styles.loader} />
+      <ActivityIndicator color={colors.text} size="large" style={styles.loader} />
       <Text style={styles.centerTitle}>Crunching your month…</Text>
       <Text style={styles.centerSubtitle}>We're putting together your June recap.</Text>
     </View>
@@ -112,6 +123,8 @@ function LoadingScreen() {
 }
 
 function LowDataScreen({ onExplore }: { onExplore: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <View style={styles.centerContent}>
@@ -127,6 +140,8 @@ function LowDataScreen({ onExplore }: { onExplore: () => void }) {
 }
 
 function FollowersScreen({ onNext }: { onNext: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const people = [
     ['AC', '#4C698F'],
     ['SR', '#865E88'],
@@ -154,6 +169,8 @@ function FollowersScreen({ onNext }: { onNext: () => void }) {
 }
 
 function ComparisonScreen({ onNext }: { onNext: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <View style={styles.comparisonContent}>
@@ -181,6 +198,8 @@ function ComparisonRow({
   delta: string;
   positive?: boolean;
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.comparisonRow}>
       <Text style={styles.comparisonLabel}>{label}</Text>
@@ -195,11 +214,13 @@ function ComparisonRow({
 }
 
 function ShareCard({ onShare }: { onShare: (channel: string) => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.shareContent}>
       <View style={styles.shareIdentity}>
         <Image source={avatar} style={styles.profileAvatar} />
-        <Image source={logo} resizeMode="contain" style={styles.logo} />
+        <TastesLogo width={110} />
       </View>
       <Text style={styles.recapTitle}>Monthly Recap</Text>
       <View style={styles.metrics}>
@@ -218,6 +239,8 @@ function ShareCard({ onShare }: { onShare: (channel: string) => void }) {
 }
 
 function Metric({ icon, label, value }: { icon: ImageSourcePropType; label: string; value: string }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.metricRow}>
       <View style={styles.metricLabel}>
@@ -230,6 +253,8 @@ function Metric({ icon, label, value }: { icon: ImageSourcePropType; label: stri
 }
 
 function ShareOption({ icon, label, onPress }: { icon: ImageSourcePropType; label: string; onPress: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.shareOption, pressed && styles.pressed]}>
       <View style={styles.shareOptionLabel}>
@@ -242,6 +267,8 @@ function ShareOption({ icon, label, onPress }: { icon: ImageSourcePropType; labe
 }
 
 function RecapButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
       <Text style={styles.ctaLabel}>{label}</Text>
@@ -259,6 +286,8 @@ function CloseConfirmation({
   onKeepWatching: () => void;
   onLeave: () => void;
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onKeepWatching}>
       <View style={styles.scrim}>
@@ -280,9 +309,9 @@ function CloseConfirmation({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#080808' },
-  pattern: { opacity: 0.16 },
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.canvas },
+  pattern: { opacity: isDark ? 0.16 : 0.05 },
   closeButton: {
     position: 'absolute',
     zIndex: 3,
@@ -292,12 +321,12 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeGlyph: { color: 'rgba(255,255,255,0.72)', fontSize: 22, fontWeight: '300', lineHeight: 24 },
+  closeGlyph: { color: colors.text, opacity: 0.72, fontSize: 22, fontWeight: '300', lineHeight: 24 },
   progress: {
     position: 'absolute',
     zIndex: 2,
@@ -308,8 +337,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
-  progressSegment: { flex: 1, height: 3, borderRadius: 2, backgroundColor: '#FFFFFF' },
-  progressPending: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  progressSegment: { flex: 1, height: 3, borderRadius: 2, backgroundColor: colors.text },
+  progressPending: { opacity: 0.25 },
   centerContent: {
     position: 'absolute',
     top: '43%',
@@ -319,9 +348,9 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   loader: { width: 60, height: 60 },
-  lockIcon: { width: 47, height: 60 },
-  centerTitle: { color: '#FFFFFF', fontSize: 26, lineHeight: 32, fontWeight: '700', textAlign: 'center' },
-  centerSubtitle: { maxWidth: 340, color: 'rgba(255,255,255,0.60)', fontSize: 15, lineHeight: 21, textAlign: 'center' },
+  lockIcon: { width: 47, height: 60, tintColor: colors.text },
+  centerTitle: { color: colors.text, fontSize: 26, lineHeight: 32, fontWeight: '700', textAlign: 'center' },
+  centerSubtitle: { maxWidth: 340, color: colors.textMuted, fontSize: 15, lineHeight: 21, textAlign: 'center' },
   followersContent: {
     position: 'absolute',
     top: '36%',
@@ -340,25 +369,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initialText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  followerCount: { color: '#FFFFFF', fontSize: 52, lineHeight: 58, fontWeight: '700' },
-  followerCaption: { color: 'rgba(255,255,255,0.60)', fontSize: 16, lineHeight: 21 },
-  followerFootnote: { color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 18 },
+  initialText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
+  followerCount: { color: colors.text, fontSize: 52, lineHeight: 58, fontWeight: '700' },
+  followerCaption: { color: colors.textMuted, fontSize: 16, lineHeight: 21 },
+  followerFootnote: { color: colors.textMuted, opacity: 0.78, fontSize: 13, lineHeight: 18 },
   comparisonContent: { position: 'absolute', top: 135, left: 16, right: 16, alignItems: 'center' },
-  comparisonTitle: { color: '#FFFFFF', fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: 0.6 },
-  comparisonSubtitle: { marginTop: 7, color: '#AAB2C5', fontSize: 16, lineHeight: 22 },
+  comparisonTitle: { color: colors.text, fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: 0.6 },
+  comparisonSubtitle: { marginTop: 7, color: colors.textSecondary, fontSize: 16, lineHeight: 22 },
   comparisonTable: { alignSelf: 'stretch', marginTop: 31 },
   comparisonRow: {
     minHeight: 54,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: colors.hairline,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  comparisonLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 16 },
+  comparisonLabel: { color: colors.text, opacity: 0.85, fontSize: 16 },
   comparisonResult: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  comparisonValue: { minWidth: 18, color: '#FFFFFF', fontSize: 20, fontWeight: '700', textAlign: 'right' },
+  comparisonValue: { minWidth: 18, color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'right' },
   deltaChip: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   positiveChip: { backgroundColor: 'rgba(77,191,115,0.18)' },
   negativeChip: { backgroundColor: 'rgba(184,47,41,0.18)' },
@@ -373,66 +402,65 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 36,
     borderWidth: 5,
-    borderColor: '#4C1816',
-    backgroundColor: '#B82F29',
+    borderColor: colors.primaryBorder,
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  ctaLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
+  ctaLabel: { color: colors.onPrimary, fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   arrow: { width: 20, height: 12 },
   shareContent: { flex: 1, paddingTop: 102, paddingHorizontal: 16 },
   shareIdentity: { alignItems: 'center', gap: 12 },
-  profileAvatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: '#FFFFFF' },
-  logo: { width: 110, height: 56 },
-  recapTitle: { marginTop: 29, color: '#FFFFFF', fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  profileAvatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.text },
+  recapTitle: { marginTop: 29, color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   metrics: { marginTop: 0 },
   metricRow: {
     height: 50,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: colors.hairline,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   metricLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metricIcon: { width: 20, height: 20 },
-  metricText: { color: 'rgba(255,255,255,0.90)', fontSize: 16 },
+  metricIcon: { width: 20, height: 20, tintColor: colors.text },
+  metricText: { color: colors.text, opacity: 0.9, fontSize: 16 },
   metricBadge: { minWidth: 32, height: 32, paddingHorizontal: 8, borderRadius: 16, backgroundColor: '#FF9EB1', alignItems: 'center', justifyContent: 'center' },
   metricValue: { color: '#080808', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  shareHeading: { marginTop: 58, color: 'rgba(255,255,255,0.60)', fontSize: 15, fontWeight: '600' },
+  shareHeading: { marginTop: 58, color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   shareOptions: { marginTop: 18, gap: 10 },
   shareOption: {
     minHeight: 50,
     paddingHorizontal: 18,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: '#161616',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   shareOptionLabel: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  shareIcon: { width: 20, height: 20 },
-  shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
-  chevron: { color: 'rgba(255,255,255,0.55)', fontSize: 28, fontWeight: '300', marginTop: -2 },
+  shareIcon: { width: 20, height: 20, tintColor: colors.text },
+  shareText: { color: colors.text, fontSize: 15, fontWeight: '500' },
+  chevron: { color: colors.textMuted, fontSize: 28, fontWeight: '300', marginTop: -2 },
   pressed: { opacity: 0.78 },
   scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 18, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
     height: 236,
     borderRadius: 22,
-    backgroundColor: '#242426',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  handle: { marginTop: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
-  sheetTitle: { marginTop: 14, color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
+  handle: { marginTop: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  sheetTitle: { marginTop: 14, color: colors.text, fontSize: 18, fontWeight: '600' },
   sheetCopy: {
     marginTop: 8,
     maxWidth: 310,
-    color: 'rgba(255,255,255,0.55)',
+    color: colors.textMuted,
     fontSize: 14,
     lineHeight: 19,
     textAlign: 'center',
@@ -442,10 +470,10 @@ const styles = StyleSheet.create({
     height: 50,
     marginTop: 18,
     borderRadius: 25,
-    backgroundColor: '#B82F29',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keepLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  leaveLabel: { marginTop: 16, color: 'rgba(255,255,255,0.50)', fontSize: 16 },
+  keepLabel: { color: colors.onPrimary, fontSize: 16, fontWeight: '600' },
+  leaveLabel: { marginTop: 16, color: colors.textMuted, fontSize: 16 },
 });

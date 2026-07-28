@@ -4,15 +4,23 @@ export const userProfileSchema = z.object({
   uid: z.string().min(1),
   displayName: z.string().min(2).max(80),
   bio: z.string().max(500).default(''),
+  photoPath: z.string().max(512).nullable().default(null),
   photoUrl: z.url().nullable().default(null),
   status: z.enum(['active', 'suspended', 'banned', 'deleted']),
 });
 
 export const createUserProfileInputSchema = z.object({
-  displayName: z.string().trim().min(2).max(80),
-  username: z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9._]+$/).optional(),
+  displayName: z.string().trim()
+    .min(2, 'Your name must be at least 2 characters long.')
+    .max(80, 'Your name must be at most 80 characters long.'),
+  username: z.string().trim()
+    .min(2, 'The username must be at least 2 characters long.')
+    .max(40, 'The username must be at most 40 characters long.')
+    .regex(/^[a-zA-Z0-9._]+$/, 'The username can only use Latin letters, numbers, dots, and underscores.')
+    .optional(),
   city: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).optional(),
+  photoPath: z.string().trim().min(1).max(512).optional(),
 });
 
 export const venueSchema = z.object({
@@ -35,20 +43,29 @@ export const reviewSchema = z.object({
   reactionCount: z.number().int().nonnegative(),
 });
 
+export const idempotencyKeySchema = z.string().trim().min(16).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
+
 export const createReviewInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
   venueId: z.string().min(1),
   rating: z.number().min(1).max(5),
   text: z.string().trim().min(1).max(2_000),
 });
 
 export const addCommentInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
   reviewId: z.string().min(1),
   text: z.string().trim().min(1).max(1_000),
 });
 
 export const reactToReviewInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
   reviewId: z.string().min(1),
   reaction: z.enum(['like']),
+});
+
+export const followUserInputSchema = z.object({
+  targetUserId: z.string().min(1).max(128),
 });
 
 export const pageInputSchema = z.object({
@@ -99,6 +116,7 @@ export type Review = z.infer<typeof reviewSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
+export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
@@ -150,6 +168,10 @@ export interface SessionStatus {
   profileExists: boolean;
   onboardingVersion: number;
   onboardingComplete: boolean;
+}
+
+export interface FollowResult {
+  following: boolean;
 }
 
 export type ApiErrorCode =

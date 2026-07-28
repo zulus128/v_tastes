@@ -22,7 +22,7 @@ import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, type Country } from './countries';
-import { onboardingTheme as theme } from './theme';
+import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
 type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
 type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked';
@@ -42,6 +42,11 @@ function errorDetails(error: unknown): Record<string, unknown> {
 
 function displayPhone(country: Country, digits: string): string {
   return `${country.callingCode} ${digits.replace(/(\d{3})(?=\d)/g, '$1 ').trim()}`;
+}
+
+function useOnboardingStyles() {
+  const { colors } = useAppTheme();
+  return useMemo(() => createStyles(colors), [colors]);
 }
 
 export function OnboardingFlow() {
@@ -186,8 +191,10 @@ export function OnboardingFlow() {
 }
 
 function EntryScreen() {
+  const { isDark } = useAppTheme();
+  const styles = useOnboardingStyles();
   return (
-    <LinearGradient colors={['#560E0B', '#000000']} style={styles.fullScreen}>
+    <LinearGradient colors={isDark ? ['#560E0B', '#000000'] : ['#F7E8E4', '#F2EFEA']} style={styles.fullScreen}>
       <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.entryPattern} style={styles.centered}>
         <Image source={logo} resizeMode="contain" style={styles.entryLogo} />
       </ImageBackground>
@@ -196,6 +203,8 @@ function EntryScreen() {
 }
 
 function ConsentScreen({ onPhone }: { onPhone: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useOnboardingStyles();
   const unavailable = (provider: string) => Alert.alert(`${provider} sign-in`, 'This provider is not configured in the local test build yet.');
   return (
     <View style={styles.fullScreen}>
@@ -204,7 +213,7 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
       <RatingPin label="5.0" style={{ left: 272, top: 121 }} />
       <RatingPin label="4.2" style={{ left: 121, top: 287 }} />
       <RatingPin label="3.5" style={{ left: 316, top: 319 }} />
-      <LinearGradient colors={['#560E0B', '#000000', '#000000']} locations={[0, 0.43, 1]} style={styles.consentPanel}>
+      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={styles.consentPanel}>
         <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPattern}>
           <View style={styles.consentPrimary}>
             <Image source={logo} resizeMode="contain" style={styles.smallLogo} />
@@ -219,7 +228,8 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
             <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
             <View style={styles.socialRow}>
               <SocialButton icon={google} label="Google" onPress={() => unavailable('Google')} />
-              <SocialButton icon={apple} label="Apple" onPress={() => unavailable('Apple')} />
+              {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
+              <SocialButton icon={apple} label="Apple" onPress={() => unavailable('Apple')} tint={colors.text} />
             </View>
             <Text style={styles.legal}>By continuing you agree to our <Text style={styles.legalLink}>Terms of Service</Text> & <Text style={styles.legalLink}>Privacy Policy</Text></Text>
           </View>
@@ -230,6 +240,7 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
 }
 
 function RatingPin({ label, style }: { label: string; style: { left: number; top: number } }) {
+  const styles = useOnboardingStyles();
   return (
     <View style={[styles.ratingPin, style]}>
       <View style={styles.ratingBubble}><Text style={styles.ratingLabel}>{label}</Text></View>
@@ -239,8 +250,9 @@ function RatingPin({ label, style }: { label: string; style: { left: number; top
   );
 }
 
-function SocialButton({ icon, label, onPress }: { icon: number; label: string; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={styles.socialButton}><Image source={icon} style={styles.socialIcon} /><Text style={styles.socialLabel}>{label}</Text></Pressable>;
+function SocialButton({ icon, label, onPress, tint }: { icon: number; label: string; onPress: () => void; tint?: string }) {
+  const styles = useOnboardingStyles();
+  return <Pressable onPress={onPress} style={styles.socialButton}><Image source={icon} style={[styles.socialIcon, tint ? { tintColor: tint } : null]} /><Text style={styles.socialLabel}>{label}</Text></Pressable>;
 }
 
 function PhoneScreen(props: {
@@ -253,6 +265,8 @@ function PhoneScreen(props: {
   onCountry: () => void;
   onContinue: () => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useOnboardingStyles();
   return (
     <PatternScreen>
       <BackButton onPress={props.onBack} />
@@ -269,7 +283,7 @@ function PhoneScreen(props: {
             keyboardType="phone-pad"
             onChangeText={props.onChange}
             placeholder="Phone number"
-            placeholderTextColor={theme.colors.placeholder}
+            placeholderTextColor={colors.placeholder}
             style={styles.phoneInput}
             textContentType="telephoneNumber"
             value={props.digits}
@@ -289,6 +303,8 @@ function CountryScreen(props: {
   onBack: () => void;
   onSelect: (country: Country) => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useOnboardingStyles();
   return (
     <PatternScreen>
       <BackButton onPress={props.onBack} />
@@ -298,7 +314,7 @@ function CountryScreen(props: {
           autoCapitalize="none"
           onChangeText={props.onQueryChange}
           placeholder="Search"
-          placeholderTextColor={theme.colors.placeholder}
+          placeholderTextColor={colors.placeholder}
           style={styles.search}
           value={props.query}
         />
@@ -332,6 +348,7 @@ function OtpScreen(props: {
   onContinue: () => void;
   onResend: () => void;
 }) {
+  const styles = useOnboardingStyles();
   const error = props.state === 'incorrect' ? 'Incorrect code. Try again.' : props.state === 'expired' ? 'Your code has expired' : props.state === 'locked' ? 'Too many attempts. Resend code.' : '';
   const canResend = props.resendSeconds === 0;
   return (
@@ -363,69 +380,71 @@ function OtpScreen(props: {
   );
 }
 
-const styles = StyleSheet.create({
-  fullScreen: { flex: 1, backgroundColor: theme.colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  entryPattern: { opacity: 1 },
+  // pattern.png is dark linework on a transparent field, meant as a faint
+  // texture (Figma uses ~4-8% opacity here), not a bold full-strength layer.
+  entryPattern: { opacity: 0.06 },
   entryLogo: { width: 189, height: 95 },
   hero: { position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: '63%' },
   ratingPin: { position: 'absolute', width: 44, height: 68, alignItems: 'center' },
-  ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: theme.colors.text, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  ratingLabel: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
-  ratingPointer: { width: 12, height: 12, backgroundColor: theme.colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: theme.colors.text, transform: [{ rotate: '45deg' }], marginTop: -7 },
-  ratingStar: { color: theme.colors.text, fontSize: 10, marginTop: 3 },
-  consentPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 414, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: theme.colors.text, overflow: 'hidden' },
+  ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: colors.onPrimary, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  ratingLabel: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
+  ratingPointer: { width: 12, height: 12, backgroundColor: colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: colors.onPrimary, transform: [{ rotate: '45deg' }], marginTop: -7 },
+  ratingStar: { color: colors.onPrimary, fontSize: 10, marginTop: 3 },
+  consentPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 414, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   consentPattern: { flex: 1, paddingHorizontal: 16, paddingVertical: 24, justifyContent: 'space-between' },
-  panelPattern: { opacity: 1 },
+  panelPattern: { opacity: 0.06 },
   consentPrimary: { gap: 24, alignItems: 'center' },
   smallLogo: { width: 98, height: 49 },
   consentCopy: { gap: 8, alignItems: 'center' },
-  consentTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },
-  consentSubtitle: { color: theme.colors.muted, fontSize: 16, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+  consentTitle: { color: colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },
+  consentSubtitle: { color: colors.textSecondary, fontSize: 16, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
   pager: { height: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  pagerActive: { width: 15, height: 6, borderRadius: 3, backgroundColor: theme.colors.text },
-  pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#737780' },
+  pagerActive: { width: 15, height: 6, borderRadius: 3, backgroundColor: colors.text },
+  pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
   fullWidth: { width: '100%' },
   socialSection: { gap: 12 },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#45474B' },
-  orText: { color: theme.colors.muted, fontSize: 15 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  orText: { color: colors.textSecondary, fontSize: 15 },
   socialRow: { flexDirection: 'row', gap: 12 },
-  socialButton: { flex: 1, height: 44, borderRadius: 36, borderWidth: 1, borderColor: theme.colors.accent, backgroundColor: theme.colors.card, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
+  socialButton: { flex: 1, height: 44, borderRadius: 36, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.surface, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
   socialIcon: { width: 20, height: 20, resizeMode: 'contain' },
-  socialLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
-  legal: { color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'center' },
-  legalLink: { color: theme.colors.text },
+  socialLabel: { color: colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
+  legal: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
+  legalLink: { color: colors.text },
   authContent: { position: 'absolute', left: 16, right: 16, top: 170, alignItems: 'center' },
-  authTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
-  authSubtitle: { color: theme.colors.muted, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
-  phoneSent: { color: theme.colors.text },
-  phoneRow: { width: '100%', height: 44, marginTop: 17, borderBottomWidth: 1, borderBottomColor: theme.colors.text, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  phoneRowError: { borderBottomColor: theme.colors.error },
+  authTitle: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
+  authSubtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
+  phoneSent: { color: colors.text },
+  phoneRow: { width: '100%', height: 44, marginTop: 17, borderBottomWidth: 1, borderBottomColor: colors.text, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  phoneRowError: { borderBottomColor: colors.danger },
   countrySelector: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  flag: { color: theme.colors.text, fontSize: 18 },
-  callingCode: { color: theme.colors.text, fontSize: 17 },
-  chevron: { color: theme.colors.placeholder, fontSize: 16 },
-  phoneDivider: { width: 1, height: 20, marginLeft: 10, marginRight: 11, backgroundColor: 'rgba(255,255,255,0.15)' },
-  phoneInput: { flex: 1, color: theme.colors.text, fontSize: 17, paddingVertical: 0 },
-  errorText: { color: theme.colors.error, fontSize: 12, marginTop: 6, textAlign: 'center' },
+  flag: { color: colors.text, fontSize: 18 },
+  callingCode: { color: colors.text, fontSize: 17 },
+  chevron: { color: colors.placeholder, fontSize: 16 },
+  phoneDivider: { width: 1, height: 20, marginLeft: 10, marginRight: 11, backgroundColor: colors.hairline },
+  phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
+  errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
   authButton: { position: 'absolute', top: 409, left: 36, right: 36 },
   countryContent: { flex: 1, paddingTop: 130, paddingHorizontal: 16 },
-  countryTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '700' },
-  search: { height: 44, marginTop: 19, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.hairline, backgroundColor: theme.colors.card, color: theme.colors.text, fontSize: 15 },
+  countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
+  search: { height: 44, marginTop: 19, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },
   countryList: { marginTop: 16 },
-  countryRow: { height: 47, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  countryRow: { height: 47, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   countryName: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   countryFlag: { fontSize: 20 },
-  countryLabel: { color: theme.colors.text, fontSize: 16 },
-  countryCode: { color: 'rgba(255,255,255,0.45)', fontSize: 16 },
+  countryLabel: { color: colors.text, fontSize: 16 },
+  countryCode: { color: colors.textMuted, fontSize: 16 },
   otpContent: { position: 'absolute', left: 16, right: 16, top: 170, minHeight: 190, alignItems: 'center' },
   otpRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.hairline, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center' },
-  otpCellError: { borderColor: theme.colors.error },
-  otpDigit: { color: theme.colors.text, fontSize: 17 },
-  resendMuted: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 10 },
-  resendLink: { color: theme.colors.accent, fontSize: 12, marginTop: 8 },
-  localCode: { color: theme.colors.muted, fontSize: 11, marginTop: 8 },
+  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  otpCellError: { borderColor: colors.danger },
+  otpDigit: { color: colors.text, fontSize: 17 },
+  resendMuted: { color: colors.textMuted, fontSize: 12, marginTop: 10 },
+  resendLink: { color: colors.primary, fontSize: 12, marginTop: 8 },
+  localCode: { color: colors.textSecondary, fontSize: 11, marginTop: 8 },
   hiddenOtpInput: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 });

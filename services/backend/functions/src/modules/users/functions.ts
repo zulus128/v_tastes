@@ -89,6 +89,9 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createUserProfileInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
+  if (input.photoPath && !input.photoPath.startsWith(`profile-images/${uid}/`)) {
+    throw new HttpsError('permission-denied', 'The profile image path is not owned by this user.');
+  }
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(userRef);
@@ -102,10 +105,13 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         username: input.username ?? existing.get('username') ?? null,
         city: input.city ?? existing.get('city') ?? null,
         bio: input.bio ?? '',
+        photoPath: input.photoPath ?? existing.get('photoPath') ?? null,
         photoUrl: existing.exists ? existing.get('photoUrl') ?? null : null,
         status: 'active',
         xp: existing.exists ? Number(existing.get('xp') ?? 0) : 0,
         monthlyXp: existing.exists ? Number(existing.get('monthlyXp') ?? 0) : 0,
+        followerCount: existing.exists ? Number(existing.get('followerCount') ?? 0) : 0,
+        followingCount: existing.exists ? Number(existing.get('followingCount') ?? 0) : 0,
         createdAt: existing.exists ? existing.get('createdAt') : now,
         updatedAt: now,
       },

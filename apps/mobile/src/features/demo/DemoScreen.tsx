@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HomePreviewState } from '../home/HomeFlow';
 import { auth, firestore, functions } from '../../infrastructure/firebase';
+import { createIdempotencyKey } from '../../infrastructure/idempotency';
 
 type DocumentData = Record<string, unknown>;
 
@@ -158,7 +159,12 @@ export function DemoScreen({
         <Button
           title="Create 5-star review"
           disabled={busy || !selectedVenueId}
-          onPress={() => run('Create review', () => api.createReview({ venueId: selectedVenueId, rating: 5, text: reviewText }))}
+          onPress={() => run('Create review', () => api.createReview({
+            idempotencyKey: createIdempotencyKey('demo-review'),
+            venueId: selectedVenueId,
+            rating: 5,
+            text: reviewText,
+          }))}
         />
       </View>
 
@@ -171,8 +177,16 @@ export function DemoScreen({
             <Text>{review.text}</Text>
             <Text style={styles.hint}>by {review.authorDisplayName} · {review.reactionCount} likes · {review.commentCount} comments</Text>
             <View style={styles.row}>
-              <Button title="Toggle like" disabled={busy} onPress={() => run('Reaction', () => api.reactToReview({ reviewId: review.id, reaction: 'like' }))} />
-              <Button title="Comment" disabled={busy} onPress={() => run('Comment', () => api.addComment({ reviewId: review.id, text: commentText }))} />
+              <Button title="Toggle like" disabled={busy} onPress={() => run('Reaction', () => api.reactToReview({
+                idempotencyKey: createIdempotencyKey('demo-reaction'),
+                reviewId: review.id,
+                reaction: 'like',
+              }))} />
+              <Button title="Comment" disabled={busy} onPress={() => run('Comment', () => api.addComment({
+                idempotencyKey: createIdempotencyKey('demo-comment'),
+                reviewId: review.id,
+                text: commentText,
+              }))} />
             </View>
           </View>
         ))}

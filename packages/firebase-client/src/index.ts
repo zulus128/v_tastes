@@ -6,6 +6,8 @@ import type {
   CreateReviewInput,
   CreateUserProfileInput,
   FeedItem,
+  FollowResult,
+  FollowUserInput,
   GetCommentsInput,
   GetFeedInput,
   GetLeaderboardInput,
@@ -44,6 +46,26 @@ export class TastesApiError extends Error {
     this.name = 'TastesApiError';
     this.retryable = code === 'unavailable' || code === 'deadline-exceeded' || code === 'internal';
   }
+}
+
+interface ValidationIssue {
+  path?: unknown;
+  message?: unknown;
+}
+
+/**
+ * Human-readable message for an API failure. Validation errors carry the
+ * per-field zod messages in `details.issues`; surface the first one instead
+ * of the generic "The request payload is invalid.".
+ */
+export function apiErrorMessage(error: unknown): string {
+  const normalized = normalizeApiError(error);
+  if (normalized.code === 'invalid-argument') {
+    const issues = (normalized.details as { issues?: ValidationIssue[] } | undefined)?.issues;
+    const message = issues?.find((issue) => typeof issue.message === 'string')?.message;
+    if (typeof message === 'string' && message.length > 0) return message;
+  }
+  return normalized.message;
 }
 
 export function normalizeApiError(error: unknown): TastesApiError {
@@ -106,6 +128,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
     createUserProfile: (input: CreateUserProfileInput) =>
       invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
+    followUser: (input: FollowUserInput) =>
+      invoke<FollowUserInput, FollowResult>('followUser', input),
+    unfollowUser: (input: FollowUserInput) =>
+      invoke<FollowUserInput, FollowResult>('unfollowUser', input),
     getFeed: (input: GetFeedInput) =>
       invoke<GetFeedInput, Page<FeedItem>>('getFeed', input),
     createReview: (input: CreateReviewInput) =>

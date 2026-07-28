@@ -1,10 +1,16 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
+
+export interface AddCommentCommand {
+  idempotencyKey: string;
+  text: string;
+}
 
 export function useComments(reviewId: string) {
   const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
   return useInfiniteQuery({
-    queryKey: ['comments', reviewId],
+    queryKey: ['comments', userId, reviewId],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const response = await api.getComments({ reviewId, cursor: pageParam, limit: 30 });
@@ -17,13 +23,14 @@ export function useComments(reviewId: string) {
 
 export function useAddComment(reviewId: string) {
   const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => api.addComment({ reviewId, text }),
+    mutationFn: (command: AddCommentCommand) => api.addComment({ reviewId, ...command }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['comments', reviewId] }),
-        queryClient.invalidateQueries({ queryKey: ['feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['comments', userId, reviewId] }),
+        queryClient.invalidateQueries({ queryKey: ['feed', userId] }),
       ]);
     },
   });

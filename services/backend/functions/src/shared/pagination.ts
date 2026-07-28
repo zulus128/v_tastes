@@ -45,3 +45,7 @@ export function cursorDate(value: string | number): Date {
   }
   return date;
 }
+
+export function compareDocumentIdsDesc(left: string, right: string): number {
+  return Buffer.compare(Buffer.from(right, 'utf8'), Buffer.from(left, 'utf8'));
+}

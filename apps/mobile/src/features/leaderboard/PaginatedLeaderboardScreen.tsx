@@ -1,5 +1,5 @@
 import type { LeaderboardEntry } from '@tastes/contracts';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -10,9 +10,12 @@ import {
 } from 'react-native';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useLeaderboard } from './api';
 
 function RankingRow({ item }: { item: LeaderboardEntry }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={styles.rank}>{item.rank}</Text>
@@ -24,6 +27,8 @@ function RankingRow({ item }: { item: LeaderboardEntry }) {
 }
 
 export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [period, setPeriod] = useState<'month' | 'allTime'>('month');
   const query = useLeaderboard(period);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -43,7 +48,7 @@ export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
         ))}
       </View>
       <Text style={styles.nudge}>{period === 'month' ? '🏅 Month leaders · Top 3 earn a badge' : 'All-time ranking'}</Text>
-      {query.isPending ? <LoadingState label="Loading leaderboard…" /> : query.isError ? (
+      {query.isPending ? <LoadingState label="Loading leaderboard…" /> : query.isError && items.length === 0 ? (
         <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
       ) : (
         <FlatList
@@ -56,7 +61,7 @@ export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.5}
-          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={theme.colors.primary} />}
+          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
           renderItem={({ item }) => <RankingRow item={item} />}
         />
       )}
@@ -64,25 +69,25 @@ export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { height: 102, paddingTop: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  header: { height: 102, paddingTop: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background },
   back: { width: 52, height: 48, alignItems: 'center', justifyContent: 'center' },
-  backText: { color: theme.colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
-  title: { color: theme.colors.text, fontSize: 17, fontWeight: '700' },
-  info: { color: theme.colors.text, fontSize: 18 },
-  period: { height: 40, margin: 12, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: theme.colors.surfaceRaised },
+  backText: { color: colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
+  title: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  info: { color: colors.text, fontSize: 18 },
+  period: { height: 40, margin: 12, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised },
   periodButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.pill },
   periodActive: { backgroundColor: '#D9DDE5' },
-  periodText: { color: theme.colors.textMuted },
-  periodTextActive: { color: theme.colors.surface, fontWeight: '700' },
-  nudge: { color: theme.colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 8 },
+  periodText: { color: colors.textMuted },
+  periodTextActive: { color: '#161616', fontWeight: '700' },
+  nudge: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 8 },
   content: { paddingBottom: 24 },
   emptyContent: { flexGrow: 1, justifyContent: 'center' },
-  empty: { color: theme.colors.textMuted, textAlign: 'center', padding: 32 },
-  row: { height: 68, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border, backgroundColor: 'rgba(22,22,22,0.88)' },
-  rank: { width: 24, color: theme.colors.textMuted, textAlign: 'center' },
+  empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
+  row: { height: 68, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
+  rank: { width: 24, color: colors.textMuted, textAlign: 'center' },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#54332D' },
-  initial: { color: theme.colors.text, fontWeight: '700' },
-  name: { flex: 1, color: theme.colors.text, fontWeight: '600' },
-  xp: { color: theme.colors.textMuted },
+  initial: { color: colors.onPrimary, fontWeight: '700' },
+  name: { flex: 1, color: colors.text, fontWeight: '600' },
+  xp: { color: colors.textMuted },
 });

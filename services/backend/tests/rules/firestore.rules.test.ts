@@ -40,8 +40,11 @@ beforeEach(async () => {
     await setDoc(doc(db, 'reviews', 'published', 'comments', 'hidden'), { status: 'hidden' });
     await setDoc(doc(db, 'reviews', 'published', 'reactions', 'user-a'), { reaction: 'like' });
     await setDoc(doc(db, 'users', 'user-a'), { displayName: 'User A' });
+    await setDoc(doc(db, 'users', 'user-a', 'following', 'user-b'), { userId: 'user-b' });
     await setDoc(doc(db, '_otpChallenges', 'secret'), { phoneNumber: '+905551234567' });
     await setDoc(doc(db, '_otpRateLimits', 'secret'), { count: 1 });
+    await setDoc(doc(db, '_contentRateLimits', 'secret'), { count: 1 });
+    await setDoc(doc(db, '_idempotency', 'secret'), { active: true });
   });
 });
 
@@ -114,5 +117,14 @@ describe('Firestore security rules', () => {
     await assertFails(getDoc(doc(staffDb, '_otpChallenges', 'secret')));
     await assertFails(setDoc(doc(userDb, '_otpChallenges', 'new'), { status: 'pending' }));
     await assertFails(getDoc(doc(staffDb, '_otpRateLimits', 'secret')));
+  });
+
+  it('keeps social edges and mutation-control documents backend-owned', async () => {
+    const userDb = testEnvironment.authenticatedContext('user-a').firestore();
+    const staffDb = testEnvironment.authenticatedContext('staff', { role: 'admin' }).firestore();
+    await assertFails(getDoc(doc(userDb, 'users', 'user-a', 'following', 'user-b')));
+    await assertFails(setDoc(doc(userDb, 'users', 'user-a', 'following', 'user-c'), { userId: 'user-c' }));
+    await assertFails(getDoc(doc(staffDb, '_contentRateLimits', 'secret')));
+    await assertFails(getDoc(doc(staffDb, '_idempotency', 'secret')));
   });
 });

@@ -211,6 +211,72 @@ describe('authenticated session and paginated reads', () => {
     });
   });
 
+  it('writes social edges and applies XP and idempotency exactly once', async () => {
+    const first = await authenticatedUser();
+    const second = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Review Author',
+      username: 'review.author',
+      city: 'Istanbul',
+    }, first.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Reader',
+      username: 'review.reader',
+      city: 'Istanbul',
+    }, second.token);
+    const author = (await db.collection('users').where('username', '==', 'review.author').limit(1).get()).docs[0];
+    const reader = (await db.collection('users').where('username', '==', 'review.reader').limit(1).get()).docs[0];
+    if (!author || !reader) throw new Error('Expected both profiles to exist.');
+    await db.collection('venues').doc('demo-cafe').set({
+      name: 'Demo Cafe',
+      city: 'Istanbul',
+      status: 'active',
+    });
+
+    expect(await callFunction('followUser', { targetUserId: author.id }, second.token)).toEqual({ following: true });
+    expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(true);
+    expect((await author.ref.collection('followers').doc(reader.id).get()).exists).toBe(true);
+
+    const reviewCommand = {
+      idempotencyKey: 'review-command-0001',
+      venueId: 'demo-cafe',
+      rating: 5,
+      text: 'Exactly once',
+    };
+    const firstReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
+    const replayedReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
+    expect(replayedReview.id).toBe(firstReview.id);
+    expect((await author.ref.get()).get('xp')).toBe(50);
+    const friendsFeed = await callFunction<{ items: Array<{ id: string }> }>(
+      'getFeed',
+      { scope: 'friends', limit: 20 },
+      second.token,
+    );
+    expect(friendsFeed.items.map((item) => item.id)).toContain(firstReview.id);
+
+    const commentCommand = {
+      idempotencyKey: 'comment-command-001',
+      reviewId: firstReview.id,
+      text: 'Exactly once too',
+    };
+    await callFunction('addComment', commentCommand, second.token);
+    await callFunction('addComment', commentCommand, second.token);
+    expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(1);
+
+    const reactionCommand = {
+      idempotencyKey: 'reaction-command-01',
+      reviewId: firstReview.id,
+      reaction: 'like',
+    };
+    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({ active: true, reactionCount: 1 });
+    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({ active: true, reactionCount: 1 });
+    expect((await author.ref.get()).get('xp')).toBe(55);
+
+    expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({ following: false });
+    expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
+  });
+
   it('returns stable, non-overlapping cursors for feed, comments, and leaderboard', async () => {
     const { token } = await authenticatedUser();
     const db = getFirestore();

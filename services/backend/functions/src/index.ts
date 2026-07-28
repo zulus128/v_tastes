@@ -1,5 +1,7 @@
 export { healthCheck } from './modules/health/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
+export { followUser, unfollowUser } from './modules/social/functions';
+export { resetMonthlyXp } from './modules/leaderboard/schedules';
 export {
   completeOnboarding,
   createUserProfile,

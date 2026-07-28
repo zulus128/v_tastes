@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "2e709d4018a76d7cc654efe3f0d78af90e9dd06e",
-    "indexed_at": "2026-07-27T19:05:20Z",
+    "commit": "7dd5b4197615e53d78a6a796753bdacf8669d00b",
+    "indexed_at": "2026-07-27T22:14:39Z",
     "project": "Users-vadimkassin-Not_Cloud-tastes",
-    "nodes": 531,
-    "edges": 1028,
-    "original_size": 2359296,
-    "compressed_size": 134729,
+    "nodes": 749,
+    "edges": 1522,
+    "original_size": 3735552,
+    "compressed_size": 574592,
     "compression_level": 3
 }

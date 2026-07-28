@@ -28,9 +28,14 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM HUP
 trap 'echo "Backend processes stopped; closing Expo." >&2; exit 1' USR1
 
+import_flag=""
+if [ -d .firebase-data ]; then
+  import_flag="--import=.firebase-data"
+fi
+
 pnpm exec concurrently -k -n functions,emulators \
   "pnpm --filter @tastes/functions build:watch" \
-  "node scripts/run-firebase.mjs emulators:start --project demo-tastes --export-on-exit=.firebase-data" \
+  "node scripts/run-firebase.mjs emulators:start --project demo-tastes $import_flag --export-on-exit=.firebase-data" \
   </dev/null &
 backend_pid=$!
 

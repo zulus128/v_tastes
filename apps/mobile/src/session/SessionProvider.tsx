@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
+import { queryClient, queryPersister } from '../infrastructure/query';
 import { authenticatedPhase } from './model';
 
 export type SessionState =
@@ -40,6 +41,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<SessionState>({ status: 'booting', user: null });
 
   const logout = useCallback(async () => {
+    queryClient.clear();
+    await queryPersister.removeClient();
     await signOut(auth);
     setState({ status: 'anonymous', user: null });
   }, []);
@@ -78,6 +81,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => onAuthStateChanged(auth, (user) => {
     if (!user) {
+      queryClient.clear();
+      void queryPersister.removeClient();
       setState({ status: 'anonymous', user: null });
       return;
     }
@@ -112,4 +117,12 @@ export function useSession(): SessionContextValue {
 
 export function useTastesApi(): TastesApi {
   return useSession().api;
+}
+
+export function useAuthenticatedUserId(): string {
+  const { state } = useSession();
+  if (state.status !== 'authenticated') {
+    throw new Error('An authenticated session is required.');
+  }
+  return state.user.uid;
 }

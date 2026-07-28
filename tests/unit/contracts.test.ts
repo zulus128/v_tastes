@@ -14,10 +14,16 @@ import { describe, expect, it } from 'vitest';
 describe('public API contracts', () => {
   it('accepts a valid review', () => {
     expect(createReviewInputSchema.parse({
+      idempotencyKey: 'review-command-0001',
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Great place',
-    })).toEqual({ venueId: 'demo-cafe', rating: 5, text: 'Great place' });
+    })).toEqual({
+      idempotencyKey: 'review-command-0001',
+      venueId: 'demo-cafe',
+      rating: 5,
+      text: 'Great place',
+    });
   });
 
   it('rejects protected or malformed input', () => {
@@ -31,7 +37,12 @@ describe('public API contracts', () => {
 
   it('normalizes profile and reaction commands', () => {
     expect(createUserProfileInputSchema.parse({ displayName: '  Demo User  ' }).displayName).toBe('Demo User');
-    expect(reactToReviewInputSchema.parse({ reviewId: 'review-1', reaction: 'like' })).toEqual({
+    expect(reactToReviewInputSchema.parse({
+      idempotencyKey: 'reaction-command-001',
+      reviewId: 'review-1',
+      reaction: 'like',
+    })).toEqual({
+      idempotencyKey: 'reaction-command-001',
       reviewId: 'review-1',
       reaction: 'like',
     });
