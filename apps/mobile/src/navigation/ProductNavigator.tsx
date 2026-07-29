@@ -218,7 +218,7 @@ export function ProductNavigator({ user }: { user: User }) {
         </RootStack.Screen>
         <RootStack.Screen name="Recap">
           {({ navigation, route }) => (
-            <MonthlyRecapFlow mode={route.params.mode} onClose={navigation.goBack} />
+            <MonthlyRecapFlow mode={route.params.mode} onClose={navigation.goBack} user={user} />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="Leaderboard">
