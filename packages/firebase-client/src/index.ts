@@ -7,6 +7,8 @@ import type {
   CreateReviewInput,
   CreateUserProfileInput,
   DeleteFolderInput,
+  DiscoverFeed,
+  DiscoverPeopleResult,
   FeedItem,
   FavouritesResult,
   FollowResult,
@@ -14,8 +16,13 @@ import type {
   GetCommentsInput,
   GetFeedInput,
   GetLeaderboardInput,
+  GetPlaceInput,
+  GetPlaceReviewsInput,
+  GetVenuesInput,
   HealthCheckResult,
   LeaderboardEntry,
+  PlaceDetails,
+  PlaceReview,
   Page,
   ReactToReviewInput,
   RenameFolderInput,
@@ -25,6 +32,7 @@ import type {
   SaveVenueInput,
   SaveVenueResult,
   UnsaveVenueInput,
+  Venue,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
 } from '@tastes/contracts';
@@ -163,6 +171,16 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<ReactToReviewInput, ReactionResult>('reactToReview', input),
     getLeaderboard: (input: GetLeaderboardInput) =>
       invoke<GetLeaderboardInput, Page<LeaderboardEntry>>('getLeaderboard', input),
+    getDiscoverFeed: () =>
+      invoke<Record<string, never>, DiscoverFeed>('getDiscoverFeed', {}),
+    getDiscoverPeople: () =>
+      invoke<Record<string, never>, DiscoverPeopleResult>('getDiscoverPeople', {}),
+    getVenues: (input: GetVenuesInput) =>
+      invoke<GetVenuesInput, Page<Venue>>('getVenues', input),
+    getPlace: (input: GetPlaceInput) =>
+      invoke<GetPlaceInput, PlaceDetails>('getPlace', input),
+    getPlaceReviews: (input: GetPlaceReviewsInput) =>
+      invoke<GetPlaceReviewsInput, PlaceReview[]>('getPlaceReviews', input),
   };
 }
 

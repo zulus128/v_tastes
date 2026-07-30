@@ -1,6 +1,11 @@
+import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -21,6 +26,13 @@ import sushiImage from '../../../assets/discover/sushi.jpg';
 import tacosImage from '../../../assets/discover/tacos.jpg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import {
+  type DiscoverVenueFilter,
+  useDiscoverFeed,
+  useDiscoverPeople,
+  useDiscoverVenues,
+  useToggleFollow,
+} from './api';
+import {
   FavouritesPane,
   SaveToFolderSheet,
   type SaveablePlace,
@@ -29,6 +41,7 @@ import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
+type MapFilter = DiscoverVenueFilter & { key: string; label: string };
 
 type Place = {
   venueId: string;
@@ -42,57 +55,90 @@ type Place = {
   image: ImageSourcePropType;
 };
 
-const places: Place[] = [
-  {
-    venueId: 'joes-shanghai',
-    name: "Joe's Shanghai Soup Dumpling Restaurant",
-    address: '2972 Westheimer Rd. Santa Ana, Illinois 85486',
-    category: 'Chinese',
-    price: '$$',
-    distance: '0,9 km',
-    rating: '4.5',
-    reviews: '821 reviews',
-    image: restaurantImage,
-  },
-  {
-    venueId: 'coffee-bar-760',
-    name: 'Coffee Bar 760',
-    address: '410 Spring St, NY 10013',
-    category: 'Café',
-    price: '$',
-    distance: '0,4 km',
-    rating: '4.2',
-    reviews: '92 reviews',
-    image: cafeImage,
-  },
-  {
-    venueId: 'tacos-la-brea',
-    name: 'Tacos La Brea',
-    address: '6051 W 3rd St, Los Angeles',
-    category: 'Mexican',
-    price: '$',
-    distance: '2,1 km',
-    rating: '4.6',
-    reviews: '240 reviews',
-    image: tacosImage,
-  },
-];
+const venueImages: Record<string, ImageSourcePropType> = {
+  sushi: sushiImage,
+  restaurant: restaurantImage,
+  lounge: loungeImage,
+  tacos: tacosImage,
+  cafe: cafeImage,
+};
 
-const gridPlaces = [
-  { ...places[0], distance: '0,9 km' },
-  { ...places[0], venueId: 'morimoto', name: 'Wasabi by Morimoto', rating: '4.7', distance: '1,8 km', image: sushiImage },
-  { ...places[0], venueId: 'gemini-750', name: 'Gemini750 Restaurant', rating: '4.3', distance: '1,2 km', image: loungeImage },
-  places[2],
-  places[1],
-];
+function venueImage(imageKey?: string | null): ImageSourcePropType {
+  if (imageKey && venueImages[imageKey]) return venueImages[imageKey];
+  return restaurantImage;
+}
 
-const people = [
-  { name: 'Kristin Watson', handle: '@kristinw', tastes: 'Tacos · BBQ', growth: '+412 this week', image: avatarKristin },
-  { name: 'Cameron Williamson', handle: '@cameronw', tastes: 'Italian · Pasta', growth: '+318 this week', image: avatarCameron },
-  { name: 'Wade Warren', handle: '@wadew', tastes: 'Sushi · Ramen', growth: '+206 this week', image: avatarWade },
-];
+const avatarImages: Record<string, ImageSourcePropType> = {
+  kristin: avatarKristin,
+  cameron: avatarCameron,
+  wade: avatarWade,
+};
 
-export function DiscoverScreen({ userId }: { userId: string }) {
+function avatarSource(photoUrl: string | null, avatarKey: string | null): ImageSourcePropType {
+  if (photoUrl) return { uri: photoUrl };
+  if (avatarKey && avatarImages[avatarKey]) return avatarImages[avatarKey];
+  return avatarKristin;
+}
+
+function formatDistance(km?: number): string {
+  return `${(km ?? 0).toFixed(1).replace('.', ',')} km`;
+}
+
+function formatCount(value: number): string {
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}K`;
+  return String(value);
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.max(1, Math.round(diffMs / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+function joinedLabel(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60_000));
+  if (days <= 0) return 'joined Today';
+  if (days === 1) return 'joined 1d ago';
+  return `joined ${days}d ago`;
+}
+
+function forYouReason(venue: Venue, index: number): string {
+  if (!venue.category) return 'Popular near you';
+  return index % 2 === 0 ? `Because you ❤️ ${venue.category}` : `Popular ${venue.category} pick`;
+}
+
+function venueToPlace(venue: Venue): Place {
+  return {
+    venueId: venue.id,
+    name: venue.name,
+    address: venue.address ?? venue.city,
+    category: venue.category ?? '',
+    price: '$'.repeat(venue.priceLevel ?? 1),
+    distance: formatDistance(venue.distanceKm),
+    rating: (venue.rating ?? 0).toFixed(1),
+    reviews: `${venue.reviewCount ?? 0} reviews`,
+    image: venueImage(venue.imageKey),
+  };
+}
+
+const MAP_BOUNDS = { latMin: 40.95, latMax: 41.08, lonMin: 28.96, lonMax: 29.08 };
+
+function clampPercent(value: number): number {
+  return Math.min(88, Math.max(8, value));
+}
+
+function projectToMap(latitude?: number, longitude?: number): { left: `${number}%`; top: `${number}%` } {
+  if (latitude == null || longitude == null) return { left: '50%', top: '50%' };
+  const left = clampPercent(((longitude - MAP_BOUNDS.lonMin) / (MAP_BOUNDS.lonMax - MAP_BOUNDS.lonMin)) * 100);
+  const top = clampPercent(((MAP_BOUNDS.latMax - latitude) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * 100);
+  return { left: `${left}%`, top: `${top}%` };
+}
+
+export function DiscoverScreen({ onOpenPlace, userId }: { onOpenPlace: (venueId: string) => void; userId: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<DiscoverTab>('trending');
@@ -100,10 +146,25 @@ export function DiscoverScreen({ userId }: { userId: string }) {
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(favourites.data?.places.map((place) => place.venueId) ?? []);
+  const feedQuery = useDiscoverFeed(userId);
+  const toggleFollow = useToggleFollow(userId);
+  const [followPendingId, setFollowPendingId] = useState<string | null>(null);
 
   function selectTab(value: DiscoverTab) {
     setTab(value);
     setFavouritesOpen(false);
+  }
+
+  function handleToggleFollow(person: DiscoverPerson) {
+    if (person.userId === userId || toggleFollow.isPending) return;
+    setFollowPendingId(person.userId);
+    toggleFollow.mutate(
+      { targetUserId: person.userId, following: person.following },
+      {
+        onError: (error) => Alert.alert('Could not update follow', apiErrorMessage(error)),
+        onSettled: () => setFollowPendingId(null),
+      },
+    );
   }
 
   return (
@@ -127,19 +188,39 @@ export function DiscoverScreen({ userId }: { userId: string }) {
       </View>
 
       {tab === 'trending' ? (
-        favourites.isPending
-          ? <TrendingLoading />
-          : <TrendingFeed onSave={setSaveTarget} savedVenueIds={savedVenueIds} />
+        feedQuery.isPending ? (
+          <TrendingLoading />
+        ) : feedQuery.isError ? (
+          <View style={styles.centerState}>
+            <Text style={styles.stateTitle}>Could not load Discover</Text>
+            <Text style={styles.stateCopy}>{feedQuery.error.message}</Text>
+            <Pressable onPress={() => void feedQuery.refetch()} style={styles.retry}>
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <TrendingFeed
+            feed={feedQuery.data}
+            followPending={toggleFollow.isPending}
+            followPendingId={followPendingId}
+            onSave={setSaveTarget}
+            onOpenPlace={onOpenPlace}
+            onToggleFollow={handleToggleFollow}
+            savedVenueIds={savedVenueIds}
+          />
+        )
       ) : null}
-      {tab === 'places' && favouritesOpen ? <FavouritesPane userId={userId} /> : null}
+      {tab === 'places' && favouritesOpen ? <FavouritesPane onOpenPlace={onOpenPlace} userId={userId} /> : null}
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           onOpenFavourites={() => setFavouritesOpen(true)}
+          onOpenPlace={onOpenPlace}
           onSave={setSaveTarget}
           savedVenueIds={savedVenueIds}
+          userId={userId}
         />
       ) : null}
-      {tab === 'people' ? <PeopleFeed /> : null}
+      {tab === 'people' ? <PeopleFeed userId={userId} /> : null}
       <SaveToFolderSheet
         onClose={() => setSaveTarget(null)}
         place={saveTarget}
@@ -153,6 +234,16 @@ export function DiscoverScreen({ userId }: { userId: string }) {
 function TrendingLoading() {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const pulse = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 0.82, duration: 780, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.45, duration: 780, useNativeDriver: true }),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
 
   return (
     <View
@@ -160,163 +251,242 @@ function TrendingLoading() {
       accessibilityState={{ busy: true }}
       style={styles.trendingLoading}
     >
-      <View style={styles.loadingHero} />
-      <View style={styles.loadingTitle} />
-      <View style={styles.loadingCard} />
-      <View style={styles.loadingCard} />
-      <View style={styles.loadingCard} />
+      <Animated.View style={[styles.loadingHero, { opacity: pulse }]} />
+      <Animated.View style={[styles.loadingTitle, { opacity: pulse }]} />
+      <Animated.View style={[styles.loadingCard, { opacity: pulse }]} />
+      <Animated.View style={[styles.loadingCard, { opacity: pulse }]} />
+      <Animated.View style={[styles.loadingCard, { opacity: pulse }]} />
     </View>
   );
 }
 
 function TrendingFeed({
+  feed,
+  followPending,
+  followPendingId,
   onSave,
+  onOpenPlace,
+  onToggleFollow,
   savedVenueIds,
 }: {
+  feed: DiscoverFeed;
+  followPending: boolean;
+  followPendingId: string | null;
   onSave: (place: SaveablePlace) => void;
+  onOpenPlace: (venueId: string) => void;
+  onToggleFollow: (person: DiscoverPerson) => void;
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { hero, topReviewer } = feed;
+  const hasContent = Boolean(
+    hero
+    || topReviewer
+    || feed.trending.length
+    || feed.newSpots.length
+    || feed.mostReviewed.length
+    || feed.forYou.length
+    || feed.hiddenGems.length
+    || feed.popularReviews.length,
+  );
+
+  if (!hasContent) {
+    return (
+      <View style={styles.centerState}>
+        <Text style={styles.stateTitle}>Nothing to discover yet</Text>
+        <Text style={styles.stateCopy}>New places and reviews will appear here soon.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       contentContainerStyle={styles.feedContent}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.hero}>
-        <Image source={sushiImage} style={styles.coverImage} />
-        <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.88)']}
-          locations={[0.34, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.hotChip}><Text style={styles.hotChipText}>🔥 Hot in your area</Text></View>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>Wasabi by Morimoto</Text>
-          <Text style={styles.heroMeta}>Japanese · 1,8 km</Text>
-          <View style={styles.inlineMeta}>
-            <RatingPill value="4.7" />
-            <Text style={styles.imageMetaText}>512 reviews</Text>
-          </View>
-        </View>
-      </View>
-
-      <SectionLabel title="Trending near you" subtitle="Highly rated within 1 mi" />
-      <ScrollView
-        contentContainerStyle={styles.horizontalContent}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        <TrendingTile image={sushiImage} name="Wasabi by Morimoto" meta="Japanese · $$$" rating="4.7" />
-        <TrendingTile image={tacosImage} name="Tacos La Brea" meta="Mexican · $" rating="4.6" />
-        <TrendingTile image={restaurantImage} name="Gemini750" meta="Italian · $$" rating="4.4" />
-      </ScrollView>
-
-      <SectionLabel title="New spots" subtitle="Just opened in your area" />
-      <View style={styles.placeRows}>
-        {places.map((place) => (
-          <PlaceRow
-            key={place.name}
-            place={place}
-            saved={savedVenueIds.has(place.venueId)}
-            onSave={() => onSave({ venueId: place.venueId, name: place.name })}
+      {hero ? (
+        <Pressable onPress={() => onOpenPlace(hero.id)} style={styles.hero}>
+          <Image source={venueImage(hero.imageKey)} style={styles.coverImage} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.88)']}
+            locations={[0.34, 1]}
+            style={StyleSheet.absoluteFill}
           />
-        ))}
-      </View>
-
-      <SectionLabel title="Most reviewed" subtitle="What everyone's talking about" />
-      <View style={styles.grid}>
-        {gridPlaces.map((place) => <GridPlace key={place.name} place={place} />)}
-        <Pressable style={({ pressed }) => [styles.seeMore, pressed && styles.pressed]}>
-          <View style={styles.plusCircle}><Text style={styles.plusText}>+</Text></View>
-          <Text style={styles.seeMoreTitle}>See more</Text>
-          <Text style={styles.seeMoreSubtitle}>12+ more spots</Text>
+          <View style={styles.hotChip}><Text style={styles.hotChipText}>🔥 Hot in your area</Text></View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle}>{hero.name}</Text>
+            <Text style={styles.heroMeta}>{hero.category} · {formatDistance(hero.distanceKm)}</Text>
+            <View style={styles.inlineMeta}>
+              <RatingPill value={(hero.rating ?? 0).toFixed(1)} />
+              <Text style={styles.imageMetaText}>{hero.reviewCount ?? 0} reviews</Text>
+            </View>
+          </View>
         </Pressable>
-      </View>
+      ) : null}
 
-      <SectionLabel title="Popular reviews" subtitle="What people are saying right now" />
-      <View style={styles.reviewList}>
-        <ReviewCard
-          author="Cameron Williamson"
-          avatar={avatarCameron}
-          image={loungeImage}
-          place="Gemini750 Restaurant"
-          rating="4.5"
-          text="The hand-cut tagliolini is unreal — go on a Tuesday for the chef's special. Came back twice this week already."
-          time="2h ago"
-        />
-        <ReviewCard
-          author="Devon Lane"
-          avatar={avatarWade}
-          image={cafeImage}
-          place="Coffee Bar 760"
-          rating="4.0"
-          text="Tucked-away matcha spot with the smoothest pull I've had in months. Ask for the house oat milk."
-          time="4h ago"
-        />
-        <ReviewCard
-          author="Wade Warren"
-          avatar={avatarKristin}
-          image={restaurantImage}
-          place="Joe's Shanghai Soup Dumpling Restaurant"
-          rating="5.0"
-          text="16 folds, perfect every time. Skip the line, sit at the bar, and order the pork and crab together."
-          time="4h ago"
-        />
-      </View>
+      {feed.trending.length > 0 ? (
+        <>
+          <SectionLabel title="Trending near you" subtitle="Highly rated within 1 mi" />
+          <ScrollView
+            contentContainerStyle={styles.horizontalContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {feed.trending.map((venue) => (
+              <TrendingTile
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                image={venueImage(venue.imageKey)}
+                meta={`${venue.category ?? ''} · ${'$'.repeat(venue.priceLevel ?? 1)}`}
+                name={venue.name}
+                rating={(venue.rating ?? 0).toFixed(1)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
 
-      <SectionLabel title="Popular reviewer" subtitle="Trusted voice in your neighborhood" />
-      <TopReviewer />
+      {feed.newSpots.length > 0 ? (
+        <>
+          <SectionLabel title="New spots" subtitle="Just opened in your area" />
+          <View style={styles.placeRows}>
+            {feed.newSpots.map((venue) => (
+              <PlaceRow
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                onSave={() => onSave({ venueId: venue.id, name: venue.name })}
+                place={venueToPlace(venue)}
+                saved={savedVenueIds.has(venue.id)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
-      <SectionLabel title="For you" subtitle="Picked from your tastes & saves" />
-      <ScrollView
-        contentContainerStyle={styles.horizontalContent}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        <ForYouCard image={restaurantImage} reason="Because you ❤️ Italian" place={places[0]} />
-        <ForYouCard image={sushiImage} reason="Saved for date night" place={{ ...places[0], venueId: 'morimoto', name: 'Wasabi by Morimoto', rating: '4.7', reviews: '512' }} />
-        <ForYouCard image={tacosImage} reason="Popular near you" place={places[2]} />
-      </ScrollView>
+      {feed.mostReviewed.length > 0 ? (
+        <>
+          <SectionLabel title="Most reviewed" subtitle="What everyone's talking about" />
+          <View style={styles.grid}>
+            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+          </View>
+        </>
+      ) : null}
 
-      <SectionLabel title="Hidden gems" subtitle="High ratings, low review counts" />
-      <View style={styles.gemList}>
-        <HiddenGem place={places[2]} />
-        <HiddenGem place={places[1]} />
-      </View>
+      {feed.popularReviews.length > 0 ? (
+        <>
+          <SectionLabel title="Popular reviews" subtitle="What people are saying right now" />
+          <View style={styles.reviewList}>
+            {feed.popularReviews.map((review) => (
+              <ReviewCard
+                author={review.authorDisplayName}
+                avatar={avatarSource(review.authorPhotoUrl, review.authorAvatarKey)}
+                image={venueImage(review.venueImageKey)}
+                key={review.id}
+                onOpen={() => onOpenPlace(review.venueId)}
+                place={review.venueName}
+                rating={review.rating.toFixed(1)}
+                reactionCount={review.reactionCount}
+                text={review.text}
+                time={timeAgo(review.createdAt)}
+                commentCount={review.commentCount}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {topReviewer ? (
+        <>
+          <SectionLabel title="Popular reviewer" subtitle="Trusted voice in your neighborhood" />
+          <TopReviewer
+            onFollow={() => onToggleFollow(topReviewer)}
+            pending={followPending || followPendingId === topReviewer.userId}
+            person={topReviewer}
+          />
+        </>
+      ) : null}
+
+      {feed.forYou.length > 0 ? (
+        <>
+          <SectionLabel title="For you" subtitle="Picked from your tastes & saves" />
+          <ScrollView
+            contentContainerStyle={styles.horizontalContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {feed.forYou.map((venue, index) => (
+              <ForYouCard
+                image={venueImage(venue.imageKey)}
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                place={venueToPlace(venue)}
+                reason={forYouReason(venue, index)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+
+      {feed.hiddenGems.length > 0 ? (
+        <>
+          <SectionLabel title="Hidden gems" subtitle="High ratings, low review counts" />
+          <View style={styles.gemList}>
+            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+          </View>
+        </>
+      ) : null}
     </ScrollView>
   );
 }
 
 function PlacesMap({
   onOpenFavourites,
+  onOpenPlace,
   onSave,
   savedVenueIds,
+  userId,
 }: {
   onOpenFavourites: () => void;
+  onOpenPlace: (venueId: string) => void;
   onSave: (place: SaveablePlace) => void;
   savedVenueIds: Set<string>;
+  userId: string;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
-  const mapPlace: Place = {
-    ...places[0],
-    venueId: 'gemini-750',
-    name: 'Gemini750 Restaurant',
-    rating: '4.4',
-    reviews: '389 reviews',
-    image: loungeImage,
-  };
+  const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
+  const catalogueQuery = useDiscoverVenues(userId);
+  const venuesQuery = useDiscoverVenues(userId, activeFilter ?? {});
+  const catalogueVenues = catalogueQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+
+  const categories = useMemo(
+    () => [...new Set(catalogueVenues.map((venue) => venue.category).filter((value): value is string => Boolean(value)))],
+    [catalogueVenues],
+  );
+  const filters = useMemo<MapFilter[]>(
+    () => [
+      { key: 'trending', label: '🔥 Trending', tag: 'trending' },
+      ...categories.map((category) => ({ key: `category:${category}`, label: category, category })),
+    ],
+    [categories],
+  );
+
+  const filtered = venues.filter((venue) => {
+    const query = search.trim().toLowerCase();
+    if (query && !venue.name.toLowerCase().includes(query)) return false;
+    return true;
+  });
 
   return (
     <View style={styles.mapScreen}>
       <Image source={mapImage} style={styles.mapImage} />
-      <MapPin left="12%" top="12%" value="4.7" />
-      <MapPin left="48%" top="16%" value="4.6" />
-      <MapPin left="16%" top="48%" value="4.3" />
-      <MapPin left="66%" top="50%" value="4.2" />
+      {filtered.map((venue) => {
+        const position = projectToMap(venue.latitude, venue.longitude);
+        return <MapPin key={venue.id} left={position.left} onPress={() => onOpenPlace(venue.id)} top={position.top} value={(venue.rating ?? 0).toFixed(1)} />;
+      })}
       <View style={styles.mapControls}>
         <Text style={styles.mapControl}>+</Text>
         <Text style={styles.mapControl}>−</Text>
@@ -347,38 +517,85 @@ function PlacesMap({
           horizontal
           showsHorizontalScrollIndicator={false}
         >
-          {['🔥 Trending', '🍴 Restaurant', '☕ Cafe', '▽ Bar', '✓ My Reviews'].map((label) => (
-            <Pressable key={label} style={styles.filterChip}>
-              <Text style={styles.filterText}>{label}</Text>
-            </Pressable>
-          ))}
+          {filters.map((filter) => {
+            const active = activeFilter?.key === filter.key;
+            return (
+              <Pressable
+                key={filter.key}
+                onPress={() => setActiveFilter(active ? null : filter)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterText, active && styles.filterTextActive]}>{filter.label}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
-        <PlaceRow
-          onSave={() => onSave({ venueId: mapPlace.venueId, name: mapPlace.name })}
-          place={mapPlace}
-          saved={savedVenueIds.has(mapPlace.venueId)}
-        />
+        {venuesQuery.isPending ? (
+          <View style={styles.placesStatus}><ActivityIndicator color={colors.primary} /></View>
+        ) : venuesQuery.isError ? (
+          <View style={styles.placesStatus}>
+            <Text style={styles.placesStatusText}>Could not load places.</Text>
+            <Pressable onPress={() => void venuesQuery.refetch()} style={styles.inlineRetry}>
+              <Text style={styles.inlineRetryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.placesStatus}><Text style={styles.placesStatusText}>No places match your search.</Text></View>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.placesList}>
+            <View style={styles.placesListContent}>
+              {filtered.map((venue) => (
+                <PlaceRow
+                  key={venue.id}
+                  onOpen={() => onOpenPlace(venue.id)}
+                  onSave={() => onSave({ venueId: venue.id, name: venue.name })}
+                  place={venueToPlace(venue)}
+                  saved={savedVenueIds.has(venue.id)}
+                />
+              ))}
+              {venuesQuery.hasNextPage ? (
+                <Pressable
+                  disabled={venuesQuery.isFetchingNextPage}
+                  onPress={() => void venuesQuery.fetchNextPage()}
+                  style={styles.loadMore}
+                >
+                  {venuesQuery.isFetchingNextPage
+                    ? <ActivityIndicator color={colors.primary} />
+                    : <Text style={styles.loadMoreText}>Load more places</Text>}
+                </Pressable>
+              ) : null}
+            </View>
+          </ScrollView>
+        )}
       </View>
     </View>
   );
 }
 
-function PeopleFeed() {
+function PeopleFeed({ userId }: { userId: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState('');
-  const [following, setFollowing] = useState<Set<string>>(() => new Set());
+  const peopleQuery = useDiscoverPeople(userId);
+  const toggleFollow = useToggleFollow(userId);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
-  function toggleFollow(name: string) {
-    setFollowing((current) => {
-      const next = new Set(current);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
+  function handleFollow(person: DiscoverPerson) {
+    if (person.userId === userId || toggleFollow.isPending) return;
+    setPendingId(person.userId);
+    toggleFollow.mutate(
+      { targetUserId: person.userId, following: person.following },
+      {
+        onError: (error) => Alert.alert('Could not update follow', apiErrorMessage(error)),
+        onSettled: () => setPendingId(null),
+      },
+    );
   }
 
   const matches = (name: string) => name.toLowerCase().includes(query.trim().toLowerCase());
+  const trending = (peopleQuery.data?.trending ?? []).filter((person) => matches(person.displayName));
+  const freshPeople = (peopleQuery.data?.new ?? []).filter((person) => matches(person.displayName));
+  const suggested = (peopleQuery.data?.suggested ?? []).filter((person) => matches(person.displayName));
 
   return (
     <ScrollView contentContainerStyle={styles.peopleContent} showsVerticalScrollIndicator={false}>
@@ -393,50 +610,78 @@ function PeopleFeed() {
         />
       </View>
 
-      <PeopleSectionHeader title="🔥 Trending tastemakers" subtitle="Gaining followers this week" />
-      <ScrollView
-        contentContainerStyle={styles.peopleCarousel}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {people.filter((person) => matches(person.name)).map((person) => (
-          <TastemakerCard
-            key={person.name}
-            following={following.has(person.name)}
-            onFollow={() => toggleFollow(person.name)}
-            person={person}
-          />
-        ))}
-      </ScrollView>
+      {peopleQuery.isPending ? (
+        <View style={styles.centerState}><Text style={styles.stateCopy}>Loading people…</Text></View>
+      ) : peopleQuery.isError ? (
+        <View style={styles.centerState}>
+          <Text style={styles.stateTitle}>Could not load people</Text>
+          <Text style={styles.stateCopy}>{peopleQuery.error.message}</Text>
+          <Pressable onPress={() => void peopleQuery.refetch()} style={styles.retry}>
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {trending.length > 0 ? (
+            <>
+              <PeopleSectionHeader subtitle="Gaining followers this week" title="🔥 Trending tastemakers" />
+              <ScrollView
+                contentContainerStyle={styles.peopleCarousel}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {trending.map((person) => (
+                  <TastemakerCard
+                    following={person.following}
+                    key={person.userId}
+                    onFollow={() => handleFollow(person)}
+                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    person={person}
+                  />
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
 
-      <PeopleSectionHeader title="New on Tastes" subtitle="Just joined the community" />
-      <View style={styles.compactPeople}>
-        {[
-          { ...people[1], name: 'Luke Cooper', tastes: 'Coffee · Brunch · joined Today' },
-          { ...people[2], name: 'Brooklyn Simmons', tastes: 'Steak · Wine · joined 2d ago' },
-          { ...people[0], name: 'Martin Baena', tastes: 'Vegan · Bakery · joined 3d ago' },
-        ].filter((person) => matches(person.name)).map((person) => (
-          <CompactPerson
-            key={person.name}
-            following={following.has(person.name)}
-            onFollow={() => toggleFollow(person.name)}
-            person={person}
-          />
-        ))}
-      </View>
+          {freshPeople.length > 0 ? (
+            <>
+              <PeopleSectionHeader subtitle="Just joined the community" title="New on Tastes" />
+              <View style={styles.compactPeople}>
+                {freshPeople.map((person) => (
+                  <CompactPerson
+                    following={person.following}
+                    key={person.userId}
+                    onFollow={() => handleFollow(person)}
+                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    person={person}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
 
-      <PeopleSectionHeader title="Similar to people you follow" subtitle="Based on mutual connections" />
-      <View style={styles.profileList}>
-        {people.slice(1).filter((person) => matches(person.name)).map((person, index) => (
-          <ProfileSuggestion
-            key={person.name}
-            following={following.has(person.name)}
-            index={index}
-            onFollow={() => toggleFollow(person.name)}
-            person={person}
-          />
-        ))}
-      </View>
+          {suggested.length > 0 ? (
+            <>
+              <PeopleSectionHeader subtitle="Based on mutual connections" title="Similar to people you follow" />
+              <View style={styles.profileList}>
+                {suggested.map((person) => (
+                  <ProfileSuggestion
+                    following={person.following}
+                    key={person.userId}
+                    onFollow={() => handleFollow(person)}
+                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    person={person}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {trending.length === 0 && freshPeople.length === 0 && suggested.length === 0 ? (
+            <View style={styles.centerState}><Text style={styles.stateCopy}>No people match your search.</Text></View>
+          ) : null}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -458,11 +703,11 @@ function RatingPill({ value }: { value: string }) {
   return <View style={styles.ratingPill}><Text style={styles.ratingText}>★ {value}</Text></View>;
 }
 
-function TrendingTile({ image, meta, name, rating }: { image: ImageSourcePropType; meta: string; name: string; rating: string }) {
+function TrendingTile({ image, meta, name, onOpen, rating }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.trendingTile}>
+    <Pressable onPress={onOpen} style={styles.trendingTile}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
       <View style={styles.tileRating}><RatingPill value={rating} /></View>
@@ -470,20 +715,20 @@ function TrendingTile({ image, meta, name, rating }: { image: ImageSourcePropTyp
         <Text numberOfLines={1} style={styles.tileTitle}>{name}</Text>
         <Text style={styles.tileMeta}>{meta}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function PlaceRow({ onSave, place, saved }: { onSave: () => void; place: Place; saved: boolean }) {
+function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.placeRow}>
-      <View>
+      <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
         <View style={styles.newChip}><Text style={styles.newChipText}>NEW</Text></View>
-      </View>
-      <View style={styles.placeInfo}>
+      </Pressable>
+      <Pressable onPress={onOpen} style={styles.placeInfo}>
         <Text numberOfLines={1} style={styles.placeName}>{place.name}</Text>
         <Text numberOfLines={2} style={styles.placeAddress}>{place.address}</Text>
         <View style={styles.inlineMeta}>
@@ -495,7 +740,7 @@ function PlaceRow({ onSave, place, saved }: { onSave: () => void; place: Place; 
             <View key={chip} style={styles.infoChip}><Text style={styles.infoChipText}>{chip}</Text></View>
           ))}
         </View>
-      </View>
+      </Pressable>
       <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} hitSlop={8} onPress={onSave}>
         <BookmarkIcon color={saved ? colors.primary : colors.text} height={20} width={20} />
       </Pressable>
@@ -503,11 +748,11 @@ function PlaceRow({ onSave, place, saved }: { onSave: () => void; place: Place; 
   );
 }
 
-function GridPlace({ place }: { place: Place }) {
+function GridPlace({ onOpen, place }: { onOpen: () => void; place: Place }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.gridCard}>
+    <Pressable onPress={onOpen} style={styles.gridCard}>
       <Image source={place.image} style={styles.gridImage} />
       <View style={styles.gridBody}>
         <Text numberOfLines={1} style={styles.gridTitle}>{place.name}</Text>
@@ -516,7 +761,7 @@ function GridPlace({ place }: { place: Place }) {
           <Text style={styles.gridMeta}>{place.distance}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -526,21 +771,27 @@ function ReviewCard({
   image,
   place,
   rating,
+  reactionCount,
   text,
   time,
+  commentCount,
+  onOpen,
 }: {
   author: string;
   avatar: ImageSourcePropType;
   image: ImageSourcePropType;
   place: string;
   rating: string;
+  reactionCount: number;
   text: string;
   time: string;
+  commentCount: number;
+  onOpen: () => void;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.reviewCard}>
+    <Pressable onPress={onOpen} style={styles.reviewCard}>
       <Image source={image} style={styles.reviewImage} />
       <View style={styles.reviewBody}>
         <View style={styles.reviewHead}>
@@ -553,19 +804,18 @@ function ReviewCard({
         </View>
         <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
         <View style={styles.reviewFooter}>
-          <Text style={styles.reviewAction}>♥ 12</Text>
-          <Text style={styles.reviewAction}>◯ 5</Text>
+          <Text style={styles.reviewAction}>♥ {reactionCount}</Text>
+          <Text style={styles.reviewAction}>◯ {commentCount}</Text>
           <Text style={styles.reviewTime}>{time}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function TopReviewer() {
+function TopReviewer({ onFollow, pending, person }: { onFollow: () => void; pending: boolean; person: DiscoverPerson }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [following, setFollowing] = useState(false);
   return (
     <LinearGradient
       colors={['rgba(184,47,41,0.28)', colors.surface]}
@@ -575,19 +825,21 @@ function TopReviewer() {
     >
       <View style={styles.reviewerHead}>
         <View>
-          <Image source={avatarKristin} style={styles.reviewerAvatar} />
+          <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.reviewerAvatar} />
           <View style={styles.reviewerBadge}><Text style={styles.reviewerBadgeText}>★</Text></View>
         </View>
         <View style={styles.reviewerCopy}>
           <Text style={styles.topReviewer}>★ Top reviewer</Text>
-          <Text style={styles.reviewerName}>Kristin Watson</Text>
-          <Text style={styles.reviewerHandle}>@kristinw</Text>
+          <Text style={styles.reviewerName}>{person.displayName}</Text>
+          <Text style={styles.reviewerHandle}>{person.username ? `@${person.username}` : ''}</Text>
         </View>
       </View>
-      <Text style={styles.reviewerMeta}>Tacos · BBQ · 87 reviews this month</Text>
+      <Text style={styles.reviewerMeta}>
+        {person.favoriteCuisines.join(' · ') || 'Local tastemaker'} · {person.reviewCount} reviews
+      </Text>
       <View style={styles.reviewerButtons}>
-        <Pressable onPress={() => setFollowing((value) => !value)} style={styles.followWide}>
-          <Text style={styles.followWideText}>{following ? 'Following' : 'Follow'}</Text>
+        <Pressable disabled={pending} onPress={onFollow} style={[styles.followWide, pending && styles.pressed]}>
+          <Text style={styles.followWideText}>{person.following ? 'Following' : 'Follow'}</Text>
         </Pressable>
         <Pressable style={styles.profileButton}><Text style={styles.profileButtonText}>View profile</Text></Pressable>
       </View>
@@ -595,11 +847,11 @@ function TopReviewer() {
   );
 }
 
-function ForYouCard({ image, place, reason }: { image: ImageSourcePropType; place: Place; reason: string }) {
+function ForYouCard({ image, onOpen, place, reason }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.forYouCard}>
+    <Pressable onPress={onOpen} style={styles.forYouCard}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']} style={StyleSheet.absoluteFill} />
       <View style={styles.reasonChip}><Text style={styles.reasonText}>{reason}</Text></View>
@@ -608,33 +860,33 @@ function ForYouCard({ image, place, reason }: { image: ImageSourcePropType; plac
         <Text style={styles.forYouMeta}>{place.category} · {place.distance}</Text>
         <View style={styles.inlineMeta}><RatingPill value={place.rating} /><Text style={styles.imageMetaText}>{place.reviews}</Text></View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function HiddenGem({ place }: { place: Place }) {
+function HiddenGem({ onOpen, place }: { onOpen: () => void; place: Place }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.gemCard}>
+    <Pressable onPress={onOpen} style={styles.gemCard}>
       <Image source={place.image} style={styles.gemImage} />
       <View style={styles.gemCopy}>
         <View style={styles.gemTop}><Text style={styles.gemBadge}>💎 GEM</Text><Text style={styles.gemReviews}>only {place.reviews}</Text></View>
         <Text style={styles.gemName}>{place.name}</Text>
         <View style={styles.inlineMeta}><RatingPill value={place.rating} /><Text style={styles.gemMeta}>{place.category} · {place.price} · {place.distance}</Text></View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function MapPin({ left, top, value }: { left: `${number}%`; top: `${number}%`; value: string }) {
+function MapPin({ left, onPress, top, value }: { left: `${number}%`; onPress: () => void; top: `${number}%`; value: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.mapPin, { left, top }]}>
+    <Pressable onPress={onPress} style={[styles.mapPin, { left, top }]}>
       <Text style={styles.mapPinText}>{value}</Text>
       <View style={styles.mapPinTip} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -652,11 +904,15 @@ function PeopleSectionHeader({ subtitle, title }: { subtitle: string; title: str
   );
 }
 
-function FollowButton({ following, onPress }: { following: boolean; onPress: () => void }) {
+function FollowButton({ following, onPress, pending }: { following: boolean; onPress: () => void; pending: boolean }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onPress} style={[styles.followButton, following && styles.followingButton]}>
+    <Pressable
+      disabled={pending}
+      onPress={onPress}
+      style={[styles.followButton, following && styles.followingButton, pending && styles.pressed]}
+    >
       <Text style={[styles.followButtonText, following && styles.followingButtonText]}>{following ? 'Following' : 'Follow'}</Text>
     </Pressable>
   );
@@ -665,21 +921,23 @@ function FollowButton({ following, onPress }: { following: boolean; onPress: () 
 function TastemakerCard({
   following,
   onFollow,
+  pending,
   person,
 }: {
   following: boolean;
   onFollow: () => void;
-  person: typeof people[number];
+  pending: boolean;
+  person: DiscoverPerson;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <LinearGradient colors={['rgba(184,47,41,0.35)', colors.surface]} style={styles.tastemakerCard}>
-      <Image source={person.image} style={styles.tastemakerAvatar} />
-      <Text numberOfLines={1} style={styles.tastemakerName}>{person.name}</Text>
-      <Text style={styles.tastemakerTastes}>{person.tastes}</Text>
-      <Text style={styles.tastemakerGrowth}>{person.growth}</Text>
-      <FollowButton following={following} onPress={onFollow} />
+      <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.tastemakerAvatar} />
+      <Text numberOfLines={1} style={styles.tastemakerName}>{person.displayName}</Text>
+      <Text style={styles.tastemakerTastes}>{person.favoriteCuisines.join(' · ') || (person.username ? `@${person.username}` : '')}</Text>
+      <Text style={styles.tastemakerGrowth}>+{person.weeklyFollowerGrowth} this week</Text>
+      <FollowButton following={following} onPress={onFollow} pending={pending} />
     </LinearGradient>
   );
 }
@@ -687,59 +945,68 @@ function TastemakerCard({
 function CompactPerson({
   following,
   onFollow,
+  pending,
   person,
 }: {
   following: boolean;
   onFollow: () => void;
-  person: typeof people[number];
+  pending: boolean;
+  person: DiscoverPerson;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.compactPerson}>
-      <Image source={person.image} style={styles.compactAvatar} />
+      <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.compactAvatar} />
       <View style={styles.compactCopy}>
-        <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.name}</Text></View>
-        <Text numberOfLines={1} style={styles.compactTastes}>{person.tastes}</Text>
+        <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.displayName}</Text></View>
+        <Text numberOfLines={1} style={styles.compactTastes}>
+          {person.favoriteCuisines.join(' · ') || 'Tastes explorer'} · {joinedLabel(person.createdAt)}
+        </Text>
       </View>
-      <FollowButton following={following} onPress={onFollow} />
+      <FollowButton following={following} onPress={onFollow} pending={pending} />
     </View>
   );
 }
 
 function ProfileSuggestion({
   following,
-  index,
   onFollow,
+  pending,
   person,
 }: {
   following: boolean;
-  index: number;
   onFollow: () => void;
-  person: typeof people[number];
+  pending: boolean;
+  person: DiscoverPerson;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const stats: Array<[string, string]> = [
+    [String(person.reviewCount), 'reviews'],
+    [formatCount(person.followerCount), 'followers'],
+    [formatCount(person.followingCount), 'following'],
+  ];
   return (
     <View style={styles.profileSuggestion}>
       <View style={styles.suggestionHead}>
-        <Image source={person.image} style={styles.suggestionAvatar} />
+        <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.suggestionAvatar} />
         <View style={styles.suggestionCopy}>
-          <Text style={styles.suggestionName}>{index ? 'Jenny Wilson' : person.name}</Text>
-          <Text style={styles.suggestionHandle}>{index ? '@jennyw' : person.handle}</Text>
-          <Text style={styles.suggestionTastes}>{person.tastes}</Text>
+          <Text style={styles.suggestionName}>{person.displayName}</Text>
+          <Text style={styles.suggestionHandle}>{person.username ? `@${person.username}` : ''}</Text>
+          <Text style={styles.suggestionTastes}>{person.favoriteCuisines.join(' · ')}</Text>
         </View>
-        <FollowButton following={following} onPress={onFollow} />
+        <FollowButton following={following} onPress={onFollow} pending={pending} />
       </View>
       <View style={styles.statsRow}>
-        {[index ? ['35', 'reviews'] : ['46', 'reviews'], index ? ['864', 'followers'] : ['1.2K', 'followers'], index ? ['212', 'following'] : ['189', 'following']].map(([value, label]) => (
+        {stats.map(([value, label]) => (
           <View key={label} style={styles.stat}>
             <Text style={styles.statValue}>{value}</Text>
             <Text style={styles.statLabel}>{label}</Text>
           </View>
         ))}
       </View>
-      <Text style={styles.mutualText}>👥 Followed by {index ? 2 : 3} people you follow</Text>
+      {person.bio ? <Text style={styles.mutualText}>{person.bio}</Text> : null}
     </View>
   );
 }
@@ -752,6 +1019,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   switchOptionActive: { backgroundColor: '#D9DDE5' },
   switchText: { color: colors.textSecondary, opacity: 0.5, fontSize: 13 },
   switchTextActive: { color: '#161616', opacity: 1, fontWeight: '700' },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
+  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  stateCopy: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
+  retry: { marginTop: 4, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: colors.primary },
+  retryText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
   trendingLoading: {
     flex: 1,
     paddingHorizontal: 16,
@@ -816,11 +1088,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   gridBody: { height: 61, padding: 9, gap: 4 },
   gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gridMeta: { color: colors.textSecondary, fontSize: 12 },
-  seeMore: { width: '48.5%', height: 158, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 13, backgroundColor: 'rgba(184,47,41,0.08)', alignItems: 'center', justifyContent: 'center' },
-  plusCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center' },
-  plusText: { color: '#FFFFFF', fontSize: 25, fontWeight: '600' },
-  seeMoreTitle: { marginTop: 8, color: colors.text, fontSize: 16, fontWeight: '600' },
-  seeMoreSubtitle: { marginTop: 8, color: colors.textSecondary, fontSize: 12 },
   reviewList: { paddingHorizontal: 16, gap: 10 },
   reviewCard: { height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
   reviewImage: { width: 110, height: 121, resizeMode: 'cover' },
@@ -882,7 +1149,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   favouritesGlyph: { color: colors.primary },
   filterContent: { height: 38, alignItems: 'center', gap: 6 },
   filterChip: { height: 28, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  filterChipActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.12)' },
   filterText: { color: colors.textSecondary, fontSize: 12 },
+  filterTextActive: { color: colors.primary, fontWeight: '700' },
+  placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
+  placesStatusText: { color: colors.textSecondary, fontSize: 13 },
+  inlineRetry: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceRaised },
+  inlineRetryText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  placesList: { maxHeight: 170, marginTop: 8 },
+  placesListContent: { gap: 10, paddingBottom: 16 },
+  loadMore: { height: 38, marginTop: 2, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
+  loadMoreText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   peopleContent: { padding: 16, paddingBottom: 24, gap: 16 },
   peopleSearch: { height: 44, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: colors.surface },
   peopleSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },

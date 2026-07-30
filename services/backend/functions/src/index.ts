@@ -11,6 +11,13 @@ export {
 } from './modules/favourites/functions';
 export { resetMonthlyXp } from './modules/leaderboard/schedules';
 export {
+  getDiscoverFeed,
+  getDiscoverPeople,
+  getPlace,
+  getPlaceReviews,
+  getVenues,
+} from './modules/discover/functions';
+export {
   completeOnboarding,
   createUserProfile,
   getLeaderboard,

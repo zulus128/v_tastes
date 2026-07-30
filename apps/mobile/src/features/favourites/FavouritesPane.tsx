@@ -40,11 +40,11 @@ import {
 type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
 
 const placeImages: Record<string, ImageSourcePropType> = {
-  'coffee-bar-760': cafeImage,
-  'gemini-750': loungeImage,
-  'joes-shanghai': restaurantImage,
-  morimoto: sushiImage,
-  'tacos-la-brea': tacosImage,
+  cafe: cafeImage,
+  lounge: loungeImage,
+  restaurant: restaurantImage,
+  sushi: sushiImage,
+  tacos: tacosImage,
 };
 
 export type SaveablePlace = {
@@ -52,7 +52,7 @@ export type SaveablePlace = {
   name: string;
 };
 
-export function FavouritesPane({ userId }: { userId: string }) {
+export function FavouritesPane({ onOpenPlace, userId }: { onOpenPlace: (venueId: string) => void; userId: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const favourites = useFavourites(userId);
@@ -181,6 +181,7 @@ export function FavouritesPane({ userId }: { userId: string }) {
               <FavouriteCard
                 key={place.venueId}
                 index={index}
+                onOpen={() => onOpenPlace(place.venueId)}
                 onUnsave={() => unsaveVenue.mutate(place.venueId)}
                 place={place}
                 styles={styles}
@@ -385,22 +386,24 @@ function EmptyState({
 
 function FavouriteCard({
   index,
+  onOpen,
   onUnsave,
   place,
   styles,
 }: {
   index: number;
+  onOpen: () => void;
   onUnsave: () => void;
   place: FavouritePlace;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.placeCard}>
-      <View style={styles.cardImageWrap}>
-        <Image source={placeImages[place.venueId] ?? restaurantImage} style={styles.cardImage} />
+      <Pressable onPress={onOpen} style={styles.cardImageWrap}>
+        <Image source={placeImages[place.imageKey ?? ''] ?? restaurantImage} style={styles.cardImage} />
         {index === 0 ? <Text style={styles.popularTag}>Popular</Text> : null}
-      </View>
-      <View style={styles.cardBody}>
+      </Pressable>
+      <Pressable onPress={onOpen} style={styles.cardBody}>
         <Text numberOfLines={1} style={styles.cardTitle}>{place.name}</Text>
         <Text numberOfLines={2} style={styles.cardAddress}>{place.address || place.city}</Text>
         <View style={styles.ratingRow}>
@@ -412,7 +415,7 @@ function FavouriteCard({
           <Text style={styles.metaPill}>{'$'.repeat(Math.max(1, place.priceLevel))}</Text>
           <Text style={styles.metaPill}>{place.distanceKm.toFixed(1).replace('.', ',')} km</Text>
         </View>
-      </View>
+      </Pressable>
       <Pressable accessibilityLabel={`Remove ${place.name} from favourites`} hitSlop={10} onPress={onUnsave}>
         <BookmarkIcon color={styles.cardTitle.color} height={20} width={20} />
       </Pressable>

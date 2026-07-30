@@ -56,6 +56,7 @@ export const getFavourites = onCall(callableOptions, async (request) => {
       city: String(venue.get('city') ?? ''),
       address: String(venue.get('address') ?? ''),
       category: String(venue.get('category') ?? ''),
+      imageKey: venue.get('imageKey') ? String(venue.get('imageKey')) : null,
       priceLevel: Number(venue.get('priceLevel') ?? 1),
       distanceKm: Number(venue.get('distanceKm') ?? 0),
       rating: Number(venue.get('rating') ?? 0),

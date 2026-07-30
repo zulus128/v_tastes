@@ -3,6 +3,7 @@ import {
   DefaultTheme,
   NavigationContainer,
   type LinkingOptions,
+  type NavigatorScreenParams,
   type Theme,
 } from '@react-navigation/native';
 import {
@@ -19,6 +20,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMemo } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
+import { PlaceScreen } from '../features/place/PlaceScreen';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
@@ -28,10 +30,11 @@ import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
 import { consumePendingDeepLink } from './pendingDeepLink';
 
 export type RootStackParamList = {
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Comments: { reviewId: string };
   Recap: { mode: 'ready' | 'lowData' };
   Leaderboard: undefined;
+  Place: { venueId: string };
 };
 
 type MainTabParamList = {
@@ -62,6 +65,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Comments: 'reviews/:reviewId/comments',
       Recap: 'recap/:mode',
       Leaderboard: 'leaderboard',
+      Place: 'places/:venueId',
     },
   },
 };
@@ -175,7 +179,7 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Discover">
-        {() => <DiscoverScreen userId={user.uid} />}
+        {() => <DiscoverScreen onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })} userId={user.uid} />}
       </Tabs.Screen>
       <Tabs.Screen name="Create">
         {() => <PlaceholderScreen title="Create a review" />}
@@ -224,6 +228,19 @@ export function ProductNavigator({ user }: { user: User }) {
         </RootStack.Screen>
         <RootStack.Screen name="Leaderboard">
           {({ navigation }) => <PaginatedLeaderboardScreen onBack={navigation.goBack} />}
+        </RootStack.Screen>
+        <RootStack.Screen name="Place">
+          {({ navigation, route }) => (
+            <PlaceScreen
+              onBack={() => {
+                if (navigation.canGoBack()) navigation.goBack();
+                else navigation.navigate('MainTabs', { screen: 'Discover' });
+              }}
+              onWriteReview={() => navigation.navigate('MainTabs', { screen: 'Create' })}
+              userId={user.uid}
+              venueId={route.params.venueId}
+            />
+          )}
         </RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>

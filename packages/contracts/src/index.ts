@@ -23,11 +23,23 @@ export const createUserProfileInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512).optional(),
 });
 
+export const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
+
 export const venueSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   city: z.string().min(1),
   status: z.enum(['active', 'hidden', 'pending', 'merged']),
+  address: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+  imageKey: z.string().min(1).max(64).optional(),
+  priceLevel: z.number().int().min(1).max(4).optional(),
+  distanceKm: z.number().nonnegative().optional(),
+  rating: z.number().min(0).max(5).optional(),
+  reviewCount: z.number().int().nonnegative().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  discoverTags: z.array(discoverTagSchema).optional(),
 });
 
 export const reviewSchema = z.object({
@@ -112,6 +124,24 @@ export const getLeaderboardInputSchema = pageInputSchema.extend({
   period: z.enum(['month', 'allTime']).default('month'),
 });
 
+export const getVenuesInputSchema = pageInputSchema.extend({
+  category: z.string().trim().min(1).max(60).optional(),
+  tag: discoverTagSchema.optional(),
+}).refine(
+  (input) => !(input.category && input.tag),
+  'Choose either a category or a Discover tag.',
+);
+
+export const getPlaceInputSchema = z.object({
+  venueId: z.string().trim().min(1).max(128),
+});
+
+export const placeReviewSortSchema = z.enum(['highest', 'lowest', 'popular', 'recent', 'oldest']);
+
+export const getPlaceReviewsInputSchema = getPlaceInputSchema.extend({
+  sort: placeReviewSortSchema.default('recent'),
+});
+
 export const completeOnboardingInputSchema = z.object({
   version: z.number().int().positive(),
 });
@@ -138,7 +168,12 @@ export const healthCheckResultSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
+export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
+export type GetVenuesInput = z.infer<typeof getVenuesInputSchema>;
+export type GetPlaceInput = z.infer<typeof getPlaceInputSchema>;
+export type GetPlaceReviewsInput = z.infer<typeof getPlaceReviewsInputSchema>;
+export type PlaceReviewSort = z.infer<typeof placeReviewSortSchema>;
 export type Review = z.infer<typeof reviewSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
@@ -222,6 +257,7 @@ export interface FavouritePlace {
   city: string;
   address: string;
   category: string;
+  imageKey: string | null;
   priceLevel: number;
   distanceKm: number;
   rating: number;
@@ -236,6 +272,86 @@ export interface FavouritesResult {
 export interface SaveVenueResult {
   saved: boolean;
   folderIds: string[];
+}
+
+export interface DiscoverPerson {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
+  avatarKey: string | null;
+  bio: string;
+  favoriteCuisines: string[];
+  weeklyFollowerGrowth: number;
+  followerCount: number;
+  followingCount: number;
+  reviewCount: number;
+  following: boolean;
+  createdAt: string;
+}
+
+export interface DiscoverReview {
+  id: string;
+  authorId: string;
+  authorDisplayName: string;
+  authorPhotoUrl: string | null;
+  authorAvatarKey: string | null;
+  venueId: string;
+  venueName: string;
+  venueCategory: string;
+  venueImageKey: string | null;
+  rating: number;
+  text: string;
+  reactionCount: number;
+  commentCount: number;
+  createdAt: string;
+}
+
+export interface DiscoverFeed {
+  hero: Venue | null;
+  trending: Venue[];
+  newSpots: Venue[];
+  mostReviewed: Venue[];
+  forYou: Venue[];
+  hiddenGems: Venue[];
+  popularReviews: DiscoverReview[];
+  topReviewer: DiscoverPerson | null;
+}
+
+export interface PlaceDish {
+  name: string;
+  rating: number;
+}
+
+export interface PlaceDetails {
+  venue: Venue;
+  phone: string | null;
+  website: string | null;
+  openingHours: Array<{ day: string; hours: string }>;
+  photoKeys: string[];
+  popularDishes: PlaceDish[];
+}
+
+export interface PlaceReview {
+  id: string;
+  authorId: string;
+  authorDisplayName: string;
+  authorUsername: string | null;
+  authorPhotoUrl: string | null;
+  authorAvatarKey: string | null;
+  rating: number;
+  text: string;
+  reactionCount: number;
+  commentCount: number;
+  createdAt: string;
+  tag: string | null;
+  dishNames: string[];
+}
+
+export interface DiscoverPeopleResult {
+  trending: DiscoverPerson[];
+  new: DiscoverPerson[];
+  suggested: DiscoverPerson[];
 }
 
 export type ApiErrorCode =

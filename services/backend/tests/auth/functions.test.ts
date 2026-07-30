@@ -379,4 +379,105 @@ describe('authenticated session and paginated reads', () => {
     expect(leadersFirst.items[0]?.rank).toBe(1);
     expect(leadersSecond.items[0]?.rank).toBe(21);
   });
+
+  it('serves Discover from Firestore with stable venue pages and real social state', async () => {
+    const { token } = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Discover Reader',
+      username: 'discover.reader',
+      city: 'Istanbul',
+    }, token);
+    const currentUser = (await db.collection('users').where('username', '==', 'discover.reader').limit(1).get()).docs[0];
+    if (!currentUser) throw new Error('Expected the authenticated Discover profile to exist.');
+
+    const reviewer = db.collection('users').doc('discover-reviewer');
+    const batch = db.batch();
+    batch.update(currentUser.ref, { reviewCount: 999, createdAt: Timestamp.fromMillis(Date.now()) });
+    batch.set(reviewer, {
+      displayName: 'Discover Reviewer',
+      username: 'discover.reviewer',
+      photoUrl: 'https://example.com/discover-reviewer.jpg',
+      city: 'Istanbul',
+      status: 'active',
+      reviewCount: 50,
+      followerCount: 100,
+      followingCount: 10,
+      weeklyFollowerGrowth: 12,
+      favoriteCuisines: ['Cafe'],
+      createdAt: Timestamp.fromMillis(Date.now() - 1_000),
+    });
+    batch.set(currentUser.ref.collection('following').doc(reviewer.id), { userId: reviewer.id, createdAt: Timestamp.now() });
+    for (let index = 0; index < 5; index += 1) {
+      const venue = db.collection('venues').doc(`discover-venue-${index}`);
+      batch.set(venue, {
+        name: `Discover venue ${index}`,
+        city: 'Istanbul',
+        status: 'active',
+        category: index % 2 === 0 ? 'Cafe' : 'Italian',
+        rating: index < 2 ? 4.8 : 4.5,
+        reviewCount: 20 - index,
+        discoverTags: index < 3 ? ['trending', 'most-reviewed'] : ['new', 'hidden-gem'],
+      });
+    }
+    batch.set(db.collection('reviews').doc('discover-review'), {
+      authorId: reviewer.id,
+      authorDisplayName: 'Discover Reviewer',
+      venueId: 'discover-venue-0',
+      venueName: 'Discover venue 0',
+      venueCity: 'Istanbul',
+      rating: 5,
+      text: 'Real Discover review',
+      status: 'published',
+      reactionCount: 37,
+      commentCount: 4,
+      createdAt: Timestamp.now(),
+    });
+    await batch.commit();
+
+    const feed = await callFunction<{
+      topReviewer: { userId: string; following: boolean } | null;
+      popularReviews: Array<{ reactionCount: number; commentCount: number; authorPhotoUrl: string | null }>;
+    }>('getDiscoverFeed', {}, token);
+    expect(feed.topReviewer).toMatchObject({ userId: reviewer.id, following: true });
+    expect(feed.popularReviews[0]).toMatchObject({
+      reactionCount: 37,
+      commentCount: 4,
+      authorPhotoUrl: 'https://example.com/discover-reviewer.jpg',
+    });
+
+    const people = await callFunction<{
+      trending: Array<{ userId: string; following: boolean }>;
+    }>('getDiscoverPeople', {}, token);
+    expect(people.trending).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: reviewer.id, following: true }),
+      ]),
+    );
+
+    const first = await callFunction<{
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    }>('getVenues', { limit: 2 }, token);
+    const second = await callFunction<{ items: Array<{ id: string }> }>(
+      'getVenues',
+      { limit: 2, cursor: first.nextCursor },
+      token,
+    );
+    expect(first.items).toHaveLength(2);
+    expect(new Set([...first.items, ...second.items].map((venue) => venue.id)).size).toBe(4);
+
+    const cafes = await callFunction<{ items: Array<{ id: string }> }>(
+      'getVenues',
+      { category: 'Cafe', limit: 20 },
+      token,
+    );
+    expect(cafes.items).toHaveLength(3);
+    const trending = await callFunction<{ items: Array<{ id: string }> }>(
+      'getVenues',
+      { tag: 'trending', limit: 20 },
+      token,
+    );
+    expect(trending.items).toHaveLength(3);
+  });
 });
