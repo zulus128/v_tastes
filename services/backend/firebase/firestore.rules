@@ -17,6 +17,16 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if signedIn();
       allow write: if false;
+
+      match /folders/{folderId} {
+        allow read: if owns(uid);
+        allow write: if false;
+      }
+
+      match /savedVenues/{venueId} {
+        allow read: if owns(uid);
+        allow write: if false;
+      }
     }
 
     match /venues/{venueId} {

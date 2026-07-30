@@ -68,6 +68,33 @@ export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
 
+export const folderNameSchema = z.string().trim()
+  .min(1, 'Enter a folder name.')
+  .max(40, 'The folder name must be at most 40 characters long.');
+
+export const createFolderInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  name: folderNameSchema,
+});
+
+export const renameFolderInputSchema = z.object({
+  folderId: z.string().min(1).max(128),
+  name: folderNameSchema,
+});
+
+export const deleteFolderInputSchema = z.object({
+  folderId: z.string().min(1).max(128),
+});
+
+export const saveVenueInputSchema = z.object({
+  venueId: z.string().min(1).max(128),
+  folderIds: z.array(z.string().min(1).max(128)).max(20).default([]),
+});
+
+export const unsaveVenueInputSchema = z.object({
+  venueId: z.string().min(1).max(128),
+});
+
 export const pageInputSchema = z.object({
   cursor: z.string().min(1).max(4_096).nullable().optional(),
   limit: z.number().int().min(1).max(50).default(20),
@@ -117,6 +144,11 @@ export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
+export type CreateFolderInput = z.infer<typeof createFolderInputSchema>;
+export type RenameFolderInput = z.infer<typeof renameFolderInputSchema>;
+export type DeleteFolderInput = z.infer<typeof deleteFolderInputSchema>;
+export type SaveVenueInput = z.infer<typeof saveVenueInputSchema>;
+export type UnsaveVenueInput = z.infer<typeof unsaveVenueInputSchema>;
 export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
@@ -159,6 +191,7 @@ export interface Comment {
 export interface LeaderboardEntry {
   userId: string;
   displayName: string;
+  username: string | null;
   photoUrl: string | null;
   xp: number;
   rank: number;
@@ -172,6 +205,37 @@ export interface SessionStatus {
 
 export interface FollowResult {
   following: boolean;
+}
+
+export interface FavouriteFolder {
+  id: string;
+  name: string;
+  placeCount: number;
+  createdAt: string;
+}
+
+export interface FavouritePlace {
+  venueId: string;
+  folderIds: string[];
+  savedAt: string;
+  name: string;
+  city: string;
+  address: string;
+  category: string;
+  priceLevel: number;
+  distanceKm: number;
+  rating: number;
+  reviewCount: number;
+}
+
+export interface FavouritesResult {
+  folders: FavouriteFolder[];
+  places: FavouritePlace[];
+}
+
+export interface SaveVenueResult {
+  saved: boolean;
+  folderIds: string[];
 }
 
 export type ApiErrorCode =

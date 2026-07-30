@@ -18,6 +18,7 @@ import type { User } from 'firebase/auth';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMemo } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
+import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
@@ -174,7 +175,7 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
         )}
       </Tabs.Screen>
       <Tabs.Screen name="Discover">
-        {() => <PlaceholderScreen title="Discover" />}
+        {() => <DiscoverScreen userId={user.uid} />}
       </Tabs.Screen>
       <Tabs.Screen name="Create">
         {() => <PlaceholderScreen title="Create a review" />}

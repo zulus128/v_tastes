@@ -59,8 +59,8 @@ import permissionLocation from '../../../assets/onboarding/permission-location.p
 import permissionNotifications from '../../../assets/onboarding/permission-notifications.png';
 import placeSelected from '../../../assets/onboarding/place-selected.png';
 import placeUnselected from '../../../assets/onboarding/place-unselected.png';
-import placeSearch from '../../../assets/onboarding/place-search.png';
-import placeTuning from '../../../assets/onboarding/place-tuning.png';
+import PlaceSearchIcon from '../../../assets/onboarding/place-search.svg';
+import PlaceTuningIcon from '../../../assets/onboarding/place-tuning.svg';
 import ratingStar from '../../../assets/onboarding/rating-star.png';
 import readyCollage from '../../../assets/onboarding/ready-collage.png';
 import restaurantPhoto from '../../../assets/onboarding/restaurant.png';
@@ -229,11 +229,21 @@ export function PostSignupOnboardingFlow({
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState('Restaurant');
+  const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['restaurant']));
   const [placeLoading, setPlaceLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
   const [contacts, setContacts] = useState(fallbackContacts);
   const [busy, setBusy] = useState(false);
+
+  function togglePlaceFilter(label: string) {
+    const key = label.toLowerCase();
+    setPlaceFilterSet((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
 
   function navigate(next: Screen) {
     setHistory((items) => [...items, screen]);
@@ -445,23 +455,23 @@ export function PostSignupOnboardingFlow({
         <View style={styles.placeHeader}>
           <View style={styles.placeSearchRow}>
             <View style={styles.placeSearch}>
-              <Image source={placeSearch} style={[styles.placeSearchIcon, { tintColor: colors.text }]} />
+              <PlaceSearchIcon color={colors.text} style={styles.placeSearchIcon} />
               <TextInput value={placeQuery} onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.placeholder} style={styles.placeSearchInput} />
               {placeQuery.length > 0 ? <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={() => setPlaceQuery('')} style={styles.placeClear}><Image source={searchClose} style={styles.placeClearIcon} /></Pressable> : <View style={styles.placeClearSpacer} />}
             </View>
-            <Image source={placeTuning} style={[styles.tuningIcon, { tintColor: colors.text }]} />
+            <PlaceTuningIcon color={colors.text} style={styles.tuningIcon} />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {placeFilters.map(({ icon, label }) => {
-              const active = normalizedPlaceQuery === label.toLowerCase();
-              return <Pressable accessibilityRole="button" key={label} onPress={() => setPlaceQuery(label)} style={[styles.filter, active && styles.filterActive]}>
+              const active = placeFilterSet.has(label.toLowerCase());
+              return <Pressable accessibilityRole="button" key={label} onPress={() => togglePlaceFilter(label)} style={[styles.filter, active && styles.filterActive]}>
                 <Image source={icon} style={[styles.filterIcon, !active && styles.filterDimmed]} />
                 <Text style={[styles.filterText, !active && styles.filterDimmed]}>{label}</Text>
               </Pressable>;
             })}
-            <Pressable accessibilityRole="button" onPress={() => setPlaceQuery('Friends')} style={[styles.filter, normalizedPlaceQuery === 'friends' && styles.filterActive]}>
-              <Image source={filterFriends} style={[styles.filterIcon, normalizedPlaceQuery !== 'friends' && styles.filterDimmed]} />
-              <Text style={[styles.filterText, normalizedPlaceQuery !== 'friends' && styles.filterDimmed]}>Friends</Text>
+            <Pressable accessibilityRole="button" onPress={() => togglePlaceFilter('Friends')} style={[styles.filter, placeFilterSet.has('friends') && styles.filterActive]}>
+              <Image source={filterFriends} style={[styles.filterIcon, !placeFilterSet.has('friends') && styles.filterDimmed]} />
+              <Text style={[styles.filterText, !placeFilterSet.has('friends') && styles.filterDimmed]}>Friends</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -567,7 +577,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   stepDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.text },
   stepDotInactive: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.5 },
   stepTitle: { marginTop: 7, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
-  stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41 },
+  stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionContent: { position: 'absolute', top: 132, left: 26, right: 26, alignItems: 'center' },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionSubtitle: { marginTop: 8, maxWidth: 320 },
@@ -608,8 +618,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dishIcon: { width: 18, height: 18 },
   dishIconDimmed: { opacity: 0.5 },
   helper: { position: 'absolute', bottom: 90, alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
-  placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.surface },
+  placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.canvas },
   placeSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeSearch: { flex: 1, height: 39, borderRadius: 22, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
   placeSearchIcon: { width: 24, height: 24 },
@@ -620,14 +630,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tuningIcon: { width: 24, height: 24 },
   filters: { height: 28, gap: 6 },
   filter: { height: 28, borderRadius: 14, paddingHorizontal: 8, gap: 3, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
+  filterActive: { backgroundColor: colors.surfaceRaised },
   filterIcon: { width: 14, height: 14 },
   filterText: { color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '500', letterSpacing: -0.23 },
   filterDimmed: { opacity: 0.5 },
   placeList: { flex: 1 },
-  placeListContent: { paddingBottom: 110 },
-  venue: { height: 188, paddingHorizontal: 16, paddingVertical: 12, gap: 9, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  venueSelected: { backgroundColor: colors.canvas },
+  placeListContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 110, gap: 12 },
+  venue: { height: 188, paddingHorizontal: 16, paddingVertical: 12, gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
+  venueSelected: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
   venueSelection: { position: 'absolute', zIndex: 2, top: 15, right: 17, width: 22, height: 22 },
   venueMain: { height: 122, flexDirection: 'row', alignItems: 'center', gap: 16 },
   venueImage: { width: 122, height: 122, borderRadius: 12 },

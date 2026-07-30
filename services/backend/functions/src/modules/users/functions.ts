@@ -71,6 +71,7 @@ export const getLeaderboard = onCall(callableOptions, async (request) => {
     items: pageDocs.map((document, index) => ({
       userId: document.id,
       displayName: String(document.get('displayName')),
+      username: document.get('username') ? String(document.get('username')) : null,
       photoUrl: document.get('photoUrl') ? String(document.get('photoUrl')) : null,
       xp: Number(document.get(xpField) ?? 0),
       rank: startPosition + index + 1,

@@ -41,6 +41,7 @@ export const colorThemes = {
     switchThumb: '#D9DDE5',
     skeleton: '#2E2E2E',
     skeletonMuted: '#242424',
+    discoverSkeleton: '#262626',
   },
   light: {
     ...shared,
@@ -59,6 +60,7 @@ export const colorThemes = {
     switchThumb: '#FFFFFF',
     skeleton: '#E4E4E4',
     skeletonMuted: '#ECEAE6',
+    discoverSkeleton: '#E4E4E4',
   },
 } as const;
 

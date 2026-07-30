@@ -3,9 +3,12 @@ import type {
   ApiErrorCode,
   Comment,
   CompleteOnboardingInput,
+  CreateFolderInput,
   CreateReviewInput,
   CreateUserProfileInput,
+  DeleteFolderInput,
   FeedItem,
+  FavouritesResult,
   FollowResult,
   FollowUserInput,
   GetCommentsInput,
@@ -15,9 +18,13 @@ import type {
   LeaderboardEntry,
   Page,
   ReactToReviewInput,
+  RenameFolderInput,
   RequestPhoneOtpInput,
   RequestPhoneOtpResult,
   SessionStatus,
+  SaveVenueInput,
+  SaveVenueResult,
+  UnsaveVenueInput,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
 } from '@tastes/contracts';
@@ -132,6 +139,18 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<FollowUserInput, FollowResult>('followUser', input),
     unfollowUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('unfollowUser', input),
+    getFavourites: () =>
+      invoke<Record<string, never>, FavouritesResult>('getFavourites', {}),
+    createFolder: (input: CreateFolderInput) =>
+      invoke<CreateFolderInput, IdResult>('createFolder', input),
+    renameFolder: (input: RenameFolderInput) =>
+      invoke<RenameFolderInput, IdResult>('renameFolder', input),
+    deleteFolder: (input: DeleteFolderInput) =>
+      invoke<DeleteFolderInput, IdResult>('deleteFolder', input),
+    saveVenue: (input: SaveVenueInput) =>
+      invoke<SaveVenueInput, SaveVenueResult>('saveVenue', input),
+    unsaveVenue: (input: UnsaveVenueInput) =>
+      invoke<UnsaveVenueInput, SaveVenueResult>('unsaveVenue', input),
     getFeed: (input: GetFeedInput) =>
       invoke<GetFeedInput, Page<FeedItem>>('getFeed', input),
     createReview: (input: CreateReviewInput) =>

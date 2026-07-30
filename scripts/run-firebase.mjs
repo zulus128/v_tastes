@@ -21,16 +21,21 @@ const child = spawn('firebase', process.argv.slice(2), {
   stdio: 'inherit',
 });
 
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      // Firebase CLI performs its emulator-tree cleanup on SIGINT. The parent
+      // development script normally stops this wrapper with SIGTERM.
+      child.kill(signal === 'SIGTERM' ? 'SIGINT' : signal);
+    }
+  });
+}
+
 child.on('error', (error) => {
   console.error(error);
   process.exit(1);
 });
 
 child.on('exit', (code, signal) => {
-  if (signal) {
-    process.kill(process.pid, signal);
-    return;
-  }
-
-  process.exit(code ?? 1);
+  process.exit(code ?? (signal ? 128 : 1));
 });

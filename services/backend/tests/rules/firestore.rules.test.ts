@@ -41,6 +41,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'reviews', 'published', 'reactions', 'user-a'), { reaction: 'like' });
     await setDoc(doc(db, 'users', 'user-a'), { displayName: 'User A' });
     await setDoc(doc(db, 'users', 'user-a', 'following', 'user-b'), { userId: 'user-b' });
+    await setDoc(doc(db, 'users', 'user-a', 'folders', 'date-spots'), { name: 'Date spots' });
+    await setDoc(doc(db, 'users', 'user-a', 'savedVenues', 'active'), { venueId: 'active' });
     await setDoc(doc(db, '_otpChallenges', 'secret'), { phoneNumber: '+905551234567' });
     await setDoc(doc(db, '_otpRateLimits', 'secret'), { count: 1 });
     await setDoc(doc(db, '_contentRateLimits', 'secret'), { count: 1 });
@@ -108,6 +110,17 @@ describe('Firestore security rules', () => {
     const db = testEnvironment.authenticatedContext('user-a').firestore();
     await assertSucceeds(getDoc(doc(db, 'users', 'user-a')));
     await assertFails(setDoc(doc(db, 'users', 'user-a'), { displayName: 'Changed' }));
+  });
+
+  it('allows owners to read favourites but keeps them backend-owned and private', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('user-a').firestore();
+    const otherDb = testEnvironment.authenticatedContext('user-b').firestore();
+    await assertSucceeds(getDoc(doc(ownerDb, 'users', 'user-a', 'folders', 'date-spots')));
+    await assertSucceeds(getDoc(doc(ownerDb, 'users', 'user-a', 'savedVenues', 'active')));
+    await assertFails(getDoc(doc(otherDb, 'users', 'user-a', 'folders', 'date-spots')));
+    await assertFails(getDoc(doc(otherDb, 'users', 'user-a', 'savedVenues', 'active')));
+    await assertFails(setDoc(doc(ownerDb, 'users', 'user-a', 'folders', 'bars'), { name: 'Bars' }));
+    await assertFails(setDoc(doc(ownerDb, 'users', 'user-a', 'savedVenues', 'hidden'), { venueId: 'hidden' }));
   });
 
   it('never exposes OTP challenges, even to staff', async () => {

@@ -29,7 +29,7 @@ Alternatively, use `pnpm dev:ios` or `pnpm dev:android` to open the simulator/em
 
 The workspace pins a local Node 22 runtime for Firebase Functions and automatically selects Java 21 on macOS, so global Node/Java defaults do not control the emulators.
 
-Seed venues after the emulators are running:
+Local demo data is seeded automatically after Firestore starts. To reapply it manually:
 
 ```bash
 pnpm seed
