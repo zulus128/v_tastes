@@ -8,3 +8,4 @@ allowBuilds:
   esbuild: true
   node: true
   protobufjs: true
+  re2: true

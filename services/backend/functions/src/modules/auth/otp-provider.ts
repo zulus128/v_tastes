@@ -1,3 +1,5 @@
+import { isRelaxedTestEnvironment } from '../../shared/runtime-environment';
+
 export type OtpCheckStatus = 'approved' | 'pending';
 
 export interface OtpStartResult {
@@ -37,7 +39,7 @@ class FakeOtpProvider implements OtpProvider {
 }
 
 export function createOtpProvider(): OtpProvider {
-  if (process.env.FUNCTIONS_EMULATOR === 'true') {
+  if (isRelaxedTestEnvironment()) {
     return new FakeOtpProvider();
   }
 

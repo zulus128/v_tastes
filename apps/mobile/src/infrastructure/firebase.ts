@@ -23,6 +23,8 @@ import { Platform } from 'react-native';
 
 const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'demo-tastes';
 const useEmulators = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false';
+const firestoreDatabaseId =
+  process.env.EXPO_PUBLIC_FIRESTORE_DATABASE_ID ?? (useEmulators ? '(default)' : 'tastes-eu');
 const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'demo-api-key';
 const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${projectId}.firebaseapp.com`;
 const storageBucket = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? `${projectId}.appspot.com`;
@@ -61,7 +63,10 @@ function initializePersistentAuth(): Auth {
 }
 
 export const auth: Auth = initializePersistentAuth();
-export const firestore: Firestore = getFirestore(app);
+export const firestore: Firestore =
+  firestoreDatabaseId === '(default)'
+    ? getFirestore(app)
+    : getFirestore(app, firestoreDatabaseId);
 export const functions: Functions = getFunctions(app, 'europe-west1');
 export const storage: FirebaseStorage = getStorage(app);
 

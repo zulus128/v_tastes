@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "254210443804",
+    "project_id": "tastes-934e6",
+    "storage_bucket": "tastes-934e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:254210443804:android:ee868fa315b4e4b11f2dd9",
+        "android_client_info": {
+          "package_name": "com.digitalityagency.tastes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANccfmTTQm23RXXT8CUp70oKj58-ae_AQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:254210443804:android:ddc430eb9ab7d65e1f2dd9",
+        "android_client_info": {
+          "package_name": "com.vkassin.tastes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANccfmTTQm23RXXT8CUp70oKj58-ae_AQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "tastes-934e6",
+        "EXPO_PUBLIC_FIRESTORE_DATABASE_ID": "tastes-eu",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyC486z8f5sqDm-ipAwFPaadVmddbX9_mqY",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "tastes-934e6.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "tastes-934e6.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:254210443804:web:1e73db67903018421f2dd9",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "254210443804",
+        "EXPO_PUBLIC_USE_FIREBASE_EMULATORS": "false"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "tastes-934e6",
+        "EXPO_PUBLIC_FIRESTORE_DATABASE_ID": "tastes-eu",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyC486z8f5sqDm-ipAwFPaadVmddbX9_mqY",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "tastes-934e6.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "tastes-934e6.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:254210443804:web:1e73db67903018421f2dd9",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "254210443804",
+        "EXPO_PUBLIC_USE_FIREBASE_EMULATORS": "false"
+      },
+      "ios": {
+        "distribution": "store"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6796403021"
+      }
+    }
+  }
+}

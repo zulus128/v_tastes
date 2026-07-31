@@ -16,7 +16,7 @@
     "dev:mobile": "pnpm --filter @tastes/mobile start",
     "mobile:build:ios": "pnpm --filter @tastes/mobile build:ios",
     "mobile:build:android": "pnpm --filter @tastes/mobile build:android",
-    "reset:ios": "xcrun simctl uninstall booted com.digitalityagency.tastes || true; pnpm mobile:build:ios && pnpm dev:ios",
+    "reset:ios": "xcrun simctl uninstall booted com.vkassin.tastes || true; pnpm mobile:build:ios && pnpm dev:ios",
     "seed": "pnpm --filter @tastes/functions seed",
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",

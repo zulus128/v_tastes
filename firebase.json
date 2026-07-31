@@ -8,6 +8,7 @@
     }
   ],
   "firestore": {
+    "database": "tastes-eu",
     "rules": "services/backend/firebase/firestore.rules",
     "indexes": "services/backend/firebase/firestore.indexes.json"
   },
