@@ -1,5 +1,16 @@
-process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8180';
-process.env.GCLOUD_PROJECT ??= 'demo-tastes';
+const seedRemote = process.env.SEED_REMOTE === 'true';
+
+if (seedRemote) {
+  if (process.env.GCLOUD_PROJECT !== 'tastes-934e6') {
+    throw new Error('Remote seeding is only allowed for the tastes-934e6 test project.');
+  }
+
+  process.env.FIRESTORE_DATABASE_ID ??= 'tastes-eu';
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+} else {
+  process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8180';
+  process.env.GCLOUD_PROJECT ??= 'demo-tastes';
+}
 
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -9,7 +20,11 @@ if (getApps().length === 0) {
 }
 
 async function main() {
-  const db = getFirestore();
+  const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID ?? '(default)';
+  const db =
+    firestoreDatabaseId === '(default)'
+      ? getFirestore()
+      : getFirestore(firestoreDatabaseId);
   const venues = [
     {
       id: 'morimoto',
@@ -19,6 +34,8 @@ async function main() {
       category: 'Japanese',
       imageKey: 'sushi',
       photoKeys: ['sushi', 'restaurant', 'lounge'],
+      photoCount: 24,
+      placeTags: ['Japanese 🍣', '$$$', '1.8 km'],
       phone: '+90 212 555 01 32',
       website: 'wasabimorimoto.com',
       openingHours: [
@@ -48,6 +65,8 @@ async function main() {
       category: 'Chinese',
       imageKey: 'restaurant',
       photoKeys: ['restaurant', 'lounge', 'restaurant'],
+      photoCount: 24,
+      placeTags: ['Chinese 🥟', '$$', '0.9 km'],
       phone: '+90 212 555 03 12',
       website: 'joesshanghai.com',
       openingHours: [
@@ -77,6 +96,8 @@ async function main() {
       category: 'Italian',
       imageKey: 'lounge',
       photoKeys: ['lounge', 'restaurant', 'lounge'],
+      photoCount: 18,
+      placeTags: ['Italian 🇮🇹', '$$', '1.2 km'],
       phone: '+90 212 555 07 50',
       website: 'gemini750.com',
       openingHours: [{ day: 'Daily', hours: '12 PM – 11 PM' }],
@@ -98,6 +119,8 @@ async function main() {
       category: 'Cafe',
       imageKey: 'cafe',
       photoKeys: ['cafe', 'restaurant', 'cafe'],
+      photoCount: 16,
+      placeTags: ['Cafe ☕', '$', '0.4 km'],
       phone: '+90 216 555 07 60',
       website: 'coffeebar760.com',
       openingHours: [{ day: 'Daily', hours: '8 AM – 8 PM' }],
@@ -119,6 +142,8 @@ async function main() {
       category: 'Mexican',
       imageKey: 'tacos',
       photoKeys: ['tacos', 'restaurant', 'tacos'],
+      photoCount: 20,
+      placeTags: ['Mexican 🌮', '$', '2.1 km'],
       phone: '+90 212 555 11 42',
       website: 'tacoslabrea.com',
       openingHours: [{ day: 'Daily', hours: '12 PM – 11 PM' }],
@@ -140,6 +165,8 @@ async function main() {
       category: 'Cafe',
       imageKey: 'cafe',
       photoKeys: ['cafe', 'lounge', 'cafe'],
+      photoCount: 12,
+      placeTags: ['Cafe ☕', '$', '3.4 km'],
       phone: '+90 216 555 72 00',
       website: 'tastes-demo.cafe',
       openingHours: [{ day: 'Daily', hours: '8 AM – 7 PM' }],

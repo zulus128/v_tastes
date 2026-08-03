@@ -254,6 +254,10 @@ export const getPlace = onCall(callableOptions, async (request) => {
     photoKeys: Array.isArray(document.get('photoKeys'))
       ? (document.get('photoKeys') as unknown[]).filter((value): value is string => typeof value === 'string')
       : [],
+    photoCount: Math.max(0, Number(document.get('photoCount') ?? 0)),
+    chips: Array.isArray(document.get('placeTags'))
+      ? (document.get('placeTags') as unknown[]).filter((value): value is string => typeof value === 'string')
+      : [],
     popularDishes,
   };
   return details;

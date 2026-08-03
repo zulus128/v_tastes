@@ -1,7 +1,8 @@
 import type { PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import avatarCameron from '../../../assets/discover/avatar-cameron.jpg';
 import avatarKristin from '../../../assets/discover/avatar-kristin.png';
@@ -34,11 +35,13 @@ function relativeTime(iso: string) {
 export function PlaceScreen({ onBack, onWriteReview, userId, venueId }: { onBack: () => void; onWriteReview: () => void; userId: string; venueId: string }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<'overview' | 'reviews'>('overview');
   const [sort, setSort] = useState<PlaceReviewSort>('recent');
   const [sheet, setSheet] = useState<'hours' | 'photos' | 'sort' | null>(null);
   const [toast, setToast] = useState(false);
+  const [activePhoto, setActivePhoto] = useState(0);
   const details = usePlace(venueId);
   const reviews = usePlaceReviews(venueId, sort);
   const favourites = useFavourites(userId);
@@ -60,23 +63,33 @@ export function PlaceScreen({ onBack, onWriteReview, userId, venueId }: { onBack
 
   const place = details.data;
   const photos = place.photoKeys.length > 0 ? place.photoKeys : [place.venue.imageKey ?? 'restaurant'];
+  const photoCount = place.photoCount > 0 ? place.photoCount : photos.length;
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image source={placeImage(place.venue.imageKey)} style={styles.heroImage} />
-          <View style={styles.shade} />
+          <ScrollView
+            horizontal
+            onMomentumScrollEnd={(event) => setActivePhoto(Math.round(event.nativeEvent.contentOffset.x / width))}
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+          >
+            {photos.map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={[styles.heroImage, { width }]} />)}
+          </ScrollView>
+          <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
+          <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
           <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + 12 }]}><Text style={styles.back}>‹</Text></Pressable>
           <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + 12 }]}>
             {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={18} width={18} />}
           </Pressable>
-          <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photos.length} photos ›</Text></Pressable>
+          <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
+          <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
         </View>
         <View style={styles.content}>
           <View style={styles.badges}><Text style={styles.primaryBadge}>Popular</Text><Text style={styles.primaryBadge}>★ {place.venue.rating?.toFixed(1) ?? '–'}</Text><Text style={styles.count}>{place.venue.reviewCount ?? 0} reviews</Text></View>
           <Text style={styles.title}>{place.venue.name}</Text>
           <Text style={styles.address}>{place.venue.address ?? place.venue.city}</Text>
-          <View style={styles.chips}>{[place.venue.category, '$'.repeat(place.venue.priceLevel ?? 1), (place.venue.distanceKm ?? 0).toFixed(1) + ' km'].map((value) => <Text key={value} style={styles.chip}>{value}</Text>)}</View>
+          <View style={styles.chips}>{(place.chips.length > 0 ? place.chips : [place.venue.category, '$'.repeat(place.venue.priceLevel ?? 1), (place.venue.distanceKm ?? 0).toFixed(1) + ' km']).map((value) => <Text key={value} style={styles.chip}>{value}</Text>)}</View>
           <View style={styles.tabs}>{(['overview', 'reviews'] as const).map((value) => <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabActive]}><Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{value === 'overview' ? 'Overview' : 'Reviews'}</Text></Pressable>)}</View>
           {tab === 'overview' ? <Overview details={place} openHours={() => setSheet('hours')} openPhotos={() => setSheet('photos')} styles={styles} /> : <Reviews error={reviews.isError ? apiErrorMessage(reviews.error) : null} items={reviews.data ?? []} loading={reviews.isPending} openSort={() => setSheet('sort')} retry={() => void reviews.refetch()} sort={sort} styles={styles} />}
         </View>
@@ -93,8 +106,8 @@ export function PlaceScreen({ onBack, onWriteReview, userId, venueId }: { onBack
 function Overview({ details, openHours, openPhotos, styles }: { details: NonNullable<ReturnType<typeof usePlace>['data']>; openHours: () => void; openPhotos: () => void; styles: ReturnType<typeof createStyles> }) {
   return <View style={styles.section}>
     <Pressable onPress={openHours} style={styles.detail}><Text style={styles.detailText}>▣  {details.openingHours[0]?.hours ?? 'Opening hours'}</Text><Text style={styles.arrow}>›</Text></Pressable>
-    {details.phone ? <View style={styles.detail}><Text style={styles.detailText}>⌕  {details.phone}</Text></View> : null}
-    {details.website ? <View style={styles.detail}><Text style={styles.detailText}>◒  {details.website}</Text></View> : null}
+    {details.phone ? <Pressable style={styles.detail}><Text style={styles.detailText}>⌕  {details.phone}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
+    {details.website ? <Pressable style={styles.detail}><Text style={styles.detailText}>◒  {details.website}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
     <Pressable onPress={openPhotos} style={styles.strip}>{details.photoKeys.slice(0, 3).map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
     <Text style={styles.sectionTitle}>☁  Top rated dishes</Text>
     {details.popularDishes.map((dish, index) => <View key={dish.name} style={styles.dish}><Text style={styles.dishName}>{index + 1}. {dish.name}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>)}
@@ -142,11 +155,11 @@ function Sort({ close, select, selected, styles, visible }: { close: () => void;
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.canvas }, hero: { height: 260, overflow: 'hidden' }, heroImage: { width: '100%', height: '100%', resizeMode: 'cover' }, shade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.24)' },
-  navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(25,25,25,0.72)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 34, lineHeight: 34, marginTop: -3 }, photoCount: { position: 'absolute', right: 14, bottom: 12, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 9, paddingVertical: 5 }, photoCountText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  content: { paddingHorizontal: 16, paddingBottom: 95 }, badges: { marginTop: 13, flexDirection: 'row', alignItems: 'center', gap: 6 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, fontSize: 9, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 10 }, title: { marginTop: 5, color: colors.text, fontSize: 17, fontWeight: '700' }, address: { marginTop: 4, color: colors.textSecondary, fontSize: 11 }, chips: { marginTop: 6, flexDirection: 'row', gap: 7 }, chip: { color: colors.text, backgroundColor: colors.surfaceRaised, borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4, fontSize: 9, fontWeight: '600' },
+  screen: { flex: 1, backgroundColor: colors.canvas }, hero: { height: 365, overflow: 'hidden' }, heroImage: { height: 365, resizeMode: 'cover' }, topShade: { position: 'absolute', zIndex: 1, top: 0, right: 0, left: 0, height: 150 }, bottomShade: { position: 'absolute', zIndex: 1, right: 0, bottom: 0, left: 0, height: 135 },
+  navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(33,33,33,0.64)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 40, lineHeight: 40, marginTop: -4 }, photoDots: { position: 'absolute', zIndex: 2, bottom: 28, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }, photoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' }, photoDotActive: { backgroundColor: '#fff' }, photoCount: { position: 'absolute', zIndex: 2, right: 18, bottom: 18, borderRadius: 13, backgroundColor: 'rgba(66,66,66,0.72)', paddingHorizontal: 11, paddingVertical: 6 }, photoCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  content: { paddingHorizontal: 16, paddingBottom: 95 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', gap: 8 }, chip: { color: colors.text, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7, fontSize: 11, fontWeight: '600' },
   tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 9, paddingTop: 10 },
-  detail: { minHeight: 34, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderRadius: 12, backgroundColor: colors.surfaceRaised }, detailText: { flex: 1, color: colors.textSecondary, fontSize: 10 }, arrow: { color: colors.textMuted, fontSize: 18 }, strip: { height: 84, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 12, marginTop: 2 }, stripImage: { width: 90, height: 84, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 8, bottom: 7, color: '#fff', backgroundColor: 'rgba(0,0,0,0.58)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8, fontSize: 9 }, sectionTitle: { color: colors.text, fontSize: 12, fontWeight: '700', marginTop: 8 }, dish: { minHeight: 30, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 10 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, fontSize: 9 },
+  detail: { minHeight: 58, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', borderRadius: 29, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailText: { flex: 1, color: colors.textSecondary, fontSize: 13 }, arrow: { color: colors.textMuted, fontSize: 23 }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 18 }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
   reviewTools: { height: 34, padding: 4, flexDirection: 'row', alignItems: 'center', gap: 15, borderRadius: 17, backgroundColor: colors.surfaceRaised }, all: { color: '#111', backgroundColor: '#D9DDE5', borderRadius: 13, paddingHorizontal: 28, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, friends: { flex: 1, color: colors.textMuted, fontSize: 10, textAlign: 'center' }, sort: { color: colors.text, fontSize: 10, paddingRight: 7 }, review: { gap: 6, padding: 11, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewer: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 29, height: 29, borderRadius: 15 }, author: { flex: 1, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 11, fontWeight: '700' }, authorHandle: { color: colors.textMuted, fontSize: 9 }, reviewDate: { color: colors.textMuted, fontSize: 9 }, stars: { color: colors.primary, fontSize: 12 }, reviewText: { color: colors.textSecondary, fontSize: 11, lineHeight: 15 }, dishes: { color: colors.text, fontSize: 10, fontWeight: '600' }, metrics: { color: colors.textMuted, fontSize: 10 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },

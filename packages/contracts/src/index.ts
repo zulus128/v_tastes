@@ -329,6 +329,8 @@ export interface PlaceDetails {
   website: string | null;
   openingHours: Array<{ day: string; hours: string }>;
   photoKeys: string[];
+  photoCount: number;
+  chips: string[];
   popularDishes: PlaceDish[];
 }
 
