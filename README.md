@@ -53,6 +53,19 @@ pnpm test
 
 Run `pnpm smoke` while the emulators are active to verify Auth, Callable Functions, Firestore transactions, profile creation, review creation, comments, and reactions end to end.
 
+### Android test distribution
+
+Pushes to `main` that change the mobile app or its workspace packages run the
+EAS workflow in `apps/mobile/.eas/workflows/firebase-app-distribution.yml`.
+It builds the `preview` APK and uploads it to the Firebase App Distribution app
+`com.vkassin.tastes`, assigning the release to the `tastes-testers` group.
+
+For the workflow to authenticate, add a Firebase service-account JSON key as a
+secret file variable named `GOOGLE_APPLICATION_CREDENTIALS` in the EAS
+`preview` environment before the next matching push. The service account needs
+the Firebase App Distribution Admin role. Do not commit the key to the
+repository.
+
 ### Local phone authentication
 
 The test client uses the same passwordless flow planned for production:

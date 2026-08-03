@@ -8,7 +8,11 @@
       "distribution": "internal"
     },
     "preview": {
+      "environment": "preview",
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "tastes-934e6",
         "EXPO_PUBLIC_FIRESTORE_DATABASE_ID": "tastes-eu",

@@ -1,0 +1,46 @@
+name: Android Firebase App Distribution
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/mobile/**
+      - packages/contracts/**
+      - packages/firebase-client/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - tsconfig.base.json
+
+jobs:
+  build_android_preview:
+    name: Build Android preview APK
+    type: build
+    params:
+      platform: android
+      profile: preview
+
+  distribute_android:
+    name: Upload APK to Firebase App Distribution
+    needs: [build_android_preview]
+    environment: preview
+    env:
+      FIREBASE_ANDROID_APP_ID: 1:254210443804:android:ddc430eb9ab7d65e1f2dd9
+      FIREBASE_TESTER_GROUP: tastes-testers
+      FIREBASE_RELEASE_NOTES: ${{ github.commit_message }}
+    steps:
+      - uses: eas/download_build
+        id: download_build
+        with:
+          build_id: ${{ needs.build_android_preview.outputs.build_id }}
+          extensions: [apk]
+      - name: Upload to Firebase App Distribution
+        run: |
+          test -n "$GOOGLE_APPLICATION_CREDENTIALS"
+          test -f "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx --yes firebase-tools@15.23.0 appdistribution:distribute \
+            "${{ steps.download_build.outputs.artifact_path }}" \
+            --app "$FIREBASE_ANDROID_APP_ID" \
+            --groups "$FIREBASE_TESTER_GROUP" \
+            --release-notes "$FIREBASE_RELEASE_NOTES"
