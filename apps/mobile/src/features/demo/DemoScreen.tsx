@@ -33,6 +33,8 @@ function toReview(id: string, data: DocumentData): Review {
     venueName: String(data.venueName ?? ''),
     rating: Number(data.rating ?? 0),
     text: String(data.text ?? ''),
+    tags: [],
+    dishReviews: [],
     status: data.status as Review['status'],
     commentCount: Number(data.commentCount ?? 0),
     reactionCount: Number(data.reactionCount ?? 0),
@@ -164,6 +166,8 @@ export function DemoScreen({
             venueId: selectedVenueId,
             rating: 5,
             text: reviewText,
+            tags: [],
+            dishReviews: [],
           }))}
         />
       </View>

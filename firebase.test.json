@@ -11,10 +11,14 @@
     "rules": "services/backend/firebase/firestore.rules",
     "indexes": "services/backend/firebase/firestore.indexes.json"
   },
+  "storage": {
+    "rules": "services/backend/firebase/storage.rules"
+  },
   "emulators": {
     "auth": { "port": 9101 },
     "functions": { "port": 5002 },
     "firestore": { "port": 8181 },
+    "storage": { "port": 9198 },
     "hub": { "port": 4402 },
     "logging": { "port": 4502 },
     "ui": { "enabled": false },

@@ -298,6 +298,10 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
       dishNames: Array.isArray(document.get('dishNames'))
         ? (document.get('dishNames') as unknown[]).filter((value): value is string => typeof value === 'string')
         : [],
+      tags: Array.isArray(document.get('tags')) ? document.get('tags') as PlaceReview['tags'] : [],
+      dishReviews: Array.isArray(document.get('dishReviews'))
+        ? document.get('dishReviews') as PlaceReview['dishReviews']
+        : [],
     };
   });
   const compare = {

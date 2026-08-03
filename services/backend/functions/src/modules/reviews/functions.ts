@@ -84,6 +84,8 @@ export const getFeed = onCall(callableOptions, async (request) => {
       venueName: String(document.get('venueName')),
       rating: Number(document.get('rating')),
       text: String(document.get('text')),
+      tags: Array.isArray(document.get('tags')) ? document.get('tags') : [],
+      dishReviews: Array.isArray(document.get('dishReviews')) ? document.get('dishReviews') : [],
       status: 'published' as const,
       commentCount: Number(document.get('commentCount') ?? 0),
       reactionCount: Number(document.get('reactionCount') ?? 0),
@@ -141,6 +143,10 @@ export const createReview = onCall(callableOptions, async (request) => {
   const reviewRef = db.collection('reviews').doc(
     idempotentDocumentId(uid, 'create-review', input.idempotencyKey),
   );
+  const expectedPhotoPrefix = `review-images/${uid}/${input.idempotencyKey}/`;
+  if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(expectedPhotoPrefix))) {
+    throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user and draft.');
+  }
 
   await db.runTransaction(async (transaction) => {
     const [user, venue, existingReview] = await Promise.all([
@@ -167,15 +173,29 @@ export const createReview = onCall(callableOptions, async (request) => {
       venueCity: venue.get('city'),
       rating: input.rating,
       text: input.text,
+      tags: input.tags,
+      tag: input.tags[0] ?? null,
+      dishReviews: input.dishReviews,
+      dishNames: input.dishReviews.map((dish) => dish.title),
       status: 'published',
       commentCount: 0,
       reactionCount: 0,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
+    const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
+    transaction.update(venueRef, {
+      rating: ((averageRating * reviewCount) + input.rating) / (reviewCount + 1),
+      reviewCount: reviewCount + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     addXp(transaction, userRef, 50, {
       xp: Number(user.get('xp') ?? 0),
       monthlyXp: Number(user.get('monthlyXp') ?? 0),
+    });
+    transaction.update(userRef, {
+      reviewCount: FieldValue.increment(1),
     });
   });
 

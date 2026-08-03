@@ -52,6 +52,7 @@ export function usePlace(venueId: string) {
   return useQuery({
     queryKey: placeQueryKey(venueId),
     queryFn: async () => (await api.getPlace({ venueId })).data,
+    enabled: venueId.length > 0,
   });
 }
 

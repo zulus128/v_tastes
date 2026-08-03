@@ -18,11 +18,25 @@ describe('public API contracts', () => {
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Great place',
+      tags: ['casual', 'date-night'],
+      dishReviews: [{
+        id: 'dish-command-0001',
+        title: 'Soup dumplings',
+        rating: 4.5,
+        photoPath: 'review-images/user-1/review-command-0001/dish-command-0001',
+      }],
     })).toEqual({
       idempotencyKey: 'review-command-0001',
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Great place',
+      tags: ['casual', 'date-night'],
+      dishReviews: [{
+        id: 'dish-command-0001',
+        title: 'Soup dumplings',
+        rating: 4.5,
+        photoPath: 'review-images/user-1/review-command-0001/dish-command-0001',
+      }],
     });
   });
 
@@ -32,6 +46,13 @@ describe('public API contracts', () => {
       venueId: 'demo-cafe',
       rating: 100,
       text: '',
+    }).success).toBe(false);
+    expect(createReviewInputSchema.safeParse({
+      idempotencyKey: 'review-command-0001',
+      venueId: 'demo-cafe',
+      rating: 5,
+      text: 'Great place',
+      dishReviews: [{ id: 'dish-1', title: '', rating: 6, photoPath: 'someone-else/photo.jpg' }],
     }).success).toBe(false);
   });
 

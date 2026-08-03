@@ -19,6 +19,7 @@ import type { User } from 'firebase/auth';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMemo } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
+import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
@@ -40,7 +41,7 @@ export type RootStackParamList = {
 type MainTabParamList = {
   Home: undefined;
   Discover: undefined;
-  Create: undefined;
+  Create: { venueId?: string } | undefined;
   Dialog: undefined;
   Profile: undefined;
 };
@@ -182,7 +183,20 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
         {() => <DiscoverScreen onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })} userId={user.uid} />}
       </Tabs.Screen>
       <Tabs.Screen name="Create">
-        {() => <PlaceholderScreen title="Create a review" />}
+        {({ navigation, route }) => (
+          <CreateReviewScreen
+            initialVenueId={route.params?.venueId}
+            onClose={() => {
+              navigation.setParams({ venueId: undefined });
+              navigation.navigate('Home');
+            }}
+            onPublished={() => {
+              navigation.setParams({ venueId: undefined });
+              navigation.navigate('Home');
+            }}
+            userId={user.uid}
+          />
+        )}
       </Tabs.Screen>
       <Tabs.Screen name="Dialog">
         {() => <PlaceholderScreen title="Dialog" />}
@@ -236,7 +250,7 @@ export function ProductNavigator({ user }: { user: User }) {
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Discover' });
               }}
-              onWriteReview={() => navigation.navigate('MainTabs', { screen: 'Create' })}
+              onWriteReview={() => navigation.navigate('MainTabs', { screen: 'Create', params: { venueId: route.params.venueId } })}
               userId={user.uid}
               venueId={route.params.venueId}
             />

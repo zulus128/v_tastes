@@ -50,6 +50,13 @@ export const reviewSchema = z.object({
   venueName: z.string().min(1),
   rating: z.number().min(1).max(5),
   text: z.string().min(1).max(2_000),
+  tags: z.array(z.enum(['casual', 'date-night', 'birthday', 'children'])).max(4).default([]),
+  dishReviews: z.array(z.object({
+    id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
+    title: z.string().trim().min(1).max(120),
+    rating: z.number().min(1).max(5),
+    photoPath: z.string().trim().min(1).max(512),
+  })).max(5).default([]),
   status: z.enum(['published', 'hidden', 'deleted']),
   commentCount: z.number().int().nonnegative(),
   reactionCount: z.number().int().nonnegative(),
@@ -57,11 +64,27 @@ export const reviewSchema = z.object({
 
 export const idempotencyKeySchema = z.string().trim().min(16).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
 
+export const reviewTagSchema = z.enum(['casual', 'date-night', 'birthday', 'children']);
+
+export const dishReviewInputSchema = z.object({
+  id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
+  title: z.string().trim()
+    .min(1, 'Enter the dish name.')
+    .max(120, 'The dish name must be at most 120 characters long.'),
+  rating: z.number().min(1).max(5),
+  photoPath: z.string().trim()
+    .min(1)
+    .max(512)
+    .regex(/^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/),
+});
+
 export const createReviewInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   venueId: z.string().min(1),
   rating: z.number().min(1).max(5),
   text: z.string().trim().min(1).max(2_000),
+  tags: z.array(reviewTagSchema).max(4).default([]),
+  dishReviews: z.array(dishReviewInputSchema).max(5).default([]),
 });
 
 export const addCommentInputSchema = z.object({
@@ -175,6 +198,8 @@ export type GetPlaceInput = z.infer<typeof getPlaceInputSchema>;
 export type GetPlaceReviewsInput = z.infer<typeof getPlaceReviewsInputSchema>;
 export type PlaceReviewSort = z.infer<typeof placeReviewSortSchema>;
 export type Review = z.infer<typeof reviewSchema>;
+export type ReviewTag = z.infer<typeof reviewTagSchema>;
+export type DishReviewInput = z.infer<typeof dishReviewInputSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
@@ -348,6 +373,8 @@ export interface PlaceReview {
   createdAt: string;
   tag: string | null;
   dishNames: string[];
+  tags: ReviewTag[];
+  dishReviews: DishReviewInput[];
 }
 
 export interface DiscoverPeopleResult {

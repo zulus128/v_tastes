@@ -243,17 +243,34 @@ describe('authenticated session and paginated reads', () => {
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Exactly once',
+      tags: ['casual', 'date-night'],
+      dishReviews: [{
+        id: 'dish-command-0001',
+        title: 'Soup dumplings',
+        rating: 4.5,
+        photoPath: `review-images/${author.id}/review-command-0001/dish-command-0001`,
+      }],
     };
     const firstReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
     const replayedReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
     expect(replayedReview.id).toBe(firstReview.id);
     expect((await author.ref.get()).get('xp')).toBe(50);
-    const friendsFeed = await callFunction<{ items: Array<{ id: string }> }>(
+    const reviewDocument = await db.collection('reviews').doc(firstReview.id).get();
+    expect(reviewDocument.get('tags')).toEqual(['casual', 'date-night']);
+    expect(reviewDocument.get('dishNames')).toEqual(['Soup dumplings']);
+    expect(reviewDocument.get('dishReviews')).toEqual(reviewCommand.dishReviews);
+    expect((await db.collection('venues').doc('demo-cafe').get()).get('reviewCount')).toBe(1);
+    expect((await author.ref.get()).get('reviewCount')).toBe(1);
+    const friendsFeed = await callFunction<{ items: Array<{ id: string; tags: string[]; dishReviews: unknown[] }> }>(
       'getFeed',
       { scope: 'friends', limit: 20 },
       second.token,
     );
     expect(friendsFeed.items.map((item) => item.id)).toContain(firstReview.id);
+    expect(friendsFeed.items.find((item) => item.id === firstReview.id)).toMatchObject({
+      tags: ['casual', 'date-night'],
+      dishReviews: reviewCommand.dishReviews,
+    });
 
     const commentCommand = {
       idempotencyKey: 'comment-command-001',
