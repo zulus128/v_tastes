@@ -692,7 +692,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   progressDotActive: { backgroundColor: colors.primary },
   inviteActions: { width: '100%', gap: 9, marginTop: 30 },
   actionRow: { height: 46, borderRadius: 23, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 17 },
-  actionIcon: { width: 18, height: 18, marginRight: 12 },
+  actionIcon: { width: 18, height: 18, marginRight: 12, tintColor: colors.text },
   actionText: { color: colors.text, fontSize: 13, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },

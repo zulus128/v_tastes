@@ -73,6 +73,7 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 function tabOptions(
   colors: ThemeColors,
+  isDark: boolean,
   { route }: { route: { name: keyof MainTabParamList } },
 ): BottomTabNavigationOptions {
   const create = route.name === 'Create';
@@ -87,7 +88,7 @@ function tabOptions(
     tabBarIcon: ({ focused }) => (
       create ? (
         <LinearGradient
-          colors={['#080808', '#4C1816']}
+          colors={isDark ? ['#080808', colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
           end={{ x: 0.5, y: 1 }}
           start={{ x: 0.5, y: 0 }}
           style={styles.createIconBorder}
@@ -162,11 +163,11 @@ function ProfileTab({ user, rootNavigation }: { user: User; rootNavigation: Root
 }
 
 function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   return (
     <Tabs.Navigator
       initialRouteName="Home"
-      screenOptions={(props) => tabOptions(colors, props)}
+      screenOptions={(props) => tabOptions(colors, isDark, props)}
       backBehavior="history"
       safeAreaInsets={{ bottom: 0 }}
     >
