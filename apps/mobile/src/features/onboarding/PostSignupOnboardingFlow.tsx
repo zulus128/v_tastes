@@ -57,13 +57,15 @@ import inviteShare from '../../../assets/onboarding/invite-share.png';
 import permissionContacts from '../../../assets/onboarding/permission-contacts.png';
 import permissionLocation from '../../../assets/onboarding/permission-location.png';
 import permissionNotifications from '../../../assets/onboarding/permission-notifications.png';
+import placeGemini from '../../../assets/onboarding/place-gemini.png';
+import placeGeminiPopular from '../../../assets/onboarding/place-gemini-popular.png';
 import placeSelected from '../../../assets/onboarding/place-selected.png';
 import placeUnselected from '../../../assets/onboarding/place-unselected.png';
+import placeWasabi from '../../../assets/onboarding/place-wasabi.png';
 import PlaceSearchIcon from '../../../assets/onboarding/place-search.svg';
 import PlaceTuningIcon from '../../../assets/onboarding/place-tuning.svg';
 import ratingStar from '../../../assets/onboarding/rating-star.png';
 import readyCollage from '../../../assets/onboarding/ready-collage.png';
-import restaurantPhoto from '../../../assets/onboarding/restaurant.png';
 import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
 import styleDark from '../../../assets/onboarding/style-dark.png';
@@ -151,6 +153,35 @@ const placeFilters = [
   { icon: filterReviews, label: 'My Reviews' },
 ] as const;
 const knownPlaceQueries = new Set([...placeFilters.map(({ label }) => label.toLowerCase()), 'friends']);
+const placeCandidates = [
+  {
+    id: 'gemini-popular',
+    name: 'Gemini750 Restaurant',
+    address: '2464 Royal Ln. Mesa, New Jersey 45463',
+    image: placeGeminiPopular,
+    rating: '4.3',
+    reviews: '389 reviews',
+    popular: true,
+  },
+  {
+    id: 'wasabi',
+    name: 'Wasabi by Morimoto',
+    address: '123 Main Street, Apt 4B, New York, NY 10001, USA',
+    image: placeWasabi,
+    rating: '3.0',
+    reviews: '35 reviews',
+    popular: false,
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini750 Restaurant',
+    address: '742 Evergreen Terrace, Apartment 12B, Springfield, IL 62704, United States of America',
+    image: placeGemini,
+    rating: '2.0',
+    reviews: '34 reviews',
+    popular: false,
+  },
+] as const;
 const fallbackContacts: ContactCandidate[] = [
   { id: 'alex', name: 'Alex Carter', handle: '@alexc', invited: false },
   { id: 'sofia', name: 'Sofia Rossi', handle: '@sofiar', invited: true },
@@ -168,8 +199,8 @@ function slug(name: string) {
 }
 
 function useOnboardingStyles() {
-  const { colors } = useAppTheme();
-  return useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useAppTheme();
+  return useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 }
 
 function Header({ onBack, onSkip }: { onBack: () => void; onSkip?: () => void }) {
@@ -229,7 +260,7 @@ export function PostSignupOnboardingFlow({
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState('Restaurant');
-  const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['restaurant']));
+  const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['trending']));
   const [placeLoading, setPlaceLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
@@ -475,22 +506,46 @@ export function PostSignupOnboardingFlow({
             </Pressable>
           </ScrollView>
         </View>
-        {placeLoading ? <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>{[1, 2, 3].map((item) => <View key={item} style={styles.venue}><View style={styles.venueMain}><View style={styles.skeletonImage} /><View style={styles.venueCopy}><View style={styles.skeletonTitle} /><View style={styles.skeletonLine} /><View style={styles.skeletonShort} /></View></View><View style={styles.skeletonTags} /></View>)}</ScrollView> : noResults ? <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search — we're adding new spots in your city every week.</Text></View> : <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>{[1, 2, 3].map((item) => {
-          const venueId = `gemini-${item}`;
-          const selected = place === venueId;
-          return <Pressable key={venueId} onPress={() => setPlace(venueId)} style={[styles.venue, selected && styles.venueSelected]}>
-            <Image source={selected ? placeSelected : placeUnselected} style={styles.venueSelection} />
-            <View style={styles.venueMain}>
-              <Image source={restaurantPhoto} resizeMode="cover" style={styles.venueImage} />
-              <View style={styles.venueCopy}>
-                <Text numberOfLines={1} style={styles.venueTitle}>Gemini750 Restaurant</Text>
-                <Text numberOfLines={1} style={styles.venueAddress}>742 Evergreen Terrace, Apartment 12B, Springfield, IL 62704, United States of America</Text>
-                <View style={styles.ratingRow}><View style={styles.ratingTag}><Image source={ratingStar} style={styles.ratingStar} /><Text style={styles.ratingValue}>2.0</Text></View><Text style={styles.reviews}>34 reviews</Text></View>
+        {placeLoading ? (
+          <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
+            {[1, 2, 3].map((item) => (
+              <View key={item} style={styles.venue}>
+                <View style={styles.skeletonImage} />
+                <View style={styles.venueCopy}>
+                  <View style={styles.skeletonTitle} />
+                  <View style={styles.skeletonLine} />
+                  <View style={styles.skeletonShort} />
+                  <View style={styles.skeletonTags} />
+                </View>
               </View>
-            </View>
-            <View style={styles.venueTagsRow}><View style={styles.venueTag}><View style={styles.venueTagContent}><Text style={styles.venueTagText}>Italian</Text><Image source={flagItaly} style={styles.venueFlag} /></View></View><View style={styles.venueTag}><Text style={styles.venueTagText}>$$</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>1,2 km</Text></View></View>
-          </Pressable>;
-        })}</ScrollView>}
+            ))}
+          </ScrollView>
+        ) : noResults ? (
+          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search — we're adding new spots in your city every week.</Text></View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
+            {placeCandidates.map((item) => {
+              const selected = place === item.id;
+              return (
+                <Pressable key={item.id} onPress={() => setPlace(item.id)} style={[styles.venue, selected && styles.venueSelected]}>
+                  <Image source={selected ? placeSelected : placeUnselected} style={styles.venueSelection} />
+                  <View style={styles.venueImageWrap}>
+                    <Image source={item.image} resizeMode="cover" style={styles.venueImage} />
+                    {item.popular ? <View style={styles.popularBadge}><Text style={styles.popularText}>Popular</Text></View> : null}
+                  </View>
+                  <View style={styles.venueCopy}>
+                    <View style={styles.venueDetails}>
+                      <Text numberOfLines={1} style={styles.venueTitle}>{item.name}</Text>
+                      <Text numberOfLines={2} style={styles.venueAddress}>{item.address}</Text>
+                      <View style={styles.ratingRow}><View style={styles.ratingTag}><Image source={ratingStar} style={styles.ratingStar} /><Text style={styles.ratingValue}>{item.rating}</Text></View><Text style={styles.reviews}>{item.reviews}</Text></View>
+                    </View>
+                    <View style={styles.venueTagsRow}><View style={styles.venueTag}><View style={styles.venueTagContent}><Text style={styles.venueTagText}>Italian</Text><Image source={flagItaly} style={styles.venueFlag} /></View></View><View style={styles.venueTag}><Text style={styles.venueTagText}>$$</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>1,2 km</Text></View></View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
       <LinearGradient
         pointerEvents="none"
@@ -564,7 +619,7 @@ export function PostSignupOnboardingFlow({
   </LinearGradient>;
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   skip: { position: 'absolute', top: 58, right: 16, zIndex: 3, padding: 8 },
   skipText: { color: colors.textMuted, fontSize: 14 },
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
@@ -635,30 +690,33 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   filterText: { color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '500', letterSpacing: -0.23 },
   filterDimmed: { opacity: 0.5 },
   placeList: { flex: 1 },
-  placeListContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 110, gap: 12 },
-  venue: { height: 188, paddingHorizontal: 16, paddingVertical: 12, gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
-  venueSelected: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
-  venueSelection: { position: 'absolute', zIndex: 2, top: 15, right: 17, width: 22, height: 22 },
-  venueMain: { height: 122, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  venueImage: { width: 122, height: 122, borderRadius: 12 },
-  venueCopy: { flex: 1, paddingRight: 18, justifyContent: 'center' },
+  placeListContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110, gap: 12 },
+  venue: { minHeight: 167, padding: 12, gap: 12, borderWidth: 1, borderColor: isDark ? '#2A2A2A' : colors.border, borderRadius: 16, backgroundColor: isDark ? '#1A1A1A' : colors.surface, flexDirection: 'row', alignItems: 'flex-start' },
+  venueSelected: { borderColor: isDark ? '#2A2A2A' : colors.border, backgroundColor: isDark ? '#222222' : colors.surfaceRaised },
+  venueSelection: { position: 'absolute', zIndex: 2, top: 9, right: 9, width: 22, height: 22 },
+  venueImageWrap: { position: 'relative', width: 86, height: 86, borderRadius: 12, overflow: 'hidden' },
+  venueImage: { width: 86, height: 86, borderRadius: 12 },
+  popularBadge: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 8, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  popularText: { color: colors.onPrimary, fontSize: 12, letterSpacing: -0.24 },
+  venueCopy: { flex: 1, minWidth: 0, gap: 12 },
+  venueDetails: { gap: 6, paddingRight: 24 },
   venueTitle: { color: colors.text, fontSize: 14, fontWeight: '600', letterSpacing: -0.41 },
-  venueAddress: { color: colors.textMuted, fontSize: 13, letterSpacing: -0.24, marginTop: 6 },
-  ratingRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 15 },
+  venueAddress: { minHeight: 30, color: colors.textMuted, fontSize: 13, lineHeight: 15, letterSpacing: -0.24 },
+  ratingRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 9 },
   ratingTag: { height: 28, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 3 },
   ratingStar: { width: 14, height: 14 },
   ratingValue: { color: colors.onPrimary, fontSize: 14, fontWeight: '600', letterSpacing: -0.23 },
   reviews: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.24 },
   venueTagsRow: { height: 33, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  venueTag: { height: 33, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  venueTag: { height: 33, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: isDark ? colors.surfaceMuted : colors.background, alignItems: 'center', justifyContent: 'center' },
   venueTagContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   venueTagText: { color: colors.text, fontSize: 15, lineHeight: 20, letterSpacing: -0.24 },
   venueFlag: { width: 18, height: 18 },
-  skeletonImage: { width: 122, height: 122, borderRadius: 12, backgroundColor: colors.skeletonMuted },
+  skeletonImage: { width: 86, height: 86, borderRadius: 12, backgroundColor: colors.skeletonMuted },
   skeletonTitle: { width: '72%', height: 14, backgroundColor: colors.skeleton, borderRadius: 4 },
-  skeletonLine: { width: '94%', height: 10, backgroundColor: colors.skeletonMuted, borderRadius: 4, marginTop: 10 },
-  skeletonShort: { width: '52%', height: 28, backgroundColor: colors.skeletonMuted, borderRadius: 14, marginTop: 15 },
-  skeletonTags: { width: 205, height: 33, backgroundColor: colors.skeletonMuted, borderRadius: 17 },
+  skeletonLine: { width: '94%', height: 24, backgroundColor: colors.skeletonMuted, borderRadius: 4 },
+  skeletonShort: { width: '52%', height: 28, backgroundColor: colors.skeletonMuted, borderRadius: 14 },
+  skeletonTags: { width: '100%', height: 33, backgroundColor: colors.skeletonMuted, borderRadius: 17 },
   placeFooterGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 94 },
   empty: { alignItems: 'center', paddingHorizontal: 45, paddingTop: 118 },
   emptyIcon: { width: 44, height: 44 },

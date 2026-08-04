@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   ImageBackground,
   Modal,
@@ -40,6 +41,12 @@ import placeDining from '../../../assets/recap/story/place-dining.png';
 import placeGarden from '../../../assets/recap/story/place-garden.png';
 import placeLounge from '../../../assets/recap/story/place-lounge.png';
 import placeTerrace from '../../../assets/recap/story/place-terrace.jpg';
+import categoryCoffee from '../../../assets/recap/story/category-coffee.png';
+import categoryFood from '../../../assets/recap/story/category-food.png';
+import categoryTrophy from '../../../assets/recap/story/category-trophy.png';
+import recapFood from '../../../assets/recap/story/recap-food.png';
+import recapMeal from '../../../assets/recap/story/recap-meal.png';
+import recapWine from '../../../assets/recap/story/recap-wine.png';
 import shareRaysLight from '../../../assets/recap/story/share-rays-light.png';
 import shareRays from '../../../assets/recap/story/share-rays.png';
 import ShareGlyph from '../../../assets/recap/story/share.svg';
@@ -260,12 +267,12 @@ function IntroScreen({ onNext }: { onNext: () => void }) {
             </View>
           ))}
         </View>
-        <TastesMouth height={57} width={80} />
+        <TastesMouth height={57} width={230} />
       </View>
       <View style={styles.introCollage}>
-        <TiltedPhoto source={placeGarden} style={styles.introPhotoLeft} rating="2.5" />
-        <TiltedPhoto source={placeTerrace} style={styles.introPhotoRight} rating="4.5" />
-        <TiltedPhoto source={placeDining} style={styles.introPhotoBottom} rating="3.5" />
+        <TiltedPhoto source={recapFood} style={styles.introPhotoLeft} rating="2.5" />
+        <TiltedPhoto source={recapMeal} style={styles.introPhotoRight} rating="4.5" />
+        <TiltedPhoto source={recapWine} style={styles.introPhotoBottom} rating="3.5" />
       </View>
       <Text style={styles.introCaption}>Here’s what you explored this month</Text>
       <RecapButton label="See my stats" onPress={onNext} />
@@ -279,7 +286,11 @@ function TiltedPhoto({ source, rating, style }: { source: ImageSourcePropType; r
   return (
     <View style={[styles.tiltedPhoto, style]}>
       <Image source={source} style={styles.tiltedPhotoImage} />
-      <View style={styles.ratingPin}><Text style={styles.ratingPinText}>{rating}</Text></View>
+      <View style={styles.ratingPin}>
+        <Text style={styles.ratingPinText}>{rating}</Text>
+        <View style={styles.ratingPinPointer} />
+        <Text style={styles.ratingPinStar}>★</Text>
+      </View>
     </View>
   );
 }
@@ -395,9 +406,9 @@ function RatingGuessScreen({
         ))}
       </View>
       <View style={styles.ratingArc}>
-        <View style={styles.ratingCategory}><Text style={styles.ratingCategoryGlyph}>☕</Text></View>
-        <View style={styles.ratingCategoryMain}><Text style={[styles.ratingCategoryGlyph, styles.ratingCategoryGlyphMain]}>🍴</Text></View>
-        <View style={styles.ratingCategory}><Text style={styles.ratingCategoryGlyph}>▽</Text></View>
+        <View style={styles.ratingCategory}><Image source={categoryCoffee} style={styles.ratingCategoryIcon} /></View>
+        <View style={styles.ratingCategoryMain}><Image source={categoryFood} style={styles.ratingCategoryMainIcon} /></View>
+        <View style={styles.ratingCategory}><Image source={categoryTrophy} style={styles.ratingCategoryIcon} /></View>
       </View>
       <View style={styles.ratingCopy}>
         <Text style={styles.ratingPlaceTitle}>Joe’s Shanghai Soup{'\n'}Dumpling Restaurant</Text>
@@ -421,9 +432,9 @@ function RatingFeedbackScreen({ correct }: { correct: boolean }) {
         </View>
       </View>
       <View style={styles.ratingArc}>
-        <View style={styles.ratingCategory}><Text style={styles.ratingCategoryGlyph}>☕</Text></View>
-        <View style={styles.ratingCategoryMain}><Text style={[styles.ratingCategoryGlyph, styles.ratingCategoryGlyphMain]}>🍴</Text></View>
-        <View style={styles.ratingCategory}><Text style={styles.ratingCategoryGlyph}>▽</Text></View>
+        <View style={styles.ratingCategory}><Image source={categoryCoffee} style={styles.ratingCategoryIcon} /></View>
+        <View style={styles.ratingCategoryMain}><Image source={categoryFood} style={styles.ratingCategoryMainIcon} /></View>
+        <View style={styles.ratingCategory}><Image source={categoryTrophy} style={styles.ratingCategoryIcon} /></View>
       </View>
       <View style={styles.ratingCopy}>
         <Text style={styles.ratingPlaceTitle}>Joe’s Shanghai Soup{'\n'}Dumpling Restaurant</Text>
@@ -731,6 +742,8 @@ function CloseConfirmation({
 }
 
 const createStyles = (_colors: ThemeColors, isDark: boolean) => {
+  const layoutScale = Math.min(1, Dimensions.get('window').height / 875);
+  const s = (value: number) => Math.round(value * layoutScale);
   const text = isDark ? '#FFFFFF' : '#080808';
   const secondaryText = isDark ? '#AAB2C5' : '#677083';
   const subtleText = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(8,8,8,0.6)';
@@ -763,22 +776,24 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   lockIcon: { width: 47, height: 60, tintColor: text },
   centerTitle: { color: text, fontSize: 26, lineHeight: 32, fontWeight: '700', textAlign: 'center' },
   centerSubtitle: { maxWidth: 360, color: secondaryText, fontSize: 15, lineHeight: 21, textAlign: 'center' },
-  introHeader: { position: 'absolute', top: 122, left: 16, right: 16, alignItems: 'center' },
+  introHeader: { position: 'absolute', top: s(122), left: 16, right: 16, alignItems: 'center' },
   introTitle: { color: text, fontSize: 28, fontWeight: '700', letterSpacing: 0.6, marginBottom: 16 },
   tastesTiles: { flexDirection: 'row', gap: 8 },
   letterTile: { width: 31, height: 47, borderRadius: 6, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   letterTilePink: { backgroundColor: '#FF9EB1' },
   letterTileText: { color: '#080808', fontSize: 26, fontWeight: '700' },
-  introCollage: { position: 'absolute', top: 294, left: 0, right: 0, height: 420 },
+  introCollage: { position: 'absolute', top: layoutScale < 1 ? s(320) : 294, left: 0, right: 0, height: s(420) },
   tiltedPhoto: { position: 'absolute', borderRadius: 8 },
   tiltedPhotoImage: { width: '100%', height: '100%', borderRadius: 8 },
-  introPhotoLeft: { left: 22, top: 80, width: 120, height: 120, transform: [{ rotate: '8deg' }] },
-  introPhotoRight: { right: 22, top: 30, width: 145, height: 145, transform: [{ rotate: '-7deg' }] },
-  introPhotoBottom: { left: '30%', top: 235, width: 145, height: 145, transform: [{ rotate: '8deg' }] },
-  ratingPin: { position: 'absolute', top: -25, alignSelf: 'center', backgroundColor: '#AD3324', borderWidth: 1, borderColor: isDark ? '#FFFFFF' : '#282828', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 6 },
+  introPhotoLeft: { left: 22, top: s(80), width: s(120), height: s(120), transform: [{ rotate: '8deg' }] },
+  introPhotoRight: { right: 22, top: s(30), width: s(145), height: s(145), transform: [{ rotate: '-7deg' }] },
+  introPhotoBottom: { left: '30%', top: s(235), width: s(145), height: s(145), transform: [{ rotate: '8deg' }] },
+  ratingPin: { position: 'absolute', top: -31, alignSelf: 'center', width: 42, height: 42, backgroundColor: '#AD3324', borderWidth: 1, borderColor: isDark ? '#FFFFFF' : '#282828', borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   ratingPinText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  ratingPinPointer: { position: 'absolute', top: 38, width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#AD3324' },
+  ratingPinStar: { position: 'absolute', top: 44, color: '#FFFFFF', fontSize: 11, lineHeight: 12 },
   introCaption: { position: 'absolute', left: 16, right: 16, bottom: 101, color: secondaryText, fontSize: 16, textAlign: 'center' },
-  questionContent: { position: 'absolute', top: 263, left: 16, right: 16 },
+  questionContent: { position: 'absolute', top: s(263), left: 16, right: 16 },
   screenHeading: { alignItems: 'center', gap: 8 },
   screenHeadingTitle: { color: text, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   screenHeadingSubtitle: { color: secondaryText, fontSize: 16, lineHeight: 18, textAlign: 'center' },
@@ -787,12 +802,12 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   answerCardMuted: { opacity: 0.3 },
   answerNumber: { color: '#FFFFFF', fontSize: 24, fontWeight: '600' },
   answerUnit: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  resultTitle: { position: 'absolute', top: 117, left: 16, right: 16, color: text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  placeResultBadge: { position: 'absolute', top: 160, left: 0, right: 0, alignItems: 'center' },
+  resultTitle: { position: 'absolute', top: s(117), left: 16, right: 16, color: text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  placeResultBadge: { position: 'absolute', top: s(160), left: 0, right: 0, alignItems: 'center' },
   resultBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FF9EB1', borderRadius: 42, paddingHorizontal: 32, paddingVertical: 10 },
   resultBadgeNumber: { color: '#080808', fontSize: 32, fontWeight: '700' },
   resultBadgeUnit: { color: '#080808', fontSize: 18, fontWeight: '600' },
-  placeSheet: { position: 'absolute', top: 235, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? '#FFFFFF' : '#E4E4E4', backgroundColor: isDark ? 'rgba(15,5,5,0.75)' : 'rgba(255,255,255,0.82)', overflow: 'hidden' },
+  placeSheet: { position: 'absolute', top: s(235), left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? '#FFFFFF' : '#E4E4E4', backgroundColor: isDark ? 'rgba(15,5,5,0.75)' : 'rgba(255,255,255,0.82)', overflow: 'hidden' },
   placeList: { padding: 16, paddingBottom: 110, gap: 8 },
   placeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeCardCompact: { minHeight: 120, borderRadius: 10, borderWidth: 1, borderColor: cardBorder, backgroundColor: cardSurface, padding: 10, gap: 24 },
@@ -804,59 +819,59 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   placeAddress: { color: secondaryText, fontSize: 14 },
   ratingTag: { backgroundColor: '#D8332D', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
   ratingTagText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  areaHeading: { position: 'absolute', top: 133, left: 16, right: 16 },
-  areaOptionTop: { position: 'absolute', top: 303, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  areaOptionBottom: { position: 'absolute', top: 593, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  areaHeading: { position: 'absolute', top: s(133), left: 16, right: 16 },
+  areaOptionTop: { position: 'absolute', top: s(303), left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  areaOptionBottom: { position: 'absolute', top: s(593), left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   areaOption: { color: text, fontSize: 18, fontWeight: '600' },
   areaRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(8,8,8,0.22)' },
-  choiceMap: { position: 'absolute', top: 340, left: '-30%', width: '160%', height: 260 },
-  feedbackPill: { position: 'absolute', top: 129, alignSelf: 'center', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(226,174,77,0.5)', backgroundColor: 'rgba(226,174,77,0.18)', paddingHorizontal: 16, paddingVertical: 8 },
+  choiceMap: { position: 'absolute', top: s(340), left: '-30%', width: '160%', height: s(260) },
+  feedbackPill: { position: 'absolute', top: s(129), alignSelf: 'center', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(226,174,77,0.5)', backgroundColor: 'rgba(226,174,77,0.18)', paddingHorizontal: 16, paddingVertical: 8 },
   feedbackPillCorrect: { borderColor: 'rgba(77,191,115,0.5)', backgroundColor: 'rgba(77,191,115,0.18)' },
   feedbackPillText: { color: '#E2AE4D', fontSize: 14, fontWeight: '500' },
   feedbackPillTextCorrect: { color: '#4DBF73' },
-  resultMapWrap: { position: 'absolute', top: 226, left: -98, right: -98, height: 363, alignItems: 'center', justifyContent: 'center' },
+  resultMapWrap: { position: 'absolute', top: s(226), left: -98, right: -98, height: s(363), alignItems: 'center', justifyContent: 'center' },
   resultMap: { width: '100%', height: '100%' },
   mapPin: { position: 'absolute', width: 134, height: 134 },
-  areaResultCopy: { position: 'absolute', top: 613, left: 65, right: 65, alignItems: 'center', gap: 13 },
+  areaResultCopy: { position: 'absolute', top: s(613), left: 65, right: 65, alignItems: 'center', gap: 13 },
   areaResultTitle: { color: text, fontSize: 24, fontWeight: '700' },
   areaResultPlace: { color: secondaryText, fontSize: 18, fontWeight: '600' },
-  ratingHeading: { position: 'absolute', top: 135, left: 40, right: 40 },
-  ratingCarousel: { position: 'absolute', top: 266, left: -94, right: -94, height: 254, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 18 },
+  ratingHeading: { position: 'absolute', top: s(135), left: 40, right: 40 },
+  ratingCarousel: { position: 'absolute', top: s(266), left: -94, right: -94, height: s(254), flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 18 },
   ratingThumb: { width: 154, height: 208, borderRadius: 8, overflow: 'hidden', opacity: 0.45, transform: [{ rotate: '-8deg' }] },
   ratingThumbSelected: { width: 226, height: 254, opacity: 1, transform: [{ rotate: '0deg' }] },
   ratingImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  ratingArc: { position: 'absolute', top: 546, left: 30, right: 30, height: 106, borderTopWidth: 5, borderColor: '#B82F29', borderRadius: 180, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 9 },
+  ratingArc: { position: 'absolute', top: s(546), left: 30, right: 30, height: s(106), borderTopWidth: 5, borderColor: '#B82F29', borderRadius: 180, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 9 },
   ratingCategory: { width: 55, height: 55, borderRadius: 28, backgroundColor: isDark ? '#3A0C0B' : 'rgba(184,47,41,0.1)', borderWidth: 1, borderColor: isDark ? cardBorder : 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   ratingCategoryMain: { width: 74, height: 74, marginTop: -46, borderRadius: 37, backgroundColor: '#B82F29', borderWidth: 2, borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  ratingCategoryGlyph: { color: '#FFFFFF', fontSize: 22 },
-  ratingCategoryGlyphMain: { color: '#FFFFFF' },
-  ratingCopy: { position: 'absolute', top: 637, left: 88, right: 88, alignItems: 'center', gap: 10 },
+  ratingCategoryIcon: { width: 20, height: 20, resizeMode: 'contain', tintColor: text },
+  ratingCategoryMainIcon: { width: 26, height: 26, resizeMode: 'contain' },
+  ratingCopy: { position: 'absolute', top: s(637), left: 88, right: 88, alignItems: 'center', gap: 10 },
   ratingPlaceTitle: { color: text, fontSize: 17, lineHeight: 22, fontWeight: '500', textAlign: 'center' },
   ratingAddress: { color: secondaryText, fontSize: 15, textAlign: 'center' },
-  ratingFeedback: { position: 'absolute', top: 188, left: 40, right: 40, color: text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  ratingFeedbackImage: { position: 'absolute', top: 266, alignSelf: 'center', width: 226, height: 254, borderRadius: 8, overflow: 'hidden' },
+  ratingFeedback: { position: 'absolute', top: s(188), left: 40, right: 40, color: text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  ratingFeedbackImage: { position: 'absolute', top: s(266), alignSelf: 'center', width: 226, height: s(254), borderRadius: 8, overflow: 'hidden' },
   feedbackMark: { position: 'absolute', alignSelf: 'center', top: '42%', width: 42, height: 42, borderRadius: 21, backgroundColor: '#2FB65B', alignItems: 'center', justifyContent: 'center' },
   feedbackMarkWrong: { backgroundColor: isDark ? '#161616' : '#080808' },
   feedbackMarkText: { color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
-  rankingHeading: { position: 'absolute', top: 135, left: 40, right: 40 },
-  rankingList: { position: 'absolute', top: 220, left: 16, right: 16, gap: 16 },
-  favoriteHeading: { position: 'absolute', top: 256, left: 102, right: 102 },
+  rankingHeading: { position: 'absolute', top: s(135), left: 40, right: 40 },
+  rankingList: { position: 'absolute', top: s(220), left: 16, right: 16, gap: s(16) },
+  favoriteHeading: { position: 'absolute', top: s(256), left: 102, right: 102 },
   foodCupcake: { position: 'absolute', top: 122, left: -5, width: 105, height: 105, resizeMode: 'contain', transform: [{ rotate: '18deg' }] },
   foodBurger: { position: 'absolute', top: 104, right: -5, width: 145, height: 120, resizeMode: 'contain', transform: [{ rotate: '-8deg' }] },
   foodPizza: { position: 'absolute', top: 344, left: -38, width: 155, height: 190, resizeMode: 'contain' },
   foodRamen: { position: 'absolute', top: 360, right: -42, width: 155, height: 155, resizeMode: 'contain', transform: [{ rotate: '-18deg' }] },
-  dishList: { position: 'absolute', top: 503, left: 16, right: 16 },
+  dishList: { position: 'absolute', top: s(503), left: 16, right: 16 },
   dishRow: { minHeight: 64, borderBottomWidth: 1, borderBottomColor: hairline, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 },
   dishAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: isDark ? '#FFFFFF' : '#E4E4E4' },
   dishName: { flex: 1, color: text, fontSize: 15, fontWeight: '600' },
-  followersContent: { position: 'absolute', top: 314, left: 21, right: 21, alignItems: 'center', gap: 14 },
+  followersContent: { position: 'absolute', top: s(314), left: 21, right: 21, alignItems: 'center', gap: 14 },
   avatarStack: { flexDirection: 'row', alignItems: 'center' },
   initialAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: isDark ? '#5D1715' : '#F2EFEA', alignItems: 'center', justifyContent: 'center' },
   initialText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   followerCount: { color: text, fontSize: 52, lineHeight: 58, fontWeight: '700' },
   followerCaption: { color: subtleText, fontSize: 16, lineHeight: 21 },
   followerFootnote: { color: faintText, fontSize: 13, lineHeight: 18 },
-  comparisonContent: { position: 'absolute', top: 135, left: 16, right: 16 },
+  comparisonContent: { position: 'absolute', top: s(135), left: 16, right: 16 },
   comparisonTable: { marginTop: 16 },
   comparisonRow: { minHeight: 57, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: softHairline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   comparisonLabel: { color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(8,8,8,0.85)', fontSize: 16 },
