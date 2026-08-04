@@ -20,17 +20,22 @@ import { useAppTheme } from '../../ui/ThemeProvider';
 
 export function PatternScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { colors, isDark } = useAppTheme();
-  // patternDark bakes light linework onto an opaque dark fill, so fading its
-  // opacity over a light canvas only produces a flat grey wash. patternLight
-  // is the same icon set as dark linework on a transparent field instead.
+  // The dark asset is the exact Figma composite: #080808 plus white linework
+  // at 4%. Keep it fully opaque; applying another opacity would double-fade
+  // the pattern. The light asset uses transparent dark linework instead.
   return (
-    <View style={[styles.screen, { backgroundColor: colors.canvas }, style]}>
+    <View style={[styles.screen, { backgroundColor: isDark ? colors.background : colors.canvas }, style]}>
       <ImageBackground
         imageStyle={{ opacity: isDark ? 1 : 0.06 }}
         resizeMode="cover"
         source={isDark ? patternDark : patternLight}
         style={styles.pattern}
       >
+        {isDark ? (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <Image resizeMode="cover" source={patternLight} style={styles.darkPatternBoost} />
+          </View>
+        ) : null}
         {children}
       </ImageBackground>
     </View>
@@ -98,7 +103,12 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   pattern: { flex: 1 },
-  patternImage: { opacity: 1 },
+  darkPatternBoost: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.025,
+    tintColor: '#FFFFFF',
+  },
   backButton: {
     position: 'absolute',
     zIndex: 2,

@@ -572,32 +572,9 @@ function ShareCard({ onShare, user }: { onShare: (channel: string) => void; user
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const profileSource: ImageSourcePropType = user?.photoURL ? { uri: user.photoURL } : avatar;
 
-  if (!isDark) {
-    return (
-      <View style={styles.shareContentLight}>
-        <Image source={shareRaysLight} resizeMode="cover" style={styles.shareRaysLight} />
-        <View style={styles.shareIdentityLight}>
-          <Image source={profileSource} style={styles.profileAvatarLight} />
-          <TastesLogo width={110} />
-        </View>
-        <Text style={styles.recapTitleLight}>Monthly Recap</Text>
-        <View style={styles.metricsLight}>
-          <Metric icon={placesIcon} label="Places visited" value="15" />
-          <Metric icon={areasIcon} label="New neighborhoods explored" value="2" />
-          <Metric icon={followersIcon} label="Followers gained" value="132" />
-        </View>
-        <View style={styles.favoriteCards}>
-          <ShareFavoriteCard image={placeLounge} label="Favorite place" rating="5.0" />
-          <ShareFavoriteCard image={foodRamen} label="Favorite dish" rating="4.5" />
-        </View>
-        <RecapButton label="Share now" shareIcon showArrow={false} onPress={() => onShare('Share now')} />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.shareContent}>
-      <Image source={shareRays} resizeMode="cover" style={styles.shareRays} />
+      <Image source={isDark ? shareRays : shareRaysLight} resizeMode="cover" style={styles.shareRays} />
       <View style={styles.shareIdentity}>
         <Image source={profileSource} style={styles.profileAvatar} />
         <TastesLogo width={110} />
@@ -614,33 +591,6 @@ function ShareCard({ onShare, user }: { onShare: (channel: string) => void; user
         <ShareOption icon={copyIcon} label="Copy link" onPress={() => onShare('Copy link')} />
         <ShareOption icon={saveIcon} label="Save image" onPress={() => onShare('Save image')} />
       </View>
-    </View>
-  );
-}
-
-function ShareFavoriteCard({
-  image,
-  label,
-  rating,
-}: {
-  image: ImageSourcePropType;
-  label: string;
-  rating: string;
-}) {
-  const { colors, isDark } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  return (
-    <View style={styles.favoriteCard}>
-      <View style={styles.favoriteCardImageWrap}>
-        <Image source={image} style={styles.favoriteCardImage} />
-        <View style={styles.favoriteCardRating}>
-          <Text style={styles.favoriteCardRatingText}>★ {rating}</Text>
-        </View>
-      </View>
-      <Text style={styles.favoriteCardLabel}>{label}</Text>
-      <Text numberOfLines={3} style={styles.favoriteCardTitle}>
-        Joe’s Shanghai Soup Dumpling Restaurant
-      </Text>
     </View>
   );
 }
@@ -887,34 +837,20 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   ctaLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   ctaLeading: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
   arrow: { width: 20, height: 12 },
-  shareContentLight: { flex: 1, overflow: 'hidden' },
-  shareRaysLight: { position: 'absolute', top: -134, left: -31, width: 464, height: 440 },
-  shareIdentityLight: { position: 'absolute', top: 102, left: 16, right: 16, alignItems: 'center', gap: 12 },
-  profileAvatarLight: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: '#FFFFFF' },
-  recapTitleLight: { position: 'absolute', top: 320, left: 16, right: 16, color: '#080808', fontSize: 20, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
-  metricsLight: { position: 'absolute', top: 348, left: 16, right: 16 },
-  favoriteCards: { position: 'absolute', top: 536, left: 16, right: 16, flexDirection: 'row', gap: 8 },
-  favoriteCard: { flex: 1, minWidth: 0, height: 235, padding: 12, borderRadius: 12, backgroundColor: '#FFFFFF', gap: 3 },
-  favoriteCardImageWrap: { width: '100%', height: 140, borderRadius: 8, overflow: 'hidden' },
-  favoriteCardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  favoriteCardRating: { position: 'absolute', left: 0, bottom: 0, height: 22, paddingHorizontal: 8, borderTopRightRadius: 8, backgroundColor: '#B82F29', alignItems: 'center', justifyContent: 'center' },
-  favoriteCardRatingText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  favoriteCardLabel: { marginTop: 3, color: 'rgba(8,8,8,0.5)', fontSize: 13, lineHeight: 18 },
-  favoriteCardTitle: { color: '#080808', fontSize: 14, lineHeight: 18, fontWeight: '500' },
-  shareContent: { flex: 1, paddingTop: 102, paddingHorizontal: 16, overflow: 'hidden' },
-  shareRays: { position: 'absolute', top: -134, left: -31, width: '126%', height: 440, opacity: isDark ? 1 : 0.14 },
+  shareContent: { flex: 1, paddingTop: s(102), paddingHorizontal: 16, overflow: 'hidden' },
+  shareRays: { position: 'absolute', top: s(-134), left: -31, width: '126%', height: s(440) },
   shareIdentity: { alignItems: 'center', gap: 12 },
-  profileAvatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: isDark ? '#FFFFFF' : '#E4E4E4' },
-  recapTitle: { marginTop: 29, color: text, fontSize: 20, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
+  profileAvatar: { width: s(120), height: s(120), borderRadius: s(60), borderWidth: 1, borderColor: '#FFFFFF' },
+  recapTitle: { marginTop: s(29), color: text, fontSize: 20, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   metrics: { marginTop: 0 },
-  metricRow: { height: 58, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  metricRow: { height: s(58), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   metricLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metricIcon: { width: 20, height: 20 },
   metricText: { color: text, fontSize: 16 },
   metricBadge: { minWidth: 32, height: 32, paddingHorizontal: 8, borderRadius: 16, backgroundColor: '#FF9EB1', alignItems: 'center', justifyContent: 'center' },
   metricValue: { color: '#080808', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  shareHeading: { marginTop: 14, color: subtleText, fontSize: 15, fontWeight: '600' },
-  shareOptions: { marginTop: 18, gap: 10 },
+  shareHeading: { marginTop: s(14), color: subtleText, fontSize: 15, fontWeight: '600' },
+  shareOptions: { marginTop: s(18), gap: s(10) },
   shareOption: { minHeight: 50, paddingHorizontal: 18, borderRadius: 25, borderWidth: 1, borderColor: cardBorder, backgroundColor: isDark ? '#161616' : '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   shareOptionLabel: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   shareIcon: { width: 20, height: 20 },
