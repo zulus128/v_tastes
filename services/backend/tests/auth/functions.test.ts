@@ -184,7 +184,7 @@ describe('phone OTP callables', () => {
     expect(reasons.every((reason) => reason === 'incorrect-code' || reason === 'verification-in-progress')).toBe(true);
     expect(snapshot.get('failedAttempts')).toBe(incorrectChecks);
     expect(incorrectChecks).toBeLessThanOrEqual(5);
-  });
+  }, 15_000);
 });
 
 describe('authenticated session and paginated reads', () => {
@@ -498,4 +498,109 @@ describe('authenticated session and paginated reads', () => {
     );
     expect(trending.items).toHaveLength(3);
   });
+});
+
+describe('messaging callables', () => {
+  it('requires mutual follows and applies message idempotency and unread state', async () => {
+    const first = await authenticatedUser();
+    const second = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'First Messenger',
+      username: 'first.messenger',
+      city: 'Istanbul',
+    }, first.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Second Messenger',
+      username: 'second.messenger',
+      city: 'Istanbul',
+    }, second.token);
+    const firstProfile = (await db.collection('users').where('username', '==', 'first.messenger').limit(1).get()).docs[0];
+    const secondProfile = (await db.collection('users').where('username', '==', 'second.messenger').limit(1).get()).docs[0];
+    if (!firstProfile || !secondProfile) throw new Error('Expected both messaging profiles to exist.');
+    const firstUid = firstProfile.id;
+    const secondUid = secondProfile.id;
+
+    await callFunction('followUser', { targetUserId: secondUid }, first.token);
+    await expectReason(
+      callFunction('createConversation', { targetUserId: secondUid }, first.token),
+      'mutual-follow-required',
+    );
+    await callFunction('followUser', { targetUserId: firstUid }, second.token);
+
+    const conversation = await callFunction<{ id: string }>(
+      'createConversation',
+      { targetUserId: secondUid },
+      first.token,
+    );
+    const replayedConversation = await callFunction<{ id: string }>(
+      'createConversation',
+      { targetUserId: firstUid },
+      second.token,
+    );
+    expect(replayedConversation.id).toBe(conversation.id);
+
+    const command = {
+      conversationId: conversation.id,
+      idempotencyKey: 'message-command-0001',
+      text: 'Hello from the real backend',
+    };
+    const firstMessage = await callFunction<{ id: string }>('sendMessage', command, first.token);
+    const replayedMessage = await callFunction<{ id: string }>('sendMessage', command, first.token);
+    expect(replayedMessage.id).toBe(firstMessage.id);
+
+    const conversationDocument = await db.collection('conversations').doc(conversation.id).get();
+    expect(conversationDocument.get('messageCount')).toBe(1);
+    expect(conversationDocument.get(`unreadCounts.${secondUid}`)).toBe(1);
+    expect((await conversationDocument.ref.collection('messages').get()).size).toBe(1);
+
+    const inbox = await callFunction<{
+      items: Array<{ id: string; unreadCount: number; otherParticipant: { userId: string } }>;
+    }>('listConversations', { limit: 20 }, second.token);
+    expect(inbox.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: conversation.id,
+        unreadCount: 1,
+        otherParticipant: expect.objectContaining({ userId: firstUid }),
+      }),
+    ]));
+
+    const messages = await callFunction<{
+      items: Array<{ id: string; senderId: string; recipientId: string; text: string }>;
+    }>('getMessages', { conversationId: conversation.id, limit: 20 }, second.token);
+    expect(messages.items).toEqual([
+      expect.objectContaining({
+        id: firstMessage.id,
+        senderId: firstUid,
+        recipientId: secondUid,
+        text: command.text,
+      }),
+    ]);
+
+    await callFunction('markConversationRead', {
+      conversationId: conversation.id,
+      throughMessageId: firstMessage.id,
+    }, second.token);
+    expect((await conversationDocument.ref.get()).get(`unreadCounts.${secondUid}`)).toBe(0);
+
+    const notifications = await db.collection('notifications')
+      .where('recipientId', '==', secondUid)
+      .where('messageId', '==', firstMessage.id)
+      .get();
+    expect(notifications.size).toBe(1);
+
+    const token = 'ExpoPushToken[abcdefghijklmnopqrstuv]';
+    expect(await callFunction('registerPushToken', { token, platform: 'android' }, first.token)).toEqual({
+      registered: true,
+    });
+    expect(await callFunction('registerPushToken', { token, platform: 'android' }, second.token)).toEqual({
+      registered: true,
+    });
+    expect((await db.collection('users').doc(firstUid).collection('pushTokens').get()).size).toBe(0);
+    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(1);
+    expect((await db.collection('_pushTokens').get()).docs[0]?.get('uid')).toBe(secondUid);
+    expect(await callFunction('unregisterPushToken', { token }, second.token)).toEqual({ registered: false });
+    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(0);
+    expect((await db.collection('_pushTokens').get()).size).toBe(0);
+  }, 15_000);
 });

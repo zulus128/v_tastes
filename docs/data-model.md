@@ -10,6 +10,7 @@ Subcollections:
 
 - `following/{targetUid}` — directed outgoing social edge.
 - `followers/{sourceUid}` — inverse edge maintained in the same backend transaction.
+- `pushTokens/{tokenHash}` — private Expo push destinations registered through Callable Functions. Clients cannot read or write tokens directly.
 
 ### `venues/{venueId}`
 
@@ -40,10 +41,28 @@ Private per-user mutation counters. Documents are scoped to a time bucket and re
 
 Private, short-lived outcomes for mutations whose natural entity ID cannot represent the result, currently reactions. Documents are removed by TTL.
 
+### `_pushTokens/{tokenHash}`
+
+Private ownership registry ensuring that one Expo push token belongs to at most one authenticated account. Registering the same device after an account switch atomically removes it from the previous user's private `pushTokens` subcollection.
+
+### `conversations/{conversationId}`
+
+Backend-owned direct conversation metadata. A deterministic ID represents one unordered pair of users. `participantIds` contains exactly two active users, `lastMessage` supports inbox rendering, and per-participant unread/read state is stored in maps. Starting a conversation and sending messages require a mutual follow.
+
+Authenticated participants may read their conversation documents directly for foreground Firestore listeners. Direct writes remain denied.
+
+Subcollections:
+
+- `messages/{messageId}` — immutable text messages with sender, recipient, server timestamp, and an idempotent server-derived ID. Only conversation participants may read them; all writes use Callable Functions.
+
+### `notifications/{notificationId}`
+
+Backend-owned notification events. Message notifications use deterministic IDs derived from the recipient and message so retries cannot create duplicates. Only the recipient may read a notification. Push delivery status is server-owned and is not a synchronization source of truth.
+
 ## Write policy
 
 Client writes are denied for the initial collections. Mutations are performed by Callable Functions using Admin SDK transactions. This protects ownership fields, counters, statuses, and server timestamps.
 
 ## Planned collections
 
-`reports`, `conversations`, `notifications`, `auditLogs`, immutable leaderboard snapshots, and private user settings will be introduced with their corresponding modules rather than pre-created without tested rules.
+`reports`, `auditLogs`, immutable leaderboard snapshots, and private user settings will be introduced with their corresponding modules rather than pre-created without tested rules.

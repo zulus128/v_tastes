@@ -2,6 +2,16 @@ export { healthCheck } from './modules/health/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
 export { followUser, unfollowUser } from './modules/social/functions';
 export {
+  createConversation,
+  getMessages,
+  listConversations,
+  markConversationRead,
+  pushMessageNotification,
+  registerPushToken,
+  sendMessage,
+  unregisterPushToken,
+} from './modules/messaging/functions';
+export {
   createFolder,
   deleteFolder,
   getFavourites,

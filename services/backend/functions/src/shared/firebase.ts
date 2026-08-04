@@ -5,7 +5,7 @@ if (getApps().length === 0) {
   initializeApp();
 }
 
-const firestoreDatabaseId =
+export const firestoreDatabaseId =
   process.env.FIRESTORE_DATABASE_ID ??
   (process.env.FIRESTORE_EMULATOR_HOST ? '(default)' : 'tastes-eu');
 

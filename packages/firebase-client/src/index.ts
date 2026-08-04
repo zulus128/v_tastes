@@ -3,6 +3,8 @@ import type {
   ApiErrorCode,
   Comment,
   CompleteOnboardingInput,
+  ConversationSummary,
+  CreateConversationInput,
   CreateFolderInput,
   CreateReviewInput,
   CreateUserProfileInput,
@@ -16,22 +18,31 @@ import type {
   GetCommentsInput,
   GetFeedInput,
   GetLeaderboardInput,
+  GetMessagesInput,
   GetPlaceInput,
   GetPlaceReviewsInput,
   GetVenuesInput,
   HealthCheckResult,
   LeaderboardEntry,
+  ListConversationsInput,
+  MarkConversationReadInput,
+  MarkConversationReadResult,
   PlaceDetails,
   PlaceReview,
   Page,
   ReactToReviewInput,
+  RegisterPushTokenInput,
   RenameFolderInput,
   RequestPhoneOtpInput,
   RequestPhoneOtpResult,
   SessionStatus,
   SaveVenueInput,
   SaveVenueResult,
+  SendMessageInput,
+  ChatMessage,
+  PushTokenResult,
   UnsaveVenueInput,
+  UnregisterPushTokenInput,
   Venue,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
@@ -147,6 +158,20 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<FollowUserInput, FollowResult>('followUser', input),
     unfollowUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('unfollowUser', input),
+    createConversation: (input: CreateConversationInput) =>
+      invoke<CreateConversationInput, IdResult>('createConversation', input),
+    listConversations: (input: ListConversationsInput) =>
+      invoke<ListConversationsInput, Page<ConversationSummary>>('listConversations', input),
+    getMessages: (input: GetMessagesInput) =>
+      invoke<GetMessagesInput, Page<ChatMessage>>('getMessages', input),
+    sendMessage: (input: SendMessageInput) =>
+      invoke<SendMessageInput, IdResult>('sendMessage', input),
+    markConversationRead: (input: MarkConversationReadInput) =>
+      invoke<MarkConversationReadInput, MarkConversationReadResult>('markConversationRead', input),
+    registerPushToken: (input: RegisterPushTokenInput) =>
+      invoke<RegisterPushTokenInput, PushTokenResult>('registerPushToken', input),
+    unregisterPushToken: (input: UnregisterPushTokenInput) =>
+      invoke<UnregisterPushTokenInput, PushTokenResult>('unregisterPushToken', input),
     getFavourites: () =>
       invoke<Record<string, never>, FavouritesResult>('getFavourites', {}),
     createFolder: (input: CreateFolderInput) =>

@@ -1,12 +1,18 @@
 import {
   completeOnboardingInputSchema,
+  createConversationInputSchema,
   createReviewInputSchema,
   createUserProfileInputSchema,
   getCommentsInputSchema,
   getFeedInputSchema,
   getLeaderboardInputSchema,
+  getMessagesInputSchema,
+  listConversationsInputSchema,
+  markConversationReadInputSchema,
   reactToReviewInputSchema,
+  registerPushTokenInputSchema,
   requestPhoneOtpInputSchema,
+  sendMessageInputSchema,
   verifyPhoneOtpInputSchema,
 } from '@tastes/contracts';
 import { describe, expect, it } from 'vitest';
@@ -99,5 +105,35 @@ describe('public API contracts', () => {
     });
     expect(getLeaderboardInputSchema.safeParse({ period: 'month', limit: 51 }).success).toBe(false);
     expect(completeOnboardingInputSchema.safeParse({ version: 0 }).success).toBe(false);
+  });
+
+  it('validates messaging commands and Expo push tokens', () => {
+    expect(createConversationInputSchema.parse({ targetUserId: 'user-2' })).toEqual({ targetUserId: 'user-2' });
+    expect(sendMessageInputSchema.parse({
+      conversationId: 'conversation-1',
+      idempotencyKey: 'message-command-001',
+      text: '  Hello  ',
+    })).toEqual({
+      conversationId: 'conversation-1',
+      idempotencyKey: 'message-command-001',
+      text: 'Hello',
+    });
+    expect(getMessagesInputSchema.parse({ conversationId: 'conversation-1' })).toEqual({
+      conversationId: 'conversation-1',
+      limit: 20,
+    });
+    expect(listConversationsInputSchema.parse({ limit: 50 })).toEqual({ limit: 50 });
+    expect(markConversationReadInputSchema.parse({
+      conversationId: 'conversation-1',
+      throughMessageId: 'message-1',
+    })).toEqual({ conversationId: 'conversation-1', throughMessageId: 'message-1' });
+    expect(registerPushTokenInputSchema.safeParse({
+      token: 'ExpoPushToken[abcdefghijklmnopqrstuv]',
+      platform: 'android',
+    }).success).toBe(true);
+    expect(registerPushTokenInputSchema.safeParse({
+      token: 'not-a-push-token',
+      platform: 'android',
+    }).success).toBe(false);
   });
 });

@@ -103,6 +103,38 @@ export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
 
+export const createConversationInputSchema = z.object({
+  targetUserId: z.string().min(1).max(128),
+});
+
+export const sendMessageInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  conversationId: z.string().min(1).max(128),
+  text: z.string().trim().min(1, 'Enter a message.').max(4_000),
+});
+
+export const conversationInputSchema = z.object({
+  conversationId: z.string().min(1).max(128),
+});
+
+export const markConversationReadInputSchema = conversationInputSchema.extend({
+  throughMessageId: z.string().min(1).max(128),
+});
+
+export const expoPushTokenSchema = z.string().trim().min(20).max(512).regex(
+  /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9._~+/=-]+\]$/,
+  'The Expo push token is invalid.',
+);
+
+export const registerPushTokenInputSchema = z.object({
+  token: expoPushTokenSchema,
+  platform: z.enum(['android', 'ios']),
+});
+
+export const unregisterPushTokenInputSchema = z.object({
+  token: expoPushTokenSchema,
+});
+
 export const folderNameSchema = z.string().trim()
   .min(1, 'Enter a folder name.')
   .max(40, 'The folder name must be at most 40 characters long.');
@@ -141,6 +173,12 @@ export const getFeedInputSchema = pageInputSchema.extend({
 
 export const getCommentsInputSchema = pageInputSchema.extend({
   reviewId: z.string().min(1),
+});
+
+export const listConversationsInputSchema = pageInputSchema;
+
+export const getMessagesInputSchema = pageInputSchema.extend({
+  conversationId: z.string().min(1).max(128),
 });
 
 export const getLeaderboardInputSchema = pageInputSchema.extend({
@@ -204,6 +242,12 @@ export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
+export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
+export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
+export type ConversationInput = z.infer<typeof conversationInputSchema>;
+export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
+export type RegisterPushTokenInput = z.infer<typeof registerPushTokenInputSchema>;
+export type UnregisterPushTokenInput = z.infer<typeof unregisterPushTokenInputSchema>;
 export type CreateFolderInput = z.infer<typeof createFolderInputSchema>;
 export type RenameFolderInput = z.infer<typeof renameFolderInputSchema>;
 export type DeleteFolderInput = z.infer<typeof deleteFolderInputSchema>;
@@ -212,6 +256,8 @@ export type UnsaveVenueInput = z.infer<typeof unsaveVenueInputSchema>;
 export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
+export type ListConversationsInput = z.infer<typeof listConversationsInputSchema>;
+export type GetMessagesInput = z.infer<typeof getMessagesInputSchema>;
 export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
 export type CompleteOnboardingInput = z.infer<typeof completeOnboardingInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
@@ -265,6 +311,46 @@ export interface SessionStatus {
 
 export interface FollowResult {
   following: boolean;
+}
+
+export interface ConversationParticipant {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  participantIds: string[];
+  otherParticipant: ConversationParticipant;
+  lastMessage: {
+    id: string;
+    senderId: string;
+    text: string;
+    createdAt: string;
+  } | null;
+  unreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  recipientId: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface MarkConversationReadResult {
+  conversationId: string;
+  unreadCount: 0;
+}
+
+export interface PushTokenResult {
+  registered: boolean;
 }
 
 export interface FavouriteFolder {
