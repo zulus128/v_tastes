@@ -125,6 +125,7 @@ describe('phone OTP callables', () => {
 
   it('consumes a challenge after a successful verification and rejects replay', async () => {
     const challenge = await requestOtp(uniquePhone());
+    expect(challenge.localCode).toBe('1332');
     const verified = await callFunction<{ customToken: string; isNewUser: boolean }>('verifyPhoneOtp', {
       challengeId: challenge.challengeId,
       code: challenge.localCode,

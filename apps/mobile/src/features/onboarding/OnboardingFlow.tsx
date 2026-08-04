@@ -8,10 +8,14 @@ import {
   Image,
   ImageBackground,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import apple from '../../../assets/onboarding/apple.png';
@@ -22,10 +26,12 @@ import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, type Country } from './countries';
+import { verificationFailureState } from './otp-errors';
+import { toE164PhoneNumber } from './phone-number';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
 type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
-type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked';
+type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked' | 'failure' | 'sign-in-failed';
 
 interface Challenge {
   id: string;
@@ -46,7 +52,9 @@ function displayPhone(country: Country, digits: string): string {
 
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
-  return useMemo(() => createStyles(colors), [colors]);
+  const { height, width } = useWindowDimensions();
+  const compact = height <= 700 || width <= 340;
+  return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
 
 export function OnboardingFlow() {
@@ -59,6 +67,7 @@ export function OnboardingFlow() {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [otpState, setOtpState] = useState<OtpState>('idle');
+  const [pendingCustomToken, setPendingCustomToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const otpInput = useRef<TextInput>(null);
@@ -85,8 +94,8 @@ export function OnboardingFlow() {
   });
 
   async function requestCode() {
-    const phoneNumber = `${country.callingCode}${phoneDigits.replace(/\D/g, '')}`;
-    if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber)) {
+    const phoneNumber = toE164PhoneNumber(country, phoneDigits);
+    if (!phoneNumber) {
       setPhoneError('Enter a valid phone number');
       return;
     }
@@ -105,6 +114,7 @@ export function OnboardingFlow() {
       setNow(Date.now());
       setOtpCode('');
       setOtpState('idle');
+      setPendingCustomToken(null);
       setScreen('otp');
       setTimeout(() => otpInput.current?.focus(), 250);
     } catch (error) {
@@ -120,17 +130,25 @@ export function OnboardingFlow() {
   }
 
   async function verifyCode() {
-    if (!challenge || otpCode.length !== 4) return;
+    if ((!challenge && !pendingCustomToken) || otpCode.length !== 4) return;
     setBusy(true);
     setOtpState('idle');
+    let customToken = pendingCustomToken;
     try {
-      const result = await api.verifyPhoneOtp({ challengeId: challenge.id, code: otpCode });
-      await signInWithCustomToken(auth, result.data.customToken);
+      if (!customToken) {
+        if (!challenge) return;
+        const result = await api.verifyPhoneOtp({ challengeId: challenge.id, code: otpCode });
+        customToken = result.data.customToken;
+        setPendingCustomToken(customToken);
+      }
+      await signInWithCustomToken(auth, customToken);
+      setPendingCustomToken(null);
     } catch (error) {
-      const reason = errorDetails(error).reason;
-      if (reason === 'code-expired') setOtpState('expired');
-      else if (reason === 'max-attempts-reached') setOtpState('locked');
-      else setOtpState('incorrect');
+      if (customToken) {
+        setOtpState('sign-in-failed');
+        return;
+      }
+      setOtpState(verificationFailureState(errorDetails(error).reason));
     } finally {
       setBusy(false);
     }
@@ -204,35 +222,52 @@ function EntryScreen() {
 
 function ConsentScreen({ onPhone }: { onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
+  const { height, width } = useWindowDimensions();
   const styles = useOnboardingStyles();
+  const compact = height <= 700 || width <= 340;
+  const pinPositions = compact
+    ? [
+        { left: width * 0.16, top: 82 },
+        { left: width * 0.72, top: 92 },
+        { left: width * 0.32, top: 232 },
+        { left: width * 0.82, top: 250 },
+      ]
+    : [
+        { left: width * 0.17, top: 109 },
+        { left: width * 0.70, top: 121 },
+        { left: width * 0.31, top: 287 },
+        { left: width * 0.81, top: 319 },
+      ];
   const unavailable = (provider: string) => Alert.alert(`${provider} sign-in`, 'This provider is not configured in the local test build yet.');
   return (
     <View style={styles.fullScreen}>
       <Image source={hero} resizeMode="cover" style={styles.hero} />
-      <RatingPin label="4.5" style={{ left: 66, top: 109 }} />
-      <RatingPin label="5.0" style={{ left: 272, top: 121 }} />
-      <RatingPin label="4.2" style={{ left: 121, top: 287 }} />
-      <RatingPin label="3.5" style={{ left: 316, top: 319 }} />
+      <RatingPin label="4.5" style={pinPositions[0]} />
+      <RatingPin label="5.0" style={pinPositions[1]} />
+      {!compact ? <RatingPin label="4.2" style={pinPositions[2]} /> : null}
+      {!compact ? <RatingPin label="3.5" style={pinPositions[3]} /> : null}
       <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={styles.consentPanel}>
-        <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPattern}>
-          <View style={styles.consentPrimary}>
-            <Image source={logo} resizeMode="contain" style={styles.smallLogo} />
-            <View style={styles.consentCopy}>
-              <Text style={styles.consentTitle}>Discover the best places!</Text>
-              <Text style={styles.consentSubtitle}>Rate dishes and restaurants to get personalized recommendations</Text>
-              <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
+        <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPanelBackground}>
+          <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.consentPrimary}>
+              <Image source={logo} resizeMode="contain" style={styles.smallLogo} />
+              <View style={styles.consentCopy}>
+                <Text style={styles.consentTitle}>Discover the best places!</Text>
+                <Text style={styles.consentSubtitle}>Rate dishes and restaurants to get personalized recommendations</Text>
+                <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
+              </View>
+              <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
             </View>
-            <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
-          </View>
-          <View style={styles.socialSection}>
-            <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
-            <View style={styles.socialRow}>
-              <SocialButton icon={google} label="Google" onPress={() => unavailable('Google')} />
-              {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
-              <SocialButton icon={apple} label="Apple" onPress={() => unavailable('Apple')} tint={colors.text} />
+            <View style={styles.socialSection}>
+              <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
+              <View style={styles.socialRow}>
+                <SocialButton icon={google} label="Google" onPress={() => unavailable('Google')} />
+                {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
+                <SocialButton icon={apple} label="Apple" onPress={() => unavailable('Apple')} tint={colors.text} />
+              </View>
+              <Text style={styles.legal}>By continuing you agree to our <Text style={styles.legalLink}>Terms of Service</Text> & <Text style={styles.legalLink}>Privacy Policy</Text></Text>
             </View>
-            <Text style={styles.legal}>By continuing you agree to our <Text style={styles.legalLink}>Terms of Service</Text> & <Text style={styles.legalLink}>Privacy Policy</Text></Text>
-          </View>
+          </ScrollView>
         </ImageBackground>
       </LinearGradient>
     </View>
@@ -268,31 +303,45 @@ function PhoneScreen(props: {
   const { colors } = useAppTheme();
   const styles = useOnboardingStyles();
   return (
-    <PatternScreen>
-      <BackButton onPress={props.onBack} />
-      <View style={styles.authContent}>
-        <Text style={styles.authTitle}>Your phone number</Text>
-        <Text style={styles.authSubtitle}>We use your number to personalize your experience</Text>
-        <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
-          <Pressable onPress={props.onCountry} style={styles.countrySelector}>
-            <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
-          </Pressable>
-          <View style={styles.phoneDivider} />
-          <TextInput
-            autoFocus
-            keyboardType="phone-pad"
-            onChangeText={props.onChange}
-            placeholder="Phone number"
-            placeholderTextColor={colors.placeholder}
-            style={styles.phoneInput}
-            textContentType="telephoneNumber"
-            value={props.digits}
-          />
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
+      <PatternScreen>
+        <BackButton onPress={props.onBack} />
+        <View style={styles.authKeyboardLayout}>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.authScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.authScroll}
+          >
+            <View style={styles.authContent}>
+              <Text style={styles.authTitle}>Your phone number</Text>
+              <Text style={styles.authSubtitle}>We use your number to personalize your experience</Text>
+              <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
+                <Pressable onPress={props.onCountry} style={styles.countrySelector}>
+                  <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
+                </Pressable>
+                <View style={styles.phoneDivider} />
+                <TextInput
+                  autoFocus
+                  keyboardType="phone-pad"
+                  onChangeText={props.onChange}
+                  placeholder="Phone number"
+                  placeholderTextColor={colors.placeholder}
+                  style={styles.phoneInput}
+                  textContentType="telephoneNumber"
+                  value={props.digits}
+                />
+              </View>
+              {props.error ? <Text style={styles.errorText}>{props.error}</Text> : null}
+            </View>
+          </ScrollView>
+          <View style={styles.authButtonArea}>
+            <PrimaryButton label="Continue" loading={props.busy} onPress={props.onContinue} />
+          </View>
         </View>
-        {props.error ? <Text style={styles.errorText}>{props.error}</Text> : null}
-      </View>
-      <PrimaryButton label="Continue" loading={props.busy} onPress={props.onContinue} style={styles.authButton} />
-    </PatternScreen>
+      </PatternScreen>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -349,55 +398,80 @@ function OtpScreen(props: {
   onResend: () => void;
 }) {
   const styles = useOnboardingStyles();
-  const error = props.state === 'incorrect' ? 'Incorrect code. Try again.' : props.state === 'expired' ? 'Your code has expired' : props.state === 'locked' ? 'Too many attempts. Resend code.' : '';
+  const error = props.state === 'incorrect'
+    ? 'Incorrect code. Try again.'
+    : props.state === 'expired'
+      ? 'Your code has expired'
+      : props.state === 'locked'
+        ? 'Too many attempts. Resend code.'
+        : props.state === 'sign-in-failed'
+          ? 'Code accepted, but sign-in failed. Try again.'
+          : props.state === 'failure'
+            ? 'Could not verify code. Try again.'
+            : '';
   const canResend = props.resendSeconds === 0;
   return (
-    <PatternScreen>
-      <BackButton onPress={props.onBack} />
-      <Pressable onPress={() => props.inputRef.current?.focus()} style={styles.otpContent}>
-        <Text style={styles.authTitle}>Enter code</Text>
-        <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
-        <View style={styles.otpRow}>
-          {[0, 1, 2, 3].map((index) => <View key={index} style={[styles.otpCell, error ? styles.otpCellError : null]}><Text style={styles.otpDigit}>{props.code[index] ?? ''}</Text></View>)}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
+      <PatternScreen>
+        <BackButton onPress={props.onBack} />
+        <View style={styles.authKeyboardLayout}>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.authScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.authScroll}
+          >
+            <Pressable onPress={() => props.inputRef.current?.focus()} style={styles.otpContent}>
+              <Text style={styles.authTitle}>Enter code</Text>
+              <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
+              <View style={styles.otpRow}>
+                {[0, 1, 2, 3].map((index) => <View key={index} style={[styles.otpCell, error ? styles.otpCellError : null]}><Text style={styles.otpDigit}>{props.code[index] ?? ''}</Text></View>)}
+              </View>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {props.resendSeconds > 0 && !error ? <Text style={styles.resendMuted}>Resend code in 0:{String(props.resendSeconds).padStart(2, '0')}</Text> : null}
+              {canResend ? <Pressable disabled={props.busy} onPress={props.onResend}><Text style={styles.resendLink}>Resend code</Text></Pressable> : null}
+              {props.localCode ? <Text style={styles.localCode}>Local test code: {props.localCode}</Text> : null}
+              <TextInput
+                ref={props.inputRef}
+                caretHidden
+                keyboardType="number-pad"
+                maxLength={4}
+                onChangeText={props.onChange}
+                style={styles.hiddenOtpInput}
+                textContentType="oneTimeCode"
+                value={props.code}
+              />
+            </Pressable>
+          </ScrollView>
+          <View style={styles.authButtonArea}>
+            <PrimaryButton disabled={props.code.length !== 4 || props.state === 'expired' || props.state === 'locked'} label="Continue" loading={props.busy} onPress={props.onContinue} />
+          </View>
         </View>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {props.resendSeconds > 0 && !error ? <Text style={styles.resendMuted}>Resend code in 0:{String(props.resendSeconds).padStart(2, '0')}</Text> : null}
-        {canResend ? <Pressable disabled={props.busy} onPress={props.onResend}><Text style={styles.resendLink}>Resend code</Text></Pressable> : null}
-        {props.localCode ? <Text style={styles.localCode}>Local test code: {props.localCode}</Text> : null}
-        <TextInput
-          ref={props.inputRef}
-          caretHidden
-          keyboardType="number-pad"
-          maxLength={4}
-          onChangeText={props.onChange}
-          style={styles.hiddenOtpInput}
-          textContentType="oneTimeCode"
-          value={props.code}
-        />
-      </Pressable>
-      <PrimaryButton disabled={props.code.length !== 4 || props.state === 'expired' || props.state === 'locked'} label="Continue" loading={props.busy} onPress={props.onContinue} style={styles.authButton} />
-    </PatternScreen>
+      </PatternScreen>
+    </KeyboardAvoidingView>
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // pattern.png is dark linework on a transparent field, meant as a faint
   // texture (Figma uses ~4-8% opacity here), not a bold full-strength layer.
   entryPattern: { opacity: 0.06 },
   entryLogo: { width: 189, height: 95 },
-  hero: { position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: '63%' },
-  ratingPin: { position: 'absolute', width: 44, height: 68, alignItems: 'center' },
+  hero: { position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: compact ? '55%' : '63%' },
+  ratingPin: { position: 'absolute', zIndex: 0, width: 44, height: 68, alignItems: 'center' },
   ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: colors.onPrimary, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   ratingLabel: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
   ratingPointer: { width: 12, height: 12, backgroundColor: colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: colors.onPrimary, transform: [{ rotate: '45deg' }], marginTop: -7 },
   ratingStar: { color: colors.onPrimary, fontSize: 10, marginTop: 3 },
-  consentPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 414, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  consentPattern: { flex: 1, paddingHorizontal: 16, paddingVertical: 24, justifyContent: 'space-between' },
+  consentPanel: { position: 'absolute', zIndex: 1, left: 0, right: 0, bottom: 0, height: compact ? 390 : 414, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  consentPanelBackground: { flex: 1 },
+  consentScrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: compact ? 14 : 24, justifyContent: 'space-between' },
   panelPattern: { opacity: 0.06 },
-  consentPrimary: { gap: 24, alignItems: 'center' },
-  smallLogo: { width: 98, height: 49 },
+  consentPrimary: { gap: compact ? 12 : 24, alignItems: 'center' },
+  smallLogo: { width: compact ? 80 : 98, height: compact ? 40 : 49 },
   consentCopy: { gap: 8, alignItems: 'center' },
   consentTitle: { color: colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },
   consentSubtitle: { color: colors.textSecondary, fontSize: 16, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
@@ -405,17 +479,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   pagerActive: { width: 15, height: 6, borderRadius: 3, backgroundColor: colors.text },
   pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
   fullWidth: { width: '100%' },
-  socialSection: { gap: 12 },
+  socialSection: { gap: compact ? 8 : 12, marginTop: compact ? 12 : 20 },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   orText: { color: colors.textSecondary, fontSize: 15 },
   socialRow: { flexDirection: 'row', gap: 12 },
-  socialButton: { flex: 1, height: 44, borderRadius: 36, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.surface, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
+  socialButton: { flex: 1, height: compact ? 42 : 44, borderRadius: 36, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.surface, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
   socialIcon: { width: 20, height: 20, resizeMode: 'contain' },
   socialLabel: { color: colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   legal: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
   legalLink: { color: colors.text },
-  authContent: { position: 'absolute', left: 16, right: 16, top: 170, alignItems: 'center' },
+  authKeyboardLayout: { flex: 1 },
+  authScroll: { flex: 1 },
+  authScrollContent: { flexGrow: 1, paddingTop: compact ? 112 : 170, paddingHorizontal: 16, paddingBottom: 16 },
+  authContent: { width: '100%', alignItems: 'center' },
   authTitle: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   authSubtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
   phoneSent: { color: colors.text },
@@ -428,8 +505,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   phoneDivider: { width: 1, height: 20, marginLeft: 10, marginRight: 11, backgroundColor: colors.hairline },
   phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
   errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
-  authButton: { position: 'absolute', top: 409, left: 36, right: 36 },
-  countryContent: { flex: 1, paddingTop: 130, paddingHorizontal: 16 },
+  authButtonArea: { paddingHorizontal: 36, paddingBottom: compact ? 12 : 24 },
+  countryContent: { flex: 1, paddingTop: compact ? 100 : 130, paddingHorizontal: 16 },
   countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
   search: { height: 44, marginTop: 19, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },
   countryList: { marginTop: 16 },
@@ -438,7 +515,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   countryFlag: { fontSize: 20 },
   countryLabel: { color: colors.text, fontSize: 16 },
   countryCode: { color: colors.textMuted, fontSize: 16 },
-  otpContent: { position: 'absolute', left: 16, right: 16, top: 170, minHeight: 190, alignItems: 'center' },
+  otpContent: { width: '100%', minHeight: 190, alignItems: 'center' },
   otpRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   otpCellError: { borderColor: colors.danger },
