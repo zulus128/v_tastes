@@ -14,6 +14,7 @@
     "@tastes/firebase-client": "workspace:*",
     "expo": "~57.0.9",
     "expo-clipboard": "~57.0.1",
+    "expo-constants": "~57.0.8",
     "expo-contacts": "~57.0.3",
     "expo-dev-client": "~57.0.10",
     "expo-image-picker": "~57.0.7",

@@ -4,7 +4,6 @@ import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useMemo, useState } from 'react';
 import {
@@ -73,6 +72,7 @@ import styleLight from '../../../assets/onboarding/style-light.png';
 import styleSelected from '../../../assets/onboarding/style-selected.png';
 import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, functions, storage } from '../../infrastructure/firebase';
+import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
@@ -387,8 +387,13 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestNotifications() {
-    await Notifications.requestPermissionsAsync();
-    navigate('ready');
+    try {
+      await syncPushNotifications(api, { requestPermission: true });
+    } catch (error) {
+      Alert.alert('Could not enable notifications', apiErrorMessage(error));
+    } finally {
+      navigate('ready');
+    }
   }
 
   async function shareInvite() {

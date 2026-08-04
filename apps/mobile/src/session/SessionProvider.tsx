@@ -17,6 +17,10 @@ import {
 } from 'react';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
+import {
+  syncPushNotifications,
+  unregisterPushNotifications,
+} from '../infrastructure/pushNotifications';
 import { queryClient, queryPersister } from '../infrastructure/query';
 import { authenticatedPhase } from './model';
 
@@ -40,7 +44,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<SessionState>({ status: 'booting', user: null });
 
-  const logout = useCallback(async () => {
+  const clearLocalSession = useCallback(async () => {
     queryClient.clear();
     await queryPersister.removeClient();
     await signOut(auth);
@@ -48,17 +52,32 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const api = useMemo(() => createTastesApi(functions, {
-    onUnauthenticated: logout,
+    onUnauthenticated: clearLocalSession,
     onError: (error, operation) => captureException(error, {
       source: 'api',
       operation,
       code: error.code,
     }),
-  }), [logout]);
+  }), [clearLocalSession]);
+
+  const logout = useCallback(async () => {
+    try {
+      await unregisterPushNotifications(api);
+    } catch (error) {
+      captureException(error, { source: 'push', operation: 'unregisterPushToken' });
+    } finally {
+      await clearLocalSession();
+    }
+  }, [api, clearLocalSession]);
 
   const loadStatus = useCallback(async (user: User) => {
     try {
       const result = await api.getSessionStatus();
+      if (result.data.profileExists) {
+        void syncPushNotifications(api).catch((error) => {
+          captureException(error, { source: 'push', operation: 'registerPushToken' });
+        });
+      }
       if (result.data.profileExists && !result.data.onboardingComplete) {
         const legacyComplete = await AsyncStorage.getItem(`tastes:post-signup-onboarding:${user.uid}`);
         if (legacyComplete === 'complete') {

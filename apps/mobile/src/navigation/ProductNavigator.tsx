@@ -24,7 +24,11 @@ import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
+import { ChatScreen } from '../features/messaging/ChatScreen';
+import { ConversationsScreen } from '../features/messaging/ConversationsScreen';
+import { useUnreadConversationCount } from '../features/messaging/realtime';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
+import { consumeInitialPushDeepLink, subscribeToPushDeepLinks } from '../infrastructure/pushNotifications';
 import { useSession } from '../session/SessionProvider';
 import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
@@ -36,6 +40,7 @@ export type RootStackParamList = {
   Recap: { mode: 'ready' | 'lowData' };
   Leaderboard: undefined;
   Place: { venueId: string };
+  Conversation: { conversationId: string };
 };
 
 type MainTabParamList = {
@@ -54,11 +59,15 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['tastes://', 'https://tastes.app'],
   async getInitialURL() {
-    return consumePendingDeepLink() ?? await Linking.getInitialURL();
+    return consumePendingDeepLink() ?? await Linking.getInitialURL() ?? consumeInitialPushDeepLink();
   },
   subscribe(listener) {
-    const subscription = Linking.addEventListener('url', ({ url }) => listener(url));
-    return () => subscription.remove();
+    const linkingSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
+    const unsubscribePush = subscribeToPushDeepLinks(listener);
+    return () => {
+      linkingSubscription.remove();
+      unsubscribePush();
+    };
   },
   config: {
     screens: {
@@ -67,6 +76,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Recap: 'recap/:mode',
       Leaderboard: 'leaderboard',
       Place: 'places/:venueId',
+      Conversation: 'conversations/:conversationId',
     },
   },
 };
@@ -107,16 +117,6 @@ function tabOptions(
       )
     ),
   };
-}
-
-function PlaceholderScreen({ title }: { title: string }) {
-  const { colors } = useAppTheme();
-  return (
-    <View style={[styles.placeholder, { backgroundColor: colors.canvas }]}>
-      <Text style={[styles.placeholderTitle, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.placeholderBody, { color: colors.textMuted }]}>This section is ready for its product screen.</Text>
-    </View>
-  );
 }
 
 function ProfileTab({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
@@ -164,6 +164,7 @@ function ProfileTab({ user, rootNavigation }: { user: User; rootNavigation: Root
 
 function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
   const { colors, isDark } = useAppTheme();
+  const unreadMessages = useUnreadConversationCount(user.uid);
   return (
     <Tabs.Navigator
       initialRouteName="Home"
@@ -199,8 +200,19 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
           />
         )}
       </Tabs.Screen>
-      <Tabs.Screen name="Dialog">
-        {() => <PlaceholderScreen title="Dialog" />}
+      <Tabs.Screen
+        name="Dialog"
+        options={{
+          tabBarBadge: unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.primary, color: colors.onPrimary, fontSize: 10 },
+        }}
+      >
+        {() => (
+          <ConversationsScreen
+            onOpenConversation={(conversationId) => rootNavigation.navigate('Conversation', { conversationId })}
+            userId={user.uid}
+          />
+        )}
       </Tabs.Screen>
       <Tabs.Screen name="Profile">
         {() => <ProfileTab user={user} rootNavigation={rootNavigation} />}
@@ -257,6 +269,18 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
+        <RootStack.Screen name="Conversation">
+          {({ navigation, route }) => (
+            <ChatScreen
+              conversationId={route.params.conversationId}
+              onBack={() => {
+                if (navigation.canGoBack()) navigation.goBack();
+                else navigation.navigate('MainTabs', { screen: 'Dialog' });
+              }}
+              userId={user.uid}
+            />
+          )}
+        </RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>
   );
@@ -276,9 +300,6 @@ const styles = StyleSheet.create({
   profileActionText: { fontSize: 16, fontWeight: '600' },
   signOutAction: { minHeight: 52, alignItems: 'center', justifyContent: 'center' },
   signOutText: { color: '#FF453A', fontSize: 16, fontWeight: '600' },
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 28 },
-  placeholderTitle: { fontSize: 28, fontWeight: '700' },
-  placeholderBody: { fontSize: 15, textAlign: 'center' },
   tabLabel: { fontSize: 12, marginTop: 1 },
   tabBar: { height: 70, paddingTop: 8, paddingBottom: 5, borderTopWidth: 0 },
   tabIcon: { width: 28, height: 25, alignItems: 'center', justifyContent: 'center' },
