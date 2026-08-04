@@ -25,7 +25,7 @@ import logo from '../../../assets/onboarding/logo.png';
 import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
-import { countries, type Country } from './countries';
+import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
@@ -60,7 +60,7 @@ function useOnboardingStyles() {
 export function OnboardingFlow() {
   const api = useMemo(() => createTastesApi(functions), []);
   const [screen, setScreen] = useState<Screen>('entry');
-  const [country, setCountry] = useState(countries[0]);
+  const [country, setCountry] = useState(defaultCountry);
   const [countrySearch, setCountrySearch] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -90,7 +90,10 @@ export function OnboardingFlow() {
 
   const filteredCountries = countries.filter((item) => {
     const query = countrySearch.trim().toLowerCase();
-    return !query || item.name.toLowerCase().includes(query) || item.callingCode.includes(query);
+    return !query
+      || item.name.toLowerCase().includes(query)
+      || item.code.toLowerCase().includes(query)
+      || item.callingCode.includes(query);
   });
 
   async function requestCode() {

@@ -165,17 +165,22 @@ export const listConversations = onCall(callableOptions, async (request) => {
   return {
     items: pageDocuments.map((document, index) => {
       const participantIds = requireParticipant(document, uid);
+      const kind = document.get('kind') === 'activity' ? 'activity' : 'direct';
       const otherUserId = otherUserIds[index] ?? '';
       const profile = profiles.get(otherUserId);
       return {
         id: document.id,
+        kind,
         participantIds,
-        otherParticipant: {
+        otherParticipant: kind === 'direct' ? {
           userId: otherUserId,
           displayName: String(profile?.get('displayName') ?? ''),
           username: profile?.get('username') ? String(profile.get('username')) : null,
           photoUrl: profile?.get('photoUrl') ? String(profile.get('photoUrl')) : null,
-        },
+        } : null,
+        activityId: kind === 'activity' ? String(document.get('activityId') ?? document.id) : null,
+        title: kind === 'activity' ? String(document.get('title') ?? 'Activity') : null,
+        imageKey: kind === 'activity' && document.get('imageKey') ? String(document.get('imageKey')) : null,
         lastMessage: lastMessage(document),
         unreadCount: unreadCount(document, uid),
         createdAt: timestampToIso(document.get('createdAt')),
@@ -212,6 +217,9 @@ export const getMessages = onCall(callableOptions, async (request) => {
       conversationId: input.conversationId,
       senderId: String(document.get('senderId')),
       recipientId: String(document.get('recipientId')),
+      recipientIds: Array.isArray(document.get('recipientIds'))
+        ? document.get('recipientIds').filter((value: unknown): value is string => typeof value === 'string')
+        : [String(document.get('recipientId'))].filter(Boolean),
       text: String(document.get('text')),
       createdAt: timestampToIso(document.get('createdAt')),
     })),
@@ -235,26 +243,31 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     if (conversation.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'The conversation is not active.');
     }
-    const recipientId = participantIds.find((participantId) => participantId !== uid);
-    if (!recipientId) throw new HttpsError('internal', 'The conversation participants are invalid.');
-
+    const recipientIds = participantIds.filter((participantId) => participantId !== uid);
+    if (recipientIds.length === 0) throw new HttpsError('internal', 'The conversation participants are invalid.');
+    const kind = conversation.get('kind') === 'activity' ? 'activity' : 'direct';
     const userRef = db.collection('users').doc(uid);
-    const recipientRef = db.collection('users').doc(recipientId);
-    const [user, recipient, forwardEdge, reverseEdge, existingMessage] = await Promise.all([
+    const recipientRefs = recipientIds.map((recipientId) => db.collection('users').doc(recipientId));
+    const directRecipientId = recipientIds[0] ?? '';
+    const [user, existingMessage, ...participantReads] = await Promise.all([
       transaction.get(userRef),
-      transaction.get(recipientRef),
-      transaction.get(userRef.collection('following').doc(recipientId)),
-      transaction.get(recipientRef.collection('following').doc(uid)),
       transaction.get(messageRef),
+      ...recipientRefs.map((recipientRef) => transaction.get(recipientRef)),
+      ...(kind === 'direct' ? [
+        transaction.get(userRef.collection('following').doc(directRecipientId)),
+        transaction.get(db.collection('users').doc(directRecipientId).collection('following').doc(uid)),
+      ] : []),
     ]);
     if (existingMessage.exists) return;
     if (!user.exists || user.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
     }
-    if (!recipient.exists || recipient.get('status') !== 'active') {
-      throw new HttpsError('not-found', 'The recipient was not found.');
+    const recipientProfiles = participantReads.slice(0, recipientIds.length);
+    if (recipientProfiles.some((recipient) => !recipient?.exists || recipient.get('status') !== 'active')) {
+      throw new HttpsError('not-found', 'One of the conversation participants was not found.');
     }
-    if (!forwardEdge.exists || !reverseEdge.exists) {
+    const followReads = participantReads.slice(recipientIds.length);
+    if (kind === 'direct' && (!followReads[0]?.exists || !followReads[1]?.exists)) {
       throw new HttpsError('permission-denied', 'Conversations require a mutual follow.', {
         reason: 'mutual-follow-required',
       });
@@ -265,15 +278,21 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     transaction.create(messageRef, {
       conversationId: conversationRef.id,
       senderId: uid,
-      recipientId,
+      recipientId: recipientIds.length === 1 ? recipientIds[0] : '',
+      recipientIds,
       text: input.text,
       type: 'text',
       status: 'sent',
       createdAt: now,
     });
+    for (const recipientId of recipientIds) {
+      transaction.update(
+        conversationRef,
+        new FieldPath('unreadCounts', recipientId), FieldValue.increment(1),
+      );
+    }
     transaction.update(
       conversationRef,
-      new FieldPath('unreadCounts', recipientId), FieldValue.increment(1),
       'lastMessage', {
         id: messageRef.id,
         senderId: uid,
@@ -283,21 +302,23 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       'messageCount', FieldValue.increment(1),
       'updatedAt', now,
     );
-    const notificationRef = db.collection('notifications').doc(
-      idempotentDocumentId(recipientId, 'message-notification', messageRef.id),
-    );
-    transaction.create(notificationRef, {
-      recipientId,
-      actorId: uid,
-      actorDisplayName: String(user.get('displayName') ?? 'Someone'),
-      type: 'message',
-      conversationId: conversationRef.id,
-      messageId: messageRef.id,
-      preview: input.text.slice(0, 160),
-      readAt: null,
-      pushStatus: 'pending',
-      createdAt: now,
-    });
+    for (const recipientId of recipientIds) {
+      const notificationRef = db.collection('notifications').doc(
+        idempotentDocumentId(recipientId, 'message-notification', messageRef.id),
+      );
+      transaction.create(notificationRef, {
+        recipientId,
+        actorId: uid,
+        actorDisplayName: String(user.get('displayName') ?? 'Someone'),
+        type: 'message',
+        conversationId: conversationRef.id,
+        messageId: messageRef.id,
+        preview: input.text.slice(0, 160),
+        readAt: null,
+        pushStatus: 'pending',
+        createdAt: now,
+      });
+    }
   });
 
   return { id: messageRef.id };

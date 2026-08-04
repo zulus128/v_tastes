@@ -37,25 +37,28 @@ function ConversationRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   const participant = conversation.otherParticipant;
+  const title = conversation.kind === 'activity'
+    ? conversation.title ?? 'Activity'
+    : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
   return (
     <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-      {participant.photoUrl ? (
+      {participant?.photoUrl ? (
         <Image source={{ uri: participant.photoUrl }} style={styles.avatar} />
       ) : (
         <View style={styles.avatarFallback}>
-          <Text style={styles.avatarInitial}>{participant.displayName.slice(0, 1).toUpperCase()}</Text>
+          <Text style={styles.avatarInitial}>{conversation.kind === 'activity' ? '◷' : title.slice(0, 1).toUpperCase()}</Text>
         </View>
       )}
       <View style={styles.rowCopy}>
         <View style={styles.rowHeading}>
-          <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{participant.displayName}</Text>
+          <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{title}</Text>
           <Text style={[styles.time, unread && styles.unreadTime]}>{relativeTime(conversation.updatedAt)}</Text>
         </View>
         <View style={styles.previewRow}>
           <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
-            {conversation.lastMessage?.senderId === conversation.otherParticipant.userId ? '' : 'You: '}
-            {conversation.lastMessage?.text ?? 'Conversation started'}
+            {conversation.kind === 'activity' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
+            {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : 'Conversation started')}
           </Text>
           {unread ? (
             <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(conversation.unreadCount, 99)}</Text></View>
@@ -84,8 +87,9 @@ export function ConversationsScreen({
   const normalizedSearch = search.trim().toLowerCase();
   const conversations = inbox.data.filter((conversation) => (
     !normalizedSearch
-    || conversation.otherParticipant.displayName.toLowerCase().includes(normalizedSearch)
-    || conversation.otherParticipant.username?.toLowerCase().includes(normalizedSearch)
+    || conversation.title?.toLowerCase().includes(normalizedSearch)
+    || conversation.otherParticipant?.displayName.toLowerCase().includes(normalizedSearch)
+    || conversation.otherParticipant?.username?.toLowerCase().includes(normalizedSearch)
   ));
 
   return (

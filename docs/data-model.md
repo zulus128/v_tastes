@@ -47,13 +47,17 @@ Private ownership registry ensuring that one Expo push token belongs to at most 
 
 ### `conversations/{conversationId}`
 
-Backend-owned direct conversation metadata. A deterministic ID represents one unordered pair of users. `participantIds` contains exactly two active users, `lastMessage` supports inbox rendering, and per-participant unread/read state is stored in maps. Starting a conversation and sending messages require a mutual follow.
+Backend-owned conversation metadata. A direct conversation uses `kind: "direct"` and a deterministic ID for one unordered pair of users. An activity conversation uses `kind: "activity"`, shares its ID with the activity, and may contain up to 21 participants. `lastMessage` supports inbox rendering, and per-participant unread/read state is stored in maps. Starting and continuing a direct conversation requires a mutual follow.
 
 Authenticated participants may read their conversation documents directly for foreground Firestore listeners. Direct writes remain denied.
 
 Subcollections:
 
-- `messages/{messageId}` — immutable text messages with sender, recipient, server timestamp, and an idempotent server-derived ID. Only conversation participants may read them; all writes use Callable Functions.
+- `messages/{messageId}` — immutable text messages with sender, recipient IDs, server timestamp, and an idempotent server-derived ID. Only conversation participants may read them; all writes use Callable Functions.
+
+### `activities/{activityId}`
+
+Backend-owned activity metadata containing its organizer, participants, venue, start time, status, and timestamps. Creation atomically creates a same-ID activity conversation. Only activity participants may read the record directly; clients cannot write it.
 
 ### `notifications/{notificationId}`
 

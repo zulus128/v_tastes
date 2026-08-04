@@ -338,8 +338,12 @@ export interface ConversationParticipant {
 
 export interface ConversationSummary {
   id: string;
+  kind: 'direct' | 'activity';
   participantIds: string[];
-  otherParticipant: ConversationParticipant;
+  otherParticipant: ConversationParticipant | null;
+  activityId: string | null;
+  title: string | null;
+  imageKey: string | null;
   lastMessage: {
     id: string;
     senderId: string;
@@ -356,6 +360,7 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   recipientId: string;
+  recipientIds: string[];
   text: string;
   createdAt: string;
 }

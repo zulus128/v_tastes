@@ -27,6 +27,10 @@ type RealtimeState<T> = {
 
 type ConversationDetails = {
   participant: ConversationParticipant | null;
+  kind: 'direct' | 'activity';
+  activityId: string | null;
+  title: string | null;
+  imageKey: string | null;
   lastMessageId: string | null;
   unreadCount: number;
 };
@@ -64,7 +68,7 @@ function peerId(document: QueryDocumentSnapshot<DocumentData>, userId: string): 
 function summaryFromDocument(
   document: QueryDocumentSnapshot<DocumentData>,
   userId: string,
-  participant: ConversationParticipant,
+  participant: ConversationParticipant | null,
 ): ConversationSummary {
   const data = document.data();
   const participantIds = Array.isArray(data.participantIds)
@@ -78,8 +82,12 @@ function summaryFromDocument(
     : {};
   return {
     id: document.id,
+    kind: data.kind === 'activity' ? 'activity' : 'direct',
     participantIds,
     otherParticipant: participant,
+    activityId: data.kind === 'activity' ? String(data.activityId ?? document.id) : null,
+    title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
+    imageKey: data.kind === 'activity' && typeof data.imageKey === 'string' ? data.imageKey : null,
     lastMessage: rawLastMessage ? {
       id: String(rawLastMessage.id ?? ''),
       senderId: String(rawLastMessage.senderId ?? ''),
@@ -112,6 +120,9 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
     );
     const unsubscribe = onSnapshot(inboxQuery, (snapshot) => {
       void Promise.all(snapshot.docs.map(async (conversation) => {
+        if (conversation.data().kind === 'activity') {
+          return summaryFromDocument(conversation, userId, null);
+        }
         const otherUserId = peerId(conversation, userId);
         let participant = profileCache.current.get(otherUserId);
         if (!participant) {
@@ -191,6 +202,9 @@ export function useConversationMessages(
             conversationId,
             senderId: String(data.senderId ?? ''),
             recipientId: String(data.recipientId ?? ''),
+            recipientIds: Array.isArray(data.recipientIds)
+              ? data.recipientIds.filter((value): value is string => typeof value === 'string')
+              : [String(data.recipientId ?? '')].filter(Boolean),
             text: String(data.text ?? ''),
             createdAt: toIso(data.createdAt),
           };
@@ -228,11 +242,15 @@ export function subscribeConversationDetails(
         ? data.unreadCounts as Record<string, unknown>
         : {};
       const base = {
+        kind: data.kind === 'activity' ? 'activity' as const : 'direct' as const,
+        activityId: data.kind === 'activity' ? String(data.activityId ?? conversationId) : null,
+        title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
+        imageKey: data.kind === 'activity' && typeof data.imageKey === 'string' ? data.imageKey : null,
         lastMessageId: lastMessage ? String(lastMessage.id ?? '') : null,
         unreadCount: Math.max(0, Number(unreadCounts[userId] ?? 0)),
       };
       profileUnsubscribe?.();
-      if (typeof otherUserId !== 'string' || otherUserId.length === 0) {
+      if (base.kind === 'activity' || typeof otherUserId !== 'string' || otherUserId.length === 0) {
         listener({ ...base, participant: null });
         return;
       }

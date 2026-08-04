@@ -62,7 +62,7 @@ export function NewActivityScreen({
   userId,
 }: {
   onBack: () => void;
-  onCreated: () => void;
+  onCreated: (activityId: string) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -104,7 +104,7 @@ export function NewActivityScreen({
     if (!venue || !valid || submitting) return;
     setSubmitting(true);
     try {
-      await api.createActivity({
+      const created = await api.createActivity({
         idempotencyKey,
         memberIds,
         startsAt: startsAt.toISOString(),
@@ -112,7 +112,7 @@ export function NewActivityScreen({
       });
       setIdempotencyKey(createIdempotencyKey('activity'));
       Alert.alert('Activity created', `${venue.name} · ${startsAt.toLocaleString()}`, [
-        { text: 'Done', onPress: onCreated },
+        { text: 'Open dialog', onPress: () => onCreated(created.data.id) },
       ]);
     } catch (error) {
       Alert.alert('Could not create activity', apiErrorMessage(error));

@@ -1,10 +1,9 @@
 import type { Country } from './countries';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
 export function toE164PhoneNumber(country: Country, input: string): string | null {
-  const nationalNumber = input.replace(/\D/g, '');
-
-  if (!country.nationalNumberLengths.includes(nationalNumber.length)) return null;
-
-  const phoneNumber = `${country.callingCode}${nationalNumber}`;
-  return /^\+[1-9]\d{7,14}$/.test(phoneNumber) ? phoneNumber : null;
+  const value = input.trim();
+  if (!value) return null;
+  const phoneNumber = parsePhoneNumberFromString(value, country.code);
+  return phoneNumber?.isPossible() ? phoneNumber.number : null;
 }

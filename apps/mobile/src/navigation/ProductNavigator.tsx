@@ -25,6 +25,7 @@ import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, 
 import { useEffect, useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
+import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
 import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
@@ -49,6 +50,7 @@ export type RootStackParamList = {
   Place: { venueId: string };
   Conversation: { conversationId: string };
   NewActivity: undefined;
+  ActivityDetails: { activityId: string };
 };
 
 type MainTabParamList = {
@@ -86,6 +88,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Place: 'places/:venueId',
       Conversation: 'conversations/:conversationId',
       NewActivity: 'activities/new',
+      ActivityDetails: 'activities/:activityId',
     },
   },
 };
@@ -368,6 +371,7 @@ export function ProductNavigator({ user }: { user: User }) {
           {({ navigation, route }) => (
             <ChatScreen
               conversationId={route.params.conversationId}
+              onOpenActivity={(activityId) => navigation.navigate('ActivityDetails', { activityId })}
               onBack={() => {
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Dialog' });
@@ -380,9 +384,14 @@ export function ProductNavigator({ user }: { user: User }) {
           {({ navigation }) => (
             <NewActivityScreen
               onBack={navigation.goBack}
-              onCreated={() => navigation.navigate('MainTabs', { screen: 'Dialog' })}
+              onCreated={(activityId) => navigation.replace('Conversation', { conversationId: activityId })}
               userId={user.uid}
             />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="ActivityDetails">
+          {({ navigation, route }) => (
+            <ActivityDetailsScreen activityId={route.params.activityId} onBack={navigation.goBack} />
           )}
         </RootStack.Screen>
       </RootStack.Navigator>

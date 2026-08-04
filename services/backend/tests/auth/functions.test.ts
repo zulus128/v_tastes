@@ -660,6 +660,33 @@ describe('activity callables', () => {
       venueId: 'activity-venue',
       venueName: 'Activity Restaurant',
     });
+    const activityConversation = await db.collection('conversations').doc(created.id).get();
+    expect(activityConversation.data()).toMatchObject({
+      kind: 'activity',
+      activityId: created.id,
+      organizerId: organizerUid,
+      participantIds: [organizerUid, friendUid],
+      title: 'Activity Restaurant',
+      status: 'active',
+    });
+    const friendInbox = await callFunction<{
+      items: Array<{ id: string; kind: string; title: string; activityId: string }>;
+    }>('listConversations', { limit: 20 }, friend.token);
+    expect(friendInbox.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: created.id,
+        kind: 'activity',
+        activityId: created.id,
+        title: 'Activity Restaurant',
+      }),
+    ]));
+    const activityMessage = await callFunction<{ id: string }>('sendMessage', {
+      conversationId: created.id,
+      idempotencyKey: 'activity-message-0001',
+      text: 'See you there!',
+    }, organizer.token);
+    expect(activityMessage.id).toBeTruthy();
+    expect((await activityConversation.ref.get()).get(`unreadCounts.${friendUid}`)).toBe(1);
     expect((await db.collection('activities').get()).size).toBe(1);
   }, 30_000);
 });

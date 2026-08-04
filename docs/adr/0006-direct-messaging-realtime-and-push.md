@@ -34,5 +34,5 @@ Each accepted message creates a durable `notifications` event in the same transa
 - Open conversations update in real time without relying on push delivery.
 - Background users receive a push when credentials and a registered Expo push token are available, then refetch authoritative data.
 - Unfollow immediately prevents new messages but preserves both participants' read access to existing history.
-- Group chats, attachments, typing indicators, presence, edits, deletion, blocking, delivery receipts, and end-to-end encryption require explicit later designs.
+- Arbitrary named group chats, attachments, typing indicators, presence, edits, deletion, blocking, delivery receipts, and end-to-end encryption require explicit later designs. Activity-scoped conversations are defined separately in ADR 0007.
 - Firestore Rules tests are mandatory because participant listeners expose a new direct-read surface.

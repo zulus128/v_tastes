@@ -38,10 +38,12 @@ function MessageBubble({ item, mine, styles }: { item: ChatMessage; mine: boolea
 export function ChatScreen({
   conversationId,
   onBack,
+  onOpenActivity,
   userId,
 }: {
   conversationId: string;
   onBack: () => void;
+  onOpenActivity: (activityId: string) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -50,6 +52,7 @@ export function ChatScreen({
   const api = useTastesApi();
   const messages = useConversationMessages(conversationId, userId);
   const [participant, setParticipant] = useState<ConversationParticipant | null>(null);
+  const [activity, setActivity] = useState<{ id: string; title: string } | null>(null);
   const [conversationError, setConversationError] = useState<Error | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -61,6 +64,9 @@ export function ChatScreen({
     userId,
     (details) => {
       setParticipant(details.participant);
+      setActivity(details.kind === 'activity' && details.activityId
+        ? { id: details.activityId, title: details.title ?? 'Activity' }
+        : null);
       setConversationError(null);
       if (details.unreadCount > 0 && details.lastMessageId && lastMarkedRead.current !== details.lastMessageId) {
         lastMarkedRead.current = details.lastMessageId;
@@ -101,19 +107,26 @@ export function ChatScreen({
         <Pressable accessibilityLabel="Back" hitSlop={12} onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
-        {participant?.photoUrl ? (
-          <Image source={{ uri: participant.photoUrl }} style={styles.headerAvatar} />
-        ) : (
-          <View style={styles.headerAvatarFallback}>
-            <Text style={styles.headerInitial}>{participant?.displayName.slice(0, 1).toUpperCase() ?? 'T'}</Text>
+        <Pressable
+          accessibilityLabel={activity ? 'Open activity details' : undefined}
+          disabled={!activity}
+          onPress={() => activity && onOpenActivity(activity.id)}
+          style={styles.headerIdentity}
+        >
+          {participant?.photoUrl ? (
+            <Image source={{ uri: participant.photoUrl }} style={styles.headerAvatar} />
+          ) : (
+            <View style={styles.headerAvatarFallback}>
+              <Text style={styles.headerInitial}>{activity ? '◷' : participant?.displayName.slice(0, 1).toUpperCase() ?? 'T'}</Text>
+            </View>
+          )}
+          <View style={styles.headerCopy}>
+            <Text numberOfLines={1} style={styles.headerName}>{activity?.title ?? participant?.displayName ?? 'Conversation'}</Text>
+            <Text numberOfLines={1} style={styles.headerUsername}>
+              {activity ? 'Activity · View details' : participant?.username ? `@${participant.username}` : 'Direct message'}
+            </Text>
           </View>
-        )}
-        <View style={styles.headerCopy}>
-          <Text numberOfLines={1} style={styles.headerName}>{participant?.displayName ?? 'Conversation'}</Text>
-          <Text numberOfLines={1} style={styles.headerUsername}>
-            {participant?.username ? `@${participant.username}` : 'Direct message'}
-          </Text>
-        </View>
+        </Pressable>
       </View>
 
       {messages.loading ? (
@@ -134,7 +147,7 @@ export function ChatScreen({
           ListEmptyComponent={(
             <View style={styles.emptyState}>
               <Text style={styles.stateTitle}>Start the conversation</Text>
-              <Text style={styles.stateCopy}>Say hello to {participant?.displayName ?? 'your connection'}.</Text>
+              <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
             </View>
           )}
           renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} styles={styles} />}
@@ -176,6 +189,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background },
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
     backText: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300', marginTop: -3 },
+    headerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center' },
     headerAvatar: { width: 40, height: 40, marginLeft: 3, borderRadius: 20, backgroundColor: colors.skeleton },
     headerAvatarFallback: { width: 40, height: 40, marginLeft: 3, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     headerInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },

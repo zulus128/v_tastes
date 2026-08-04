@@ -53,6 +53,7 @@ export const createActivity = onCall(callableOptions, async (request) => {
   const activityRef = db.collection('activities').doc(
     idempotentDocumentId(uid, 'create-activity', input.idempotencyKey),
   );
+  const conversationRef = db.collection('conversations').doc(activityRef.id);
   const userRef = db.collection('users').doc(uid);
   const venueRef = db.collection('venues').doc(input.venueId);
 
@@ -96,6 +97,23 @@ export const createActivity = onCall(callableOptions, async (request) => {
       status: 'active',
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
+    });
+    const now = FieldValue.serverTimestamp();
+    const participantIds = [uid, ...input.memberIds];
+    transaction.create(conversationRef, {
+      kind: 'activity',
+      activityId: activityRef.id,
+      organizerId: uid,
+      title: String(venue.get('name') ?? ''),
+      imageKey: venue.get('imageKey') ? String(venue.get('imageKey')) : null,
+      participantIds,
+      unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
+      lastReadAt: {},
+      lastMessage: null,
+      messageCount: 0,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
     });
   });
 

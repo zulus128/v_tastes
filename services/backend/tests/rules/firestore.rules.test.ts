@@ -54,6 +54,11 @@ beforeEach(async () => {
       text: 'Hello',
       createdAt: new Date(),
     });
+    await setDoc(doc(db, 'activities', 'activity-ab'), {
+      organizerId: 'user-a',
+      participantIds: ['user-a', 'user-b'],
+      status: 'active',
+    });
     await setDoc(doc(db, 'notifications', 'notification-b'), {
       recipientId: 'user-b',
       type: 'message',
@@ -182,6 +187,14 @@ describe('Firestore security rules', () => {
       where('participantIds', 'array-contains', 'user-a'),
     )));
     await assertFails(getDocs(collection(db, 'conversations')));
+  });
+
+  it('allows only participants to read activity details and denies direct writes', async () => {
+    const participantDb = testEnvironment.authenticatedContext('user-b').firestore();
+    const otherDb = testEnvironment.authenticatedContext('user-c').firestore();
+    await assertSucceeds(getDoc(doc(participantDb, 'activities', 'activity-ab')));
+    await assertFails(getDoc(doc(otherDb, 'activities', 'activity-ab')));
+    await assertFails(setDoc(doc(participantDb, 'activities', 'activity-ab'), { status: 'cancelled' }));
   });
 
   it('keeps notifications private and push tokens backend-only', async () => {
