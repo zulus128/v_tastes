@@ -1,0 +1,116 @@
+import type { ActivityCandidate } from '@tastes/contracts';
+import { apiErrorMessage } from '@tastes/firebase-client';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
+import { useTastesApi } from '../../session/SessionProvider';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+
+export function NewDialogSheet({
+  onClose,
+  onNewActivity,
+  onOpenConversation,
+  visible,
+}: {
+  onClose: () => void;
+  onNewActivity: () => void;
+  onOpenConversation: (conversationId: string) => void;
+  visible: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const api = useTastesApi();
+  const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setLoading(true);
+    void api.listActivityCandidates()
+      .then((result) => { if (active) setCandidates(result.data); })
+      .catch((error) => { if (active) Alert.alert('Could not load friends', apiErrorMessage(error)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [api, visible]);
+
+  async function openConversation(candidate: ActivityCandidate) {
+    if (openingId) return;
+    setOpeningId(candidate.userId);
+    try {
+      const result = await api.createConversation({ targetUserId: candidate.userId });
+      onClose();
+      onOpenConversation(result.data.id);
+    } catch (error) {
+      Alert.alert('Could not start dialog', apiErrorMessage(error));
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
+  const query = search.trim().toLowerCase();
+  const filtered = candidates.filter((candidate) => (
+    !query
+    || candidate.displayName.toLowerCase().includes(query)
+    || candidate.username?.toLowerCase().includes(query)
+  ));
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+      <Pressable onPress={onClose} style={styles.backdrop}>
+        <Pressable onPress={() => undefined} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={styles.header}>
+            <Text style={styles.title}>New Dialog</Text>
+            <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
+          </View>
+          <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
+          <Pressable disabled style={[styles.action, styles.groupAction, styles.groupDisabled]}>
+            <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
+          </Pressable>
+          <Pressable onPress={() => { onClose(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
+            <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
+          </Pressable>
+          <Text style={styles.section}>COMMUNICATE OFTEN</Text>
+          {loading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.userId}
+              ListEmptyComponent={<Text style={styles.empty}>Mutual followers will appear here.</Text>}
+              renderItem={({ item }) => (
+                <Pressable disabled={openingId !== null} onPress={() => void openConversation(item)} style={({ pressed }) => [styles.person, pressed && styles.personPressed]}>
+                  {item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View>}
+                  <View style={styles.copy}><Text style={styles.name}>{item.displayName}</Text><Text style={styles.handle}>{item.username ? `@${item.username}` : 'Mutual follower'}</Text></View>
+                  {openingId === item.userId ? <ActivityIndicator color={colors.primary} /> : null}
+                </Pressable>
+              )}
+            />
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function GroupIcon({ color }: { color: string }) {
+  return <Svg fill="none" height={18} viewBox="0 0 18 18" width={18}><Circle cx={6.25} cy={6} r={2.4} stroke={color} strokeWidth={1.5} /><Circle cx={12.25} cy={6.75} r={1.8} stroke={color} strokeWidth={1.4} /><Path d="M1.8 14.5c.35-3 2-4.5 4.45-4.5s4.1 1.5 4.45 4.5H1.8ZM10.5 10.7c2.7-.7 4.75.7 5 3.15h-3.4" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /></Svg>;
+}
+
+function BellIcon({ color }: { color: string }) {
+  return <Svg fill="none" height={18} viewBox="0 0 18 18" width={18}><Path d="M4.3 12.2h9.4l-1.05-1.45V7.5A3.65 3.65 0 0 0 9 3.85 3.65 3.65 0 0 0 5.35 7.5v3.25L4.3 12.2Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /><Path d="M7.4 14.1a1.8 1.8 0 0 0 3.2 0" stroke={color} strokeLinecap="round" strokeWidth={1.5} /></Svg>;
+}
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
+    sheet: { maxHeight: '80%', minHeight: 570, paddingHorizontal: 16, borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
+    header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
+    searchBox: { height: 40, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, marginRight: 8, fontSize: 21 }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, groupDisabled: { opacity: 0.65 }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
+    section: { color: colors.textMuted, marginTop: 25, marginBottom: 10, fontSize: 12 }, loader: { marginTop: 35 }, empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
+    person: { height: 76, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' }, personPressed: { opacity: 0.7 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.skeleton }, avatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' }, copy: { flex: 1, marginLeft: 10 }, name: { color: colors.text, fontSize: 15, fontWeight: '600' }, handle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
+  });
+}

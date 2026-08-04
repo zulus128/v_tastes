@@ -2,8 +2,10 @@ import {
   completeOnboardingInputSchema,
   createUserProfileInputSchema,
   getLeaderboardInputSchema,
+  updateProfilePhotoInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
@@ -12,6 +14,7 @@ import { decodeCursor, encodeCursor } from '../../shared/pagination';
 import { parseInput } from '../../shared/validation';
 
 const CURRENT_ONBOARDING_VERSION = 1;
+const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
 
 export const getSessionStatus = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -121,4 +124,41 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   });
 
   return { id: uid };
+});
+
+export const updateProfilePhoto = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(updateProfilePhotoInputSchema, request.data);
+  if (!input.photoPath.startsWith(`profile-images/${uid}/`)) {
+    throw new HttpsError('permission-denied', 'The profile image path is not owned by this user.');
+  }
+
+  const userRef = db.collection('users').doc(uid);
+  const user = await userRef.get();
+  if (!user.exists || user.get('status') !== 'active') {
+    throw new HttpsError('failed-precondition', 'An active user profile is required.');
+  }
+
+  const file = getStorage().bucket().file(input.photoPath);
+  let metadata;
+  try {
+    [metadata] = await file.getMetadata();
+  } catch (error) {
+    if ((error as { code?: number }).code === 404) {
+      throw new HttpsError('not-found', 'The uploaded profile photo was not found.');
+    }
+    throw error;
+  }
+  const size = Number(metadata.size ?? 0);
+  if (!metadata.contentType?.startsWith('image/') || !Number.isFinite(size) || size <= 0 || size >= MAX_PROFILE_PHOTO_BYTES) {
+    throw new HttpsError('failed-precondition', 'The uploaded profile photo must be an image smaller than 750 KB.');
+  }
+
+  const photoUrl = await getDownloadURL(file);
+  await userRef.update({
+    photoPath: input.photoPath,
+    photoUrl,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { photoPath: input.photoPath, photoUrl };
 });

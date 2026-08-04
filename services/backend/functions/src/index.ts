@@ -1,6 +1,7 @@
 export { healthCheck } from './modules/health/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
 export { followUser, unfollowUser } from './modules/social/functions';
+export { createActivity, listActivityCandidates } from './modules/activities/functions';
 export {
   createConversation,
   getMessages,
@@ -32,6 +33,7 @@ export {
   createUserProfile,
   getLeaderboard,
   getSessionStatus,
+  updateProfilePhoto,
 } from './modules/users/functions';
 export {
   addComment,

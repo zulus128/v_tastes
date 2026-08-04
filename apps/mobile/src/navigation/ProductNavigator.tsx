@@ -14,11 +14,17 @@ import {
   createNativeStackNavigator,
   type NativeStackNavigationProp,
 } from '@react-navigation/native-stack';
+import { apiErrorMessage, createTastesApi } from '@tastes/firebase-client';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useMemo } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
+import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
@@ -28,6 +34,7 @@ import { ChatScreen } from '../features/messaging/ChatScreen';
 import { ConversationsScreen } from '../features/messaging/ConversationsScreen';
 import { useUnreadConversationCount } from '../features/messaging/realtime';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
+import { firestore, functions, storage } from '../infrastructure/firebase';
 import { consumeInitialPushDeepLink, subscribeToPushDeepLinks } from '../infrastructure/pushNotifications';
 import { useSession } from '../session/SessionProvider';
 import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
@@ -41,6 +48,7 @@ export type RootStackParamList = {
   Leaderboard: undefined;
   Place: { venueId: string };
   Conversation: { conversationId: string };
+  NewActivity: undefined;
 };
 
 type MainTabParamList = {
@@ -77,6 +85,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Leaderboard: 'leaderboard',
       Place: 'places/:venueId',
       Conversation: 'conversations/:conversationId',
+      NewActivity: 'activities/new',
     },
   },
 };
@@ -122,12 +131,97 @@ function tabOptions(
 function ProfileTab({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
   const { logout } = useSession();
   const { colors, preference, setPreference } = useAppTheme();
+  const api = useMemo(() => createTastesApi(functions), []);
+  const [profile, setProfile] = useState<{
+    displayName: string | null;
+    photoPath: string | null;
+    photoUrl: string | null;
+  }>({ displayName: user.displayName, photoPath: null, photoUrl: user.photoURL });
+  const [avatarUri, setAvatarUri] = useState<string | null>(user.photoURL);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  useEffect(() => onSnapshot(doc(firestore, 'users', user.uid), (snapshot) => {
+    const data = snapshot.data();
+    const next = {
+      displayName: typeof data?.displayName === 'string' ? data.displayName : user.displayName,
+      photoPath: typeof data?.photoPath === 'string' ? data.photoPath : null,
+      photoUrl: typeof data?.photoUrl === 'string' ? data.photoUrl : null,
+    };
+    setProfile(next);
+    if (next.photoUrl) setAvatarUri(next.photoUrl);
+  }), [user.displayName, user.uid]);
+
+  async function chooseProfilePhoto() {
+    if (uploadingPhoto) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to add a profile photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const previousPath = profile.photoPath;
+    const photoPath = `profile-images/${user.uid}/avatar-${Date.now()}.jpg`;
+    setUploadingPhoto(true);
+    try {
+      const cropSize = Math.min(asset.width, asset.height);
+      const optimized = await manipulateAsync(
+        asset.uri,
+        [
+          {
+            crop: {
+              originX: Math.max(0, (asset.width - cropSize) / 2),
+              originY: Math.max(0, (asset.height - cropSize) / 2),
+              width: cropSize,
+              height: cropSize,
+            },
+          },
+          { resize: { width: 512, height: 512 } },
+        ],
+        { compress: 0.78, format: SaveFormat.JPEG },
+      );
+      setAvatarUri(optimized.uri);
+      const response = await fetch(optimized.uri);
+      const blob = await response.blob();
+      await uploadBytes(storageRef(storage, photoPath), blob, {
+        contentType: 'image/jpeg',
+      });
+      const updated = await api.updateProfilePhoto({ photoPath });
+      setAvatarUri(updated.data.photoUrl);
+      if (previousPath && previousPath !== photoPath) {
+        void deleteObject(storageRef(storage, previousPath)).catch(() => undefined);
+      }
+    } catch (error) {
+      setAvatarUri(profile.photoUrl);
+      Alert.alert('Could not update photo', apiErrorMessage(error));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  const displayName = profile.displayName ?? user.displayName ?? 'Your profile';
   return (
     <View style={[styles.profile, { backgroundColor: colors.canvas }]}>
-      <View style={styles.profileAvatar}>
-        <Text style={styles.profileInitial}>{(user.displayName ?? user.phoneNumber ?? 'T').slice(0, 1).toUpperCase()}</Text>
-      </View>
-      <Text style={[styles.profileName, { color: colors.text }]}>{user.displayName ?? 'Your profile'}</Text>
+      <Pressable
+        accessibilityLabel="Add profile photo"
+        accessibilityRole="button"
+        disabled={uploadingPhoto}
+        onPress={() => void chooseProfilePhoto()}
+        style={({ pressed }) => [styles.profileAvatar, pressed && styles.profileAvatarPressed]}
+      >
+        {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.profileAvatarImage} /> : (
+          <Text style={styles.profileInitial}>{displayName === 'Your profile' ? '+' : displayName.slice(0, 1).toUpperCase()}</Text>
+        )}
+        {uploadingPhoto ? <View style={styles.profileAvatarBusy}><ActivityIndicator color="#fff" /></View> : null}
+      </Pressable>
+      <Text style={[styles.profileName, { color: colors.text }]}>{displayName}</Text>
       <Text style={[styles.profileIdentity, { color: colors.textMuted }]}>{user.phoneNumber ?? user.email ?? user.uid}</Text>
       <View style={styles.profileActions}>
         <Text style={[styles.appearanceLabel, { color: colors.textMuted }]}>Appearance</Text>
@@ -209,6 +303,7 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
       >
         {() => (
           <ConversationsScreen
+            onNewActivity={() => rootNavigation.navigate('NewActivity')}
             onOpenConversation={(conversationId) => rootNavigation.navigate('Conversation', { conversationId })}
             userId={user.uid}
           />
@@ -281,6 +376,15 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
+        <RootStack.Screen name="NewActivity">
+          {({ navigation }) => (
+            <NewActivityScreen
+              onBack={navigation.goBack}
+              onCreated={() => navigation.navigate('MainTabs', { screen: 'Dialog' })}
+              userId={user.uid}
+            />
+          )}
+        </RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>
   );
@@ -289,6 +393,9 @@ export function ProductNavigator({ user }: { user: User }) {
 const styles = StyleSheet.create({
   profile: { flex: 1, alignItems: 'center', paddingTop: 110, paddingHorizontal: 24 },
   profileAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  profileAvatarPressed: { opacity: 0.8 },
+  profileAvatarImage: { width: 88, height: 88, borderRadius: 44 },
+  profileAvatarBusy: { position: 'absolute', inset: 0, borderRadius: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
   profileInitial: { color: '#fff', fontSize: 36, fontWeight: '700' },
   profileName: { marginTop: 18, fontSize: 24, fontWeight: '700' },
   profileIdentity: { marginTop: 6, fontSize: 13 },

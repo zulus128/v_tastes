@@ -23,6 +23,10 @@ export const createUserProfileInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512).optional(),
 });
 
+export const updateProfilePhotoInputSchema = z.object({
+  photoPath: z.string().trim().min(1).max(512),
+});
+
 export const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
 
 export const venueSchema = z.object({
@@ -106,6 +110,16 @@ export const followUserInputSchema = z.object({
 export const createConversationInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
+
+export const createActivityInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  venueId: z.string().trim().min(1).max(128),
+  startsAt: z.string().datetime(),
+  memberIds: z.array(z.string().min(1).max(128)).min(1).max(20),
+}).refine(
+  (input) => new Set(input.memberIds).size === input.memberIds.length,
+  { message: 'Choose each member only once.', path: ['memberIds'] },
+);
 
 export const sendMessageInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
@@ -229,6 +243,7 @@ export const healthCheckResultSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
+export type UpdateProfilePhotoInput = z.infer<typeof updateProfilePhotoInputSchema>;
 export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
 export type GetVenuesInput = z.infer<typeof getVenuesInputSchema>;
@@ -243,6 +258,7 @@ export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
+export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
@@ -383,6 +399,18 @@ export interface FavouritesResult {
 export interface SaveVenueResult {
   saved: boolean;
   folderIds: string[];
+}
+
+export interface ProfilePhotoResult {
+  photoPath: string;
+  photoUrl: string;
+}
+
+export interface ActivityCandidate {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
 }
 
 export interface DiscoverPerson {

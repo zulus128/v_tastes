@@ -30,6 +30,30 @@ afterAll(async () => {
 });
 
 describe('Storage security rules', () => {
+  it('allows an owner to upload a compact avatar and authenticated users to read it', async () => {
+    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const readerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const path = 'profile-images/user-a/avatar.jpg';
+
+    await assertSucceeds(
+      ownerStorage.ref(path).put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+    );
+    await assertSucceeds(readerStorage.ref(path).getDownloadURL());
+  });
+
+  it('rejects oversized avatars and uploads to another user profile', async () => {
+    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const attackerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const path = 'profile-images/user-a/avatar.jpg';
+
+    await assertFails(
+      ownerStorage.ref(path).put(new Uint8Array(750 * 1024), { contentType: 'image/jpeg' }),
+    );
+    await assertFails(
+      attackerStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+    );
+  });
+
   it('allows an owner to upload and authenticated users to read a dish image', async () => {
     const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
     const readerStorage = testEnvironment.authenticatedContext('user-b').storage();

@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useConversationInbox } from './realtime';
+import { NewDialogSheet } from './NewDialogSheet';
 
 function relativeTime(iso: string): string {
   const elapsed = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -66,9 +67,11 @@ function ConversationRow({
 }
 
 export function ConversationsScreen({
+  onNewActivity,
   onOpenConversation,
   userId,
 }: {
+  onNewActivity: () => void;
   onOpenConversation: (conversationId: string) => void;
   userId: string;
 }) {
@@ -76,6 +79,7 @@ export function ConversationsScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [search, setSearch] = useState('');
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
   const inbox = useConversationInbox(userId);
   const normalizedSearch = search.trim().toLowerCase();
   const conversations = inbox.data.filter((conversation) => (
@@ -87,19 +91,20 @@ export function ConversationsScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
-        <Text style={styles.subtitle}>Your conversations</Text>
-      </View>
-      <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>⌕</Text>
-        <TextInput
-          autoCorrect={false}
-          onChangeText={setSearch}
-          placeholder="Search messages"
-          placeholderTextColor={colors.placeholder}
-          style={styles.searchInput}
-          value={search}
-        />
+        <View style={styles.titleRow}>
+          <View style={styles.headerButton} />
+          <Text style={styles.title}>Dialog</Text>
+          <Pressable accessibilityLabel="New dialog" onPress={() => setNewDialogOpen(true)} style={styles.headerButton}>
+            <View style={styles.addCircle}><Text style={styles.addText}>+</Text></View>
+          </Pressable>
+        </View>
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} />
+          </View>
+          <Text style={styles.requests}>Requests <Text style={styles.requestsCount}>(0)</Text></Text>
+        </View>
       </View>
       {inbox.loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
@@ -129,6 +134,12 @@ export function ConversationsScreen({
           showsVerticalScrollIndicator={false}
         />
       )}
+      <NewDialogSheet
+        onClose={() => setNewDialogOpen(false)}
+        onNewActivity={onNewActivity}
+        onOpenConversation={onOpenConversation}
+        visible={newDialogOpen}
+      />
     </View>
   );
 }
@@ -136,12 +147,16 @@ export function ConversationsScreen({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.canvas },
-    header: { paddingTop: safeTop + 18, paddingHorizontal: 20 },
-    title: { color: colors.text, fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -0.7 },
-    subtitle: { color: colors.textMuted, marginTop: 2, fontSize: 14 },
-    searchBox: { height: 46, marginTop: 18, marginHorizontal: 20, paddingHorizontal: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
+    header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
+    titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
+    title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
+    headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    addCircle: { width: 22, height: 22, borderWidth: 1.5, borderColor: colors.text, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.text, fontSize: 19, lineHeight: 19, fontWeight: '300' },
+    searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    searchBox: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
     searchIcon: { color: colors.textSecondary, fontSize: 22, marginRight: 8, marginTop: -2 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    requests: { color: colors.textSecondary, fontSize: 14 }, requestsCount: { color: colors.primary },
     listContent: { paddingTop: 10, paddingBottom: 24 },
     emptyContent: { flexGrow: 1 },
     row: { minHeight: 82, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },

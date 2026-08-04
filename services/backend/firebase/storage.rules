@@ -11,9 +11,14 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    function validProfileImage() {
+      return request.resource.size < 750 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /profile-images/{uid}/{fileName} {
       allow read: if signedIn();
-      allow create, update: if signedIn() && request.auth.uid == uid && validImage();
+      allow create, update: if signedIn() && request.auth.uid == uid && validProfileImage();
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 

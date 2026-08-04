@@ -4,6 +4,7 @@ import type {
   Comment,
   CompleteOnboardingInput,
   ConversationSummary,
+  CreateActivityInput,
   CreateConversationInput,
   CreateFolderInput,
   CreateReviewInput,
@@ -23,6 +24,7 @@ import type {
   GetPlaceReviewsInput,
   GetVenuesInput,
   HealthCheckResult,
+  ActivityCandidate,
   LeaderboardEntry,
   ListConversationsInput,
   MarkConversationReadInput,
@@ -30,6 +32,7 @@ import type {
   PlaceDetails,
   PlaceReview,
   Page,
+  ProfilePhotoResult,
   ReactToReviewInput,
   RegisterPushTokenInput,
   RenameFolderInput,
@@ -43,6 +46,7 @@ import type {
   PushTokenResult,
   UnsaveVenueInput,
   UnregisterPushTokenInput,
+  UpdateProfilePhotoInput,
   Venue,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
@@ -154,12 +158,18 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
     createUserProfile: (input: CreateUserProfileInput) =>
       invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
+    updateProfilePhoto: (input: UpdateProfilePhotoInput) =>
+      invoke<UpdateProfilePhotoInput, ProfilePhotoResult>('updateProfilePhoto', input),
     followUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('followUser', input),
     unfollowUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('unfollowUser', input),
     createConversation: (input: CreateConversationInput) =>
       invoke<CreateConversationInput, IdResult>('createConversation', input),
+    listActivityCandidates: () =>
+      invoke<Record<string, never>, ActivityCandidate[]>('listActivityCandidates', {}),
+    createActivity: (input: CreateActivityInput) =>
+      invoke<CreateActivityInput, IdResult>('createActivity', input),
     listConversations: (input: ListConversationsInput) =>
       invoke<ListConversationsInput, Page<ConversationSummary>>('listConversations', input),
     getMessages: (input: GetMessagesInput) =>

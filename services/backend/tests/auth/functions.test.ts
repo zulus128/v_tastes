@@ -604,3 +604,62 @@ describe('messaging callables', () => {
     expect((await db.collection('_pushTokens').get()).size).toBe(0);
   }, 15_000);
 });
+
+describe('activity callables', () => {
+  it('lists mutual followers and creates an idempotent activity', async () => {
+    const organizer = await authenticatedUser();
+    const friend = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Activity Organizer',
+      username: 'activity.organizer',
+      city: 'Istanbul',
+    }, organizer.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Activity Friend',
+      username: 'activity.friend',
+      city: 'Istanbul',
+    }, friend.token);
+    const organizerProfile = (await db.collection('users').where('username', '==', 'activity.organizer').limit(1).get()).docs[0];
+    const friendProfile = (await db.collection('users').where('username', '==', 'activity.friend').limit(1).get()).docs[0];
+    if (!organizerProfile || !friendProfile) throw new Error('Expected both activity profiles to exist.');
+    const organizerUid = organizerProfile.id;
+    const friendUid = friendProfile.id;
+    await db.collection('venues').doc('activity-venue').set({
+      name: 'Activity Restaurant',
+      city: 'Istanbul',
+      status: 'active',
+      rating: 4.7,
+    });
+    await callFunction('followUser', { targetUserId: friendUid }, organizer.token);
+    await callFunction('followUser', { targetUserId: organizerUid }, friend.token);
+
+    const candidates = await callFunction<Array<{ userId: string; username: string | null }>>(
+      'listActivityCandidates',
+      {},
+      organizer.token,
+    );
+    expect(candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ userId: friendUid, username: 'activity.friend' }),
+    ]));
+
+    const command = {
+      idempotencyKey: 'activity-command-0001',
+      memberIds: [friendUid],
+      startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      venueId: 'activity-venue',
+    };
+    const created = await callFunction<{ id: string }>('createActivity', command, organizer.token);
+    const replayed = await callFunction<{ id: string }>('createActivity', command, organizer.token);
+    expect(replayed.id).toBe(created.id);
+    const activity = await db.collection('activities').doc(created.id).get();
+    expect(activity.data()).toMatchObject({
+      organizerId: organizerUid,
+      participantIds: [organizerUid, friendUid],
+      status: 'active',
+      venueId: 'activity-venue',
+      venueName: 'Activity Restaurant',
+    });
+    expect((await db.collection('activities').get()).size).toBe(1);
+  }, 30_000);
+});
