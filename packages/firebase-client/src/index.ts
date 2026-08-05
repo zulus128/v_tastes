@@ -55,6 +55,47 @@ import type {
 import type { Functions } from 'firebase/functions';
 import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 
+export const callableOperationNames = [
+  'healthCheck',
+  'requestPhoneOtp',
+  'verifyPhoneOtp',
+  'getSessionStatus',
+  'completeOnboarding',
+  'createUserProfile',
+  'updateProfilePhoto',
+  'followUser',
+  'unfollowUser',
+  'createConversation',
+  'listActivityCandidates',
+  'createActivity',
+  'respondToActivityInvitation',
+  'listConversations',
+  'getMessages',
+  'sendMessage',
+  'markConversationRead',
+  'registerPushToken',
+  'unregisterPushToken',
+  'getFavourites',
+  'createFolder',
+  'renameFolder',
+  'deleteFolder',
+  'saveVenue',
+  'unsaveVenue',
+  'getFeed',
+  'createReview',
+  'getComments',
+  'addComment',
+  'reactToReview',
+  'getLeaderboard',
+  'getDiscoverFeed',
+  'getDiscoverPeople',
+  'getVenues',
+  'getPlace',
+  'getPlaceReviews',
+] as const;
+
+export type CallableOperationName = typeof callableOperationNames[number];
+
 export interface IdResult {
   id: string;
 }
@@ -132,7 +173,7 @@ export interface TastesApiOptions {
 
 export function createTastesApi(functions: Functions, options: TastesApiOptions = {}) {
   async function invoke<Input, Output>(
-    operation: string,
+    operation: CallableOperationName,
     input: Input,
   ): Promise<HttpsCallableResult<Output>> {
     try {

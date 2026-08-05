@@ -5,8 +5,8 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
 
 let testEnvironment: RulesTestEnvironment;
 const projectId = process.env.TEST_PROJECT_ID ?? 'demo-tastes';
@@ -99,6 +99,21 @@ describe('Firestore security rules', () => {
     const db = testEnvironment.authenticatedContext('user-a').firestore();
     await assertSucceeds(getDoc(doc(db, 'reviews', 'published')));
     await assertFails(setDoc(doc(db, 'reviews', 'new'), { authorId: 'user-a', status: 'published' }));
+  });
+
+  it('allows the profile screen to read a user and query their published reviews', async () => {
+    const db = testEnvironment.authenticatedContext('user-b').firestore();
+    await assertSucceeds(getDoc(doc(db, 'users', 'user-a')));
+
+    const reviews = await assertSucceeds(getDocs(query(
+      collection(db, 'reviews'),
+      where('status', '==', 'published'),
+      where('authorId', '==', 'user-a'),
+      orderBy('createdAt', 'desc'),
+      limit(20),
+    )));
+
+    expect(reviews.docs.map((review) => review.id)).toEqual(['published']);
   });
 
   it('allows moderators and admins to read hidden venues and reviews', async () => {
