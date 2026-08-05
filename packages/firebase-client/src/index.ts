@@ -92,6 +92,21 @@ export const callableOperationNames = [
   'getVenues',
   'getPlace',
   'getPlaceReviews',
+  'getAdminOverview',
+  'getReportedContent',
+  'dismissReport',
+  'deleteContent',
+  'editContent',
+  'searchUsers',
+  'suspendUser',
+  'banUser',
+  'unbanUser',
+  'reinstateUser',
+  'searchAdminVenues',
+  'upsertVenue',
+  'setVenueStatus',
+  'setVenueFlags',
+  'mergeVenues',
 ] as const;
 
 export type CallableOperationName = typeof callableOperationNames[number];

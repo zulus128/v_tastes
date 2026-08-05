@@ -12,5 +12,8 @@ ui-debug.log
 **/lib/
 **/dist/
 **/.expo/
+**/.next/
+**/out/
 coverage/
 pnpm-debug.log*
+*.tsbuildinfo

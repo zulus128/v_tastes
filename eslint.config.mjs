@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/lib/**', '**/node_modules/**', '.firebase-data/**'] },
+  { ignores: ['**/dist/**', '**/lib/**', '**/.next/**', '**/out/**', '**/node_modules/**', '.firebase-data/**'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,

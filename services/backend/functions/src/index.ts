@@ -46,3 +46,20 @@ export {
   getFeed,
   reactToReview,
 } from './modules/reviews/functions';
+export {
+  banUser,
+  deleteContent,
+  dismissReport,
+  editContent,
+  getAdminOverview,
+  getReportedContent,
+  mergeVenues,
+  reinstateUser,
+  searchAdminVenues,
+  searchUsers,
+  setVenueFlags,
+  setVenueStatus,
+  suspendUser,
+  unbanUser,
+  upsertVenue,
+} from './modules/admin/functions';
