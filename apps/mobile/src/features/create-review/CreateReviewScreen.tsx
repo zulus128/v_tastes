@@ -454,12 +454,19 @@ function DishEditor({
       <Pressable onPress={onClose} style={styles.scrim} />
       <View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom) }]}>
         <View style={styles.header}><Text style={styles.title}>Add Dish</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
-        <Pressable onPress={pickSource} style={styles.photo}>
-          {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.photoImage} /> : <Text style={styles.photoAdd}>⊕</Text>}
-        </Pressable>
-        <RatingCurve onChange={(rating) => setDraft({ ...draft, rating })} value={draft.rating} />
-        <SectionLabel label="Title" />
-        <TextInput maxLength={120} onChangeText={(title) => setDraft({ ...draft, title })} placeholder="Enter text" placeholderTextColor={colors.placeholder} style={styles.input} value={draft.title} />
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+        >
+          <Pressable onPress={pickSource} style={styles.photo}>
+            {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.photoImage} /> : <Text style={styles.photoAdd}>⊕</Text>}
+          </Pressable>
+          <RatingCurve onChange={(rating) => setDraft({ ...draft, rating })} value={draft.rating} />
+          <SectionLabel label="Title" />
+          <TextInput maxLength={120} onChangeText={(title) => setDraft({ ...draft, title })} placeholder="Enter text" placeholderTextColor={colors.placeholder} style={styles.input} value={draft.title} />
+        </ScrollView>
         <View style={styles.actions}>
           <Pressable onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
           <Pressable disabled={!valid} onPress={() => onSave(draft)} style={[styles.save, !valid && styles.disabled]}><Text style={styles.saveText}>✓  Save</Text></Pressable>
@@ -561,12 +568,14 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
 
 const createDishStyles = (colors: ThemeColors) => StyleSheet.create({
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
-  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '92%', paddingHorizontal: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
-  header: { height: 64, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
+  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
+  header: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
+  scroll: { flex: 1 },
+  body: { paddingHorizontal: 16, paddingBottom: 16 },
   photo: { width: '100%', aspectRatio: 1, maxHeight: 370, borderWidth: 1, borderColor: colors.border, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.background },
   photoImage: { width: '100%', height: '100%', resizeMode: 'cover' }, photoAdd: { color: colors.textMuted, fontSize: 32 },
   input: { height: 50, borderRadius: 12, paddingHorizontal: 12, color: colors.text, backgroundColor: colors.background, fontSize: 16 },
-  actions: { marginTop: 16, flexDirection: 'row', gap: 10 }, cancel: { flex: 1, height: 52, borderWidth: 1, borderColor: colors.primary, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontSize: 15 },
+  actions: { paddingTop: 14, paddingHorizontal: 16, flexDirection: 'row', gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas }, cancel: { flex: 1, height: 52, borderWidth: 1, borderColor: colors.primary, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontSize: 15 },
   save: { flex: 1, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' }, saveText: { color: '#fff', fontSize: 15, fontWeight: '600' }, disabled: { opacity: 0.45 },
 });
 
