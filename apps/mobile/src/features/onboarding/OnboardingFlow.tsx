@@ -229,29 +229,25 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
   const panelHeight = compact ? 390 : 414;
-  const lastPinTop = Math.min(compact ? 250 : 319, height - panelHeight - 76);
-  const thirdPinTop = Math.min(compact ? 232 : 287, lastPinTop - 12);
-  const pinPositions = compact
-    ? [
-        { left: width * 0.16, top: 82 },
-        { left: width * 0.72, top: 92 },
-        { left: width * 0.32, top: thirdPinTop },
-        { left: width * 0.82, top: lastPinTop },
-      ]
-    : [
-        { left: width * 0.17, top: 109 },
-        { left: width * 0.70, top: 121 },
-        { left: width * 0.31, top: thirdPinTop },
-        { left: width * 0.81, top: lastPinTop },
-      ];
+  const heroHeight = height - panelHeight;
+  const heroScale = Math.min(1, heroHeight / 387);
+  const pinTop = (top: number) => top * heroScale - (1 - heroScale) * 34;
+  const pinPositions = [
+    { left: width * 0.17, top: pinTop(109) },
+    { left: width * 0.70, top: pinTop(121) },
+    { left: width * 0.31, top: pinTop(287) },
+    { left: width * 0.81, top: pinTop(319) },
+  ];
   const unavailable = (provider: string) => Alert.alert(`${provider} sign-in`, 'This provider is not configured in the local test build yet.');
   return (
     <View style={styles.fullScreen}>
-      <Image source={hero} resizeMode="cover" style={styles.hero} />
-      <RatingPin label="4.5" style={pinPositions[0]} />
-      <RatingPin label="5.0" style={pinPositions[1]} />
-      <RatingPin label="4.2" style={pinPositions[2]} />
-      <RatingPin label="3.5" style={pinPositions[3]} />
+      <View style={[styles.heroLayer, { height: heroHeight }]}>
+        <Image source={hero} resizeMode="cover" style={styles.hero} />
+        <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
+        <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
+        <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
+        <RatingPin label="3.5" scale={heroScale} style={pinPositions[3]} />
+      </View>
       <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, { height: panelHeight }]}>
         <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPanelBackground}>
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
@@ -280,10 +276,10 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
   );
 }
 
-function RatingPin({ label, style }: { label: string; style: { left: number; top: number } }) {
+function RatingPin({ label, scale, style }: { label: string; scale: number; style: { left: number; top: number } }) {
   const styles = useOnboardingStyles();
   return (
-    <View style={[styles.ratingPin, style]}>
+    <View style={[styles.ratingPin, style, { transform: [{ scale }] }]}>
       <View style={styles.ratingBubble}><Text style={styles.ratingLabel}>{label}</Text></View>
       <View style={styles.ratingPointer} />
       <Text style={styles.ratingStar}>★</Text>
@@ -465,7 +461,8 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   // pattern.png is dark linework on a transparent field, meant as a faint
   // texture (Figma uses ~4-8% opacity here), not a bold full-strength layer.
   entryPattern: { opacity: 0.06 },
-  hero: { position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: compact ? '55%' : '63%' },
+  heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
+  hero: { width: '100%', height: '100%' },
   ratingPin: { position: 'absolute', zIndex: 0, width: 44, height: 68, alignItems: 'center' },
   ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: colors.onPrimary, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   ratingLabel: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
