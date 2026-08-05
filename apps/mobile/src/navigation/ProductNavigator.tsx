@@ -19,7 +19,7 @@ import type { DiscoverPerson } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
@@ -27,6 +27,7 @@ import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
+import { ProfileSettingsSheet } from '../features/profile/ProfileSettingsSheet';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
 import { ChatScreen } from '../features/messaging/ChatScreen';
@@ -34,7 +35,7 @@ import { ConversationsScreen } from '../features/messaging/ConversationsScreen';
 import { useUnreadConversationCount } from '../features/messaging/realtime';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
 import { consumeInitialPushDeepLink, subscribeToPushDeepLinks } from '../infrastructure/pushNotifications';
-import { useTastesApi } from '../session/SessionProvider';
+import { useSession } from '../session/SessionProvider';
 import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
 import { consumePendingDeepLink } from './pendingDeepLink';
@@ -131,7 +132,8 @@ function tabOptions(
 function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
   const { colors, isDark } = useAppTheme();
   const unreadMessages = useUnreadConversationCount(user.uid);
-  const api = useTastesApi();
+  const { api, logout } = useSession();
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   async function openConversation(targetUserId: string) {
     try {
@@ -141,7 +143,7 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
       Alert.alert('Could not start conversation', apiErrorMessage(error));
     }
   }
-  return (
+  return <>
     <Tabs.Navigator
       initialRouteName="Home"
       screenOptions={(props) => tabOptions(colors, isDark, props)}
@@ -211,21 +213,20 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
             }}
             onMessage={(targetId) => void openConversation(targetId)}
             onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
-            onSettings={() => Alert.alert(
-              'Profile',
-              'Your profile settings',
-              [
-                { text: 'Leaderboard', onPress: () => rootNavigation.navigate('Leaderboard') },
-                { text: 'Monthly recap', onPress: () => rootNavigation.navigate('Recap', { mode: 'ready' }) },
-                { text: 'Cancel', style: 'cancel' },
-              ],
-            )}
+            onSettings={() => setSettingsVisible(true)}
             targetUserId={targetUserId}
           />;
         }}
       </Tabs.Screen>
     </Tabs.Navigator>
-  );
+    <ProfileSettingsSheet
+      onClose={() => setSettingsVisible(false)}
+      onLeaderboard={() => rootNavigation.navigate('Leaderboard')}
+      onLogout={logout}
+      onRecap={() => rootNavigation.navigate('Recap', { mode: 'ready' })}
+      visible={settingsVisible}
+    />
+  </>;
 }
 
 export function ProductNavigator({ user }: { user: User }) {
