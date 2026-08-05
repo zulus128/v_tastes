@@ -12,6 +12,12 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - tsconfig.base.json
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        type: string
+        required: false
+        default: Manual Android preview release
 
 jobs:
   build_android_preview:
@@ -28,7 +34,7 @@ jobs:
     env:
       FIREBASE_ANDROID_APP_ID: 1:254210443804:android:ddc430eb9ab7d65e1f2dd9
       FIREBASE_TESTER_GROUP: tastes-testers
-      FIREBASE_RELEASE_NOTES: ${{ github.commit_message }}
+      FIREBASE_RELEASE_NOTES: ${{ github.commit_message || inputs.release_notes }}
     steps:
       - uses: eas/download_build
         id: download_build
