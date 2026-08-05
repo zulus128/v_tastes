@@ -293,7 +293,7 @@ describe('authenticated session and paginated reads', () => {
 
     expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({ following: false });
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
-  });
+  }, 15_000);
 
   it('returns stable, non-overlapping cursors for feed, comments, and leaderboard', async () => {
     const { token } = await authenticatedUser();
@@ -688,5 +688,115 @@ describe('activity callables', () => {
     expect(activityMessage.id).toBeTruthy();
     expect((await activityConversation.ref.get()).get(`unreadCounts.${friendUid}`)).toBe(1);
     expect((await db.collection('activities').get()).size).toBe(1);
+  }, 30_000);
+
+  it('requires invite acceptance before messaging and removes declined invitees', async () => {
+    const organizer = await authenticatedUser();
+    const acceptingFriend = await authenticatedUser();
+    const decliningFriend = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Invitation Organizer',
+      username: 'invitation.organizer',
+      city: 'Istanbul',
+    }, organizer.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Accepting Friend',
+      username: 'invitation.accepting',
+      city: 'Istanbul',
+    }, acceptingFriend.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Declining Friend',
+      username: 'invitation.declining',
+      city: 'Istanbul',
+    }, decliningFriend.token);
+
+    const profiles = await db.collection('users').where('username', '>=', 'invitation.')
+      .where('username', '<=', 'invitation.\uf8ff')
+      .get();
+    const userIds = new Map(profiles.docs.map((profile) => [profile.get('username'), profile.id]));
+    const organizerUid = userIds.get('invitation.organizer');
+    const acceptingUid = userIds.get('invitation.accepting');
+    const decliningUid = userIds.get('invitation.declining');
+    if (!organizerUid || !acceptingUid || !decliningUid) {
+      throw new Error('Expected all invitation profiles to exist.');
+    }
+
+    await db.collection('venues').doc('invitation-venue').set({
+      name: 'Invitation Restaurant',
+      city: 'Istanbul',
+      status: 'active',
+      rating: 4.8,
+    });
+    await Promise.all([
+      callFunction('followUser', { targetUserId: acceptingUid }, organizer.token),
+      callFunction('followUser', { targetUserId: decliningUid }, organizer.token),
+      callFunction('followUser', { targetUserId: organizerUid }, acceptingFriend.token),
+      callFunction('followUser', { targetUserId: organizerUid }, decliningFriend.token),
+    ]);
+
+    const created = await callFunction<{ id: string }>('createActivity', {
+      idempotencyKey: 'activity-invitations-0001',
+      memberIds: [acceptingUid, decliningUid],
+      startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      venueId: 'invitation-venue',
+    }, organizer.token);
+
+    await expect(callFunction('sendMessage', {
+      conversationId: created.id,
+      idempotencyKey: 'pending-message-0001',
+      text: 'Can I send before accepting?',
+    }, acceptingFriend.token)).rejects.toMatchObject({ status: 'FAILED_PRECONDITION' });
+
+    expect(await callFunction('respondToActivityInvitation', {
+      activityId: created.id,
+      response: 'accepted',
+    }, acceptingFriend.token)).toEqual({ id: created.id });
+    expect(await callFunction('respondToActivityInvitation', {
+      activityId: created.id,
+      response: 'accepted',
+    }, acceptingFriend.token)).toEqual({ id: created.id });
+
+    const acceptedMessage = await callFunction<{ id: string }>('sendMessage', {
+      conversationId: created.id,
+      idempotencyKey: 'accepted-message-0001',
+      text: 'I am joining!',
+    }, acceptingFriend.token);
+    expect(acceptedMessage.id).toBeTruthy();
+
+    expect(await callFunction('respondToActivityInvitation', {
+      activityId: created.id,
+      response: 'declined',
+    }, decliningFriend.token)).toEqual({ id: created.id });
+    expect(await callFunction('respondToActivityInvitation', {
+      activityId: created.id,
+      response: 'declined',
+    }, decliningFriend.token)).toEqual({ id: created.id });
+
+    const [activity, conversation] = await Promise.all([
+      db.collection('activities').doc(created.id).get(),
+      db.collection('conversations').doc(created.id).get(),
+    ]);
+    expect(activity.get(`invitationStatuses.${acceptingUid}`)).toBe('accepted');
+    expect(conversation.get(`invitationStatuses.${acceptingUid}`)).toBe('accepted');
+    expect(activity.get(`invitationStatuses.${decliningUid}`)).toBe('declined');
+    expect(conversation.get(`invitationStatuses.${decliningUid}`)).toBe('declined');
+    expect(activity.get('participantIds')).toEqual(expect.arrayContaining([organizerUid, acceptingUid]));
+    expect(activity.get('participantIds')).not.toContain(decliningUid);
+    expect(conversation.get('participantIds')).not.toContain(decliningUid);
+    expect(conversation.get(`unreadCounts.${decliningUid}`)).toBeUndefined();
+
+    const declinedInbox = await callFunction<{ items: Array<{ id: string }> }>(
+      'listConversations',
+      { limit: 20 },
+      decliningFriend.token,
+    );
+    expect(declinedInbox.items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: created.id }),
+    ]));
+    await expect(callFunction('getMessages', {
+      conversationId: created.id,
+      limit: 20,
+    }, decliningFriend.token)).rejects.toMatchObject({ status: 'NOT_FOUND' });
   }, 30_000);
 });

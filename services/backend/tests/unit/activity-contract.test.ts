@@ -1,4 +1,7 @@
-import { createActivityInputSchema } from '@tastes/contracts';
+import {
+  createActivityInputSchema,
+  respondToActivityInvitationInputSchema,
+} from '@tastes/contracts';
 import { describe, expect, it } from 'vitest';
 
 const validInput = {
@@ -26,5 +29,21 @@ describe('createActivityInputSchema', () => {
 
   it('requires an ISO datetime', () => {
     expect(createActivityInputSchema.safeParse({ ...validInput, startsAt: 'tomorrow' }).success).toBe(false);
+  });
+});
+
+describe('respondToActivityInvitationInputSchema', () => {
+  it.each(['accepted', 'declined'] as const)('accepts the %s response', (response) => {
+    expect(respondToActivityInvitationInputSchema.safeParse({
+      activityId: 'activity-1',
+      response,
+    }).success).toBe(true);
+  });
+
+  it('rejects unsupported invitation responses', () => {
+    expect(respondToActivityInvitationInputSchema.safeParse({
+      activityId: 'activity-1',
+      response: 'maybe',
+    }).success).toBe(false);
   });
 });

@@ -60,6 +60,14 @@ function lastMessage(document: DocumentSnapshot) {
   };
 }
 
+function invitationStatus(document: DocumentSnapshot, uid: string) {
+  const statuses = document.get('invitationStatuses');
+  const status = statuses && typeof statuses === 'object'
+    ? (statuses as Record<string, unknown>)[uid]
+    : undefined;
+  return status === 'pending' || status === 'declined' ? status : 'accepted';
+}
+
 async function requireActiveProfile(uid: string) {
   const profile = await db.collection('users').doc(uid).get();
   if (!profile.exists || profile.get('status') !== 'active') {
@@ -181,6 +189,8 @@ export const listConversations = onCall(callableOptions, async (request) => {
         activityId: kind === 'activity' ? String(document.get('activityId') ?? document.id) : null,
         title: kind === 'activity' ? String(document.get('title') ?? 'Activity') : null,
         imageKey: kind === 'activity' && document.get('imageKey') ? String(document.get('imageKey')) : null,
+        organizerId: kind === 'activity' ? String(document.get('organizerId') ?? '') : null,
+        invitationStatus: kind === 'activity' ? invitationStatus(document, uid) : null,
         lastMessage: lastMessage(document),
         unreadCount: unreadCount(document, uid),
         createdAt: timestampToIso(document.get('createdAt')),
@@ -246,6 +256,9 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     const recipientIds = participantIds.filter((participantId) => participantId !== uid);
     if (recipientIds.length === 0) throw new HttpsError('internal', 'The conversation participants are invalid.');
     const kind = conversation.get('kind') === 'activity' ? 'activity' : 'direct';
+    if (kind === 'activity' && invitationStatus(conversation, uid) !== 'accepted') {
+      throw new HttpsError('failed-precondition', 'Accept the activity invitation before sending messages.');
+    }
     const userRef = db.collection('users').doc(uid);
     const recipientRefs = recipientIds.map((recipientId) => db.collection('users').doc(recipientId));
     const directRecipientId = recipientIds[0] ?? '';

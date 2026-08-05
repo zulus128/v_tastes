@@ -34,6 +34,7 @@ import type {
   Page,
   ProfilePhotoResult,
   ReactToReviewInput,
+  RespondToActivityInvitationInput,
   RegisterPushTokenInput,
   RenameFolderInput,
   RequestPhoneOtpInput,
@@ -170,6 +171,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<Record<string, never>, ActivityCandidate[]>('listActivityCandidates', {}),
     createActivity: (input: CreateActivityInput) =>
       invoke<CreateActivityInput, IdResult>('createActivity', input),
+    respondToActivityInvitation: (input: RespondToActivityInvitationInput) =>
+      invoke<RespondToActivityInvitationInput, IdResult>('respondToActivityInvitation', input),
     listConversations: (input: ListConversationsInput) =>
       invoke<ListConversationsInput, Page<ConversationSummary>>('listConversations', input),
     getMessages: (input: GetMessagesInput) =>

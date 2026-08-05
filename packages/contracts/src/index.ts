@@ -121,6 +121,11 @@ export const createActivityInputSchema = z.object({
   { message: 'Choose each member only once.', path: ['memberIds'] },
 );
 
+export const respondToActivityInvitationInputSchema = z.object({
+  activityId: z.string().min(1).max(128),
+  response: z.enum(['accepted', 'declined']),
+});
+
 export const sendMessageInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   conversationId: z.string().min(1).max(128),
@@ -259,6 +264,7 @@ export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
 export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
+export type RespondToActivityInvitationInput = z.infer<typeof respondToActivityInvitationInputSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
@@ -344,6 +350,8 @@ export interface ConversationSummary {
   activityId: string | null;
   title: string | null;
   imageKey: string | null;
+  organizerId: string | null;
+  invitationStatus: 'pending' | 'accepted' | 'declined' | null;
   lastMessage: {
     id: string;
     senderId: string;

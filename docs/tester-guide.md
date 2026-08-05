@@ -13,6 +13,8 @@ Please focus on:
 - following and unfollowing people;
 - saving venues and managing favourite folders;
 - comments;
+- direct and activity conversations, unread state, and activity invitations;
+- message push notifications while the app is backgrounded;
 - leaderboard and monthly recap;
 - app stability, error handling, and data persistence after restart.
 
@@ -59,8 +61,11 @@ After installing the build, please complete this short test first:
 12. Open comments from a Home feed item and add a comment.
 13. Open the leaderboard from Home or Profile.
 14. Open the monthly recap from Profile.
-15. Close and reopen the app. Confirm that you remain signed in and that saved server-side changes are still present.
-16. Sign out from Profile and confirm that the sign-in screen appears.
+15. Open **Dialog**, start a conversation with a mutual follower, and exchange a message.
+16. Create an activity for a future time and invite a mutual follower.
+17. On the invited account, accept the invitation and confirm that messaging becomes available.
+18. Close and reopen the app. Confirm that you remain signed in and that saved server-side changes are still present.
+19. Sign out from Profile and confirm that the sign-in screen appears.
 
 ## Create review checks
 
@@ -92,14 +97,31 @@ While testing, please also try:
 - closing the app during onboarding and continuing after reopening it;
 - entering invalid or incomplete values in forms.
 
+## Dialog, activity, and push checks
+
+Use two test accounts that follow each other. Two physical devices are preferred for push testing; signing out and switching accounts is sufficient for the remaining checks.
+
+- start a direct conversation and confirm that it appears for both accounts;
+- send messages in both directions and confirm ordering, live updates, and unread badge changes;
+- open the conversation and confirm that its unread count clears;
+- background the recipient device, send a message, and confirm that an OS push notification arrives;
+- tap the notification and confirm that the app opens the corresponding conversation;
+- create an activity with a venue, future date, and both test accounts;
+- confirm that the invitee sees an invitation before participating in the activity chat;
+- try to message before accepting and confirm that the action is rejected;
+- accept the invitation and confirm that messaging becomes available;
+- create another activity, decline it, and confirm that it disappears from the invitee's Dialog list;
+- repeat accept and decline actions during a slow connection and confirm that duplicate requests do not corrupt the activity;
+- restart both apps and confirm that accepted conversations and unread state persist.
+
 ## Known limitations
 
 - This increment is distributed for Android testing. iOS distribution is not part of the current tester flow.
-- **Dialog** is currently a placeholder; conversations are not implemented yet.
 - A review draft is not saved if the app is closed before publishing.
 - Dish photos are visible only to signed-in users in this test environment.
 - Real SMS delivery and third-party sign-in providers are not enabled. Use the test code `1332`.
-- Push notifications are not delivered even if notification permission is granted.
+- There is no dedicated in-app notifications inbox yet; message notifications are delivered as OS push notifications.
+- Push delivery requires notification permission, a physical device, and network access; simulator and emulator delivery is not part of this tester flow.
 - Reporting and moderation are not connected to a backend workflow yet.
 - Testers share one Firebase test environment. Content or counters may change while other people are testing.
 - Reinstalling the app or signing out does not delete server-side test data.

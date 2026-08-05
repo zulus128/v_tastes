@@ -1,5 +1,5 @@
 import type { ConversationSummary } from '@tastes/contracts';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
@@ -83,7 +84,17 @@ export function ConversationsScreen({
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [search, setSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
   const inbox = useConversationInbox(userId);
+  const pendingInvitation = inbox.data.find((conversation) => (
+    conversation.kind === 'activity'
+    && conversation.invitationStatus === 'pending'
+    && conversation.activityId !== suppressedInviteId
+  ));
+  const pendingActivityId = pendingInvitation?.activityId ?? null;
+  const closeInvitation = useCallback(() => {
+    if (pendingActivityId) setSuppressedInviteId(pendingActivityId);
+  }, [pendingActivityId]);
   const normalizedSearch = search.trim().toLowerCase();
   const conversations = inbox.data.filter((conversation) => (
     !normalizedSearch
@@ -143,6 +154,12 @@ export function ConversationsScreen({
         onNewActivity={onNewActivity}
         onOpenConversation={onOpenConversation}
         visible={newDialogOpen}
+      />
+      <ActivityInviteModal
+        activityId={pendingActivityId}
+        onClose={closeInvitation}
+        userId={userId}
+        visible={Boolean(pendingActivityId)}
       />
     </View>
   );

@@ -1,6 +1,6 @@
 import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -38,12 +39,10 @@ function MessageBubble({ item, mine, styles }: { item: ChatMessage; mine: boolea
 export function ChatScreen({
   conversationId,
   onBack,
-  onOpenActivity,
   userId,
 }: {
   conversationId: string;
   onBack: () => void;
-  onOpenActivity: (activityId: string) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -53,11 +52,13 @@ export function ChatScreen({
   const messages = useConversationMessages(conversationId, userId);
   const [participant, setParticipant] = useState<ConversationParticipant | null>(null);
   const [activity, setActivity] = useState<{ id: string; title: string } | null>(null);
+  const [activityPreviewOpen, setActivityPreviewOpen] = useState(false);
   const [conversationError, setConversationError] = useState<Error | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('message'));
   const lastMarkedRead = useRef<string | null>(null);
+  const closeActivityPreview = useCallback(() => setActivityPreviewOpen(false), []);
 
   useEffect(() => subscribeConversationDetails(
     conversationId,
@@ -110,7 +111,7 @@ export function ChatScreen({
         <Pressable
           accessibilityLabel={activity ? 'Open activity details' : undefined}
           disabled={!activity}
-          onPress={() => activity && onOpenActivity(activity.id)}
+          onPress={() => activity && setActivityPreviewOpen(true)}
           style={styles.headerIdentity}
         >
           {participant?.photoUrl ? (
@@ -179,6 +180,12 @@ export function ChatScreen({
           {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <Text style={styles.sendText}>↑</Text>}
         </Pressable>
       </View>
+      <ActivityInviteModal
+        activityId={activity?.id ?? null}
+        onClose={closeActivityPreview}
+        userId={userId}
+        visible={activityPreviewOpen && Boolean(activity)}
+      />
     </KeyboardAvoidingView>
   );
 }

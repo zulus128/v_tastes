@@ -371,7 +371,6 @@ export function ProductNavigator({ user }: { user: User }) {
           {({ navigation, route }) => (
             <ChatScreen
               conversationId={route.params.conversationId}
-              onOpenActivity={(activityId) => navigation.navigate('ActivityDetails', { activityId })}
               onBack={() => {
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Dialog' });

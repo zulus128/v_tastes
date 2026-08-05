@@ -1,7 +1,11 @@
 export { healthCheck } from './modules/health/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
 export { followUser, unfollowUser } from './modules/social/functions';
-export { createActivity, listActivityCandidates } from './modules/activities/functions';
+export {
+  createActivity,
+  listActivityCandidates,
+  respondToActivityInvitation,
+} from './modules/activities/functions';
 export {
   createConversation,
   getMessages,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countries } from '../../apps/mobile/src/features/onboarding/countries';
+import { countries, defaultCountry } from '../../apps/mobile/src/features/onboarding/countries';
 import { toE164PhoneNumber } from '../../apps/mobile/src/features/onboarding/phone-number';
 
 function country(code: string) {
@@ -15,6 +15,10 @@ describe('phone number validation', () => {
     expect(country('IN').callingCode).toBe('+91');
     expect(country('BR').callingCode).toBe('+55');
     expect(country('JP').callingCode).toBe('+81');
+  });
+
+  it('always provides a safe default country for the phone screen', () => {
+    expect(defaultCountry).toMatchObject({ code: 'MC', flag: '🇲🇨', callingCode: '+377' });
   });
 
   it('rejects a Monaco number with too few national digits', () => {

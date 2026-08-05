@@ -88,6 +88,14 @@ function summaryFromDocument(
     activityId: data.kind === 'activity' ? String(data.activityId ?? document.id) : null,
     title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
     imageKey: data.kind === 'activity' && typeof data.imageKey === 'string' ? data.imageKey : null,
+    organizerId: data.kind === 'activity' && typeof data.organizerId === 'string' ? data.organizerId : null,
+    invitationStatus: data.kind === 'activity'
+      ? data.invitationStatuses?.[userId] === 'pending'
+        ? 'pending'
+        : data.invitationStatuses?.[userId] === 'declined'
+          ? 'declined'
+          : 'accepted'
+      : null,
     lastMessage: rawLastMessage ? {
       id: String(rawLastMessage.id ?? ''),
       senderId: String(rawLastMessage.senderId ?? ''),

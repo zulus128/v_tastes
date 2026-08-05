@@ -1,5 +1,8 @@
-import { createActivityInputSchema } from '@tastes/contracts';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import {
+  createActivityInputSchema,
+  respondToActivityInvitationInputSchema,
+} from '@tastes/contracts';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
@@ -46,9 +49,6 @@ export const createActivity = onCall(callableOptions, async (request) => {
     throw new HttpsError('invalid-argument', 'You are already the activity organizer.');
   }
   const startsAt = new Date(input.startsAt);
-  if (startsAt.getTime() < Date.now() + 5 * 60_000) {
-    throw new HttpsError('failed-precondition', 'Choose a time at least five minutes from now.');
-  }
 
   const activityRef = db.collection('activities').doc(
     idempotentDocumentId(uid, 'create-activity', input.idempotencyKey),
@@ -58,8 +58,9 @@ export const createActivity = onCall(callableOptions, async (request) => {
   const venueRef = db.collection('venues').doc(input.venueId);
 
   await db.runTransaction(async (transaction) => {
-    const [existing, user, venue, ...memberData] = await Promise.all([
+    const [existing, existingConversation, user, venue, ...memberData] = await Promise.all([
       transaction.get(activityRef),
+      transaction.get(conversationRef),
       transaction.get(userRef),
       transaction.get(venueRef),
       ...input.memberIds.flatMap((memberId) => [
@@ -68,7 +69,40 @@ export const createActivity = onCall(callableOptions, async (request) => {
         transaction.get(db.collection('users').doc(memberId).collection('following').doc(uid)),
       ]),
     ]);
-    if (existing.exists) return;
+    if (existing.exists) {
+      if (!existingConversation.exists) {
+        const rawParticipantIds: unknown = existing.get('participantIds');
+        const participantIds: string[] = Array.isArray(rawParticipantIds)
+          ? rawParticipantIds.filter((participantId: unknown): participantId is string => (
+            typeof participantId === 'string' && participantId.length > 0
+          ))
+          : [uid];
+        const now = FieldValue.serverTimestamp();
+        transaction.create(conversationRef, {
+          kind: 'activity',
+          activityId: activityRef.id,
+          organizerId: String(existing.get('organizerId') ?? uid),
+          title: String(existing.get('venueName') ?? 'Activity'),
+          imageKey: null,
+          participantIds,
+          invitationStatuses: Object.fromEntries(participantIds.map((participantId) => [
+            participantId,
+            participantId === String(existing.get('organizerId') ?? uid) ? 'accepted' : 'pending',
+          ])),
+          unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
+          lastReadAt: {},
+          lastMessage: null,
+          messageCount: 0,
+          status: 'active',
+          createdAt: existing.get('createdAt') ?? now,
+          updatedAt: now,
+        });
+      }
+      return;
+    }
+    if (startsAt.getTime() < Date.now() + 5 * 60_000) {
+      throw new HttpsError('failed-precondition', 'Choose a time at least five minutes from now.');
+    }
     if (!user.exists || user.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
     }
@@ -91,6 +125,10 @@ export const createActivity = onCall(callableOptions, async (request) => {
     transaction.create(activityRef, {
       organizerId: uid,
       participantIds: [uid, ...input.memberIds],
+      invitationStatuses: {
+        [uid]: 'accepted',
+        ...Object.fromEntries(input.memberIds.map((memberId) => [memberId, 'pending'])),
+      },
       venueId: venue.id,
       venueName: String(venue.get('name') ?? ''),
       startsAt: Timestamp.fromDate(startsAt),
@@ -107,6 +145,10 @@ export const createActivity = onCall(callableOptions, async (request) => {
       title: String(venue.get('name') ?? ''),
       imageKey: venue.get('imageKey') ? String(venue.get('imageKey')) : null,
       participantIds,
+      invitationStatuses: {
+        [uid]: 'accepted',
+        ...Object.fromEntries(input.memberIds.map((memberId) => [memberId, 'pending'])),
+      },
       unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
       lastReadAt: {},
       lastMessage: null,
@@ -118,4 +160,63 @@ export const createActivity = onCall(callableOptions, async (request) => {
   });
 
   return { id: activityRef.id };
+});
+
+export const respondToActivityInvitation = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(respondToActivityInvitationInputSchema, request.data);
+  const activityRef = db.collection('activities').doc(input.activityId);
+  const conversationRef = db.collection('conversations').doc(input.activityId);
+
+  await db.runTransaction(async (transaction) => {
+    const [activity, conversation] = await Promise.all([
+      transaction.get(activityRef),
+      transaction.get(conversationRef),
+    ]);
+    if (!activity.exists || !conversation.exists) {
+      throw new HttpsError('not-found', 'The activity invitation was not found.');
+    }
+    if (activity.get('organizerId') === uid) {
+      throw new HttpsError('failed-precondition', 'The organizer is already taking part.');
+    }
+    const statuses = activity.get('invitationStatuses');
+    const currentStatus = statuses && typeof statuses === 'object'
+      ? (statuses as Record<string, unknown>)[uid]
+      : undefined;
+    if (currentStatus === input.response) return;
+    if (currentStatus !== 'pending') {
+      throw new HttpsError('failed-precondition', 'This invitation is no longer pending.');
+    }
+
+    const now = FieldValue.serverTimestamp();
+    if (input.response === 'declined') {
+      transaction.update(
+        activityRef,
+        new FieldPath('invitationStatuses', uid), input.response,
+        'participantIds', FieldValue.arrayRemove(uid),
+        'updatedAt', now,
+      );
+      transaction.update(
+        conversationRef,
+        new FieldPath('invitationStatuses', uid), input.response,
+        'participantIds', FieldValue.arrayRemove(uid),
+        new FieldPath('unreadCounts', uid), FieldValue.delete(),
+        new FieldPath('lastReadAt', uid), FieldValue.delete(),
+        'updatedAt', now,
+      );
+    } else {
+      transaction.update(
+        activityRef,
+        new FieldPath('invitationStatuses', uid), input.response,
+        'updatedAt', now,
+      );
+      transaction.update(
+        conversationRef,
+        new FieldPath('invitationStatuses', uid), input.response,
+        'updatedAt', now,
+      );
+    }
+  });
+
+  return { id: input.activityId };
 });
