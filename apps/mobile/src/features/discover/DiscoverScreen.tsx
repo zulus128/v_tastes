@@ -138,7 +138,15 @@ function projectToMap(latitude?: number, longitude?: number): { left: `${number}
   return { left: `${left}%`, top: `${top}%` };
 }
 
-export function DiscoverScreen({ onOpenPlace, userId }: { onOpenPlace: (venueId: string) => void; userId: string }) {
+export function DiscoverScreen({
+  onOpenPlace,
+  onOpenProfile,
+  userId,
+}: {
+  onOpenPlace: (venueId: string) => void;
+  onOpenProfile: (person: DiscoverPerson) => void;
+  userId: string;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<DiscoverTab>('trending');
@@ -220,7 +228,7 @@ export function DiscoverScreen({ onOpenPlace, userId }: { onOpenPlace: (venueId:
           userId={userId}
         />
       ) : null}
-      {tab === 'people' ? <PeopleFeed userId={userId} /> : null}
+      {tab === 'people' ? <PeopleFeed onOpenProfile={onOpenProfile} userId={userId} /> : null}
       <SaveToFolderSheet
         onClose={() => setSaveTarget(null)}
         place={saveTarget}
@@ -572,7 +580,7 @@ function PlacesMap({
   );
 }
 
-function PeopleFeed({ userId }: { userId: string }) {
+function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: DiscoverPerson) => void; userId: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState('');
@@ -635,6 +643,7 @@ function PeopleFeed({ userId }: { userId: string }) {
                     following={person.following}
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
+                    onOpen={() => onOpenProfile(person)}
                     pending={toggleFollow.isPending || pendingId === person.userId}
                     person={person}
                   />
@@ -652,6 +661,7 @@ function PeopleFeed({ userId }: { userId: string }) {
                     following={person.following}
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
+                    onOpen={() => onOpenProfile(person)}
                     pending={toggleFollow.isPending || pendingId === person.userId}
                     person={person}
                   />
@@ -669,6 +679,7 @@ function PeopleFeed({ userId }: { userId: string }) {
                     following={person.following}
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
+                    onOpen={() => onOpenProfile(person)}
                     pending={toggleFollow.isPending || pendingId === person.userId}
                     person={person}
                   />
@@ -921,11 +932,13 @@ function FollowButton({ following, onPress, pending }: { following: boolean; onP
 function TastemakerCard({
   following,
   onFollow,
+  onOpen,
   pending,
   person,
 }: {
   following: boolean;
   onFollow: () => void;
+  onOpen: () => void;
   pending: boolean;
   person: DiscoverPerson;
 }) {
@@ -933,8 +946,10 @@ function TastemakerCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <LinearGradient colors={['rgba(184,47,41,0.35)', colors.surface]} style={styles.tastemakerCard}>
-      <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.tastemakerAvatar} />
-      <Text numberOfLines={1} style={styles.tastemakerName}>{person.displayName}</Text>
+      <Pressable onPress={onOpen}>
+        <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.tastemakerAvatar} />
+      </Pressable>
+      <Text numberOfLines={1} onPress={onOpen} style={styles.tastemakerName}>{person.displayName}</Text>
       <Text style={styles.tastemakerTastes}>{person.favoriteCuisines.join(' · ') || (person.username ? `@${person.username}` : '')}</Text>
       <Text style={styles.tastemakerGrowth}>+{person.weeklyFollowerGrowth} this week</Text>
       <FollowButton following={following} onPress={onFollow} pending={pending} />
@@ -945,11 +960,13 @@ function TastemakerCard({
 function CompactPerson({
   following,
   onFollow,
+  onOpen,
   pending,
   person,
 }: {
   following: boolean;
   onFollow: () => void;
+  onOpen: () => void;
   pending: boolean;
   person: DiscoverPerson;
 }) {
@@ -957,13 +974,13 @@ function CompactPerson({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.compactPerson}>
-      <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.compactAvatar} />
-      <View style={styles.compactCopy}>
+      <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.compactAvatar} /></Pressable>
+      <Pressable onPress={onOpen} style={styles.compactCopy}>
         <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.displayName}</Text></View>
         <Text numberOfLines={1} style={styles.compactTastes}>
           {person.favoriteCuisines.join(' · ') || 'Tastes explorer'} · {joinedLabel(person.createdAt)}
         </Text>
-      </View>
+      </Pressable>
       <FollowButton following={following} onPress={onFollow} pending={pending} />
     </View>
   );
@@ -972,11 +989,13 @@ function CompactPerson({
 function ProfileSuggestion({
   following,
   onFollow,
+  onOpen,
   pending,
   person,
 }: {
   following: boolean;
   onFollow: () => void;
+  onOpen: () => void;
   pending: boolean;
   person: DiscoverPerson;
 }) {
@@ -990,12 +1009,12 @@ function ProfileSuggestion({
   return (
     <View style={styles.profileSuggestion}>
       <View style={styles.suggestionHead}>
-        <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.suggestionAvatar} />
-        <View style={styles.suggestionCopy}>
+        <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.suggestionAvatar} /></Pressable>
+        <Pressable onPress={onOpen} style={styles.suggestionCopy}>
           <Text style={styles.suggestionName}>{person.displayName}</Text>
           <Text style={styles.suggestionHandle}>{person.username ? `@${person.username}` : ''}</Text>
           <Text style={styles.suggestionTastes}>{person.favoriteCuisines.join(' · ')}</Text>
-        </View>
+        </Pressable>
         <FollowButton following={following} onPress={onFollow} pending={pending} />
       </View>
       <View style={styles.statsRow}>
