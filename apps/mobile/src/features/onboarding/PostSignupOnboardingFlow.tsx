@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -436,31 +437,43 @@ export function PostSignupOnboardingFlow({
   }
 
   if (screen === 'profile') {
-    return <PatternScreen>
-      <View style={styles.profilePage}>
-        <Text style={styles.title}>Create your profile</Text>
-        <Text style={[styles.subtitle, styles.profileSubtitle]}>Choose a username and add a photo so others can recognize you</Text>
-        <Pressable accessibilityLabel="Add profile photo" onPress={() => setPhotoSheet(true)} style={styles.photo}>
-          {photoUri ? <Image source={{ uri: photoUri }} style={styles.photoImage} /> : <Image source={addPhoto} style={styles.addPhotoIcon} />}
-        </Pressable>
-        <TextInput value={displayName} onChangeText={setDisplayName} placeholder="Your Name" placeholderTextColor={colors.placeholder} style={styles.field} />
-        <TextInput value={username} autoCapitalize="none" onChangeText={setUsername} placeholder="Username" placeholderTextColor={colors.placeholder} style={styles.field} />
-        <Pressable onPress={() => navigate('city')} style={styles.fieldRow}><Text style={styles.locationLabel}>Location</Text><View style={styles.locationSelection}><Text style={styles.locationValue}>{city}</Text><Image source={cityFlag} style={styles.locationFlag} /><Image source={chevronRight} style={styles.locationChevron} /></View></Pressable>
-      </View>
-      <PrimaryButton label="Continue" loading={busy} onPress={saveProfile} style={styles.bottomButton} />
-      <Modal animationType="slide" transparent visible={photoSheet} onRequestClose={() => setPhotoSheet(false)}>
-        <Pressable onPress={() => setPhotoSheet(false)} style={styles.modalBackdrop}>
-          <View style={styles.sheetWrap}>
-            <View style={styles.sheet}>
-              <Pressable onPress={() => choosePhoto(true)} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
-              <Pressable onPress={() => choosePhoto(false)} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
-              <Pressable onPress={() => { setPhotoUri(null); setPhotoSheet(false); }} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
-            </View>
-            <Pressable onPress={() => setPhotoSheet(false)} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
+    return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.profileKeyboardAvoiding}>
+      <PatternScreen>
+        <View style={styles.profileKeyboardLayout}>
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.profilePage}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.profileScroll}
+          >
+            <Text style={styles.title}>Create your profile</Text>
+            <Text style={[styles.subtitle, styles.profileSubtitle]}>Choose a username and add a photo so others can recognize you</Text>
+            <Pressable accessibilityLabel="Add profile photo" onPress={() => setPhotoSheet(true)} style={styles.photo}>
+              {photoUri ? <Image source={{ uri: photoUri }} style={styles.photoImage} /> : <Image source={addPhoto} style={styles.addPhotoIcon} />}
+            </Pressable>
+            <TextInput value={displayName} onChangeText={setDisplayName} placeholder="Your Name" placeholderTextColor={colors.placeholder} style={styles.field} />
+            <TextInput value={username} autoCapitalize="none" onChangeText={setUsername} placeholder="Username" placeholderTextColor={colors.placeholder} style={styles.field} />
+            <Pressable onPress={() => navigate('city')} style={styles.fieldRow}><Text style={styles.locationLabel}>Location</Text><View style={styles.locationSelection}><Text style={styles.locationValue}>{city}</Text><Image source={cityFlag} style={styles.locationFlag} /><Image source={chevronRight} style={styles.locationChevron} /></View></Pressable>
+          </ScrollView>
+          <View style={styles.profileButtonArea}>
+            <PrimaryButton label="Continue" loading={busy} onPress={saveProfile} />
           </View>
-        </Pressable>
-      </Modal>
-    </PatternScreen>;
+        </View>
+        <Modal animationType="slide" transparent visible={photoSheet} onRequestClose={() => setPhotoSheet(false)}>
+          <Pressable onPress={() => setPhotoSheet(false)} style={styles.modalBackdrop}>
+            <View style={styles.sheetWrap}>
+              <View style={styles.sheet}>
+                <Pressable onPress={() => choosePhoto(true)} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
+                <Pressable onPress={() => choosePhoto(false)} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
+                <Pressable onPress={() => { setPhotoUri(null); setPhotoSheet(false); }} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
+              </View>
+              <Pressable onPress={() => setPhotoSheet(false)} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+      </PatternScreen>
+    </KeyboardAvoidingView>;
   }
 
   if (screen === 'dish') {
@@ -642,7 +655,11 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionSubtitle: { marginTop: 8, maxWidth: 320 },
   permissionBodyText: { color: colors.textMuted },
-  profilePage: { paddingHorizontal: 20, paddingTop: 126, alignItems: 'center' },
+  profileKeyboardAvoiding: { flex: 1 },
+  profileKeyboardLayout: { flex: 1 },
+  profileScroll: { flex: 1 },
+  profilePage: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 126, paddingBottom: 16, alignItems: 'center' },
+  profileButtonArea: { paddingHorizontal: 36, paddingBottom: Platform.OS === 'ios' ? 24 : 18 },
   profileSubtitle: { marginTop: 8, width: 285 },
   photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, marginTop: 22, marginBottom: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   photoImage: { width: '100%', height: '100%', borderRadius: 59 },
@@ -716,7 +733,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   venueTag: { height: 33, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: isDark ? colors.surfaceMuted : colors.background, alignItems: 'center', justifyContent: 'center' },
   venueTagContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   venueTagText: { color: colors.text, fontSize: 15, lineHeight: 20, letterSpacing: -0.24 },
-  venueFlag: { width: 18, height: 18 },
+  venueFlag: { width: 14, height: 14, transform: [{ translateY: -1 }] },
   skeletonImage: { width: 86, height: 86, borderRadius: 12, backgroundColor: colors.skeletonMuted },
   skeletonTitle: { width: '72%', height: 14, backgroundColor: colors.skeleton, borderRadius: 4 },
   skeletonLine: { width: '94%', height: 24, backgroundColor: colors.skeletonMuted, borderRadius: 4 },

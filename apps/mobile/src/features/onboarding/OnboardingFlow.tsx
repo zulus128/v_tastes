@@ -21,14 +21,14 @@ import {
 import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
-import logo from '../../../assets/onboarding/logo.png';
 import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
+import { TastesLogo } from '../../ui/FigmaIcons';
+import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
-import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
 type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
 type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked' | 'failure' | 'sign-in-failed';
@@ -217,7 +217,7 @@ function EntryScreen() {
   return (
     <LinearGradient colors={isDark ? ['#560E0B', '#000000'] : ['#F7E8E4', '#F2EFEA']} style={styles.fullScreen}>
       <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.entryPattern} style={styles.centered}>
-        <Image source={logo} resizeMode="contain" style={styles.entryLogo} />
+        <TastesLogo width={189} />
       </ImageBackground>
     </LinearGradient>
   );
@@ -228,18 +228,21 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
   const { height, width } = useWindowDimensions();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
+  const panelHeight = compact ? 390 : 414;
+  const lastPinTop = Math.min(compact ? 250 : 319, height - panelHeight - 76);
+  const thirdPinTop = Math.min(compact ? 232 : 287, lastPinTop - 12);
   const pinPositions = compact
     ? [
         { left: width * 0.16, top: 82 },
         { left: width * 0.72, top: 92 },
-        { left: width * 0.32, top: 232 },
-        { left: width * 0.82, top: 250 },
+        { left: width * 0.32, top: thirdPinTop },
+        { left: width * 0.82, top: lastPinTop },
       ]
     : [
         { left: width * 0.17, top: 109 },
         { left: width * 0.70, top: 121 },
-        { left: width * 0.31, top: 287 },
-        { left: width * 0.81, top: 319 },
+        { left: width * 0.31, top: thirdPinTop },
+        { left: width * 0.81, top: lastPinTop },
       ];
   const unavailable = (provider: string) => Alert.alert(`${provider} sign-in`, 'This provider is not configured in the local test build yet.');
   return (
@@ -247,13 +250,13 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
       <Image source={hero} resizeMode="cover" style={styles.hero} />
       <RatingPin label="4.5" style={pinPositions[0]} />
       <RatingPin label="5.0" style={pinPositions[1]} />
-      {!compact ? <RatingPin label="4.2" style={pinPositions[2]} /> : null}
-      {!compact ? <RatingPin label="3.5" style={pinPositions[3]} /> : null}
-      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={styles.consentPanel}>
+      <RatingPin label="4.2" style={pinPositions[2]} />
+      <RatingPin label="3.5" style={pinPositions[3]} />
+      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, { height: panelHeight }]}>
         <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPanelBackground}>
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
-              <Image source={logo} resizeMode="contain" style={styles.smallLogo} />
+              <TastesLogo width={compact ? 80 : 98} />
               <View style={styles.consentCopy}>
                 <Text style={styles.consentTitle}>Discover the best places!</Text>
                 <Text style={styles.consentSubtitle}>Rate dishes and restaurants to get personalized recommendations</Text>
@@ -319,7 +322,7 @@ function PhoneScreen(props: {
           >
             <View style={styles.authContent}>
               <Text style={styles.authTitle}>Your phone number</Text>
-              <Text style={styles.authSubtitle}>We use your number to personalize your experience</Text>
+              <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
               <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
                 <Pressable onPress={props.onCountry} style={styles.countrySelector}>
                   <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
@@ -336,7 +339,7 @@ function PhoneScreen(props: {
                   value={props.digits}
                 />
               </View>
-              {props.error ? <Text style={styles.errorText}>{props.error}</Text> : null}
+              {props.error ? <Text style={[styles.errorText, styles.phoneErrorText]}>{props.error}</Text> : null}
             </View>
           </ScrollView>
           <View style={styles.authButtonArea}>
@@ -462,19 +465,17 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   // pattern.png is dark linework on a transparent field, meant as a faint
   // texture (Figma uses ~4-8% opacity here), not a bold full-strength layer.
   entryPattern: { opacity: 0.06 },
-  entryLogo: { width: 189, height: 95 },
   hero: { position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: compact ? '55%' : '63%' },
   ratingPin: { position: 'absolute', zIndex: 0, width: 44, height: 68, alignItems: 'center' },
   ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: colors.onPrimary, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   ratingLabel: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
   ratingPointer: { width: 12, height: 12, backgroundColor: colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: colors.onPrimary, transform: [{ rotate: '45deg' }], marginTop: -7 },
   ratingStar: { color: colors.onPrimary, fontSize: 10, marginTop: 3 },
-  consentPanel: { position: 'absolute', zIndex: 1, left: 0, right: 0, bottom: 0, height: compact ? 390 : 414, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  consentPanel: { position: 'absolute', zIndex: 1, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   consentPanelBackground: { flex: 1 },
   consentScrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: compact ? 14 : 24, justifyContent: 'space-between' },
   panelPattern: { opacity: 0.06 },
   consentPrimary: { gap: compact ? 12 : 24, alignItems: 'center' },
-  smallLogo: { width: compact ? 80 : 98, height: compact ? 40 : 49 },
   consentCopy: { gap: 8, alignItems: 'center' },
   consentTitle: { color: colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },
   consentSubtitle: { color: colors.textSecondary, fontSize: 16, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
@@ -508,6 +509,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   phoneDivider: { width: 1, height: 20, marginLeft: 10, marginRight: 11, backgroundColor: colors.hairline },
   phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
   errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
+  phoneErrorText: { width: '100%', paddingHorizontal: 16, textAlign: 'left' },
   authButtonArea: { paddingHorizontal: 36, paddingBottom: compact ? 12 : 24 },
   countryContent: { flex: 1, paddingTop: compact ? 100 : 130, paddingHorizontal: 16 },
   countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
