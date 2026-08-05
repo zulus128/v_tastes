@@ -506,7 +506,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   phoneDivider: { width: 1, height: 20, marginLeft: 10, marginRight: 11, backgroundColor: colors.hairline },
   phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
   errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
-  phoneErrorText: { width: '100%', paddingHorizontal: 16, textAlign: 'left' },
+  phoneErrorText: { width: '100%', textAlign: 'left' },
   authButtonArea: { paddingHorizontal: 36, paddingBottom: compact ? 12 : 24 },
   countryContent: { flex: 1, paddingTop: compact ? 100 : 130, paddingHorizontal: 16 },
   countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
