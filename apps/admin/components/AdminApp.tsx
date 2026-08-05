@@ -2,7 +2,7 @@
 
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { callAdmin, getFirebaseAuth } from '../lib/firebase';
+import { callAdmin, getFirebaseAuth } from '../infrastructure/firebase';
 
 type View = 'overview' | 'reports' | 'venues' | 'users';
 type StaffRole = 'admin' | 'moderator';
