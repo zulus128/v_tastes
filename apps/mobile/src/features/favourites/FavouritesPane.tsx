@@ -14,7 +14,6 @@ import {
   Text,
   TextInput,
   View,
-  type ImageSourcePropType,
 } from 'react-native';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import EmptyIcon from '../../../assets/favourites/empty.svg';
@@ -22,11 +21,7 @@ import FolderActiveIcon from '../../../assets/favourites/folder-active.svg';
 import FolderIcon from '../../../assets/favourites/folder.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
 import CloseCircle from '../../../assets/recap/story/close-circle.svg';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import {
   useCreateFolder,
@@ -38,14 +33,6 @@ import {
 } from './api';
 
 type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
-
-const placeImages: Record<string, ImageSourcePropType> = {
-  cafe: cafeImage,
-  lounge: loungeImage,
-  restaurant: restaurantImage,
-  sushi: sushiImage,
-  tacos: tacosImage,
-};
 
 export type SaveablePlace = {
   venueId: string;
@@ -400,7 +387,7 @@ function FavouriteCard({
   return (
     <View style={styles.placeCard}>
       <Pressable onPress={onOpen} style={styles.cardImageWrap}>
-        <Image source={placeImages[place.imageKey ?? ''] ?? restaurantImage} style={styles.cardImage} />
+        <Image source={place.imageUrl ? { uri: place.imageUrl } : restaurantImage} style={styles.cardImage} />
         {index === 0 ? <Text style={styles.popularTag}>Popular</Text> : null}
       </Pressable>
       <Pressable onPress={onOpen} style={styles.cardBody}>

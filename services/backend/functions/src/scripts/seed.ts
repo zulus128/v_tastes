@@ -14,9 +14,60 @@ if (seedRemote) {
 
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getDownloadURL, getStorage } from 'firebase-admin/storage';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { extname, resolve } from 'node:path';
 
 if (getApps().length === 0) {
-  initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+  initializeApp({
+    projectId: process.env.GCLOUD_PROJECT,
+    storageBucket: seedRemote ? 'tastes-934e6.firebasestorage.app' : 'demo-tastes.appspot.com',
+  });
+}
+
+const seedMedia = {
+  venues: {
+    sushi: 'apps/mobile/assets/discover/sushi.jpg',
+    restaurant: 'apps/mobile/assets/discover/restaurant.png',
+    lounge: 'apps/mobile/assets/discover/lounge.png',
+    tacos: 'apps/mobile/assets/discover/tacos.jpg',
+    cafe: 'apps/mobile/assets/discover/cafe.png',
+  },
+  avatars: {
+    kristin: 'apps/mobile/assets/discover/avatar-kristin.png',
+    cameron: 'apps/mobile/assets/discover/avatar-cameron.jpg',
+    wade: 'apps/mobile/assets/discover/avatar-wade.png',
+  },
+} as const;
+
+function seedDownloadToken(path: string): string {
+  const hex = createHash('sha256').update(`tastes-seed-media:${path}`).digest('hex').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+async function uploadSeedMediaGroup(
+  group: 'venues' | 'avatars',
+  assets: Record<string, string>,
+): Promise<Record<string, string>> {
+  const workspaceRoot = resolve(__dirname, '../../../../..');
+  const bucket = getStorage().bucket();
+  const entries = await Promise.all(Object.entries(assets).map(async ([key, assetPath]) => {
+    const extension = extname(assetPath);
+    const file = bucket.file(`seed-media/${group}/${key}${extension}`);
+    await file.save(await readFile(resolve(workspaceRoot, assetPath)), {
+      resumable: false,
+      metadata: {
+        contentType: extension === '.jpg' ? 'image/jpeg' : 'image/png',
+        cacheControl: 'public,max-age=31536000,immutable',
+        metadata: {
+          firebaseStorageDownloadTokens: seedDownloadToken(`${group}/${key}${extension}`),
+        },
+      },
+    });
+    return [key, await getDownloadURL(file)] as const;
+  }));
+  return Object.fromEntries(entries);
 }
 
 async function main() {
@@ -25,6 +76,10 @@ async function main() {
     firestoreDatabaseId === '(default)'
       ? getFirestore()
       : getFirestore(firestoreDatabaseId);
+  const [venueMedia, avatarMedia] = await Promise.all([
+    uploadSeedMediaGroup('venues', seedMedia.venues),
+    uploadSeedMediaGroup('avatars', seedMedia.avatars),
+  ]);
   const venues = [
     {
       id: 'morimoto',
@@ -32,8 +87,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Zorlu Center, Beşiktaş',
       category: 'Japanese',
-      imageKey: 'sushi',
-      photoKeys: ['sushi', 'restaurant', 'lounge'],
+      imageUrl: venueMedia.sushi,
+      photoUrls: [venueMedia.sushi, venueMedia.restaurant, venueMedia.lounge],
       photoCount: 24,
       placeTags: ['Japanese 🍣', '$$$', '1.8 km'],
       phone: '+90 212 555 01 32',
@@ -63,8 +118,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Teşvikiye Cd. 41, Şişli',
       category: 'Chinese',
-      imageKey: 'restaurant',
-      photoKeys: ['restaurant', 'lounge', 'restaurant'],
+      imageUrl: venueMedia.restaurant,
+      photoUrls: [venueMedia.restaurant, venueMedia.lounge, venueMedia.restaurant],
       photoCount: 24,
       placeTags: ['Chinese 🥟', '$$', '0.9 km'],
       phone: '+90 212 555 03 12',
@@ -94,8 +149,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Karaköy, Beyoğlu',
       category: 'Italian',
-      imageKey: 'lounge',
-      photoKeys: ['lounge', 'restaurant', 'lounge'],
+      imageUrl: venueMedia.lounge,
+      photoUrls: [venueMedia.lounge, venueMedia.restaurant, venueMedia.lounge],
       photoCount: 18,
       placeTags: ['Italian 🇮🇹', '$$', '1.2 km'],
       phone: '+90 212 555 07 50',
@@ -117,8 +172,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Moda Cd. 18, Kadıköy',
       category: 'Cafe',
-      imageKey: 'cafe',
-      photoKeys: ['cafe', 'restaurant', 'cafe'],
+      imageUrl: venueMedia.cafe,
+      photoUrls: [venueMedia.cafe, venueMedia.restaurant, venueMedia.cafe],
       photoCount: 16,
       placeTags: ['Cafe ☕', '$', '0.4 km'],
       phone: '+90 216 555 07 60',
@@ -140,8 +195,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Akarsu Ykş. 11, Cihangir',
       category: 'Mexican',
-      imageKey: 'tacos',
-      photoKeys: ['tacos', 'restaurant', 'tacos'],
+      imageUrl: venueMedia.tacos,
+      photoUrls: [venueMedia.tacos, venueMedia.restaurant, venueMedia.tacos],
       photoCount: 20,
       placeTags: ['Mexican 🌮', '$', '2.1 km'],
       phone: '+90 212 555 11 42',
@@ -163,8 +218,8 @@ async function main() {
       city: 'Istanbul',
       address: 'Bağdat Cd. 72, Kadıköy',
       category: 'Cafe',
-      imageKey: 'cafe',
-      photoKeys: ['cafe', 'lounge', 'cafe'],
+      imageUrl: venueMedia.cafe,
+      photoUrls: [venueMedia.cafe, venueMedia.lounge, venueMedia.cafe],
       photoCount: 12,
       placeTags: ['Cafe ☕', '$', '3.4 km'],
       phone: '+90 216 555 72 00',
@@ -186,7 +241,7 @@ async function main() {
       city: 'Istanbul',
       address: 'Seed-only moderation fixture',
       category: 'Test',
-      imageKey: 'restaurant',
+      imageUrl: venueMedia.restaurant,
       priceLevel: 1,
       distanceKm: 0,
       rating: 5,
@@ -203,6 +258,8 @@ async function main() {
       db.collection('venues').doc(id).set(
         {
           ...venue,
+          imageKey: FieldValue.delete(),
+          photoKeys: FieldValue.delete(),
           source: 'seed',
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -273,7 +330,7 @@ async function main() {
       id: 'discover-kristin',
       displayName: 'Kristin Watson',
       username: 'kristinw',
-      avatarKey: 'kristin',
+      photoUrl: avatarMedia.kristin,
       city: 'Istanbul',
       bio: 'Tacos, BBQ and neighborhood gems.',
       favoriteCuisines: ['Tacos', 'BBQ'],
@@ -287,7 +344,7 @@ async function main() {
       id: 'discover-cameron',
       displayName: 'Cameron Williamson',
       username: 'cameronw',
-      avatarKey: 'cameron',
+      photoUrl: avatarMedia.cameron,
       city: 'Istanbul',
       bio: 'Italian food and handmade pasta.',
       favoriteCuisines: ['Italian', 'Pasta'],
@@ -301,7 +358,7 @@ async function main() {
       id: 'discover-wade',
       displayName: 'Wade Warren',
       username: 'wadew',
-      avatarKey: 'wade',
+      photoUrl: avatarMedia.wade,
       city: 'Istanbul',
       bio: 'Sushi, ramen and late-night eats.',
       favoriteCuisines: ['Sushi', 'Ramen'],
@@ -315,7 +372,7 @@ async function main() {
       id: 'discover-luke',
       displayName: 'Luke Cooper',
       username: 'lukec',
-      avatarKey: 'cameron',
+      photoUrl: avatarMedia.cameron,
       city: 'Istanbul',
       bio: 'Coffee and brunch hunter.',
       favoriteCuisines: ['Coffee', 'Brunch'],
@@ -329,7 +386,7 @@ async function main() {
       id: 'discover-brooklyn',
       displayName: 'Brooklyn Simmons',
       username: 'brooklyns',
-      avatarKey: 'kristin',
+      photoUrl: avatarMedia.kristin,
       city: 'Istanbul',
       bio: 'Steak, wine and date-night spots.',
       favoriteCuisines: ['Steak', 'Wine'],
@@ -343,7 +400,7 @@ async function main() {
       id: 'discover-martin',
       displayName: 'Martin Baena',
       username: 'martinb',
-      avatarKey: 'wade',
+      photoUrl: avatarMedia.wade,
       city: 'Istanbul',
       bio: 'Vegan bakeries and natural wine.',
       favoriteCuisines: ['Vegan', 'Bakery'],
@@ -357,7 +414,7 @@ async function main() {
       id: 'discover-devon',
       displayName: 'Devon Lane',
       username: 'devonl',
-      avatarKey: 'kristin',
+      photoUrl: avatarMedia.kristin,
       city: 'Istanbul',
       bio: 'Coffee, matcha and quiet corners.',
       favoriteCuisines: ['Coffee', 'Desserts'],
@@ -371,7 +428,7 @@ async function main() {
       id: 'phone_ND8NpcfJMs4TlHoGzE9o7G4JO_XRzXis4G56p5AF',
       displayName: 'Ty',
       username: 'yy',
-      avatarKey: 'cameron',
+      photoUrl: avatarMedia.cameron,
       city: 'Istanbul',
       bio: 'Local test account',
       favoriteCuisines: ['Italian', 'Japanese', 'Mexican'],
@@ -389,7 +446,8 @@ async function main() {
         {
           ...user,
           uid: id,
-          photoUrl: null,
+          photoUrl: 'photoUrl' in user ? user.photoUrl : null,
+          avatarKey: FieldValue.delete(),
           status: 'active',
           source: 'seed',
           createdAt: FieldValue.serverTimestamp(),

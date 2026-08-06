@@ -15,15 +15,9 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
-import avatarCameron from '../../../assets/discover/avatar-cameron.jpg';
-import avatarKristin from '../../../assets/discover/avatar-kristin.png';
-import avatarWade from '../../../assets/discover/avatar-wade.png';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import mapImage from '../../../assets/discover/map.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
+import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import {
   type DiscoverVenueFilter,
@@ -55,29 +49,12 @@ type Place = {
   image: ImageSourcePropType;
 };
 
-const venueImages: Record<string, ImageSourcePropType> = {
-  sushi: sushiImage,
-  restaurant: restaurantImage,
-  lounge: loungeImage,
-  tacos: tacosImage,
-  cafe: cafeImage,
-};
-
-function venueImage(imageKey?: string | null): ImageSourcePropType {
-  if (imageKey && venueImages[imageKey]) return venueImages[imageKey];
-  return restaurantImage;
+function venueImage(imageUrl?: string | null): ImageSourcePropType {
+  return imageUrl ? { uri: imageUrl } : restaurantImage;
 }
 
-const avatarImages: Record<string, ImageSourcePropType> = {
-  kristin: avatarKristin,
-  cameron: avatarCameron,
-  wade: avatarWade,
-};
-
-function avatarSource(photoUrl: string | null, avatarKey: string | null): ImageSourcePropType {
-  if (photoUrl) return { uri: photoUrl };
-  if (avatarKey && avatarImages[avatarKey]) return avatarImages[avatarKey];
-  return avatarKristin;
+function avatarSource(photoUrl: string | null): ImageSourcePropType {
+  return photoUrl ? { uri: photoUrl } : fallbackAvatar;
 }
 
 function formatDistance(km?: number): string {
@@ -121,7 +98,7 @@ function venueToPlace(venue: Venue): Place {
     distance: formatDistance(venue.distanceKm),
     rating: (venue.rating ?? 0).toFixed(1),
     reviews: `${venue.reviewCount ?? 0} reviews`,
-    image: venueImage(venue.imageKey),
+    image: venueImage(venue.imageUrl),
   };
 }
 
@@ -315,7 +292,7 @@ function TrendingFeed({
     >
       {hero ? (
         <Pressable onPress={() => onOpenPlace(hero.id)} style={styles.hero}>
-          <Image source={venueImage(hero.imageKey)} style={styles.coverImage} />
+          <Image source={venueImage(hero.imageUrl)} style={styles.coverImage} />
           <LinearGradient
             colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.88)']}
             locations={[0.34, 1]}
@@ -345,7 +322,7 @@ function TrendingFeed({
               <TrendingTile
                 key={venue.id}
                 onOpen={() => onOpenPlace(venue.id)}
-                image={venueImage(venue.imageKey)}
+                image={venueImage(venue.imageUrl)}
                 meta={`${venue.category ?? ''} · ${'$'.repeat(venue.priceLevel ?? 1)}`}
                 name={venue.name}
                 rating={(venue.rating ?? 0).toFixed(1)}
@@ -388,8 +365,8 @@ function TrendingFeed({
             {feed.popularReviews.map((review) => (
               <ReviewCard
                 author={review.authorDisplayName}
-                avatar={avatarSource(review.authorPhotoUrl, review.authorAvatarKey)}
-                image={venueImage(review.venueImageKey)}
+                avatar={avatarSource(review.authorPhotoUrl)}
+                image={venueImage(review.venueImageUrl)}
                 key={review.id}
                 onOpen={() => onOpenPlace(review.venueId)}
                 place={review.venueName}
@@ -425,7 +402,7 @@ function TrendingFeed({
           >
             {feed.forYou.map((venue, index) => (
               <ForYouCard
-                image={venueImage(venue.imageKey)}
+                image={venueImage(venue.imageUrl)}
                 key={venue.id}
                 onOpen={() => onOpenPlace(venue.id)}
                 place={venueToPlace(venue)}
@@ -836,7 +813,7 @@ function TopReviewer({ onFollow, pending, person }: { onFollow: () => void; pend
     >
       <View style={styles.reviewerHead}>
         <View>
-          <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.reviewerAvatar} />
+          <Image source={avatarSource(person.photoUrl)} style={styles.reviewerAvatar} />
           <View style={styles.reviewerBadge}><Text style={styles.reviewerBadgeText}>★</Text></View>
         </View>
         <View style={styles.reviewerCopy}>
@@ -947,7 +924,7 @@ function TastemakerCard({
   return (
     <LinearGradient colors={['rgba(184,47,41,0.35)', colors.surface]} style={styles.tastemakerCard}>
       <Pressable onPress={onOpen}>
-        <Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.tastemakerAvatar} />
+        <Image source={avatarSource(person.photoUrl)} style={styles.tastemakerAvatar} />
       </Pressable>
       <Text numberOfLines={1} onPress={onOpen} style={styles.tastemakerName}>{person.displayName}</Text>
       <Text style={styles.tastemakerTastes}>{person.favoriteCuisines.join(' · ') || (person.username ? `@${person.username}` : '')}</Text>
@@ -974,7 +951,7 @@ function CompactPerson({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.compactPerson}>
-      <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.compactAvatar} /></Pressable>
+      <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl)} style={styles.compactAvatar} /></Pressable>
       <Pressable onPress={onOpen} style={styles.compactCopy}>
         <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.displayName}</Text></View>
         <Text numberOfLines={1} style={styles.compactTastes}>
@@ -1009,7 +986,7 @@ function ProfileSuggestion({
   return (
     <View style={styles.profileSuggestion}>
       <View style={styles.suggestionHead}>
-        <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl, person.avatarKey)} style={styles.suggestionAvatar} /></Pressable>
+        <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl)} style={styles.suggestionAvatar} /></Pressable>
         <Pressable onPress={onOpen} style={styles.suggestionCopy}>
           <Text style={styles.suggestionName}>{person.displayName}</Text>
           <Text style={styles.suggestionHandle}>{person.username ? `@${person.username}` : ''}</Text>

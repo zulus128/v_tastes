@@ -16,27 +16,16 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useDiscoverVenues } from '../discover/api';
 
-const venueImages: Record<string, ImageSourcePropType> = {
-  cafe: cafeImage,
-  lounge: loungeImage,
-  restaurant: restaurantImage,
-  sushi: sushiImage,
-  tacos: tacosImage,
-};
 const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-function venueImage(key?: string): ImageSourcePropType {
-  return key && venueImages[key] ? venueImages[key] : restaurantImage;
+function venueImage(url?: string): ImageSourcePropType {
+  return url ? { uri: url } : restaurantImage;
 }
 
 function initialStart(): Date {
@@ -132,7 +121,7 @@ export function NewActivityScreen({
         <Text style={styles.sectionLabel}>PLACE</Text>
         {venue ? (
           <View style={styles.venueCard}>
-            <Image source={venueImage(venue.imageKey)} style={styles.venueImage} />
+            <Image source={venueImage(venue.imageUrl)} style={styles.venueImage} />
             <View style={styles.venueCopy}>
               <Text numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
               <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
@@ -231,7 +220,7 @@ function PlaceSelector({ onClose, onSelect, styles, userId, visible }: { onClose
           keyExtractor={(item) => item.id}
           ListEmptyComponent={venues.isLoading ? <ActivityIndicator style={styles.loader} /> : <Text style={styles.emptyText}>No places found</Text>}
           onEndReached={() => { if (venues.hasNextPage && !venues.isFetchingNextPage) void venues.fetchNextPage(); }}
-          renderItem={({ item }) => <Pressable onPress={() => onSelect(item)} style={styles.placeRow}><Image source={venueImage(item.imageKey)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
+          renderItem={({ item }) => <Pressable onPress={() => onSelect(item)} style={styles.placeRow}><Image source={venueImage(item.imageUrl)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
         />
       </View></View>
     </Modal>

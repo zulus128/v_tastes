@@ -188,7 +188,7 @@ export const listConversations = onCall(callableOptions, async (request) => {
         } : null,
         activityId: kind === 'activity' ? String(document.get('activityId') ?? document.id) : null,
         title: kind === 'activity' ? String(document.get('title') ?? 'Activity') : null,
-        imageKey: kind === 'activity' && document.get('imageKey') ? String(document.get('imageKey')) : null,
+        imageUrl: kind === 'activity' && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
         organizerId: kind === 'activity' ? String(document.get('organizerId') ?? '') : null,
         invitationStatus: kind === 'activity' ? invitationStatus(document, uid) : null,
         lastMessage: lastMessage(document),

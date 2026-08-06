@@ -15,7 +15,6 @@ import { useEffect, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 
 export type ProfileData = {
-  avatarKey: string | null;
   bio: string;
   city: string | null;
   displayName: string;
@@ -34,7 +33,6 @@ function profileFromDocument(data: DocumentData | undefined, fallbackName: strin
     ? data.favoriteCuisines.filter((value: unknown): value is string => typeof value === 'string')
     : [];
   return {
-    avatarKey: typeof data?.avatarKey === 'string' ? data.avatarKey : null,
     bio: typeof data?.bio === 'string' ? data.bio : '',
     city: typeof data?.city === 'string' ? data.city : null,
     displayName: typeof data?.displayName === 'string' ? data.displayName : fallbackName,

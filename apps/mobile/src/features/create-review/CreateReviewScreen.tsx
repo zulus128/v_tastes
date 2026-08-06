@@ -20,11 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { ClipPath, Defs, Path, Rect } from 'react-native-svg';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import RatingPin from '../../../assets/create-review/rating-pin.svg';
@@ -57,16 +53,8 @@ const tagOptions: Array<{ label: string; value: ReviewTag }> = [
   { label: '♨ Birthday', value: 'birthday' },
   { label: '☺ Children', value: 'children' },
 ];
-const venueImages: Record<string, ImageSourcePropType> = {
-  cafe: cafeImage,
-  lounge: loungeImage,
-  restaurant: restaurantImage,
-  sushi: sushiImage,
-  tacos: tacosImage,
-};
-
-function venueImage(key: string | undefined): ImageSourcePropType {
-  return key && venueImages[key] ? venueImages[key] : restaurantImage;
+function venueImage(url: string | undefined): ImageSourcePropType {
+  return url ? { uri: url } : restaurantImage;
 }
 
 export function CreateReviewScreen({
@@ -154,7 +142,7 @@ export function CreateReviewScreen({
             {venue ? (
               <>
                 <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.venueCard}>
-                  <Image source={venueImage(venue.imageKey)} style={styles.venueImage} />
+                  <Image source={venueImage(venue.imageUrl)} style={styles.venueImage} />
                   <View style={styles.venueCopy}>
                     <Text numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
                     <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
@@ -388,7 +376,7 @@ function PlaceSelector({
           <ScrollView keyboardShouldPersistTaps="handled">
             {filtered.map((venue) => (
               <Pressable key={venue.id} onPress={() => onSelect(venue)} style={styles.row}>
-                <Image source={venueImage(venue.imageKey)} style={styles.rowImage} />
+                <Image source={venueImage(venue.imageUrl)} style={styles.rowImage} />
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={styles.rowName}>{venue.name}</Text>
                   <Text numberOfLines={1} style={styles.rowAddress}>{venue.address ?? venue.city}</Text>

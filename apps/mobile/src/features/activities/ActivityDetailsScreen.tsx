@@ -11,21 +11,9 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
 import { firestore } from '../../infrastructure/firebase';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-
-const venueImages: Record<string, ImageSourcePropType> = {
-  cafe: cafeImage,
-  lounge: loungeImage,
-  restaurant: restaurantImage,
-  sushi: sushiImage,
-  tacos: tacosImage,
-};
 
 type Member = {
   id: string;
@@ -41,7 +29,7 @@ type ActivityDetails = {
     address: string;
     category: string;
     city: string;
-    imageKey: string | null;
+    imageUrl: string | null;
     name: string;
     priceLevel: number;
     rating: number;
@@ -50,8 +38,8 @@ type ActivityDetails = {
   members: Member[];
 };
 
-function imageFor(key: string | null): ImageSourcePropType {
-  return key && venueImages[key] ? venueImages[key] : restaurantImage;
+function imageFor(url: string | null): ImageSourcePropType {
+  return url ? { uri: url } : restaurantImage;
 }
 
 function memberFromData(id: string, data: DocumentData | undefined): Member {
@@ -101,7 +89,7 @@ export function ActivityDetailsScreen({
           address: typeof venue?.address === 'string' ? venue.address : '',
           category: typeof venue?.category === 'string' ? venue.category : 'Restaurant',
           city: typeof venue?.city === 'string' ? venue.city : '',
-          imageKey: typeof venue?.imageKey === 'string' ? venue.imageKey : null,
+          imageUrl: typeof venue?.imageUrl === 'string' ? venue.imageUrl : null,
           name: typeof venue?.name === 'string' ? venue.name : String(data.venueName ?? 'Activity'),
           priceLevel: Math.max(0, Number(venue?.priceLevel ?? 0)),
           rating: Math.max(0, Number(venue?.rating ?? 0)),
@@ -129,7 +117,7 @@ export function ActivityDetailsScreen({
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Image source={imageFor(details.venue.imageKey)} style={styles.heroImage} />
+          <Image source={imageFor(details.venue.imageUrl)} style={styles.heroImage} />
           <View style={styles.heroShade} />
           <View style={[styles.navigation, { paddingTop: insets.top }]}> 
             <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.navButton}><Text style={styles.back}>‹</Text></Pressable>

@@ -36,7 +36,7 @@ export const venueSchema = z.object({
   status: z.enum(['active', 'hidden', 'pending', 'merged']),
   address: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
-  imageKey: z.string().min(1).max(64).optional(),
+  imageUrl: z.url().optional(),
   priceLevel: z.number().int().min(1).max(4).optional(),
   distanceKm: z.number().nonnegative().optional(),
   rating: z.number().min(0).max(5).optional(),
@@ -349,7 +349,7 @@ export interface ConversationSummary {
   otherParticipant: ConversationParticipant | null;
   activityId: string | null;
   title: string | null;
-  imageKey: string | null;
+  imageUrl: string | null;
   organizerId: string | null;
   invitationStatus: 'pending' | 'accepted' | 'declined' | null;
   lastMessage: {
@@ -397,7 +397,7 @@ export interface FavouritePlace {
   city: string;
   address: string;
   category: string;
-  imageKey: string | null;
+  imageUrl: string | null;
   priceLevel: number;
   distanceKm: number;
   rating: number;
@@ -431,7 +431,6 @@ export interface DiscoverPerson {
   displayName: string;
   username: string | null;
   photoUrl: string | null;
-  avatarKey: string | null;
   bio: string;
   favoriteCuisines: string[];
   weeklyFollowerGrowth: number;
@@ -447,11 +446,10 @@ export interface DiscoverReview {
   authorId: string;
   authorDisplayName: string;
   authorPhotoUrl: string | null;
-  authorAvatarKey: string | null;
   venueId: string;
   venueName: string;
   venueCategory: string;
-  venueImageKey: string | null;
+  venueImageUrl: string | null;
   rating: number;
   text: string;
   reactionCount: number;
@@ -480,7 +478,7 @@ export interface PlaceDetails {
   phone: string | null;
   website: string | null;
   openingHours: Array<{ day: string; hours: string }>;
-  photoKeys: string[];
+  photoUrls: string[];
   photoCount: number;
   chips: string[];
   popularDishes: PlaceDish[];
@@ -492,7 +490,6 @@ export interface PlaceReview {
   authorDisplayName: string;
   authorUsername: string | null;
   authorPhotoUrl: string | null;
-  authorAvatarKey: string | null;
   rating: number;
   text: string;
   reactionCount: number;

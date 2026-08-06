@@ -4,28 +4,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import avatarCameron from '../../../assets/discover/avatar-cameron.jpg';
-import avatarKristin from '../../../assets/discover/avatar-kristin.png';
-import avatarWade from '../../../assets/discover/avatar-wade.png';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
+import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import { useFavourites, useSaveVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 
-const venueImages: Record<string, ImageSourcePropType> = { sushi: sushiImage, restaurant: restaurantImage, lounge: loungeImage, tacos: tacosImage, cafe: cafeImage };
-const avatarImages: Record<string, ImageSourcePropType> = { kristin: avatarKristin, cameron: avatarCameron, wade: avatarWade };
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
 
-function placeImage(key: string | null | undefined): ImageSourcePropType {
-  return key && venueImages[key] ? venueImages[key] : restaurantImage;
+function placeImage(url: string | null | undefined): ImageSourcePropType {
+  return url ? { uri: url } : restaurantImage;
 }
-function personImage(url: string | null, key: string | null): ImageSourcePropType {
-  return url ? { uri: url } : (key && avatarImages[key] ? avatarImages[key] : avatarKristin);
+function personImage(url: string | null): ImageSourcePropType {
+  return url ? { uri: url } : fallbackAvatar;
 }
 function relativeTime(iso: string) {
   const hours = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 3_600_000));
@@ -62,7 +54,7 @@ export function PlaceScreen({ onBack, onWriteReview, userId, venueId }: { onBack
   if (details.isError || !details.data) return <ErrorPage onBack={onBack} message={details.isError ? apiErrorMessage(details.error) : 'Please try again.'} retry={() => void details.refetch()} />;
 
   const place = details.data;
-  const photos = place.photoKeys.length > 0 ? place.photoKeys : [place.venue.imageKey ?? 'restaurant'];
+  const photos = place.photoUrls.length > 0 ? place.photoUrls : [place.venue.imageUrl ?? ''];
   const photoCount = place.photoCount > 0 ? place.photoCount : photos.length;
   return (
     <View style={styles.screen}>
@@ -108,7 +100,7 @@ function Overview({ details, openHours, openPhotos, styles }: { details: NonNull
     <Pressable onPress={openHours} style={styles.detail}><Text style={styles.detailText}>▣  {details.openingHours[0]?.hours ?? 'Opening hours'}</Text><Text style={styles.arrow}>›</Text></Pressable>
     {details.phone ? <Pressable style={styles.detail}><Text style={styles.detailText}>⌕  {details.phone}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
     {details.website ? <Pressable style={styles.detail}><Text style={styles.detailText}>◒  {details.website}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
-    <Pressable onPress={openPhotos} style={styles.strip}>{details.photoKeys.slice(0, 3).map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
+    <Pressable onPress={openPhotos} style={styles.strip}>{details.photoUrls.slice(0, 3).map((url, index) => <Image key={url + String(index)} source={placeImage(url)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
     <Text style={styles.sectionTitle}>☁  Top rated dishes</Text>
     {details.popularDishes.map((dish, index) => <View key={dish.name} style={styles.dish}><Text style={styles.dishName}>{index + 1}. {dish.name}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>)}
   </View>;
@@ -120,7 +112,7 @@ function Reviews({ error, items, loading, openSort, retry, sort, styles }: { err
   return <View style={styles.section}>
     <View style={styles.reviewTools}><Text style={styles.all}>All</Text><Text style={styles.friends}>Friends</Text><Pressable onPress={openSort}><Text style={styles.sort}>⇅ {sorts[sort]}</Text></Pressable></View>
     {items.length === 0 ? <Text style={styles.empty}>No reviews yet.</Text> : items.map((review) => <View key={review.id} style={styles.review}>
-      <View style={styles.reviewer}><Image source={personImage(review.authorPhotoUrl, review.authorAvatarKey)} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{relativeTime(review.createdAt)}</Text></View>
+      <View style={styles.reviewer}><Image source={personImage(review.authorPhotoUrl)} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{relativeTime(review.createdAt)}</Text></View>
       <Text style={styles.stars}>{'★'.repeat(Math.round(review.rating))}</Text><Text style={styles.reviewText}>{review.text}</Text>
       {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<Text style={styles.metrics}>♡ {review.reactionCount}   ◯ {review.commentCount}   ↗</Text>
     </View>)}

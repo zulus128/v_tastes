@@ -27,7 +27,7 @@ function toVenue(document: QueryDocumentSnapshot): Venue {
     status: document.get('status') as Venue['status'],
     address: document.get('address') ? String(document.get('address')) : undefined,
     category: document.get('category') ? String(document.get('category')) : undefined,
-    imageKey: document.get('imageKey') ? String(document.get('imageKey')) : undefined,
+    imageUrl: document.get('imageUrl') ? String(document.get('imageUrl')) : undefined,
     priceLevel: document.get('priceLevel') != null ? Number(document.get('priceLevel')) : undefined,
     distanceKm: document.get('distanceKm') != null ? Number(document.get('distanceKm')) : undefined,
     rating: document.get('rating') != null ? Number(document.get('rating')) : undefined,
@@ -46,7 +46,6 @@ function toDiscoverPerson(document: QueryDocumentSnapshot, following: boolean): 
     displayName: String(document.get('displayName') ?? ''),
     username: document.get('username') ? String(document.get('username')) : null,
     photoUrl: document.get('photoUrl') ? String(document.get('photoUrl')) : null,
-    avatarKey: document.get('avatarKey') ? String(document.get('avatarKey')) : null,
     bio: String(document.get('bio') ?? ''),
     favoriteCuisines: Array.isArray(document.get('favoriteCuisines'))
       ? (document.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string')
@@ -102,26 +101,21 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const venueDetailsById = new Map(
     reviewVenueDocs.map((document) => [document.id, {
       category: document.exists ? String(document.get('category') ?? '') : '',
-      imageKey: document.exists && document.get('imageKey') ? String(document.get('imageKey')) : null,
+      imageUrl: document.exists && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
     }]),
   );
   const photoUrlByAuthorId = new Map(
     reviewAuthorDocs.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]),
   );
-  const avatarKeyByAuthorId = new Map(
-    reviewAuthorDocs.map((document) => [document.id, document.exists && document.get('avatarKey') ? String(document.get('avatarKey')) : null]),
-  );
-
   const popularReviews: DiscoverReview[] = reviewsSnapshot.docs.map((document) => ({
     id: document.id,
     authorId: String(document.get('authorId')),
     authorDisplayName: String(document.get('authorDisplayName')),
     authorPhotoUrl: photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
-    authorAvatarKey: avatarKeyByAuthorId.get(String(document.get('authorId'))) ?? null,
     venueId: String(document.get('venueId')),
     venueName: String(document.get('venueName')),
     venueCategory: venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
-    venueImageKey: venueDetailsById.get(String(document.get('venueId')))?.imageKey ?? null,
+    venueImageUrl: venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
     rating: Number(document.get('rating')),
     text: String(document.get('text')),
     reactionCount: Number(document.get('reactionCount') ?? 0),
@@ -251,8 +245,8 @@ export const getPlace = onCall(callableOptions, async (request) => {
     phone: document.get('phone') ? String(document.get('phone')) : null,
     website: document.get('website') ? String(document.get('website')) : null,
     openingHours,
-    photoKeys: Array.isArray(document.get('photoKeys'))
-      ? (document.get('photoKeys') as unknown[]).filter((value): value is string => typeof value === 'string')
+    photoUrls: Array.isArray(document.get('photoUrls'))
+      ? (document.get('photoUrls') as unknown[]).filter((value): value is string => typeof value === 'string')
       : [],
     photoCount: Math.max(0, Number(document.get('photoCount') ?? 0)),
     chips: Array.isArray(document.get('placeTags'))
@@ -288,7 +282,6 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
       authorDisplayName: String(document.get('authorDisplayName') ?? ''),
       authorUsername: author?.exists && author.get('username') ? String(author.get('username')) : null,
       authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
-      authorAvatarKey: author?.exists && author.get('avatarKey') ? String(author.get('avatarKey')) : null,
       rating: Number(document.get('rating') ?? 0),
       text: String(document.get('text') ?? ''),
       reactionCount: Number(document.get('reactionCount') ?? 0),

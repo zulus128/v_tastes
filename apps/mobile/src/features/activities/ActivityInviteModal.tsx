@@ -15,22 +15,10 @@ import {
 } from 'react-native';
 import CalendarIcon from '../../../assets/activities/calendar.svg';
 import CheckIcon from '../../../assets/activities/check.svg';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import sushiImage from '../../../assets/discover/sushi.jpg';
-import tacosImage from '../../../assets/discover/tacos.jpg';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { firestore } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
-
-const venueImages: Record<string, ImageSourcePropType> = {
-  cafe: cafeImage,
-  lounge: loungeImage,
-  restaurant: restaurantImage,
-  sushi: sushiImage,
-  tacos: tacosImage,
-};
 
 type Member = {
   id: string;
@@ -46,7 +34,7 @@ type Details = {
   venue: {
     address: string;
     category: string;
-    imageKey: string | null;
+    imageUrl: string | null;
     name: string;
     placeTags: string[];
     rating: number;
@@ -62,8 +50,8 @@ function member(id: string, data: DocumentData | undefined): Member {
   };
 }
 
-function venueImage(key: string | null): ImageSourcePropType {
-  return key && venueImages[key] ? venueImages[key] : restaurantImage;
+function venueImage(url: string | null): ImageSourcePropType {
+  return url ? { uri: url } : restaurantImage;
 }
 
 function Avatar({ person, size }: { person: Member; size: number }) {
@@ -127,7 +115,7 @@ export function ActivityInviteModal({
         venue: {
           address: '',
           category: 'Restaurant',
-          imageKey: null,
+          imageUrl: null,
           name: String(data.venueName ?? 'Activity'),
           placeTags: [],
           rating: 0,
@@ -154,7 +142,7 @@ export function ActivityInviteModal({
           venue: {
             address: typeof venue?.address === 'string' ? venue.address : '',
             category: typeof venue?.category === 'string' ? venue.category : 'Restaurant',
-            imageKey: typeof venue?.imageKey === 'string' ? venue.imageKey : null,
+            imageUrl: typeof venue?.imageUrl === 'string' ? venue.imageUrl : null,
             name: typeof venue?.name === 'string' ? venue.name : String(data.venueName ?? 'Activity'),
             placeTags: Array.isArray(venue?.placeTags)
               ? venue.placeTags.filter((value): value is string => typeof value === 'string').slice(0, 3)
@@ -225,7 +213,7 @@ export function ActivityInviteModal({
               <View style={styles.placeCard}>
                 <View style={styles.placeTop}>
                   <View>
-                    <Image source={venueImage(details.venue.imageKey)} style={styles.venueImage} />
+                    <Image source={venueImage(details.venue.imageUrl)} style={styles.venueImage} />
                     <Text style={styles.popular}>Popular</Text>
                   </View>
                   <View style={styles.placeCopy}>

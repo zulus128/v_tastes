@@ -83,7 +83,7 @@ export const createActivity = onCall(callableOptions, async (request) => {
           activityId: activityRef.id,
           organizerId: String(existing.get('organizerId') ?? uid),
           title: String(existing.get('venueName') ?? 'Activity'),
-          imageKey: null,
+          imageUrl: existing.get('imageUrl') ? String(existing.get('imageUrl')) : null,
           participantIds,
           invitationStatuses: Object.fromEntries(participantIds.map((participantId) => [
             participantId,
@@ -131,6 +131,7 @@ export const createActivity = onCall(callableOptions, async (request) => {
       },
       venueId: venue.id,
       venueName: String(venue.get('name') ?? ''),
+      imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
       startsAt: Timestamp.fromDate(startsAt),
       status: 'active',
       createdAt: FieldValue.serverTimestamp(),
@@ -143,7 +144,7 @@ export const createActivity = onCall(callableOptions, async (request) => {
       activityId: activityRef.id,
       organizerId: uid,
       title: String(venue.get('name') ?? ''),
-      imageKey: venue.get('imageKey') ? String(venue.get('imageKey')) : null,
+      imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
       participantIds,
       invitationStatuses: {
         [uid]: 'accepted',

@@ -30,7 +30,7 @@ type ConversationDetails = {
   kind: 'direct' | 'activity';
   activityId: string | null;
   title: string | null;
-  imageKey: string | null;
+  imageUrl: string | null;
   lastMessageId: string | null;
   unreadCount: number;
 };
@@ -87,7 +87,7 @@ function summaryFromDocument(
     otherParticipant: participant,
     activityId: data.kind === 'activity' ? String(data.activityId ?? document.id) : null,
     title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
-    imageKey: data.kind === 'activity' && typeof data.imageKey === 'string' ? data.imageKey : null,
+    imageUrl: data.kind === 'activity' && typeof data.imageUrl === 'string' ? data.imageUrl : null,
     organizerId: data.kind === 'activity' && typeof data.organizerId === 'string' ? data.organizerId : null,
     invitationStatus: data.kind === 'activity'
       ? data.invitationStatuses?.[userId] === 'pending'
@@ -253,7 +253,7 @@ export function subscribeConversationDetails(
         kind: data.kind === 'activity' ? 'activity' as const : 'direct' as const,
         activityId: data.kind === 'activity' ? String(data.activityId ?? conversationId) : null,
         title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
-        imageKey: data.kind === 'activity' && typeof data.imageKey === 'string' ? data.imageKey : null,
+        imageUrl: data.kind === 'activity' && typeof data.imageUrl === 'string' ? data.imageUrl : null,
         lastMessageId: lastMessage ? String(lastMessage.id ?? '') : null,
         unreadCount: Math.max(0, Number(unreadCounts[userId] ?? 0)),
       };
