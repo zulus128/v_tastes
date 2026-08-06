@@ -160,28 +160,33 @@ export const listConversations = onCall(callableOptions, async (request) => {
 
   const snapshot = await query.limit(input.limit + 1).get();
   const pageDocuments = snapshot.docs.slice(0, input.limit);
-  const otherUserIds = pageDocuments.map((document) => {
+  const rows = pageDocuments.map((document) => {
     const participantIds = requireParticipant(document, uid);
-    return participantIds.find((participantId) => participantId !== uid) ?? '';
+    const kind = document.get('kind') === 'activity' ? 'activity' : 'direct';
+    const otherUserId = kind === 'direct'
+      ? participantIds.find((participantId) => participantId !== uid) ?? null
+      : null;
+    return { document, participantIds, kind, otherUserId };
   });
-  const profileSnapshots = otherUserIds.length > 0
-    ? await db.getAll(...otherUserIds.map((userId) => db.collection('users').doc(userId)))
+  const profileIds = [...new Set(rows
+    .filter((row) => row.kind === 'direct' && Boolean(row.otherUserId))
+    .map((row) => row.otherUserId as string))];
+  const profileSnapshots = profileIds.length > 0
+    ? await db.getAll(...profileIds.map((userId) => db.collection('users').doc(userId)))
     : [];
   const profiles = new Map(profileSnapshots.map((profile) => [profile.id, profile]));
   const last = pageDocuments.at(-1);
 
   return {
-    items: pageDocuments.map((document, index) => {
-      const participantIds = requireParticipant(document, uid);
-      const kind = document.get('kind') === 'activity' ? 'activity' : 'direct';
-      const otherUserId = otherUserIds[index] ?? '';
-      const profile = profiles.get(otherUserId);
+    items: rows.map((row) => {
+      const { document, participantIds, kind, otherUserId } = row;
+      const profile = otherUserId ? profiles.get(otherUserId) : null;
       return {
         id: document.id,
         kind,
         participantIds,
         otherParticipant: kind === 'direct' ? {
-          userId: otherUserId,
+          userId: otherUserId ?? '',
           displayName: String(profile?.get('displayName') ?? ''),
           username: profile?.get('username') ? String(profile.get('username')) : null,
           photoUrl: profile?.get('photoUrl') ? String(profile.get('photoUrl')) : null,

@@ -9,7 +9,6 @@ import type {
   PlaceReview,
   Venue,
 } from '@tastes/contracts';
-import { FieldPath } from 'firebase-admin/firestore';
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
@@ -194,13 +193,13 @@ export const getVenues = onCall(callableOptions, async (request) => {
   if (input.tag) {
     venuesQuery = venuesQuery.where('discoverTags', 'array-contains', input.tag);
   }
-  venuesQuery = venuesQuery.orderBy('rating', 'desc').orderBy(FieldPath.documentId(), 'asc');
+  venuesQuery = venuesQuery.orderBy('rating', 'desc');
 
   if (cursor) {
     if (typeof cursor.value !== 'number') {
       throw new HttpsError('invalid-argument', 'The venues cursor is invalid.');
     }
-    venuesQuery = venuesQuery.startAfter(cursor.value, cursor.id);
+    venuesQuery = venuesQuery.startAfter(cursor.value);
   }
 
   const snapshot = await venuesQuery.limit(input.limit + 1).get();
