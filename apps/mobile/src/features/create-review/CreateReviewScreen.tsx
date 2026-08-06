@@ -87,10 +87,10 @@ export function CreateReviewScreen({
   const valid = Boolean(venueId && text.trim() && rating >= 1 && dishes.every((dish) => dish.photoUri && dish.title.trim() && dish.rating >= 1));
 
   useEffect(() => {
-    if (!initialVenueId) return;
+    if (!initialVenueId || selectedVenue) return;
     setVenueId(initialVenueId);
     setSelectedVenue(null);
-  }, [initialVenueId]);
+  }, [initialVenueId, selectedVenue]);
 
   function reset() {
     setVenueId('');
