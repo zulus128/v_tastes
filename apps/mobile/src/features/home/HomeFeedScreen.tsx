@@ -205,14 +205,17 @@ function ReportSheet({
           </Pressable>
         ))}
         {showDetails ? (
-          <TextInput
-            value={details}
-            onChangeText={(value) => onDetailsChange(value.slice(0, 300))}
-            placeholder="Please provide details (optional)"
-            placeholderTextColor="#9DA3AD"
-            multiline
-            style={overlayStyles.detailsInput}
-          />
+          <View style={overlayStyles.detailsWrapper}>
+            <TextInput
+              value={details}
+              onChangeText={(value) => onDetailsChange(value.slice(0, 300))}
+              placeholder="Please provide details (optional)"
+              placeholderTextColor="#9DA3AD"
+              multiline
+              style={overlayStyles.detailsInput}
+            />
+            <Text style={overlayStyles.detailsCounter}>{details.length}/300</Text>
+          </View>
         ) : null}
         <View style={overlayStyles.reportFooter}>
           <Pressable disabled={submitting} onPress={onSubmit} style={[overlayStyles.primaryButton, submitting && overlayStyles.disabledButton]}>
@@ -497,6 +500,8 @@ const overlayStyles = StyleSheet.create({
   reportRadio: { color: '#fff', fontSize: 18 },
   reportFooter: { flexDirection: 'row', gap: 8, marginTop: 8 },
   detailsInput: { height: 96, marginTop: 4, borderRadius: 12, padding: 10, backgroundColor: '#3a3a3a', color: '#fff' },
+  detailsWrapper: { },
+  detailsCounter: { color: '#9DA3AD', fontSize: 12, marginTop: 4, textAlign: 'right' },
   primaryButton: { flex: 1, height: 42, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
   primaryButtonText: { color: '#fff', fontWeight: '600' },
   secondaryButton: { flex: 1, height: 42, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3e3e3e' },
