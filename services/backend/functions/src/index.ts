@@ -44,6 +44,8 @@ export {
   createReview,
   getComments,
   getFeed,
+  hideReview,
+  reportReview,
   reactToReview,
 } from './modules/reviews/functions';
 export {

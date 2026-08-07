@@ -103,6 +103,27 @@ export const reactToReviewInputSchema = z.object({
   reaction: z.enum(['like']),
 });
 
+export const reportReasonSchema = z.enum([
+  'Spam',
+  'Inappropriate',
+  'Harassment',
+  'Misinformation',
+  'Hate',
+  'Safety risk',
+  'Something else',
+]);
+
+export const hideReviewInputSchema = z.object({
+  reviewId: z.string().min(1),
+});
+
+export const reportReviewInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  reviewId: z.string().min(1),
+  reason: reportReasonSchema,
+  details: z.string().trim().max(300).optional(),
+});
+
 export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
@@ -261,6 +282,9 @@ export type DishReviewInput = z.infer<typeof dishReviewInputSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
+export type HideReviewInput = z.infer<typeof hideReviewInputSchema>;
+export type ReportReason = z.infer<typeof reportReasonSchema>;
+export type ReportReviewInput = z.infer<typeof reportReviewInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
 export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;

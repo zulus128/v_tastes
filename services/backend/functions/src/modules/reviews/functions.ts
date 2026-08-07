@@ -3,7 +3,9 @@ import {
   createReviewInputSchema,
   getCommentsInputSchema,
   getFeedInputSchema,
+  hideReviewInputSchema,
   reactToReviewInputSchema,
+  reportReviewInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
@@ -29,9 +31,12 @@ export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getFeedInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
+  const hiddenReviews = await db.collection('users').doc(uid).collection('hiddenReviews').get();
+  const hiddenReviewIds = new Set(hiddenReviews.docs.map((document) => document.id));
   const applyCursor = (query: Query): Query => cursor
     ? query.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id)
     : query;
+  const fetchLimit = Math.min(100, input.limit * 2);
   let candidates: QueryDocumentSnapshot[];
 
   if (input.scope === 'friends') {
@@ -42,21 +47,20 @@ export const getFeed = onCall(callableOptions, async (request) => {
       { length: Math.ceil(authorIds.length / 30) },
       (_, index) => authorIds.slice(index * 30, index * 30 + 30),
     );
-    const snapshots = await Promise.all(chunks.map((chunk) => applyCursor(
+      const snapshots = await Promise.all(chunks.map((chunk) => applyCursor(
       db.collection('reviews')
         .where('status', '==', 'published')
         .where('authorId', 'in', chunk)
         .orderBy('createdAt', 'desc')
         .orderBy(FieldPath.documentId(), 'desc'),
-    ).limit(input.limit + 1).get()));
+    ).limit(fetchLimit + 1).get()));
     candidates = snapshots
       .flatMap((snapshot) => snapshot.docs)
       .sort((left, right) => {
         const timeDifference = (right.get('createdAt') as Timestamp).toMillis()
           - (left.get('createdAt') as Timestamp).toMillis();
         return timeDifference || compareDocumentIdsDesc(left.id, right.id);
-      })
-      .slice(0, input.limit + 1);
+      });
   } else {
     const profile = await db.collection('users').doc(uid).get();
     const city = profile.get('city');
@@ -69,10 +73,11 @@ export const getFeed = onCall(callableOptions, async (request) => {
       .where('venueCity', '==', city)
       .orderBy('createdAt', 'desc')
       .orderBy(FieldPath.documentId(), 'desc');
-    candidates = (await applyCursor(feedQuery).limit(input.limit + 1).get()).docs;
+    candidates = (await applyCursor(feedQuery).limit(fetchLimit + 1).get()).docs;
   }
 
-  const pageDocs = candidates.slice(0, input.limit);
+  const visibleCandidates = candidates.filter((document) => !hiddenReviewIds.has(document.id));
+  const pageDocs = visibleCandidates.slice(0, input.limit);
   const last = pageDocs.at(-1);
 
   return {
@@ -327,5 +332,84 @@ export const reactToReview = onCall(callableOptions, async (request) => {
       createdAt: FieldValue.serverTimestamp(),
     });
     return { active: true, reactionCount };
+  });
+});
+
+export const hideReview = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(hideReviewInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const hiddenReviewRef = db.collection('users').doc(uid).collection('hiddenReviews').doc(input.reviewId);
+
+  await db.runTransaction(async (transaction) => {
+    const [user, review] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)),
+      transaction.get(reviewRef),
+    ]);
+
+    if (!user.exists || user.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    if (!review.exists || review.get('status') !== 'published') {
+      throw new HttpsError('not-found', 'The review was not found.');
+    }
+
+    transaction.set(hiddenReviewRef, {
+      reviewId: input.reviewId,
+      hiddenAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  return { id: input.reviewId };
+});
+
+export const reportReview = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(reportReviewInputSchema, request.data);
+  const idempotencyRef = db.collection('_idempotency').doc(
+    idempotentDocumentId(uid, `report-review:${input.reviewId}`, input.idempotencyKey),
+  );
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const userRef = db.collection('users').doc(uid);
+
+  return db.runTransaction(async (transaction) => {
+    const [idempotency, review, user] = await Promise.all([
+      transaction.get(idempotencyRef),
+      transaction.get(reviewRef),
+      transaction.get(userRef),
+    ]);
+
+    if (!user.exists || user.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    if (idempotency.exists) {
+      return { id: String(idempotency.get('reportId') ?? '') };
+    }
+    if (!review.exists || review.get('status') !== 'published') {
+      throw new HttpsError('not-found', 'The review was not found.');
+    }
+
+    const reportRef = db.collection('reports').doc();
+    transaction.set(reportRef, {
+      reporterId: uid,
+      reporterName: String(user.get('displayName') ?? 'Tastes user'),
+      targetType: 'review',
+      targetId: input.reviewId,
+      reason: input.reason,
+      details: input.details ?? '',
+      contentPreview: String(review.get('text') ?? '').slice(0, 180),
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const expiresAt = Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000);
+    transaction.create(idempotencyRef, {
+      reportId: reportRef.id,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt,
+    });
+
+    return { id: reportRef.id };
   });
 });

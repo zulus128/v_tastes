@@ -8,6 +8,10 @@ import {
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import type { FeedItem, Page } from '@tastes/contracts';
+import type {
+  HideReviewInput,
+  ReportReviewInput,
+} from '@tastes/contracts';
 
 type FeedReactionState = Record<string, boolean>;
 
@@ -54,11 +58,14 @@ export function useReactToReview() {
   const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();
   return useMutation<{ active: boolean; reactionCount: number }, Error, string, FeedReactionMutationContext>({
-    mutationFn: async (reviewId: string) => api.reactToReview({
+    mutationFn: async (reviewId: string) => {
+      const response = await api.reactToReview({
       reviewId,
       idempotencyKey: createIdempotencyKey('feed-reaction'),
       reaction: 'like',
-    }),
+      });
+      return response.data;
+    },
     onMutate: async (reviewId) => {
       const reactionCacheKey = reactionQueryKey(userId);
       const previousReactions = queryClient.getQueryData<FeedReactionState>(reactionCacheKey) ?? {};
@@ -139,6 +146,63 @@ export function useReactToReview() {
       context.previousPagesByScope?.forEach(({ scope, data }) => {
         queryClient.setQueryData(feedQueryKey(userId, scope), data);
       });
+    },
+  });
+}
+
+export function useHideReview() {
+  const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
+  return useMutation<string, Error, string, { previousPagesByScope: Array<{ scope: FeedScope; data: InfiniteData<Page<FeedItem>> | undefined }> }>({
+    mutationFn: async (reviewId: string) => {
+      const response = await api.hideReview({ reviewId });
+      return response.data.id;
+    },
+    onMutate: async (reviewId) => {
+      const previousPagesByScope: Array<{ scope: FeedScope; data: InfiniteData<Page<FeedItem>> | undefined }> = [];
+      await queryClient.cancelQueries({ queryKey: ['feed', userId] });
+
+      feedScopes.forEach((feedScope) => {
+        const key = feedQueryKey(userId, feedScope);
+        const previousPageData = queryClient.getQueryData<InfiniteData<Page<FeedItem>>>(key);
+        previousPagesByScope.push({ scope: feedScope, data: previousPageData });
+        if (!previousPageData) {
+          return;
+        }
+        queryClient.setQueryData<InfiniteData<Page<FeedItem>>>(key, (current) => {
+          if (!current) {
+            return previousPageData;
+          }
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.filter((candidate) => candidate.id !== reviewId),
+            })),
+          };
+        });
+      });
+
+      return { previousPagesByScope };
+    },
+    onError: (_error, _reviewId, context) => {
+      context?.previousPagesByScope.forEach(({ scope, data }) => {
+        queryClient.setQueryData(feedQueryKey(userId, scope), data);
+      });
+    },
+  });
+}
+
+export function useReportReview() {
+  const api = useTastesApi();
+  return useMutation<{ id: string }, Error, Omit<ReportReviewInput, 'idempotencyKey'>>({
+    mutationFn: async (input) => {
+      const response = await api.reportReview({
+      ...input,
+      idempotencyKey: createIdempotencyKey('report-review'),
+      });
+      return response.data;
     },
   });
 }

@@ -1,14 +1,16 @@
 import { getDownloadURL, ref } from 'firebase/storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList,
   Alert,
+  FlatList,
   Image,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
@@ -16,8 +18,14 @@ import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import type { FeedItem } from '@tastes/contracts';
-import { useFeed, useFeedReactionState, useReactToReview } from './api';
+import type { FeedItem, ReportReason } from '@tastes/contracts';
+import {
+  useFeed,
+  useFeedReactionState,
+  useHideReview,
+  useReactToReview,
+  useReportReview,
+} from './api';
 import {
   HomeFeedEmptyState,
   HomeFeedLoadingState,
@@ -31,6 +39,8 @@ const tagLabels: Record<string, string> = {
   birthday: 'Birthday',
   children: 'With children',
 };
+
+const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 'Hate', 'Safety risk', 'Something else'] as const;
 
 function DishPhoto({ photoPath }: { photoPath: string }) {
   const [uri, setUri] = useState<string>();
@@ -63,12 +73,16 @@ function FeedCard({
   onReaction,
   reactionDisabled,
   isReactionActive,
+  onShare,
+  onLongPress,
 }: {
   item: FeedItem;
   onComments: () => void;
   onReaction: () => void;
   reactionDisabled: boolean;
   isReactionActive: boolean;
+  onShare: () => void;
+  onLongPress: () => void;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -77,7 +91,7 @@ function FeedCard({
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
   return (
-    <View style={styles.card}>
+    <Pressable onLongPress={onLongPress} delayLongPress={350} style={styles.card}>
       <View style={styles.authorRow}>
         <Image source={avatar} style={styles.avatar} />
         <View style={styles.authorCopy}>
@@ -119,6 +133,95 @@ function FeedCard({
         <Pressable onPress={onComments}>
           <Text style={styles.metric}>◯ {item.commentCount}</Text>
         </Pressable>
+        <Pressable onPress={onShare}>
+          <Text style={styles.metric}>↗</Text>
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+}
+
+function ActionSheet({
+  actions,
+  onCancel,
+}: {
+  actions: Array<{ label: string; destructive?: boolean; onPress: () => void }>;
+  onCancel: () => void;
+}) {
+  return (
+    <View style={overlayStyles.scrim}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+      <View style={overlayStyles.sheet}>
+        <View style={overlayStyles.sheetGroup}>
+          {actions.map((action, index) => (
+            <Pressable
+              key={action.label}
+              onPress={action.onPress}
+              style={[overlayStyles.sheetAction, index > 0 && overlayStyles.sheetDivider]}
+            >
+              <Text style={[overlayStyles.sheetActionText, action.destructive && overlayStyles.destructive]}>{action.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable onPress={onCancel} style={overlayStyles.sheetCancel}>
+          <Text style={overlayStyles.sheetCancelText}>Cancel</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ReportSheet({
+  selectedReason,
+  onSelectReason,
+  onSubmit,
+  onCancel,
+  details,
+  onDetailsChange,
+  submitting,
+}: {
+  selectedReason: string;
+  onSelectReason: (reason: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  details: string;
+  onDetailsChange: (value: string) => void;
+  submitting: boolean;
+}) {
+  const showDetails = selectedReason === 'Something else';
+  return (
+    <View style={overlayStyles.scrim}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+      <View style={overlayStyles.reportSheet}>
+        <Text style={overlayStyles.sheetTitle}>Why are you reporting this post?</Text>
+        {reportReasons.map((reason) => (
+          <Pressable
+            key={reason}
+            onPress={() => onSelectReason(reason)}
+            style={overlayStyles.reportRow}
+          >
+            <Text style={overlayStyles.reportReason}>{reason}</Text>
+            <Text style={overlayStyles.reportRadio}>{selectedReason === reason ? '◉' : '◯'}</Text>
+          </Pressable>
+        ))}
+        {showDetails ? (
+          <TextInput
+            value={details}
+            onChangeText={(value) => onDetailsChange(value.slice(0, 300))}
+            placeholder="Please provide details (optional)"
+            placeholderTextColor="#9DA3AD"
+            multiline
+            style={overlayStyles.detailsInput}
+          />
+        ) : null}
+        <View style={overlayStyles.reportFooter}>
+          <Pressable disabled={submitting} onPress={onSubmit} style={[overlayStyles.primaryButton, submitting && overlayStyles.disabledButton]}>
+            <Text style={overlayStyles.primaryButtonText}>{submitting ? 'Submitting…' : 'Submit report'}</Text>
+          </Pressable>
+          <Pressable style={overlayStyles.secondaryButton} onPress={onCancel}>
+            <Text style={overlayStyles.secondaryButtonText}>Cancel</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -138,9 +241,34 @@ export function HomeFeedScreen({
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const reactionMutation = useReactToReview();
+  const hideMutation = useHideReview();
+  const reportMutation = useReportReview();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
+  const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
+  const [reportReviewId, setReportReviewId] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<ReportReason>(reportReasons[0] as ReportReason);
+  const [reportDetails, setReportDetails] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+
+  useEffect(() => () => {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
+  }, []);
+
+  function showToast(message: string) {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
+    setToast(message);
+    toastTimer.current = setTimeout(() => {
+      setToast(null);
+      toastTimer.current = null;
+    }, 1800);
+  }
 
   const handleReactionPress = async (item: FeedItem) => {
     if (pendingReactions[item.id]) {
@@ -158,6 +286,47 @@ export function HomeFeedScreen({
         delete next[item.id];
         return next;
       });
+    }
+  };
+
+  const handleSharePress = async (item: FeedItem) => {
+    try {
+      await Share.share({
+        message: `${item.authorDisplayName} · ${item.venueName}\n${item.text.slice(0, 120)}`,
+      });
+    } catch {
+      Alert.alert('Share unavailable', 'Unable to open share options right now.');
+    }
+  };
+
+  const handleHidePress = async (itemId: string) => {
+    setMenuReviewId(null);
+    try {
+      await hideMutation.mutateAsync(itemId);
+      showToast('Post hidden');
+    } catch {
+      Alert.alert('Could not hide post', 'Please try again.');
+    }
+  };
+
+  const handleReportSubmit = async () => {
+    if (!reportReviewId) {
+      return;
+    }
+    const reviewId = reportReviewId;
+    try {
+      await reportMutation.mutateAsync({
+        reviewId,
+        reason: selectedReason,
+        details: reportDetails || undefined,
+      });
+      setReportReviewId(null);
+      setSelectedReason(reportReasons[0] as ReportReason);
+      setReportDetails('');
+      showToast('Report submitted');
+    } catch {
+      Alert.alert('Could not send report', 'Please try again.');
+      setReportReviewId(reviewId);
     }
   };
 
@@ -179,7 +348,11 @@ export function HomeFeedScreen({
         </View>
         <View style={styles.switcher}>
           {(['friends', 'local'] as const).map((value) => (
-            <Pressable key={value} onPress={() => setScope(value)} style={[styles.switch, scope === value && styles.switchActive]}>
+            <Pressable
+              key={value}
+              onPress={() => setScope(value)}
+              style={[styles.switch, scope === value && styles.switchActive]}
+            >
               <Text style={[styles.switchText, scope === value && styles.switchTextActive]}>
                 {value === 'friends' ? 'Friends' : 'Local'}
               </Text>
@@ -205,24 +378,66 @@ export function HomeFeedScreen({
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.45}
-          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
-          renderItem={({ item }) => {
-            return (
-              <FeedCard
-                item={item}
-                onComments={() => onOpenComments(item.id)}
-                isReactionActive={Boolean(reactionState[item.id])}
-                reactionDisabled={Boolean(pendingReactions[item.id])}
-                onReaction={() => {
-                  void handleReactionPress(item);
-                }}
-              />
-            );
-          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={query.isRefetching && !query.isFetchingNextPage}
+              onRefresh={() => void query.refetch()}
+              tintColor={colors.primary}
+            />
+          }
+          renderItem={({ item }) => (
+            <FeedCard
+              item={item}
+              onComments={() => onOpenComments(item.id)}
+              isReactionActive={Boolean(reactionState[item.id])}
+              reactionDisabled={Boolean(pendingReactions[item.id])}
+              onReaction={() => {
+                void handleReactionPress(item);
+              }}
+              onShare={() => {
+                void handleSharePress(item);
+              }}
+              onLongPress={() => setMenuReviewId(item.id)}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           style={styles.list}
         />
       )}
+      {toast ? (
+        <View style={overlayStyles.toast}>
+          <Text style={overlayStyles.toastText}>✓  {toast}</Text>
+        </View>
+      ) : null}
+      {!!menuReviewId ? (
+        <ActionSheet
+          actions={[
+            { label: 'Report post', destructive: true, onPress: () => {
+              setReportReviewId(menuReviewId);
+              setMenuReviewId(null);
+            } },
+            { label: hideMutation.isPending ? 'Hiding…' : 'Hide post', onPress: () => {
+              void handleHidePress(menuReviewId);
+            } },
+          ]}
+          onCancel={() => setMenuReviewId(null)}
+        />
+      ) : null}
+      {!!reportReviewId ? (
+        <ReportSheet
+          selectedReason={selectedReason}
+          onSelectReason={(reason) => setSelectedReason(reason as ReportReason)}
+          onSubmit={() => void handleReportSubmit()}
+          onCancel={() => {
+            setReportReviewId(null);
+            setSelectedReason(reportReasons[0] as ReportReason);
+            setReportDetails('');
+          }}
+          details={reportDetails}
+          onDetailsChange={(value) => setReportDetails(value)}
+          submitting={reportMutation.isPending}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -263,4 +478,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 const stylesStatic = StyleSheet.create({
   dishPhoto: { width: 124, height: 84, backgroundColor: '#ECEEF2' },
   dishPhotoPlaceholder: { width: 124, height: 84, backgroundColor: '#ECEEF2' },
+});
+
+const overlayStyles = StyleSheet.create({
+  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', padding: 8, paddingBottom: 14, backgroundColor: 'rgba(0,0,0,0.64)' },
+  sheet: { gap: 8 },
+  sheetGroup: { overflow: 'hidden', borderRadius: 16, backgroundColor: '#272727' },
+  sheetAction: { height: 54, alignItems: 'center', justifyContent: 'center' },
+  sheetDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#484848' },
+  sheetActionText: { color: '#fff', fontSize: 17 },
+  destructive: { color: '#FF453A' },
+  sheetCancel: { height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#272727' },
+  sheetCancelText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  reportSheet: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 8, borderRadius: 16, backgroundColor: '#272727' },
+  sheetTitle: { color: '#fff', fontSize: 19, fontWeight: '700', marginBottom: 6 },
+  reportRow: { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#414141' },
+  reportReason: { color: '#fff', fontSize: 16 },
+  reportRadio: { color: '#fff', fontSize: 18 },
+  reportFooter: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  detailsInput: { height: 96, marginTop: 4, borderRadius: 12, padding: 10, backgroundColor: '#3a3a3a', color: '#fff' },
+  primaryButton: { flex: 1, height: 42, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  primaryButtonText: { color: '#fff', fontWeight: '600' },
+  secondaryButton: { flex: 1, height: 42, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3e3e3e' },
+  secondaryButtonText: { color: '#fff', fontWeight: '600' },
+  disabledButton: { opacity: 0.7 },
+  toast: { position: 'absolute', zIndex: 40, top: 168, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 18, backgroundColor: '#303030' },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

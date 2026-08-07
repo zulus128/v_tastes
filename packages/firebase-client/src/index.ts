@@ -26,9 +26,11 @@ import type {
   HealthCheckResult,
   ActivityCandidate,
   LeaderboardEntry,
+  HideReviewInput,
   ListConversationsInput,
   MarkConversationReadInput,
   MarkConversationReadResult,
+  ReportReviewInput,
   PlaceDetails,
   PlaceReview,
   Page,
@@ -86,6 +88,8 @@ export const callableOperationNames = [
   'getComments',
   'addComment',
   'reactToReview',
+  'hideReview',
+  'reportReview',
   'getLeaderboard',
   'getDiscoverFeed',
   'getDiscoverPeople',
@@ -263,6 +267,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<AddCommentInput, IdResult>('addComment', input),
     reactToReview: (input: ReactToReviewInput) =>
       invoke<ReactToReviewInput, ReactionResult>('reactToReview', input),
+    hideReview: (input: HideReviewInput) =>
+      invoke<HideReviewInput, IdResult>('hideReview', input),
+    reportReview: (input: ReportReviewInput) =>
+      invoke<ReportReviewInput, { id: string }>('reportReview', input),
     getLeaderboard: (input: GetLeaderboardInput) =>
       invoke<GetLeaderboardInput, Page<LeaderboardEntry>>('getLeaderboard', input),
     getDiscoverFeed: () =>
