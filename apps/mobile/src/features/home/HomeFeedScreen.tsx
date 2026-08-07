@@ -16,7 +16,7 @@ import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { useFeed } from './api';
+import { useFeed, useReactToReview } from './api';
 import {
   HomeFeedEmptyState,
   HomeFeedLoadingState,
@@ -56,7 +56,17 @@ function isOfflineError(error: Error) {
   return code === 'unavailable' || code === 'deadline-exceeded';
 }
 
-function FeedCard({ item, onComments }: { item: FeedItem; onComments: () => void }) {
+function FeedCard({
+  item,
+  onComments,
+  onReaction,
+  reactionDisabled,
+}: {
+  item: FeedItem;
+  onComments: () => void;
+  onReaction: () => void;
+  reactionDisabled: boolean;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Persisted query caches and reviews created before Increment 2 do not have
@@ -94,7 +104,9 @@ function FeedCard({ item, onComments }: { item: FeedItem; onComments: () => void
         </View>
       ) : null}
       <View style={styles.metrics}>
-        <Text style={styles.metric}>♥ {item.reactionCount}</Text>
+        <Pressable disabled={reactionDisabled} onPress={onReaction}>
+          <Text style={[styles.metric, reactionDisabled ? styles.metricDisabled : undefined]}>♥ {item.reactionCount}</Text>
+        </Pressable>
         <Pressable onPress={onComments}>
           <Text style={styles.metric}>◯ {item.commentCount}</Text>
         </Pressable>
@@ -116,6 +128,7 @@ export function HomeFeedScreen({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
+  const reactionMutation = useReactToReview();
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
@@ -163,7 +176,16 @@ export function HomeFeedScreen({
           }}
           onEndReachedThreshold={0.45}
           refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
-          renderItem={({ item }) => <FeedCard item={item} onComments={() => onOpenComments(item.id)} />}
+          renderItem={({ item }) => (
+            <FeedCard
+              item={item}
+              onComments={() => onOpenComments(item.id)}
+              reactionDisabled={reactionMutation.isPending}
+              onReaction={() => {
+                void reactionMutation.mutateAsync(item.id);
+              }}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           style={styles.list}
         />
@@ -201,6 +223,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised, color: colors.textSecondary, fontSize: 12 },
   metrics: { paddingTop: 10, flexDirection: 'row', gap: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   metric: { color: colors.textMuted, fontSize: 13 },
+  metricDisabled: { opacity: 0.5 },
 });
 
 const stylesStatic = StyleSheet.create({
