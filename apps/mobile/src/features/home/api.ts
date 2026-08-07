@@ -1,6 +1,26 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import type { FeedItem, Page } from '@tastes/contracts';
+
+type FeedReactionState = Record<string, boolean>;
+
+const feedScopes = ['friends', 'local'] as const;
+type FeedScope = typeof feedScopes[number];
+
+type FeedReactionMutationContext = {
+  previousReactions: FeedReactionState;
+  previousPagesByScope: Array<{ scope: FeedScope; data: InfiniteData<Page<FeedItem>> | undefined }>;
+};
+
+const feedQueryKey = (userId: string, scope: FeedScope) => ['feed', userId, scope] as const;
+const reactionQueryKey = (userId: string) => ['feedReactions', userId] as const;
 
 export function useFeed(scope: 'friends' | 'local') {
   const api = useTastesApi();
@@ -16,18 +36,109 @@ export function useFeed(scope: 'friends' | 'local') {
   });
 }
 
+export function useFeedReactionState() {
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: reactionQueryKey(userId),
+    queryFn: async () => {
+      return queryClient.getQueryData<FeedReactionState>(reactionQueryKey(userId)) ?? {};
+    },
+    initialData: () => queryClient.getQueryData<FeedReactionState>(reactionQueryKey(userId)) ?? {},
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 export function useReactToReview() {
   const api = useTastesApi();
   const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<{ active: boolean; reactionCount: number }, Error, string, FeedReactionMutationContext>({
     mutationFn: async (reviewId: string) => api.reactToReview({
       reviewId,
       idempotencyKey: createIdempotencyKey('feed-reaction'),
       reaction: 'like',
     }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['feed', userId] });
+    onMutate: async (reviewId) => {
+      const reactionCacheKey = reactionQueryKey(userId);
+      const previousReactions = queryClient.getQueryData<FeedReactionState>(reactionCacheKey) ?? {};
+      const previousActive = previousReactions[reviewId] ?? false;
+      const nextActive = !previousActive;
+      const delta = nextActive ? 1 : -1;
+
+      await queryClient.cancelQueries({ queryKey: ['feed', userId] });
+      queryClient.setQueryData<FeedReactionState>(reactionCacheKey, {
+        ...previousReactions,
+        [reviewId]: nextActive,
+      });
+
+      const previousPagesByScope: Array<{ scope: FeedScope; data: InfiniteData<Page<FeedItem>> | undefined }> = [];
+      feedScopes.forEach((feedScope) => {
+        const key = feedQueryKey(userId, feedScope);
+        const previousPageData = queryClient.getQueryData<InfiniteData<Page<FeedItem>>>(key);
+        previousPagesByScope.push({ scope: feedScope, data: previousPageData });
+        if (!previousPageData) {
+          return;
+        }
+
+        queryClient.setQueryData<InfiniteData<Page<FeedItem>>>(key, (current) => {
+          if (!current) {
+            return previousPageData;
+          }
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.map((candidate) => (candidate.id === reviewId
+                ? {
+                  ...candidate,
+                  reactionCount: Math.max(0, candidate.reactionCount + delta),
+                }
+                : candidate)),
+            })),
+          };
+        });
+      });
+
+      return {
+        previousReactions,
+        previousPagesByScope,
+      };
+    },
+    onSuccess: async (response, reviewId) => {
+      const reactionCacheKey = reactionQueryKey(userId);
+      const previousReactions = queryClient.getQueryData<FeedReactionState>(reactionCacheKey) ?? {};
+      queryClient.setQueryData<FeedReactionState>(reactionCacheKey, {
+        ...previousReactions,
+        [reviewId]: response.active,
+      });
+
+      feedScopes.forEach((feedScope) => {
+        queryClient.setQueryData<InfiniteData<Page<FeedItem>>>(feedQueryKey(userId, feedScope), (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.map((candidate) => (candidate.id === reviewId
+                ? { ...candidate, reactionCount: response.reactionCount }
+                : candidate)),
+            })),
+          };
+        });
+      });
+    },
+    onError: (_error, _reviewId, context) => {
+      if (!context) {
+        return;
+      }
+      const reactionCacheKey = reactionQueryKey(userId);
+      if (context.previousReactions) {
+        queryClient.setQueryData<FeedReactionState>(reactionCacheKey, context.previousReactions);
+      }
+      context.previousPagesByScope?.forEach(({ scope, data }) => {
+        queryClient.setQueryData(feedQueryKey(userId, scope), data);
+      });
     },
   });
 }
