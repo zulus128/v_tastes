@@ -40,6 +40,20 @@ export function useFeed(scope: 'friends' | 'local') {
   });
 }
 
+export function useLatestFeedItem(scope: 'friends' | 'local') {
+  const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  return useQuery({
+    queryKey: ['feedLatest', userId, scope],
+    queryFn: async () => {
+      const response = await api.getFeed({ scope, limit: 1 });
+      return response.data.items[0] ?? null;
+    },
+    staleTime: 45_000,
+    refetchInterval: 20_000,
+  });
+}
+
 export function useFeedReactionState() {
   const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();

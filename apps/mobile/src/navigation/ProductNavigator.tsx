@@ -156,6 +156,7 @@ function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNa
             onExplore={() => navigation.navigate('Discover')}
             onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
             onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
+            onOpenNotifications={() => rootNavigation.navigate('MainTabs', { screen: 'Dialog' })}
           />
         )}
       </Tabs.Screen>

@@ -24,6 +24,7 @@ import {
   useFeedReactionState,
   useHideReview,
   useReactToReview,
+  useLatestFeedItem,
   useReportReview,
 } from './api';
 import {
@@ -234,15 +235,18 @@ export function HomeFeedScreen({
   onExplore,
   onOpenComments,
   onOpenLeaderboard,
+  onOpenNotifications,
 }: {
   onExplore: () => void;
   onOpenComments: (reviewId: string) => void;
   onOpenLeaderboard: () => void;
+  onOpenNotifications?: () => void;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
+  const latestFeedQuery = useLatestFeedItem(scope);
   const reactionMutation = useReactToReview();
   const hideMutation = useHideReview();
   const reportMutation = useReportReview();
@@ -255,6 +259,7 @@ export function HomeFeedScreen({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const hasNewPosts = Boolean(items[0]?.id && latestFeedQuery.data?.id && items[0].id !== latestFeedQuery.data.id);
 
   useEffect(() => () => {
     if (toastTimer.current) {
@@ -333,6 +338,10 @@ export function HomeFeedScreen({
     }
   };
 
+  const handleRefreshNewPosts = async () => {
+    await query.refetch();
+  };
+
   return (
     <Screen background="homeFeed">
       <View style={styles.header}>
@@ -345,9 +354,13 @@ export function HomeFeedScreen({
             <StatsGlyph />
           </Pressable>
           <TastesLogo />
-          <View style={styles.headerIcon}>
+          <Pressable
+            accessibilityLabel="Open notifications"
+            onPress={onOpenNotifications}
+            style={styles.headerIcon}
+          >
             <NotificationsGlyph />
-          </View>
+          </Pressable>
         </View>
         <View style={styles.switcher}>
           {(['friends', 'local'] as const).map((value) => (
@@ -363,6 +376,11 @@ export function HomeFeedScreen({
           ))}
         </View>
       </View>
+      {hasNewPosts ? (
+        <Pressable onPress={() => { void handleRefreshNewPosts(); }} style={styles.newPostsBanner}>
+          <Text style={styles.newPostsText}>↑ New posts</Text>
+        </Pressable>
+      ) : null}
       {query.isPending ? <HomeFeedLoadingState /> : query.isError && items.length === 0 ? (
         isOfflineError(query.error) ? (
           <HomeFeedOfflineState onRetry={() => void query.refetch()} />
@@ -454,6 +472,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   switchActive: { backgroundColor: '#D9DDE5' },
   switchText: { color: colors.textSecondary, opacity: 0.5, fontSize: 13 },
   switchTextActive: { color: '#161616', opacity: 1, fontWeight: '700' },
+  newPostsBanner: { position: 'absolute', top: 152, left: 16, right: 16, zIndex: 3, alignSelf: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#161616CC' },
+  newPostsText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
   content: { padding: 15, gap: 16 },
   card: { gap: 12, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: theme.radius.lg, backgroundColor: colors.surface },
