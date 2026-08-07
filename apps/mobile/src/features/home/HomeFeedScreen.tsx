@@ -3,6 +3,7 @@ import { getDownloadURL, ref } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -29,6 +30,12 @@ const tagLabels: Record<string, string> = {
   'date-night': 'Date night',
   birthday: 'Birthday',
   children: 'With children',
+};
+
+type ReactionState = {
+  active: boolean;
+  count: number;
+  pending: boolean;
 };
 
 function DishPhoto({ photoPath }: { photoPath: string }) {
@@ -61,11 +68,15 @@ function FeedCard({
   onComments,
   onReaction,
   reactionDisabled,
+  reactionCount,
+  isReactionActive,
 }: {
   item: FeedItem;
   onComments: () => void;
   onReaction: () => void;
   reactionDisabled: boolean;
+  reactionCount: number;
+  isReactionActive: boolean;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -105,7 +116,13 @@ function FeedCard({
       ) : null}
       <View style={styles.metrics}>
         <Pressable disabled={reactionDisabled} onPress={onReaction}>
-          <Text style={[styles.metric, reactionDisabled ? styles.metricDisabled : undefined]}>♥ {item.reactionCount}</Text>
+          <Text style={[
+            styles.metric,
+            isReactionActive ? styles.metricActive : undefined,
+            reactionDisabled ? styles.metricDisabled : undefined,
+          ]}>
+            ♥ {reactionCount}
+          </Text>
         </Pressable>
         <Pressable onPress={onComments}>
           <Text style={styles.metric}>◯ {item.commentCount}</Text>
@@ -129,7 +146,46 @@ export function HomeFeedScreen({
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const reactionMutation = useReactToReview();
+  const [reactionState, setReactionState] = useState<Record<string, ReactionState>>({});
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+
+  const getReactionState = (reviewId: string) => reactionState[reviewId];
+
+  const handleReactionPress = async (item: FeedItem) => {
+    const current = getReactionState(item.id);
+    const currentActive = current?.active ?? false;
+    const currentCount = current?.count ?? item.reactionCount;
+    if (current?.pending ?? false) return;
+    const nextActive = !currentActive;
+    const nextCount = Math.max(0, currentCount + (nextActive ? 1 : -1));
+
+    setReactionState((prev) => ({
+      ...prev,
+      [item.id]: { active: nextActive, count: nextCount, pending: true },
+    }));
+
+    try {
+      const response = await reactionMutation.mutateAsync(item.id);
+      setReactionState((prev) => ({
+        ...prev,
+        [item.id]: {
+          active: response.active,
+          count: response.reactionCount,
+          pending: false,
+        },
+      }));
+    } catch {
+      setReactionState((prev) => ({
+        ...prev,
+        [item.id]: {
+          active: currentActive,
+          count: currentCount,
+          pending: false,
+        },
+      }));
+      Alert.alert('Reaction unavailable', 'Unable to update reaction right now. Please try again.');
+    }
+  };
 
   return (
     <Screen background="homeFeed">
@@ -176,16 +232,21 @@ export function HomeFeedScreen({
           }}
           onEndReachedThreshold={0.45}
           refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
-          renderItem={({ item }) => (
-            <FeedCard
-              item={item}
-              onComments={() => onOpenComments(item.id)}
-              reactionDisabled={reactionMutation.isPending}
-              onReaction={() => {
-                void reactionMutation.mutateAsync(item.id);
-              }}
-            />
-          )}
+          renderItem={({ item }) => {
+            const state = getReactionState(item.id);
+            return (
+              <FeedCard
+                item={item}
+                onComments={() => onOpenComments(item.id)}
+                reactionCount={state?.count ?? item.reactionCount}
+                isReactionActive={state?.active ?? false}
+                reactionDisabled={Boolean(state?.pending)}
+                onReaction={() => {
+                  void handleReactionPress(item);
+                }}
+              />
+            );
+          }}
           showsVerticalScrollIndicator={false}
           style={styles.list}
         />
@@ -223,6 +284,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised, color: colors.textSecondary, fontSize: 12 },
   metrics: { paddingTop: 10, flexDirection: 'row', gap: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   metric: { color: colors.textMuted, fontSize: 13 },
+  metricActive: { color: colors.text, fontWeight: '700' },
   metricDisabled: { opacity: 0.5 },
 });
 
