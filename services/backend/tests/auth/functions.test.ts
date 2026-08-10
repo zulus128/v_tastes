@@ -37,7 +37,7 @@ async function callFunction<T>(name: string, data: unknown, token?: string): Pro
     },
     body: JSON.stringify({ data }),
   });
-  const payload = await response.json() as { result?: T; error?: CallableFailure };
+  const payload = (await response.json()) as { result?: T; error?: CallableFailure };
 
   if (!response.ok || payload.error) {
     throw payload.error ?? new Error(`Callable ${name} failed with HTTP ${response.status}`);
@@ -59,7 +59,7 @@ async function authenticatedUser() {
       body: JSON.stringify({ token: verified.customToken, returnSecureToken: true }),
     },
   );
-  const result = await response.json() as { idToken: string; localId: string };
+  const result = (await response.json()) as { idToken: string; localId: string };
   return { token: result.idToken, uid: result.localId };
 }
 
@@ -103,9 +103,12 @@ describe('phone OTP callables', () => {
     expect(first.challengeId).not.toBe(createHash('sha256').update(phoneNumber).digest('hex'));
     await expectReason(requestOtp(phoneNumber), 'resend-too-soon');
 
-    await getFirestore().collection('_otpRateLimits').doc(rateLimitId(phoneNumber)).update({
-      nextAllowedAt: Timestamp.fromMillis(Date.now() - 1),
-    });
+    await getFirestore()
+      .collection('_otpRateLimits')
+      .doc(rateLimitId(phoneNumber))
+      .update({
+        nextAllowedAt: Timestamp.fromMillis(Date.now() - 1),
+      });
     const second = await requestOtp(phoneNumber);
     expect(second.challengeId).not.toBe(first.challengeId);
   });
@@ -115,9 +118,12 @@ describe('phone OTP callables', () => {
 
     for (let request = 1; request <= 5; request += 1) {
       await requestOtp(phoneNumber);
-      await getFirestore().collection('_otpRateLimits').doc(rateLimitId(phoneNumber)).update({
-        nextAllowedAt: Timestamp.fromMillis(Date.now() - 1),
-      });
+      await getFirestore()
+        .collection('_otpRateLimits')
+        .doc(rateLimitId(phoneNumber))
+        .update({
+          nextAllowedAt: Timestamp.fromMillis(Date.now() - 1),
+        });
     }
 
     await expectReason(requestOtp(phoneNumber), 'rate-limit-reached');
@@ -126,62 +132,93 @@ describe('phone OTP callables', () => {
   it('consumes a challenge after a successful verification and rejects replay', async () => {
     const challenge = await requestOtp(uniquePhone());
     expect(challenge.localCode).toBe('1332');
-    const verified = await callFunction<{ customToken: string; isNewUser: boolean }>('verifyPhoneOtp', {
-      challengeId: challenge.challengeId,
-      code: challenge.localCode,
-    });
+    const verified = await callFunction<{ customToken: string; isNewUser: boolean }>(
+      'verifyPhoneOtp',
+      {
+        challengeId: challenge.challengeId,
+        code: challenge.localCode,
+      },
+    );
 
     expect(verified.customToken).toBeTruthy();
     expect(verified.isNewUser).toBe(true);
-    await expectReason(callFunction('verifyPhoneOtp', {
-      challengeId: challenge.challengeId,
-      code: '0000',
-    }), 'challenge-not-found');
+    await expectReason(
+      callFunction('verifyPhoneOtp', {
+        challengeId: challenge.challengeId,
+        code: '0000',
+      }),
+      'challenge-not-found',
+    );
   });
 
   it('rejects expired challenges', async () => {
     const challenge = await requestOtp(uniquePhone());
-    await getFirestore().collection('_otpChallenges').doc(challenge.challengeId).update({
-      expiresAt: Timestamp.fromMillis(Date.now() - 1),
-    });
+    await getFirestore()
+      .collection('_otpChallenges')
+      .doc(challenge.challengeId)
+      .update({
+        expiresAt: Timestamp.fromMillis(Date.now() - 1),
+      });
 
-    await expectReason(callFunction('verifyPhoneOtp', {
-      challengeId: challenge.challengeId,
-      code: challenge.localCode,
-    }), 'code-expired');
+    await expectReason(
+      callFunction('verifyPhoneOtp', {
+        challengeId: challenge.challengeId,
+        code: challenge.localCode,
+      }),
+      'code-expired',
+    );
   });
 
   it('locks a challenge after five incorrect attempts', async () => {
     const challenge = await requestOtp(uniquePhone());
 
     for (let attempt = 1; attempt <= 5; attempt += 1) {
-      const failure = await expectReason(callFunction('verifyPhoneOtp', {
-        challengeId: challenge.challengeId,
-        code: '0000',
-      }), 'incorrect-code');
+      const failure = await expectReason(
+        callFunction('verifyPhoneOtp', {
+          challengeId: challenge.challengeId,
+          code: '0000',
+        }),
+        'incorrect-code',
+      );
       expect(failure.details?.attemptsRemaining).toBe(5 - attempt);
     }
 
-    await expectReason(callFunction('verifyPhoneOtp', {
-      challengeId: challenge.challengeId,
-      code: challenge.localCode,
-    }), 'max-attempts-reached');
+    await expectReason(
+      callFunction('verifyPhoneOtp', {
+        challengeId: challenge.challengeId,
+        code: challenge.localCode,
+      }),
+      'max-attempts-reached',
+    );
   });
 
   it('serializes concurrent checks so they cannot bypass the attempt counter', async () => {
     const challenge = await requestOtp(uniquePhone());
-    const results = await Promise.allSettled(Array.from({ length: 5 }, () => callFunction('verifyPhoneOtp', {
-      challengeId: challenge.challengeId,
-      code: '0000',
-    })));
-    const reasons = results.map((result) => result.status === 'rejected'
-      ? (result.reason as CallableFailure).details?.reason
-      : 'unexpected-success');
-    const snapshot = await getFirestore().collection('_otpChallenges').doc(challenge.challengeId).get();
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        callFunction('verifyPhoneOtp', {
+          challengeId: challenge.challengeId,
+          code: '0000',
+        }),
+      ),
+    );
+    const reasons = results.map((result) =>
+      result.status === 'rejected'
+        ? (result.reason as CallableFailure).details?.reason
+        : 'unexpected-success',
+    );
+    const snapshot = await getFirestore()
+      .collection('_otpChallenges')
+      .doc(challenge.challengeId)
+      .get();
     const incorrectChecks = reasons.filter((reason) => reason === 'incorrect-code').length;
 
     expect(reasons).toContain('incorrect-code');
-    expect(reasons.every((reason) => reason === 'incorrect-code' || reason === 'verification-in-progress')).toBe(true);
+    expect(
+      reasons.every(
+        (reason) => reason === 'incorrect-code' || reason === 'verification-in-progress',
+      ),
+    ).toBe(true);
     expect(snapshot.get('failedAttempts')).toBe(incorrectChecks);
     expect(incorrectChecks).toBeLessThanOrEqual(5);
   }, 15_000);
@@ -196,19 +233,46 @@ describe('authenticated session and paginated reads', () => {
       onboardingVersion: 0,
       onboardingComplete: false,
     });
-    await callFunction('createUserProfile', {
-      displayName: 'Demo User',
-      username: 'demo.user',
-      city: 'Istanbul',
-    }, token);
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Demo User',
+        username: 'demo.user',
+        city: 'Istanbul',
+      },
+      token,
+    );
     expect(await callFunction('getSessionStatus', {}, token)).toMatchObject({
       profileExists: true,
       onboardingComplete: false,
     });
-    await callFunction('completeOnboarding', { version: 1 }, token);
+    await callFunction(
+      'completeOnboarding',
+      {
+        version: 1,
+        favoriteDish: 'Sushi',
+        favoriteVenueId: 'morimoto',
+        invitedContactCount: 3,
+        appearance: 'dark',
+      },
+      token,
+    );
     expect(await callFunction('getSessionStatus', {}, token)).toMatchObject({
       onboardingVersion: 1,
       onboardingComplete: true,
+    });
+    const profile = await getFirestore()
+      .collection('users')
+      .where('username', '==', 'demo.user')
+      .limit(1)
+      .get();
+    expect(profile.docs[0]?.get('tastePreferences')).toEqual({
+      favoriteDish: 'Sushi',
+      favoriteVenueId: 'morimoto',
+    });
+    expect(await callFunction('getMonthlyRecap', {}, token)).toMatchObject({
+      ready: false,
+      placesVisited: 0,
     });
   });
 
@@ -216,18 +280,30 @@ describe('authenticated session and paginated reads', () => {
     const first = await authenticatedUser();
     const second = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'Review Author',
-      username: 'review.author',
-      city: 'Istanbul',
-    }, first.token);
-    await callFunction('createUserProfile', {
-      displayName: 'Reader',
-      username: 'review.reader',
-      city: 'Istanbul',
-    }, second.token);
-    const author = (await db.collection('users').where('username', '==', 'review.author').limit(1).get()).docs[0];
-    const reader = (await db.collection('users').where('username', '==', 'review.reader').limit(1).get()).docs[0];
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Review Author',
+        username: 'review.author',
+        city: 'Istanbul',
+      },
+      first.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Reader',
+        username: 'review.reader',
+        city: 'Istanbul',
+      },
+      second.token,
+    );
+    const author = (
+      await db.collection('users').where('username', '==', 'review.author').limit(1).get()
+    ).docs[0];
+    const reader = (
+      await db.collection('users').where('username', '==', 'review.reader').limit(1).get()
+    ).docs[0];
     if (!author || !reader) throw new Error('Expected both profiles to exist.');
     await db.collection('venues').doc('demo-cafe').set({
       name: 'Demo Cafe',
@@ -235,7 +311,9 @@ describe('authenticated session and paginated reads', () => {
       status: 'active',
     });
 
-    expect(await callFunction('followUser', { targetUserId: author.id }, second.token)).toEqual({ following: true });
+    expect(await callFunction('followUser', { targetUserId: author.id }, second.token)).toEqual({
+      following: true,
+    });
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(true);
     expect((await author.ref.collection('followers').doc(reader.id).get()).exists).toBe(true);
 
@@ -245,15 +323,25 @@ describe('authenticated session and paginated reads', () => {
       rating: 5,
       text: 'Exactly once',
       tags: ['casual', 'date-night'],
-      dishReviews: [{
-        id: 'dish-command-0001',
-        title: 'Soup dumplings',
-        rating: 4.5,
-        photoPath: `review-images/${author.id}/review-command-0001/dish-command-0001`,
-      }],
+      dishReviews: [
+        {
+          id: 'dish-command-0001',
+          title: 'Soup dumplings',
+          rating: 4.5,
+          photoPath: `review-images/${author.id}/review-command-0001/dish-command-0001`,
+        },
+      ],
     };
-    const firstReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
-    const replayedReview = await callFunction<{ id: string }>('createReview', reviewCommand, first.token);
+    const firstReview = await callFunction<{ id: string }>(
+      'createReview',
+      reviewCommand,
+      first.token,
+    );
+    const replayedReview = await callFunction<{ id: string }>(
+      'createReview',
+      reviewCommand,
+      first.token,
+    );
     expect(replayedReview.id).toBe(firstReview.id);
     expect((await author.ref.get()).get('xp')).toBe(50);
     const reviewDocument = await db.collection('reviews').doc(firstReview.id).get();
@@ -262,11 +350,9 @@ describe('authenticated session and paginated reads', () => {
     expect(reviewDocument.get('dishReviews')).toEqual(reviewCommand.dishReviews);
     expect((await db.collection('venues').doc('demo-cafe').get()).get('reviewCount')).toBe(1);
     expect((await author.ref.get()).get('reviewCount')).toBe(1);
-    const friendsFeed = await callFunction<{ items: Array<{ id: string; tags: string[]; dishReviews: unknown[] }> }>(
-      'getFeed',
-      { scope: 'friends', limit: 20 },
-      second.token,
-    );
+    const friendsFeed = await callFunction<{
+      items: Array<{ id: string; tags: string[]; dishReviews: unknown[] }>;
+    }>('getFeed', { scope: 'friends', limit: 20 }, second.token);
     expect(friendsFeed.items.map((item) => item.id)).toContain(firstReview.id);
     expect(friendsFeed.items.find((item) => item.id === firstReview.id)).toMatchObject({
       tags: ['casual', 'date-night'],
@@ -278,32 +364,88 @@ describe('authenticated session and paginated reads', () => {
       reviewId: firstReview.id,
       text: 'Exactly once too',
     };
-    await callFunction('addComment', commentCommand, second.token);
+    const firstComment = await callFunction<{ id: string }>(
+      'addComment',
+      commentCommand,
+      second.token,
+    );
     await callFunction('addComment', commentCommand, second.token);
     expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(1);
+
+    const report = await callFunction<{ id: string }>(
+      'reportComment',
+      {
+        idempotencyKey: 'comment-report-0001',
+        reviewId: firstReview.id,
+        commentId: firstComment.id,
+        reason: 'Spam',
+      },
+      second.token,
+    );
+    const reportDocument = await db.collection('reports').doc(report.id).get();
+    expect(reportDocument.exists).toBe(true);
+    expect(reportDocument.data()).toMatchObject({
+      reporterId: reader.id,
+      reporterName: 'Reader',
+      contentType: 'comment',
+      contentId: firstComment.id,
+      status: 'pending',
+    });
+
+    await db
+      .collection('reviews')
+      .doc(firstReview.id)
+      .update({ dishNames: ['Tiramisu'] });
+    const profileExtras = await callFunction<{
+      xp: number;
+      rewards: Array<{ id: string; completed: boolean; progress: number }>;
+    }>('getProfileExtras', {}, first.token);
+    expect(profileExtras.xp).toBe(50);
+    expect(profileExtras.rewards.find((reward) => reward.id === 'tiramisu')).toMatchObject({
+      completed: true,
+      progress: 1,
+    });
+    expect(profileExtras.rewards.find((reward) => reward.id === 'matcha')).toMatchObject({
+      completed: false,
+      progress: 0,
+    });
 
     const reactionCommand = {
       idempotencyKey: 'reaction-command-01',
       reviewId: firstReview.id,
       reaction: 'like',
     };
-    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({ active: true, reactionCount: 1 });
-    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({ active: true, reactionCount: 1 });
+    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({
+      active: true,
+      reactionCount: 1,
+    });
+    expect(await callFunction('reactToReview', reactionCommand, second.token)).toMatchObject({
+      active: true,
+      reactionCount: 1,
+    });
     expect((await author.ref.get()).get('xp')).toBe(55);
 
-    expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({ following: false });
+    expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({
+      following: false,
+    });
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
   }, 15_000);
 
   it('returns stable, non-overlapping cursors for feed, comments, and leaderboard', async () => {
     const { token } = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'Demo User',
-      username: 'demo.user',
-      city: 'Istanbul',
-    }, token);
-    const currentUser = (await db.collection('users').where('username', '==', 'demo.user').limit(1).get()).docs[0];
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Demo User',
+        username: 'demo.user',
+        city: 'Istanbul',
+      },
+      token,
+    );
+    const currentUser = (
+      await db.collection('users').where('username', '==', 'demo.user').limit(1).get()
+    ).docs[0];
     if (!currentUser) throw new Error('Expected the authenticated profile to exist.');
 
     const batch = db.batch();
@@ -329,13 +471,16 @@ describe('authenticated session and paginated reads', () => {
       });
     }
     for (let index = 0; index < 35; index += 1) {
-      batch.set(db.collection('reviews').doc('review-00').collection('comments').doc(`comment-${index}`), {
-        authorId: 'seed-author',
-        authorDisplayName: 'Demo User',
-        text: `Comment ${index}`,
-        status: 'published',
-        createdAt: Timestamp.fromMillis(base - index),
-      });
+      batch.set(
+        db.collection('reviews').doc('review-00').collection('comments').doc(`comment-${index}`),
+        {
+          authorId: 'seed-author',
+          authorDisplayName: 'Demo User',
+          text: `Comment ${index}`,
+          status: 'published',
+          createdAt: Timestamp.fromMillis(base - index),
+        },
+      );
       batch.set(db.collection('users').doc(`ranked-${String(index).padStart(2, '0')}`), {
         displayName: `Ranked ${index}`,
         status: 'active',
@@ -350,11 +495,10 @@ describe('authenticated session and paginated reads', () => {
       { scope: 'local', limit: 20 },
       token,
     );
-    const feedSecond = await callFunction<{ items: Array<{ id: string }>; nextCursor: string | null }>(
-      'getFeed',
-      { scope: 'local', limit: 20, cursor: feedFirst.nextCursor },
-      token,
-    );
+    const feedSecond = await callFunction<{
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    }>('getFeed', { scope: 'local', limit: 20, cursor: feedFirst.nextCursor }, token);
     expect(feedFirst.items).toHaveLength(20);
     expect(feedSecond.items).toHaveLength(20);
     expect(new Set([...feedFirst.items, ...feedSecond.items].map((item) => item.id)).size).toBe(40);
@@ -369,7 +513,9 @@ describe('authenticated session and paginated reads', () => {
       { scope: 'friends', limit: 20, cursor: friendsFirst.nextCursor },
       token,
     );
-    expect(new Set([...friendsFirst.items, ...friendsSecond.items].map((item) => item.id)).size).toBe(40);
+    expect(
+      new Set([...friendsFirst.items, ...friendsSecond.items].map((item) => item.id)).size,
+    ).toBe(40);
 
     const commentsFirst = await callFunction<{ items: Array<{ id: string }>; nextCursor: string }>(
       'getComments',
@@ -384,11 +530,10 @@ describe('authenticated session and paginated reads', () => {
     expect(commentsFirst.items).toHaveLength(20);
     expect(commentsSecond.items).toHaveLength(15);
 
-    const leadersFirst = await callFunction<{ items: Array<{ userId: string; rank: number }>; nextCursor: string }>(
-      'getLeaderboard',
-      { period: 'month', limit: 20 },
-      token,
-    );
+    const leadersFirst = await callFunction<{
+      items: Array<{ userId: string; rank: number }>;
+      nextCursor: string;
+    }>('getLeaderboard', { period: 'month', limit: 20 }, token);
     const leadersSecond = await callFunction<{ items: Array<{ rank: number }> }>(
       'getLeaderboard',
       { period: 'month', limit: 20, cursor: leadersFirst.nextCursor },
@@ -401,17 +546,26 @@ describe('authenticated session and paginated reads', () => {
   it('serves Discover from Firestore with stable venue pages and real social state', async () => {
     const { token } = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'Discover Reader',
-      username: 'discover.reader',
-      city: 'Istanbul',
-    }, token);
-    const currentUser = (await db.collection('users').where('username', '==', 'discover.reader').limit(1).get()).docs[0];
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Discover Reader',
+        username: 'discover.reader',
+        city: 'Istanbul',
+      },
+      token,
+    );
+    const currentUser = (
+      await db.collection('users').where('username', '==', 'discover.reader').limit(1).get()
+    ).docs[0];
     if (!currentUser) throw new Error('Expected the authenticated Discover profile to exist.');
 
     const reviewer = db.collection('users').doc('discover-reviewer');
     const batch = db.batch();
-    batch.update(currentUser.ref, { reviewCount: 999, createdAt: Timestamp.fromMillis(Date.now()) });
+    batch.update(currentUser.ref, {
+      reviewCount: 999,
+      createdAt: Timestamp.fromMillis(Date.now()),
+    });
     batch.set(reviewer, {
       displayName: 'Discover Reviewer',
       username: 'discover.reviewer',
@@ -425,7 +579,10 @@ describe('authenticated session and paginated reads', () => {
       favoriteCuisines: ['Cafe'],
       createdAt: Timestamp.fromMillis(Date.now() - 1_000),
     });
-    batch.set(currentUser.ref.collection('following').doc(reviewer.id), { userId: reviewer.id, createdAt: Timestamp.now() });
+    batch.set(currentUser.ref.collection('following').doc(reviewer.id), {
+      userId: reviewer.id,
+      createdAt: Timestamp.now(),
+    });
     for (let index = 0; index < 5; index += 1) {
       const venue = db.collection('venues').doc(`discover-venue-${index}`);
       batch.set(venue, {
@@ -455,7 +612,11 @@ describe('authenticated session and paginated reads', () => {
 
     const feed = await callFunction<{
       topReviewer: { userId: string; following: boolean } | null;
-      popularReviews: Array<{ reactionCount: number; commentCount: number; authorPhotoUrl: string | null }>;
+      popularReviews: Array<{
+        reactionCount: number;
+        commentCount: number;
+        authorPhotoUrl: string | null;
+      }>;
     }>('getDiscoverFeed', {}, token);
     expect(feed.topReviewer).toMatchObject({ userId: reviewer.id, following: true });
     expect(feed.popularReviews[0]).toMatchObject({
@@ -468,9 +629,7 @@ describe('authenticated session and paginated reads', () => {
       trending: Array<{ userId: string; following: boolean }>;
     }>('getDiscoverPeople', {}, token);
     expect(people.trending).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ userId: reviewer.id, following: true }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ userId: reviewer.id, following: true })]),
     );
 
     const first = await callFunction<{
@@ -505,19 +664,32 @@ describe('messaging callables', () => {
     const first = await authenticatedUser();
     const second = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'First Messenger',
-      username: 'first.messenger',
-      city: 'Istanbul',
-    }, first.token);
-    await callFunction('createUserProfile', {
-      displayName: 'Second Messenger',
-      username: 'second.messenger',
-      city: 'Istanbul',
-    }, second.token);
-    const firstProfile = (await db.collection('users').where('username', '==', 'first.messenger').limit(1).get()).docs[0];
-    const secondProfile = (await db.collection('users').where('username', '==', 'second.messenger').limit(1).get()).docs[0];
-    if (!firstProfile || !secondProfile) throw new Error('Expected both messaging profiles to exist.');
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'First Messenger',
+        username: 'first.messenger',
+        city: 'Istanbul',
+      },
+      first.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Second Messenger',
+        username: 'second.messenger',
+        city: 'Istanbul',
+      },
+      second.token,
+    );
+    const firstProfile = (
+      await db.collection('users').where('username', '==', 'first.messenger').limit(1).get()
+    ).docs[0];
+    const secondProfile = (
+      await db.collection('users').where('username', '==', 'second.messenger').limit(1).get()
+    ).docs[0];
+    if (!firstProfile || !secondProfile)
+      throw new Error('Expected both messaging profiles to exist.');
     const firstUid = firstProfile.id;
     const secondUid = secondProfile.id;
 
@@ -557,13 +729,15 @@ describe('messaging callables', () => {
     const inbox = await callFunction<{
       items: Array<{ id: string; unreadCount: number; otherParticipant: { userId: string } }>;
     }>('listConversations', { limit: 20 }, second.token);
-    expect(inbox.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: conversation.id,
-        unreadCount: 1,
-        otherParticipant: expect.objectContaining({ userId: firstUid }),
-      }),
-    ]));
+    expect(inbox.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: conversation.id,
+          unreadCount: 1,
+          otherParticipant: expect.objectContaining({ userId: firstUid }),
+        }),
+      ]),
+    );
 
     const messages = await callFunction<{
       items: Array<{ id: string; senderId: string; recipientId: string; text: string }>;
@@ -577,30 +751,47 @@ describe('messaging callables', () => {
       }),
     ]);
 
-    await callFunction('markConversationRead', {
-      conversationId: conversation.id,
-      throughMessageId: firstMessage.id,
-    }, second.token);
+    await callFunction(
+      'markConversationRead',
+      {
+        conversationId: conversation.id,
+        throughMessageId: firstMessage.id,
+      },
+      second.token,
+    );
     expect((await conversationDocument.ref.get()).get(`unreadCounts.${secondUid}`)).toBe(0);
 
-    const notifications = await db.collection('notifications')
+    const notifications = await db
+      .collection('notifications')
       .where('recipientId', '==', secondUid)
       .where('messageId', '==', firstMessage.id)
       .get();
     expect(notifications.size).toBe(1);
 
     const token = 'ExpoPushToken[abcdefghijklmnopqrstuv]';
-    expect(await callFunction('registerPushToken', { token, platform: 'android' }, first.token)).toEqual({
+    expect(
+      await callFunction('registerPushToken', { token, platform: 'android' }, first.token),
+    ).toEqual({
       registered: true,
     });
-    expect(await callFunction('registerPushToken', { token, platform: 'android' }, second.token)).toEqual({
+    expect(
+      await callFunction('registerPushToken', { token, platform: 'android' }, second.token),
+    ).toEqual({
       registered: true,
     });
-    expect((await db.collection('users').doc(firstUid).collection('pushTokens').get()).size).toBe(0);
-    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(1);
+    expect((await db.collection('users').doc(firstUid).collection('pushTokens').get()).size).toBe(
+      0,
+    );
+    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(
+      1,
+    );
     expect((await db.collection('_pushTokens').get()).docs[0]?.get('uid')).toBe(secondUid);
-    expect(await callFunction('unregisterPushToken', { token }, second.token)).toEqual({ registered: false });
-    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(0);
+    expect(await callFunction('unregisterPushToken', { token }, second.token)).toEqual({
+      registered: false,
+    });
+    expect((await db.collection('users').doc(secondUid).collection('pushTokens').get()).size).toBe(
+      0,
+    );
     expect((await db.collection('_pushTokens').get()).size).toBe(0);
   }, 15_000);
 });
@@ -610,19 +801,32 @@ describe('activity callables', () => {
     const organizer = await authenticatedUser();
     const friend = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'Activity Organizer',
-      username: 'activity.organizer',
-      city: 'Istanbul',
-    }, organizer.token);
-    await callFunction('createUserProfile', {
-      displayName: 'Activity Friend',
-      username: 'activity.friend',
-      city: 'Istanbul',
-    }, friend.token);
-    const organizerProfile = (await db.collection('users').where('username', '==', 'activity.organizer').limit(1).get()).docs[0];
-    const friendProfile = (await db.collection('users').where('username', '==', 'activity.friend').limit(1).get()).docs[0];
-    if (!organizerProfile || !friendProfile) throw new Error('Expected both activity profiles to exist.');
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Activity Organizer',
+        username: 'activity.organizer',
+        city: 'Istanbul',
+      },
+      organizer.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Activity Friend',
+        username: 'activity.friend',
+        city: 'Istanbul',
+      },
+      friend.token,
+    );
+    const organizerProfile = (
+      await db.collection('users').where('username', '==', 'activity.organizer').limit(1).get()
+    ).docs[0];
+    const friendProfile = (
+      await db.collection('users').where('username', '==', 'activity.friend').limit(1).get()
+    ).docs[0];
+    if (!organizerProfile || !friendProfile)
+      throw new Error('Expected both activity profiles to exist.');
     const organizerUid = organizerProfile.id;
     const friendUid = friendProfile.id;
     await db.collection('venues').doc('activity-venue').set({
@@ -639,9 +843,11 @@ describe('activity callables', () => {
       {},
       organizer.token,
     );
-    expect(candidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({ userId: friendUid, username: 'activity.friend' }),
-    ]));
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: friendUid, username: 'activity.friend' }),
+      ]),
+    );
 
     const command = {
       idempotencyKey: 'activity-command-0001',
@@ -672,19 +878,25 @@ describe('activity callables', () => {
     const friendInbox = await callFunction<{
       items: Array<{ id: string; kind: string; title: string; activityId: string }>;
     }>('listConversations', { limit: 20 }, friend.token);
-    expect(friendInbox.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: created.id,
-        kind: 'activity',
-        activityId: created.id,
-        title: 'Activity Restaurant',
-      }),
-    ]));
-    const activityMessage = await callFunction<{ id: string }>('sendMessage', {
-      conversationId: created.id,
-      idempotencyKey: 'activity-message-0001',
-      text: 'See you there!',
-    }, organizer.token);
+    expect(friendInbox.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: created.id,
+          kind: 'activity',
+          activityId: created.id,
+          title: 'Activity Restaurant',
+        }),
+      ]),
+    );
+    const activityMessage = await callFunction<{ id: string }>(
+      'sendMessage',
+      {
+        conversationId: created.id,
+        idempotencyKey: 'activity-message-0001',
+        text: 'See you there!',
+      },
+      organizer.token,
+    );
     expect(activityMessage.id).toBeTruthy();
     expect((await activityConversation.ref.get()).get(`unreadCounts.${friendUid}`)).toBe(1);
     expect((await db.collection('activities').get()).size).toBe(1);
@@ -695,23 +907,37 @@ describe('activity callables', () => {
     const acceptingFriend = await authenticatedUser();
     const decliningFriend = await authenticatedUser();
     const db = getFirestore();
-    await callFunction('createUserProfile', {
-      displayName: 'Invitation Organizer',
-      username: 'invitation.organizer',
-      city: 'Istanbul',
-    }, organizer.token);
-    await callFunction('createUserProfile', {
-      displayName: 'Accepting Friend',
-      username: 'invitation.accepting',
-      city: 'Istanbul',
-    }, acceptingFriend.token);
-    await callFunction('createUserProfile', {
-      displayName: 'Declining Friend',
-      username: 'invitation.declining',
-      city: 'Istanbul',
-    }, decliningFriend.token);
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Invitation Organizer',
+        username: 'invitation.organizer',
+        city: 'Istanbul',
+      },
+      organizer.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Accepting Friend',
+        username: 'invitation.accepting',
+        city: 'Istanbul',
+      },
+      acceptingFriend.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Declining Friend',
+        username: 'invitation.declining',
+        city: 'Istanbul',
+      },
+      decliningFriend.token,
+    );
 
-    const profiles = await db.collection('users').where('username', '>=', 'invitation.')
+    const profiles = await db
+      .collection('users')
+      .where('username', '>=', 'invitation.')
       .where('username', '<=', 'invitation.\uf8ff')
       .get();
     const userIds = new Map(profiles.docs.map((profile) => [profile.get('username'), profile.id]));
@@ -735,43 +961,81 @@ describe('activity callables', () => {
       callFunction('followUser', { targetUserId: organizerUid }, decliningFriend.token),
     ]);
 
-    const created = await callFunction<{ id: string }>('createActivity', {
-      idempotencyKey: 'activity-invitations-0001',
-      memberIds: [acceptingUid, decliningUid],
-      startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
-      venueId: 'invitation-venue',
-    }, organizer.token);
+    const created = await callFunction<{ id: string }>(
+      'createActivity',
+      {
+        idempotencyKey: 'activity-invitations-0001',
+        memberIds: [acceptingUid, decliningUid],
+        startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        venueId: 'invitation-venue',
+      },
+      organizer.token,
+    );
 
-    await expect(callFunction('sendMessage', {
-      conversationId: created.id,
-      idempotencyKey: 'pending-message-0001',
-      text: 'Can I send before accepting?',
-    }, acceptingFriend.token)).rejects.toMatchObject({ status: 'FAILED_PRECONDITION' });
+    await expect(
+      callFunction(
+        'sendMessage',
+        {
+          conversationId: created.id,
+          idempotencyKey: 'pending-message-0001',
+          text: 'Can I send before accepting?',
+        },
+        acceptingFriend.token,
+      ),
+    ).rejects.toMatchObject({ status: 'FAILED_PRECONDITION' });
 
-    expect(await callFunction('respondToActivityInvitation', {
-      activityId: created.id,
-      response: 'accepted',
-    }, acceptingFriend.token)).toEqual({ id: created.id });
-    expect(await callFunction('respondToActivityInvitation', {
-      activityId: created.id,
-      response: 'accepted',
-    }, acceptingFriend.token)).toEqual({ id: created.id });
+    expect(
+      await callFunction(
+        'respondToActivityInvitation',
+        {
+          activityId: created.id,
+          response: 'accepted',
+        },
+        acceptingFriend.token,
+      ),
+    ).toEqual({ id: created.id });
+    expect(
+      await callFunction(
+        'respondToActivityInvitation',
+        {
+          activityId: created.id,
+          response: 'accepted',
+        },
+        acceptingFriend.token,
+      ),
+    ).toEqual({ id: created.id });
 
-    const acceptedMessage = await callFunction<{ id: string }>('sendMessage', {
-      conversationId: created.id,
-      idempotencyKey: 'accepted-message-0001',
-      text: 'I am joining!',
-    }, acceptingFriend.token);
+    const acceptedMessage = await callFunction<{ id: string }>(
+      'sendMessage',
+      {
+        conversationId: created.id,
+        idempotencyKey: 'accepted-message-0001',
+        text: 'I am joining!',
+      },
+      acceptingFriend.token,
+    );
     expect(acceptedMessage.id).toBeTruthy();
 
-    expect(await callFunction('respondToActivityInvitation', {
-      activityId: created.id,
-      response: 'declined',
-    }, decliningFriend.token)).toEqual({ id: created.id });
-    expect(await callFunction('respondToActivityInvitation', {
-      activityId: created.id,
-      response: 'declined',
-    }, decliningFriend.token)).toEqual({ id: created.id });
+    expect(
+      await callFunction(
+        'respondToActivityInvitation',
+        {
+          activityId: created.id,
+          response: 'declined',
+        },
+        decliningFriend.token,
+      ),
+    ).toEqual({ id: created.id });
+    expect(
+      await callFunction(
+        'respondToActivityInvitation',
+        {
+          activityId: created.id,
+          response: 'declined',
+        },
+        decliningFriend.token,
+      ),
+    ).toEqual({ id: created.id });
 
     const [activity, conversation] = await Promise.all([
       db.collection('activities').doc(created.id).get(),
@@ -781,7 +1045,9 @@ describe('activity callables', () => {
     expect(conversation.get(`invitationStatuses.${acceptingUid}`)).toBe('accepted');
     expect(activity.get(`invitationStatuses.${decliningUid}`)).toBe('declined');
     expect(conversation.get(`invitationStatuses.${decliningUid}`)).toBe('declined');
-    expect(activity.get('participantIds')).toEqual(expect.arrayContaining([organizerUid, acceptingUid]));
+    expect(activity.get('participantIds')).toEqual(
+      expect.arrayContaining([organizerUid, acceptingUid]),
+    );
     expect(activity.get('participantIds')).not.toContain(decliningUid);
     expect(conversation.get('participantIds')).not.toContain(decliningUid);
     expect(conversation.get(`unreadCounts.${decliningUid}`)).toBeUndefined();
@@ -791,12 +1057,18 @@ describe('activity callables', () => {
       { limit: 20 },
       decliningFriend.token,
     );
-    expect(declinedInbox.items).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: created.id }),
-    ]));
-    await expect(callFunction('getMessages', {
-      conversationId: created.id,
-      limit: 20,
-    }, decliningFriend.token)).rejects.toMatchObject({ status: 'NOT_FOUND' });
+    expect(declinedInbox.items).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: created.id })]),
+    );
+    await expect(
+      callFunction(
+        'getMessages',
+        {
+          conversationId: created.id,
+          limit: 20,
+        },
+        decliningFriend.token,
+      ),
+    ).rejects.toMatchObject({ status: 'NOT_FOUND' });
   }, 30_000);
 });

@@ -46,6 +46,15 @@ function seedDownloadToken(path: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+function stableSeedKey(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16);
+}
+
+function directConversationId(firstUserId: string, secondUserId: string): string {
+  const participantIds = [firstUserId, secondUserId].sort();
+  return createHash('sha256').update(`direct:${participantIds[0]}\0${participantIds[1]}`).digest('hex');
+}
+
 async function uploadSeedMediaGroup(
   group: 'venues' | 'avatars',
   assets: Record<string, string>,
@@ -55,17 +64,21 @@ async function uploadSeedMediaGroup(
   const entries = await Promise.all(Object.entries(assets).map(async ([key, assetPath]) => {
     const extension = extname(assetPath);
     const file = bucket.file(`seed-media/${group}/${key}${extension}`);
+    const downloadToken = seedDownloadToken(`${group}/${key}${extension}`);
     await file.save(await readFile(resolve(workspaceRoot, assetPath)), {
       resumable: false,
       metadata: {
         contentType: extension === '.jpg' ? 'image/jpeg' : 'image/png',
         cacheControl: 'public,max-age=31536000,immutable',
         metadata: {
-          firebaseStorageDownloadTokens: seedDownloadToken(`${group}/${key}${extension}`),
+          firebaseStorageDownloadTokens: downloadToken,
         },
       },
     });
-    return [key, await getDownloadURL(file)] as const;
+    const downloadUrl = seedRemote
+      ? await getDownloadURL(file)
+      : `http://127.0.0.1:9199/v0/b/${bucket.name}/o/${encodeURIComponent(file.name)}?alt=media&token=${downloadToken}`;
+    return [key, downloadUrl] as const;
   }));
   return Object.fromEntries(entries);
 }
@@ -569,6 +582,79 @@ async function main() {
     ...hydratedProfiles.map((profile) => profile.id),
   ];
   const followedUserIds = ['discover-kristin', 'discover-cameron', 'discover-wade'];
+  const localProfileSnapshots = await db.getAll(
+    ...localTestProfileIds.map((profileId) => db.collection('users').doc(profileId)),
+  );
+  const localProfilesById = new Map(localProfileSnapshots.map((profile) => [profile.id, profile]));
+  const localReviewTemplates = [
+    { venueId: 'morimoto', rating: 4.9, text: 'Counter seats, flawless nigiri, and a genuinely memorable omakase. I would come back for the salmon alone.', tags: ['Great food'], hoursAgo: 26 },
+    { venueId: 'gemini-750', rating: 4.6, text: 'Beautiful room and excellent handmade pasta. The tiramisu was the best finish to the evening.', tags: ['Date night'], hoursAgo: 86 },
+    { venueId: 'tacos-la-brea', rating: 4.8, text: 'Crispy birria, rich consommé and fast service. An easy recommendation for a casual dinner.', tags: ['Hidden gem'], hoursAgo: 170 },
+    { venueId: 'coffee-bar-760', rating: 4.2, text: 'Quiet enough to work, friendly baristas and a very good matcha latte.', tags: ['Work friendly'], hoursAgo: 240 },
+    { venueId: 'joes-shanghai', rating: 4.5, text: 'The soup dumplings arrived piping hot and every basket disappeared immediately.', tags: ['Worth the wait'], hoursAgo: 360 },
+    { venueId: 'demo-cafe', rating: 4.1, text: 'A dependable brunch with plenty of space for a group and a solid cold brew.', tags: ['Brunch'], hoursAgo: 520 },
+  ];
+  await Promise.all(localTestProfileIds.flatMap((profileId) => {
+    const profile = localProfilesById.get(profileId);
+    const authorDisplayName = String(profile?.get('displayName') ?? 'Tastes tester');
+    return localReviewTemplates.map((review, index) => {
+      const venue = venuesById.get(review.venueId);
+      if (!venue) throw new Error(`Invalid local review fixture ${review.venueId}.`);
+      const reviewId = `seed-own-${stableSeedKey(profileId)}-${index + 1}`;
+      return db.collection('reviews').doc(reviewId).set({
+        authorId: profileId,
+        authorDisplayName,
+        venueId: review.venueId,
+        venueName: venue.name,
+        venueCity: venue.city,
+        rating: review.rating,
+        text: review.text,
+        tags: review.tags,
+        dishReviews: index < 3 ? [{
+          id: `dish-${index + 1}`,
+          title: index === 0 ? 'Salmon nigiri' : index === 1 ? 'Tiramisu' : 'Birria tacos',
+          rating: review.rating,
+          photoPath: null,
+        }] : [],
+        status: 'published',
+        reactionCount: 8 + index * 3,
+        commentCount: index === 0 ? 2 : index % 2,
+        source: 'seed',
+        createdAt: Timestamp.fromMillis(Date.now() - review.hoursAgo * 60 * 60 * 1_000),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+  }));
+  const recapNow = new Date();
+  const recapPrevious = new Date(recapNow.getFullYear(), recapNow.getMonth() - 1, 1);
+  const recapSeed = {
+    month: recapNow.toLocaleDateString('en-US', { month: 'long' }),
+    previousMonth: recapPrevious.toLocaleDateString('en-US', { month: 'long' }),
+    ready: true,
+    placesVisited: 15,
+    previousPlacesVisited: 11,
+    areasExplored: 3,
+    previousAreasExplored: 2,
+    reviewsWritten: 9,
+    previousReviewsWritten: 11,
+    followersGained: 132,
+    favoriteArea: 'Belgravia',
+    topPlaces: ['morimoto', 'gemini-750', 'joes-shanghai', 'tacos-la-brea', 'coffee-bar-760'].map((venueId) => {
+      const venue = venuesById.get(venueId);
+      if (!venue) throw new Error(`Invalid recap venue fixture ${venueId}.`);
+      return { venueId, name: venue.name, address: venue.address, rating: venue.rating, imageUrl: venue.imageUrl, area: venue.address.split(',').at(-1)?.trim() ?? venue.city };
+    }),
+    topDishes: [
+      { name: 'Grilled Salmon with Lemon', rating: 5, imageUrl: venueMedia.sushi },
+      { name: 'Sushi Roll', rating: 4.6, imageUrl: venueMedia.restaurant },
+      { name: 'Tiramisu', rating: 4.2, imageUrl: venueMedia.lounge },
+    ],
+    source: 'seed',
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await Promise.all(localTestProfileIds.map((profileId) =>
+    db.collection('users').doc(profileId).collection('monthlyRecaps').doc('current').set(recapSeed, { merge: true }),
+  ));
   await Promise.all(localTestProfileIds.map(async (profileId) => {
     const seededFollowing = await db.collection('users').doc(profileId)
       .collection('following').where('source', '==', 'seed').get();
@@ -578,6 +664,15 @@ async function main() {
     followedUserIds.map((followedUserId) =>
       db.collection('users').doc(profileId).collection('following').doc(followedUserId).set({
         userId: followedUserId,
+        source: 'seed',
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true }),
+    ),
+  ));
+  await Promise.all(localTestProfileIds.flatMap((profileId) =>
+    followedUserIds.map((followedUserId) =>
+      db.collection('users').doc(followedUserId).collection('following').doc(profileId).set({
+        userId: profileId,
         source: 'seed',
         createdAt: FieldValue.serverTimestamp(),
       }, { merge: true }),
@@ -671,8 +766,188 @@ async function main() {
     }, { merge: true }),
   ));
 
+  const notificationSeeds = [
+    { id: 'new-comment', kind: 'comment', title: 'Kristin commented on your review', body: '“Adding this to my list.”', targetType: 'comments', targetId: 'discover-review-gemini', unread: true, minutesAgo: 12 },
+    { id: 'new-follower', kind: 'follow', title: 'Cameron started following you', body: 'You share a taste for handmade pasta.', targetType: 'profile', targetId: 'discover-cameron', unread: true, minutesAgo: 48 },
+    { id: 'activity-invite', kind: 'invite', title: 'Dinner plan invitation', body: 'Wade invited you to Friday night dinner.', targetType: 'activity', targetId: 'seed-friday-dinner', unread: false, minutesAgo: 180 },
+    { id: 'monthly-recap', kind: 'reward', title: 'Your monthly recap is ready', body: 'See the places and flavours that made your month.', targetType: 'recap', targetId: 'monthly', unread: false, minutesAgo: 1_440 },
+    { id: 'badge-city-explorer', kind: 'reward', title: 'City Explorer unlocked', body: 'You reviewed places in five different areas.', targetType: 'recap', targetId: 'monthly', unread: true, minutesAgo: 2_880 },
+    { id: 'badge-tiramisu', kind: 'reward', title: 'Tiramisu Connaisseur unlocked', body: 'Your dessert hunt earned a new badge.', targetType: 'recap', targetId: 'monthly', unread: false, minutesAgo: 4_320 },
+    { id: 'weekend-pick', kind: 'system', title: 'Devon shared a weekend pick', body: 'A hidden café that matches your taste is waiting.', targetType: 'profile', targetId: 'discover-devon', unread: false, minutesAgo: 5_760 },
+  ] as const;
+  const requestSeeds = [
+    { id: 'weekend-foodies-invite', kind: 'group', title: 'Weekend Foodies', body: 'Kristin invited you to join the group.', senderName: 'Kristin Watson', targetId: 'weekend-foodies' },
+    { id: 'friday-dinner-invite', kind: 'activity', title: 'Friday night dinner', body: 'Wade invited you to a shared activity.', senderName: 'Wade Warren', targetId: 'seed-friday-dinner' },
+  ] as const;
+
+  await db.collection('groups').doc('weekend-foodies').set({
+    name: 'Weekend Foodies',
+    adminId: 'discover-kristin',
+    memberIds: ['discover-kristin', 'discover-cameron', 'discover-wade'],
+    status: 'active',
+    source: 'seed',
+    createdAt: Timestamp.fromMillis(Date.now() - 14 * 24 * 60 * 60 * 1_000),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const activityParticipantIds = ['discover-wade', 'discover-kristin', ...localTestProfileIds];
+  const activityStatuses = Object.fromEntries(activityParticipantIds.map((profileId) => [
+    profileId,
+    profileId === 'discover-wade' || profileId === 'discover-kristin' ? 'accepted' : 'pending',
+  ]));
+  const activityStartsAt = Timestamp.fromMillis(Date.now() + 3 * 24 * 60 * 60 * 1_000);
+  const activityCreatedAt = Timestamp.fromMillis(Date.now() - 3 * 60 * 60 * 1_000);
+  const activityLastMessageAt = Timestamp.fromMillis(Date.now() - 42 * 60 * 1_000);
+  await db.collection('activities').doc('seed-friday-dinner').set({
+    organizerId: 'discover-wade',
+    participantIds: activityParticipantIds,
+    invitationStatuses: activityStatuses,
+    venueId: 'morimoto',
+    venueName: venuesById.get('morimoto')?.name ?? 'Wasabi by Morimoto',
+    imageUrl: venueMedia.sushi,
+    startsAt: activityStartsAt,
+    status: 'active',
+    source: 'seed',
+    createdAt: activityCreatedAt,
+    updatedAt: activityLastMessageAt,
+  }, { merge: true });
+  await db.collection('conversations').doc('seed-friday-dinner').set({
+    kind: 'activity',
+    activityId: 'seed-friday-dinner',
+    organizerId: 'discover-wade',
+    title: 'Friday night dinner',
+    imageUrl: venueMedia.sushi,
+    participantIds: activityParticipantIds,
+    invitationStatuses: activityStatuses,
+    unreadCounts: Object.fromEntries(activityParticipantIds.map((profileId) => [profileId, localTestProfileIds.includes(profileId) ? 2 : 0])),
+    lastReadAt: {},
+    lastMessage: { id: 'activity-message-3', senderId: 'discover-wade', text: 'I booked the counter for 8:00. See you Friday!', createdAt: activityLastMessageAt },
+    messageCount: 3,
+    status: 'active',
+    source: 'seed',
+    createdAt: activityCreatedAt,
+    updatedAt: activityLastMessageAt,
+  }, { merge: true });
+  const activityMessages = [
+    { id: 'activity-message-1', senderId: 'discover-wade', text: 'How does sushi on Friday sound?', minutesAgo: 170 },
+    { id: 'activity-message-2', senderId: 'discover-kristin', text: 'Perfect. I am in!', minutesAgo: 95 },
+    { id: 'activity-message-3', senderId: 'discover-wade', text: 'I booked the counter for 8:00. See you Friday!', minutesAgo: 42 },
+  ];
+  await Promise.all(activityMessages.map((message) =>
+    db.collection('conversations').doc('seed-friday-dinner').collection('messages').doc(message.id).set({
+      conversationId: 'seed-friday-dinner',
+      senderId: message.senderId,
+      recipientId: '',
+      recipientIds: activityParticipantIds.filter((profileId) => profileId !== message.senderId),
+      text: message.text,
+      type: 'text',
+      status: 'sent',
+      source: 'seed',
+      createdAt: Timestamp.fromMillis(Date.now() - message.minutesAgo * 60_000),
+    }, { merge: true }),
+  ));
+
+  const directConversationSeeds = [
+    { peerId: 'discover-kristin', texts: ['That taco place was a great call.', 'Glad you liked it! Try the elote next time.', 'Saved it for Saturday 🌮'], hoursAgo: 1, unread: 1 },
+    { peerId: 'discover-cameron', texts: ['Have you tried the new pasta menu?', 'Not yet — is the tagliolini still there?', 'Yes, and it is even better now.'], hoursAgo: 5, unread: 2 },
+    { peerId: 'discover-wade', texts: ['The omakase photos look incredible.', 'It was worth every course.', 'Let us go again next month.'], hoursAgo: 28, unread: 0 },
+  ];
+  await Promise.all(localTestProfileIds.flatMap((profileId) => directConversationSeeds.flatMap((conversation) => {
+    const conversationId = directConversationId(profileId, conversation.peerId);
+    const participantIds = [profileId, conversation.peerId].sort();
+    const messageTimes = conversation.texts.map((_, index) => Timestamp.fromMillis(
+      Date.now() - conversation.hoursAgo * 60 * 60 * 1_000 - (conversation.texts.length - index - 1) * 18 * 60_000,
+    ));
+    const messages = conversation.texts.map((text, index) => {
+      const senderId = index % 2 === 0 ? conversation.peerId : profileId;
+      const recipientId = senderId === profileId ? conversation.peerId : profileId;
+      return {
+        id: `seed-message-${index + 1}`,
+        senderId,
+        recipientId,
+        recipientIds: [recipientId],
+        text,
+        createdAt: messageTimes[index],
+      };
+    });
+    const lastMessage = messages.at(-1);
+    if (!lastMessage) throw new Error('Direct message fixture cannot be empty.');
+    return [
+      db.collection('conversations').doc(conversationId).set({
+        kind: 'direct',
+        participantIds,
+        unreadCounts: { [profileId]: conversation.unread, [conversation.peerId]: 0 },
+        lastReadAt: {},
+        lastMessage: { id: lastMessage.id, senderId: lastMessage.senderId, text: lastMessage.text, createdAt: lastMessage.createdAt },
+        messageCount: messages.length,
+        status: 'active',
+        source: 'seed',
+        createdAt: messageTimes[0],
+        updatedAt: lastMessage.createdAt,
+      }, { merge: true }),
+      ...messages.map((message) => db.collection('conversations').doc(conversationId).collection('messages').doc(message.id).set({
+        conversationId,
+        ...message,
+        type: 'text',
+        status: 'sent',
+        source: 'seed',
+      }, { merge: true })),
+    ];
+  })));
+
+  await Promise.all(localTestProfileIds.flatMap((profileId) => {
+    const ownReviewId = `seed-own-${stableSeedKey(profileId)}-1`;
+    const authorName = String(localProfilesById.get(profileId)?.get('displayName') ?? 'Tastes tester');
+    return [
+      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-kristin-comment').set({ authorId: 'discover-kristin', authorDisplayName: 'Kristin Watson', text: 'This convinced me to book the counter.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 70 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-author-reply').set({ authorId: profileId, authorDisplayName: authorName, text: 'Do it — the chef makes the whole evening special.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 55 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('reviews').doc(ownReviewId).collection('reactions').doc('discover-kristin').set({ userId: 'discover-kristin', reaction: 'like', source: 'seed', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+    ];
+  }));
+
+  await Promise.all([
+    db.collection('reports').doc('seed-pending-review-report').set({ reporterId: 'discover-kristin', reporterName: 'Kristin Watson', contentType: 'review', contentId: 'discover-review-demo-cafe', reviewId: 'discover-review-demo-cafe', reason: 'Spam', details: 'Seed fixture for moderation testing.', status: 'pending', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 6 * 60 * 60 * 1_000) }, { merge: true }),
+    db.collection('reports').doc('seed-pending-comment-report').set({ reporterId: 'discover-wade', reporterName: 'Wade Warren', contentType: 'comment', contentId: 'comment-1', reviewId: 'discover-review-gemini', reason: 'Inappropriate', details: 'Seed fixture for moderation testing.', status: 'pending', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 2 * 60 * 60 * 1_000) }, { merge: true }),
+  ]);
+
+  await Promise.all(localTestProfileIds.flatMap((profileId) => {
+    const userRef = db.collection('users').doc(profileId);
+    return [
+      ...notificationSeeds.map((notification) => userRef.collection('notifications').doc(notification.id).set({
+        ...notification,
+        source: 'seed',
+        createdAt: Timestamp.fromMillis(Date.now() - notification.minutesAgo * 60_000),
+      }, { merge: true })),
+      ...requestSeeds.map((request) => userRef.collection('requests').doc(request.id).set({
+        ...request,
+        status: 'pending',
+        source: 'seed',
+        createdAt: Timestamp.fromMillis(Date.now() - 2 * 60 * 60 * 1_000),
+      }, { merge: true })),
+      ...followedUserIds.map((followerId) => userRef.collection('followers').doc(followerId).set({
+        userId: followerId,
+        source: 'seed',
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true })),
+    ];
+  }));
+
+  await Promise.all(localTestProfileIds.map(async (profileId) => {
+    const [profileReviews, conversations, notifications, requests, folders, savedVenues] = await Promise.all([
+      db.collection('reviews').where('authorId', '==', profileId).where('status', '==', 'published').get(),
+      db.collection('conversations').where('participantIds', 'array-contains', profileId).where('status', '==', 'active').get(),
+      db.collection('users').doc(profileId).collection('notifications').get(),
+      db.collection('users').doc(profileId).collection('requests').where('status', '==', 'pending').get(),
+      db.collection('users').doc(profileId).collection('folders').get(),
+      db.collection('users').doc(profileId).collection('savedVenues').get(),
+    ]);
+    if (profileReviews.size < localReviewTemplates.length || conversations.size < directConversationSeeds.length + 1 || notifications.empty || requests.empty || folders.empty || savedVenues.empty) {
+      throw new Error(`Seed verification failed for local profile ${profileId}.`);
+    }
+  }));
+
   console.log(
-    `Seeded ${venues.length} venues, ${users.length} users, ${reviewSeeds.length} reviews, ${commentSeeds.length} comments, ${favouriteFolderSeeds.length} favourite folders, and ${savedVenueSeeds.length} saved venues per local profile in ${process.env.GCLOUD_PROJECT}.`,
+    `Seeded ${venues.length} venues, ${users.length} users, ${reviewSeeds.length} public reviews, ${localReviewTemplates.length} personal reviews, ${commentSeeds.length} public comments, ${directConversationSeeds.length} direct chats, 1 activity chat, notifications, requests, groups, reports, ${favouriteFolderSeeds.length} favourite folders, and ${savedVenueSeeds.length} saved venues per local profile in ${process.env.GCLOUD_PROJECT}.`,
   );
 }
 

@@ -1,4 +1,4 @@
-import { createUserProfileInputSchema } from '@tastes/contracts';
+import { createUserProfileInputSchema, type CompleteOnboardingInput } from '@tastes/contracts';
 import { apiErrorMessage, createTastesApi } from '@tastes/firebase-client';
 import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -93,7 +93,7 @@ type Screen =
 
 interface PostSignupOnboardingFlowProps {
   onAuthenticationRequired: () => Promise<void>;
-  onComplete: () => Promise<void>;
+  onComplete: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
 }
 
 function isUnauthenticated(error: unknown): boolean {
@@ -153,7 +153,6 @@ const placeFilters = [
   { icon: filterBar, label: 'Bar' },
   { icon: filterReviews, label: 'My Reviews' },
 ] as const;
-const knownPlaceQueries = new Set([...placeFilters.map(({ label }) => label.toLowerCase()), 'friends']);
 const placeCandidates = [
   {
     id: 'gemini-popular',
@@ -183,6 +182,16 @@ const placeCandidates = [
     popular: false,
   },
 ] as const;
+type PlaceCandidate = {
+  id: string;
+  name: string;
+  address: string;
+  image: ImageSourcePropType;
+  rating: string;
+  reviews: string;
+  popular: boolean;
+  category?: string;
+};
 const fallbackContacts: ContactCandidate[] = [
   { id: 'alex', name: 'Alex Carter', handle: '@alexc', invited: false },
   { id: 'sofia', name: 'Sofia Rossi', handle: '@sofiar', invited: true },
@@ -263,6 +272,7 @@ export function PostSignupOnboardingFlow({
   const [placeQuery, setPlaceQuery] = useState('Restaurant');
   const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['trending']));
   const [placeLoading, setPlaceLoading] = useState(false);
+  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>([...placeCandidates]);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
   const [contacts, setContacts] = useState(fallbackContacts);
@@ -367,7 +377,19 @@ export function PostSignupOnboardingFlow({
   function enterPlaces() {
     navigate('place');
     setPlaceLoading(true);
-    setTimeout(() => setPlaceLoading(false), 700);
+    void api.getVenues({ limit: 20 }).then((response) => {
+      const mapped = response.data.items.map((venue, index): PlaceCandidate => ({
+        id: venue.id,
+        name: venue.name,
+        address: venue.address ?? venue.city,
+        image: venue.imageUrl ? { uri: venue.imageUrl } : [placeGeminiPopular, placeWasabi, placeGemini][index % 3]!,
+        rating: (venue.rating ?? 0).toFixed(1),
+        reviews: `${venue.reviewCount ?? 0} reviews`,
+        popular: venue.discoverTags?.includes('trending') ?? false,
+        category: venue.category,
+      }));
+      if (mapped.length > 0) setAvailablePlaces(mapped);
+    }).catch(() => undefined).finally(() => setPlaceLoading(false));
   }
 
   async function requestContacts() {
@@ -405,7 +427,12 @@ export function PostSignupOnboardingFlow({
     setBusy(true);
     try {
       await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
-      await onComplete();
+      await onComplete({
+        favoriteDish: dish ?? undefined,
+        favoriteVenueId: place ?? undefined,
+        invitedContactCount: invitedCount,
+        appearance: automatic ? 'system' : (darkMode ? 'dark' : 'light'),
+      });
     } catch (error) {
       if (isUnauthenticated(error)) {
         await onAuthenticationRequired();
@@ -493,10 +520,16 @@ export function PostSignupOnboardingFlow({
 
   if (screen === 'place') {
     const normalizedPlaceQuery = placeQuery.trim().toLowerCase();
-    const noResults = !placeLoading
-      && normalizedPlaceQuery.length > 0
-      && !knownPlaceQueries.has(normalizedPlaceQuery)
-      && !'gemini750 restaurant'.includes(normalizedPlaceQuery);
+    const filteredPlaces = availablePlaces.filter((candidate) => {
+      const queryMatches = !normalizedPlaceQuery
+        || candidate.name.toLowerCase().includes(normalizedPlaceQuery)
+        || candidate.category?.toLowerCase().includes(normalizedPlaceQuery);
+      const categoryFilters = [...placeFilterSet].filter((value) => !['trending', 'friends', 'my reviews'].includes(value));
+      const categoryMatches = categoryFilters.length === 0 || categoryFilters.some((value) => candidate.category?.toLowerCase().includes(value));
+      const trendingMatches = !placeFilterSet.has('trending') || candidate.popular;
+      return queryMatches && categoryMatches && trendingMatches;
+    });
+    const noResults = !placeLoading && filteredPlaces.length === 0;
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('style')} />
       <StepHeader step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
@@ -542,7 +575,7 @@ export function PostSignupOnboardingFlow({
           <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search — we're adding new spots in your city every week.</Text></View>
         ) : (
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
-            {placeCandidates.map((item) => {
+            {filteredPlaces.map((item) => {
               const selected = place === item.id;
               return (
                 <Pressable key={item.id} onPress={() => setPlace(item.id)} style={[styles.venue, selected && styles.venueSelected]}>

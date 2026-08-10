@@ -33,6 +33,8 @@ import {
   HomeFeedOfflineState,
 } from './HomeFeedStates';
 import avatar from '../../../assets/home/avatar.png';
+import { useDiscoverFeed } from '../discover/api';
+import { useAuthenticatedUserId } from '../../session/SessionProvider';
 
 const tagLabels: Record<string, string> = {
   casual: 'Casual',
@@ -236,26 +238,33 @@ export function HomeFeedScreen({
   onOpenComments,
   onOpenLeaderboard,
   onOpenNotifications,
+  onOpenPlace,
 }: {
   onExplore: () => void;
   onOpenComments: (reviewId: string) => void;
   onOpenLeaderboard: () => void;
   onOpenNotifications?: () => void;
+  onOpenPlace: (venueId: string) => void;
 }) {
+  const userId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
+  const recommendationQuery = useDiscoverFeed(userId);
   const reactionMutation = useReactToReview();
   const hideMutation = useHideReview();
   const reportMutation = useReportReview();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
   const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
+  const [recommendationMenu, setRecommendationMenu] = useState(false);
+  const [recommendationHidden, setRecommendationHidden] = useState(false);
   const [reportReviewId, setReportReviewId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<ReportReason>(reportReasons[0] as ReportReason);
   const [reportDetails, setReportDetails] = useState('');
+  const [reportSent, setReportSent] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -331,7 +340,7 @@ export function HomeFeedScreen({
       setReportReviewId(null);
       setSelectedReason(reportReasons[0] as ReportReason);
       setReportDetails('');
-      showToast('Report submitted');
+      setReportSent(true);
     } catch {
       Alert.alert('Could not send report', 'Please try again.');
       setReportReviewId(reviewId);
@@ -394,6 +403,7 @@ export function HomeFeedScreen({
           contentContainerStyle={styles.content}
           data={items}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={!recommendationHidden && recommendationQuery.data?.forYou[0] ? <Pressable onLongPress={() => setRecommendationMenu(true)} onPress={() => onOpenPlace(recommendationQuery.data!.forYou[0]!.id)} style={styles.recommendation}><Image source={recommendationQuery.data.forYou[0].imageUrl ? { uri: recommendationQuery.data.forYou[0].imageUrl } : avatar} style={styles.recommendationImage} /><View style={styles.recommendationCopy}><Text style={styles.recommendationEyebrow}>RECOMMENDED FOR YOU</Text><Text style={styles.recommendationTitle}>{recommendationQuery.data.forYou[0].name}</Text><Text style={styles.recommendationMeta}>{recommendationQuery.data.forYou[0].category} · ★ {recommendationQuery.data.forYou[0].rating?.toFixed(1)}</Text><Text style={styles.recommendationReason}>Because it matches your tastes and saves</Text></View></Pressable> : null}
           ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
@@ -430,21 +440,26 @@ export function HomeFeedScreen({
           <Text style={overlayStyles.toastText}>✓  {toast}</Text>
         </View>
       ) : null}
-      {!!menuReviewId ? (
+      {menuReviewId ? (
         <ActionSheet
           actions={[
+            { label: 'Why am I seeing this?', onPress: () => {
+              setMenuReviewId(null);
+              showToast('Shown because it matches your tastes');
+            } },
             { label: 'Report post', destructive: true, onPress: () => {
               setReportReviewId(menuReviewId);
               setMenuReviewId(null);
             } },
-            { label: hideMutation.isPending ? 'Hiding…' : 'Hide post', onPress: () => {
+            { label: hideMutation.isPending ? 'Hiding…' : 'Not interested', onPress: () => {
               void handleHidePress(menuReviewId);
             } },
           ]}
           onCancel={() => setMenuReviewId(null)}
         />
       ) : null}
-      {!!reportReviewId ? (
+      {recommendationMenu ? <ActionSheet actions={[{ label: 'Why am I seeing this?', onPress: () => { setRecommendationMenu(false); showToast('Based on your tastes, ratings and saves'); } }, { label: 'Not interested', destructive: true, onPress: () => { setRecommendationMenu(false); setRecommendationHidden(true); showToast('Recommendation hidden'); } }]} onCancel={() => setRecommendationMenu(false)} /> : null}
+      {reportReviewId ? (
         <ReportSheet
           selectedReason={selectedReason}
           onSelectReason={(reason) => setSelectedReason(reason as ReportReason)}
@@ -459,6 +474,7 @@ export function HomeFeedScreen({
           submitting={reportMutation.isPending}
         />
       ) : null}
+      {reportSent ? <View style={overlayStyles.sentScreen}><View style={overlayStyles.sentMark}><Text style={overlayStyles.sentCheck}>✓</Text></View><Text style={overlayStyles.sentTitle}>Report sent</Text><Text style={overlayStyles.sentCopy}>Thanks for helping keep Tastes safe. Our team will review this shortly.</Text><Pressable onPress={() => setReportSent(false)} style={overlayStyles.sentDone}><Text style={overlayStyles.sentDoneText}>Done</Text></Pressable></View> : null}
     </Screen>
   );
 }
@@ -476,6 +492,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   newPostsText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
   content: { padding: 15, gap: 16 },
+  recommendation: { minHeight: 142, marginBottom: 2, borderRadius: 20, overflow: 'hidden', flexDirection: 'row', backgroundColor: colors.surface },
+  recommendationImage: { width: 128, alignSelf: 'stretch' },
+  recommendationCopy: { flex: 1, padding: 14, justifyContent: 'center', gap: 5 },
+  recommendationEyebrow: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  recommendationTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  recommendationMeta: { color: colors.text, fontSize: 12 },
+  recommendationReason: { color: colors.textSecondary, fontSize: 11, marginTop: 4 },
   card: { gap: 12, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: theme.radius.lg, backgroundColor: colors.surface },
   authorRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -529,4 +552,11 @@ const overlayStyles = StyleSheet.create({
   disabledButton: { opacity: 0.7 },
   toast: { position: 'absolute', zIndex: 40, top: 168, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 18, backgroundColor: '#303030' },
   toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  sentScreen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 50, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616' },
+  sentMark: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  sentCheck: { color: '#FFFFFF', fontSize: 34, fontWeight: '800' },
+  sentTitle: { marginTop: 24, color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
+  sentCopy: { marginTop: 10, maxWidth: 320, color: '#A6A8AD', fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  sentDone: { position: 'absolute', left: 36, right: 36, bottom: 34, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  sentDoneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

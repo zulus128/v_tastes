@@ -105,6 +105,13 @@ describe('public API contracts', () => {
     });
     expect(getLeaderboardInputSchema.safeParse({ period: 'month', limit: 51 }).success).toBe(false);
     expect(completeOnboardingInputSchema.safeParse({ version: 0 }).success).toBe(false);
+    expect(completeOnboardingInputSchema.parse({
+      version: 1,
+      favoriteDish: 'Sushi',
+      favoriteVenueId: 'morimoto',
+      invitedContactCount: 3,
+      appearance: 'dark',
+    })).toMatchObject({ favoriteDish: 'Sushi', favoriteVenueId: 'morimoto', invitedContactCount: 3, appearance: 'dark' });
   });
 
   it('validates messaging commands and Expo push tokens', () => {

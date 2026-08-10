@@ -1,0 +1,635 @@
+import type { ActivityCandidate, AppRequest, TastesGroup } from '@tastes/contracts';
+import { apiErrorMessage } from '@tastes/firebase-client';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+
+export function RequestsScreen({ onBack }: { onBack: () => void }) {
+  const api = useTastesApi();
+  const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const [requests, setRequests] = useState<AppRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    void api
+      .listRequests()
+      .then((r) => {
+        if (active) setRequests(r.data);
+      })
+      .catch((e) => Alert.alert('Could not load requests', apiErrorMessage(e)))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+  const respond = async (item: AppRequest, response: 'accepted' | 'declined') => {
+    await api.respondToRequest({ requestId: item.id, response });
+    setRequests((current) => current.filter((candidate) => candidate.id !== item.id));
+  };
+  return (
+    <View style={styles.screen}>
+      <Header onBack={onBack} styles={styles} title="Requests" />
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.list}
+          data={requests}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Empty
+              copy="New message and activity requests will appear here."
+              styles={styles}
+              title="No requests"
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={styles.request}>
+              <View style={styles.requestIcon}>
+                <Text style={styles.requestIconText}>{item.kind === 'group' ? 'G' : '◷'}</Text>
+              </View>
+              <View style={styles.requestCopy}>
+                <Text style={styles.requestName}>{item.title}</Text>
+                <Text style={styles.requestBody}>{item.body}</Text>
+                <Text style={styles.requestType}>
+                  {item.senderName} · {item.kind}
+                </Text>
+              </View>
+              <View style={styles.requestActions}>
+                <Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}>
+                  <Text style={styles.actionText}>Accept</Text>
+                </Pressable>
+                <Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}>
+                  <Text style={styles.declineText}>×</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        />
+      )}
+    </View>
+  );
+}
+
+export function NewGroupScreen({
+  onBack,
+  onCreated,
+}: {
+  onBack: () => void;
+  onCreated: (groupId: string) => void;
+}) {
+  const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const api = useTastesApi();
+  const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
+  const [people, setPeople] = useState<ActivityCandidate[]>([]);
+  const [selected, setSelected] = useState(new Set<string>());
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api
+      .listActivityCandidates()
+      .then((result) => {
+        if (active) setPeople(result.data);
+      })
+      .catch((error) => Alert.alert('Could not load friends', apiErrorMessage(error)))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+  const filtered = people.filter(
+    (person) =>
+      !query ||
+      `${person.displayName} ${person.username ?? ''}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  const create = async () => {
+    setCreating(true);
+    try {
+      const result = await api.createGroup({ name, memberIds: [...selected] });
+      onCreated(result.data.id);
+    } catch (error) {
+      Alert.alert('Could not create group', apiErrorMessage(error));
+    } finally {
+      setCreating(false);
+    }
+  };
+  return (
+    <View style={styles.screen}>
+      <Header
+        action={creating ? 'Creating…' : 'Create'}
+        actionDisabled={creating || !name.trim() || selected.size < 2}
+        onAction={() => void create()}
+        onBack={onBack}
+        styles={styles}
+        title="New group"
+      />
+      <View style={styles.groupHero}>
+        <View style={styles.groupAvatar}>
+          <Text style={styles.groupAvatarText}>+</Text>
+        </View>
+        <TextInput
+          maxLength={60}
+          onChangeText={setName}
+          placeholder="Group name"
+          placeholderTextColor={colors.placeholder}
+          style={styles.groupName}
+          value={name}
+        />
+      </View>
+      <View style={styles.search}>
+        <Text style={styles.searchGlyph}>⌕</Text>
+        <TextInput
+          onChangeText={setQuery}
+          placeholder="Search people"
+          placeholderTextColor={colors.placeholder}
+          style={styles.searchInput}
+          value={query}
+        />
+      </View>
+      <Text style={styles.section}>SELECT MEMBERS · {selected.size}</Text>
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.userId}
+          renderItem={({ item }) => {
+            const active = selected.has(item.userId);
+            return (
+              <Pressable
+                onPress={() =>
+                  setSelected((current) => {
+                    const next = new Set(current);
+                    if (active) next.delete(item.userId);
+                    else next.add(item.userId);
+                    return next;
+                  })
+                }
+                style={styles.person}
+              >
+                <Avatar name={item.displayName} photoUrl={item.photoUrl} styles={styles} />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{item.displayName}</Text>
+                  <Text style={styles.personHandle}>
+                    {item.username ? `@${item.username}` : 'Mutual follower'}
+                  </Text>
+                </View>
+                <View style={[styles.check, active && styles.checkActive]}>
+                  <Text style={styles.checkText}>{active ? '✓' : ''}</Text>
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+export function GroupDetailsScreen({ groupId, onBack }: { groupId: string; onBack: () => void }) {
+  const api = useTastesApi();
+  const currentUserId = useAuthenticatedUserId();
+  const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const [group, setGroup] = useState<TastesGroup | null>(null);
+  const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
+  const [adding, setAdding] = useState(false);
+  const load = async () => {
+    const [g, people] = await Promise.all([
+      api.getGroup({ groupId }),
+      api.listActivityCandidates(),
+    ]);
+    setGroup(g.data);
+    setCandidates(people.data);
+  };
+  useEffect(() => {
+    void load().catch((e) => Alert.alert('Could not load group', apiErrorMessage(e)));
+  }, [api, groupId]);
+  if (!group)
+    return (
+      <View style={styles.screen}>
+        <Header onBack={onBack} styles={styles} title="Group details" />
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      </View>
+    );
+  const admin = currentUserId === group.adminId;
+  const update = async (ids: string[]) => {
+    await api.updateGroupMembers({ groupId, memberIds: ids });
+    await load();
+  };
+  const available = candidates.filter(
+    (candidate) => !group.members.some((member) => member.userId === candidate.userId),
+  );
+  return (
+    <View style={styles.screen}>
+      <Header onBack={onBack} styles={styles} title="Group details" />
+      <ScrollView contentContainerStyle={styles.details}>
+        <View style={styles.groupAvatarLarge}>
+          <Text style={styles.groupAvatarLargeText}>
+            {group.name
+              .split(' ')
+              .map((v) => v[0])
+              .join('')
+              .slice(0, 2)}
+          </Text>
+        </View>
+        <Text style={styles.detailsTitle}>{group.name}</Text>
+        <Text style={styles.detailsSubtitle}>
+          {group.members.length} members · Created {new Date(group.createdAt).toLocaleDateString()}
+        </Text>
+        {admin ? (
+          <Pressable onPress={() => setAdding((value) => !value)} style={styles.primaryOutline}>
+            <Text style={styles.primaryOutlineText}>{adding ? 'Done' : '+ Add members'}</Text>
+          </Pressable>
+        ) : null}
+        {adding
+          ? available.map((person) => (
+              <Pressable
+                key={person.userId}
+                onPress={() =>
+                  void update([...group.members.map((member) => member.userId), person.userId])
+                }
+                style={styles.person}
+              >
+                <Avatar name={person.displayName} photoUrl={person.photoUrl} styles={styles} />
+                <Text style={[styles.personName, { marginLeft: 10, flex: 1 }]}>
+                  {person.displayName}
+                </Text>
+                <Text style={styles.primaryOutlineText}>Add</Text>
+              </Pressable>
+            ))
+          : null}
+        <Text style={styles.section}>MEMBERS ({group.members.length})</Text>
+        {group.members.map((member) => (
+          <View key={member.userId} style={styles.person}>
+            <Avatar name={member.displayName} photoUrl={member.photoUrl} styles={styles} />
+            <View style={styles.personCopy}>
+              <Text style={styles.personName}>{member.displayName}</Text>
+              <Text style={styles.personHandle}>
+                {member.username ? `@${member.username}` : ''}
+              </Text>
+            </View>
+            {member.admin ? (
+              <View style={styles.admin}>
+                <Text style={styles.adminText}>Admin</Text>
+              </View>
+            ) : admin ? (
+              <Pressable
+                accessibilityLabel={`Remove ${member.displayName}`}
+                onPress={() =>
+                  void update(
+                    group.members
+                      .filter((candidate) => candidate.userId !== member.userId)
+                      .map((candidate) => candidate.userId),
+                  )
+                }
+                style={styles.remove}
+              >
+                <Text style={styles.removeText}>⌫</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+        <Pressable
+          onPress={() =>
+            Alert.alert(admin ? 'Delete group?' : 'Leave group?', undefined, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: admin ? 'Delete' : 'Leave',
+                style: 'destructive',
+                onPress: () => void api.leaveGroup({ groupId }).then(onBack),
+              },
+            ])
+          }
+          style={styles.danger}
+        >
+          <Text style={styles.dangerText}>{admin ? 'Delete group' : 'Leave group'}</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+function Header({
+  action,
+  actionDisabled,
+  onAction,
+  onBack,
+  styles,
+  title,
+}: {
+  action?: string;
+  actionDisabled?: boolean;
+  onAction?: () => void;
+  onBack: () => void;
+  styles: ReturnType<typeof createStyles>;
+  title: string;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={onBack} style={styles.headerButton}>
+        <Text style={styles.back}>‹</Text>
+      </Pressable>
+      <Text style={styles.headerTitle}>{title}</Text>
+      <Pressable disabled={actionDisabled} onPress={onAction} style={styles.headerButton}>
+        <Text style={[styles.headerAction, actionDisabled && styles.disabled]}>{action}</Text>
+      </Pressable>
+    </View>
+  );
+}
+function Avatar({
+  name,
+  photoUrl,
+  styles,
+}: {
+  name: string;
+  photoUrl?: string | null;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return photoUrl ? (
+    <Image source={{ uri: photoUrl }} style={styles.avatar} />
+  ) : (
+    <View style={styles.avatarFallback}>
+      <Text style={styles.avatarText}>
+        {name
+          .split(' ')
+          .map((part) => part[0])
+          .join('')
+          .slice(0, 2)}
+      </Text>
+    </View>
+  );
+}
+function Empty({
+  copy,
+  styles,
+  title,
+}: {
+  copy: string;
+  styles: ReturnType<typeof createStyles>;
+  title: string;
+}) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyGlyph}>···</Text>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyCopy}>{copy}</Text>
+    </View>
+  );
+}
+
+function createStyles(colors: ThemeColors, safeTop: number) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.canvas },
+    header: {
+      height: safeTop + 62,
+      paddingTop: safeTop,
+      paddingHorizontal: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    headerButton: {
+      width: 68,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    back: {
+      color: colors.text,
+      fontSize: 38,
+      lineHeight: 40,
+      fontWeight: '300',
+    },
+    headerTitle: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    headerAction: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+    disabled: { opacity: 0.35 },
+    list: { paddingBottom: 30 },
+    request: {
+      minHeight: 110,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    requestIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    requestIconText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+    requestCopy: { flex: 1, marginLeft: 12 },
+    requestName: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    requestBody: {
+      marginTop: 4,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+    },
+    requestType: { marginTop: 5, color: colors.primary, fontSize: 11 },
+    requestActions: { marginLeft: 8, alignItems: 'center', gap: 7 },
+    accept: {
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+    },
+    actionText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+    decline: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    declineText: { color: colors.textMuted, fontSize: 18 },
+    empty: {
+      minHeight: 500,
+      padding: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyGlyph: { color: colors.primary, fontSize: 38, fontWeight: '900' },
+    emptyTitle: {
+      marginTop: 14,
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    emptyCopy: {
+      marginTop: 8,
+      color: colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    groupHero: { padding: 20, alignItems: 'center', gap: 14 },
+    groupAvatar: {
+      width: 94,
+      height: 94,
+      borderRadius: 47,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    groupAvatarText: { color: colors.primary, fontSize: 34, fontWeight: '300' },
+    groupName: {
+      width: '100%',
+      height: 46,
+      paddingHorizontal: 14,
+      borderRadius: 23,
+      color: colors.text,
+      backgroundColor: colors.surface,
+      fontSize: 16,
+      textAlign: 'center',
+    },
+    search: {
+      height: 40,
+      marginHorizontal: 16,
+      paddingHorizontal: 11,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 21 },
+    searchInput: { flex: 1, color: colors.text, fontSize: 16 },
+    section: {
+      marginHorizontal: 16,
+      marginTop: 18,
+      marginBottom: 6,
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    loader: { marginTop: 40 },
+    person: {
+      height: 76,
+      marginHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    avatar: { width: 42, height: 42, borderRadius: 21 },
+    avatarFallback: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    personCopy: { flex: 1, marginLeft: 10 },
+    personName: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    personHandle: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
+    check: {
+      width: 24,
+      height: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    checkText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    details: { paddingBottom: 40 },
+    groupAvatarLarge: {
+      width: 118,
+      height: 118,
+      marginTop: 28,
+      alignSelf: 'center',
+      borderRadius: 59,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    groupAvatarLargeText: { color: '#FFFFFF', fontSize: 34, fontWeight: '900' },
+    detailsTitle: {
+      marginTop: 14,
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+    detailsSubtitle: {
+      marginTop: 6,
+      color: colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    primaryOutline: {
+      height: 44,
+      margin: 18,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primaryOutlineText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+    admin: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 14,
+      backgroundColor: colors.primary,
+    },
+    adminText: { color: '#FFFFFF', fontSize: 11 },
+    remove: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    removeText: { color: colors.danger, fontSize: 20 },
+    danger: {
+      height: 48,
+      margin: 20,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dangerText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
+  });
+}

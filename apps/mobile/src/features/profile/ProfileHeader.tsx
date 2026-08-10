@@ -17,13 +17,13 @@ import { profileAvatarSource } from './avatar';
 const badgeAssets = [levelBadge, burgerBadge, tiramisuBadge, matchaBadge, cityBadge];
 const badgeLabels = ['Level', 'Burger Lover', 'Tiramisu Connaisseur', 'Matcha Hunter', 'City Explorer'];
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, onPress, value }: { label: string; onPress?: () => void; value: number }) {
   const { colors } = useAppTheme();
   return (
-    <View style={staticStyles.stat}>
+    <Pressable disabled={!onPress} onPress={onPress} style={staticStyles.stat}>
       <Text style={[staticStyles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[staticStyles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -33,6 +33,8 @@ export function ProfileHeader({
   onAvatarPress,
   onBack,
   onMessage,
+  onFollowers,
+  onRewards,
   onSettings,
   onToggleFollow,
   own,
@@ -45,6 +47,8 @@ export function ProfileHeader({
   onAvatarPress: () => void;
   onBack: () => void;
   onMessage: () => void;
+  onFollowers: () => void;
+  onRewards: () => void;
   onSettings: () => void;
   onToggleFollow: () => void;
   own: boolean;
@@ -84,7 +88,7 @@ export function ProfileHeader({
       <View style={styles.stats}>
         <Stat label="Reviews" value={profile.reviewCount || reviewCount} />
         <View style={styles.statDivider} />
-        <Stat label="Followers" value={profile.followerCount} />
+        <Stat label="Followers" onPress={onFollowers} value={profile.followerCount} />
         <View style={styles.statDivider} />
         <Stat label="Following" value={profile.followingCount} />
       </View>
@@ -115,13 +119,13 @@ export function ProfileHeader({
           {chips.map((chip) => <Text key={chip} style={styles.chip}>{chip}</Text>)}
         </ScrollView>
       ) : null}
-      <View style={styles.badges}>
+      <Pressable accessibilityLabel="Open rewards" onPress={onRewards} style={styles.badges}>
         {badgeAssets.map((asset, index) => (
           <View key={badgeLabels[index]} style={styles.badge}>
             <Image resizeMode="contain" source={asset} style={styles.badgeImage} />
           </View>
         ))}
-      </View>
+      </Pressable>
     </View>
   );
 }

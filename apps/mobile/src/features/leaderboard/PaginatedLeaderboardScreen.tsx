@@ -2,7 +2,6 @@ import type { LeaderboardEntry } from '@tastes/contracts';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   ImageBackground,
@@ -121,12 +120,16 @@ function PeriodButton({
 }
 
 function LeaderboardHeader({
+  audience,
   onBack,
   onInfo,
+  onAudience,
   styles,
 }: {
+  audience: 'friends' | 'local';
   onBack: () => void;
   onInfo: () => void;
+  onAudience: (audience: 'friends' | 'local') => void;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
@@ -153,16 +156,11 @@ function LeaderboardHeader({
         </Pressable>
       </View>
       <View style={styles.audienceSwitch}>
-        <View style={styles.audienceSelected}>
-          <Text style={styles.audienceSelectedText}>Friends</Text>
-        </View>
-        <Pressable
-          onPress={() => Alert.alert('Local leaderboard', 'Coming soon')}
-          style={styles.audienceOption}
-        >
-          <Text style={styles.audienceText}>Local</Text>
-          <View style={styles.soonBadge}><Text style={styles.soonText}>Soon</Text></View>
-        </Pressable>
+        {(['friends', 'local'] as const).map((option) => (
+          <Pressable key={option} onPress={() => onAudience(option)} style={audience === option ? styles.audienceSelected : styles.audienceOption}>
+            <Text style={audience === option ? styles.audienceSelectedText : styles.audienceText}>{option === 'friends' ? 'Friends' : 'Local'}</Text>
+          </Pressable>
+        ))}
       </View>
     </View>
   );
@@ -262,31 +260,32 @@ function LeaderboardLoadingState({ styles }: { styles: ReturnType<typeof createS
   );
 }
 
-function LeaderboardEmptyState({ styles }: { styles: ReturnType<typeof createStyles> }) {
+function LeaderboardEmptyState({ audience, onAddFriends, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={styles.emptyState}>
       <Image source={emptyFriendsIcon} resizeMode="contain" style={styles.emptyIcon} />
-      <Text style={styles.emptyTitle}>No friends ranked yet</Text>
-      <Text style={styles.emptyCopy}>Add friends to see who's topping the Tastes charts this week.</Text>
+      <Text style={styles.emptyTitle}>{audience === 'friends' ? 'No friends ranked yet' : 'No local rankings yet'}</Text>
+      <Text style={styles.emptyCopy}>{audience === 'friends' ? "Add friends to see who's topping the Tastes charts this week." : 'Set your city in your profile to join the local leaderboard.'}</Text>
       <Pressable
         accessibilityRole="button"
-        onPress={() => Alert.alert('Add friends', 'Friend search will open here.')}
+        onPress={onAddFriends}
         style={({ pressed }) => [styles.addFriends, pressed && styles.pressed]}
       >
-        <Text style={styles.addFriendsText}>Add friends</Text>
+        <Text style={styles.addFriendsText}>{audience === 'friends' ? 'Add friends' : 'Edit profile'}</Text>
       </Pressable>
     </View>
   );
 }
 
-export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
+export function PaginatedLeaderboardScreen({ onAddFriends, onBack }: { onAddFriends: () => void; onBack: () => void }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
   const currentUserId = useAuthenticatedUserId();
   const [period, setPeriod] = useState<Period>('month');
+  const [audience, setAudience] = useState<'friends' | 'local'>('friends');
   const [showXp, setShowXp] = useState(false);
-  const query = useLeaderboard(period);
+  const query = useLeaderboard(period, audience);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const podiumByRank = items.slice(0, 3);
   const podium = podiumByRank.length === 3
@@ -303,7 +302,7 @@ export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
       resizeMode="cover"
       style={styles.screen}
     >
-      <LeaderboardHeader onBack={onBack} onInfo={() => setShowXp(true)} styles={styles} />
+      <LeaderboardHeader audience={audience} onAudience={setAudience} onBack={onBack} onInfo={() => setShowXp(true)} styles={styles} />
       {!query.isPending && items.length > 0 ? (
         <View style={styles.periodArea}>
           <View style={styles.periodSwitch}>
@@ -327,7 +326,7 @@ export function PaginatedLeaderboardScreen({ onBack }: { onBack: () => void }) {
           </Pressable>
         </View>
       ) : items.length === 0 ? (
-        <LeaderboardEmptyState styles={styles} />
+        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} styles={styles} />
       ) : (
         <>
           <View style={styles.podium}>

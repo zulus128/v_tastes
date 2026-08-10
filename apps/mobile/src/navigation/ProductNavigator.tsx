@@ -25,16 +25,28 @@ import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
 import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
+import { DiscoverFiltersScreen } from '../features/discover/DiscoverFiltersScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { ProfileSettingsSheet } from '../features/profile/ProfileSettingsSheet';
+import { ProfileExtras, type ProfileExtra } from '../features/profile/ProfileExtras';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
 import { ChatScreen } from '../features/messaging/ChatScreen';
 import { ConversationsScreen } from '../features/messaging/ConversationsScreen';
+import {
+  GroupDetailsScreen,
+  NewGroupScreen,
+  RequestsScreen,
+} from '../features/messaging/MessagingExtras';
 import { useUnreadConversationCount } from '../features/messaging/realtime';
 import { MonthlyRecapFlow } from '../features/recap/MonthlyRecapFlow';
-import { consumeInitialPushDeepLink, subscribeToPushDeepLinks } from '../infrastructure/pushNotifications';
+import { NotificationsScreen } from '../features/notifications/NotificationsScreen';
+import { TastesAIScreen } from '../features/ai/TastesAIScreen';
+import {
+  consumeInitialPushDeepLink,
+  subscribeToPushDeepLinks,
+} from '../infrastructure/pushNotifications';
 import { useSession } from '../session/SessionProvider';
 import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
@@ -49,6 +61,12 @@ export type RootStackParamList = {
   Conversation: { conversationId: string };
   NewActivity: undefined;
   ActivityDetails: { activityId: string };
+  Notifications: undefined;
+  TastesAI: undefined;
+  Requests: undefined;
+  NewGroup: undefined;
+  GroupDetails: { groupId: string; admin?: boolean };
+  DiscoverFilters: undefined;
 };
 
 type MainTabParamList = {
@@ -67,7 +85,9 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['tastes://', 'https://tastes.app'],
   async getInitialURL() {
-    return consumePendingDeepLink() ?? await Linking.getInitialURL() ?? consumeInitialPushDeepLink();
+    return (
+      consumePendingDeepLink() ?? (await Linking.getInitialURL()) ?? consumeInitialPushDeepLink()
+    );
   },
   subscribe(listener) {
     const linkingSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
@@ -93,7 +113,6 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 function tabOptions(
   colors: ThemeColors,
-  isDark: boolean,
   { route }: { route: { name: keyof MainTabParamList } },
 ): BottomTabNavigationOptions {
   const create = route.name === 'Create';
@@ -105,16 +124,16 @@ function tabOptions(
     tabBarLabelStyle: styles.tabLabel,
     tabBarLabel: create ? () => null : undefined,
     tabBarItemStyle: create ? styles.createTabItem : undefined,
-    tabBarIcon: ({ focused }) => (
+    tabBarIcon: ({ focused }) =>
       create ? (
         <LinearGradient
-          colors={isDark ? ['#080808', colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
+          colors={[colors.background, colors.brandGradientEnd]}
           end={{ x: 0.5, y: 1 }}
           start={{ x: 0.5, y: 0 }}
           style={styles.createIconBorder}
         >
-          <View style={styles.createIcon}>
-          <CreateTabGlyph />
+          <View style={[styles.createIcon, { backgroundColor: colors.primary }]}>
+            <CreateTabGlyph />
           </View>
         </LinearGradient>
       ) : (
@@ -124,114 +143,157 @@ function tabOptions(
             name={route.name as Exclude<keyof MainTabParamList, 'Create'>}
           />
         </View>
-      )
-    ),
+      ),
   };
 }
 
-function MainTabs({ user, rootNavigation }: { user: User; rootNavigation: RootNavigation }) {
-  const { colors, isDark } = useAppTheme();
+function MainTabs({
+  discoverFilters,
+  user,
+  rootNavigation,
+}: {
+  discoverFilters: string[];
+  user: User;
+  rootNavigation: RootNavigation;
+}) {
+  const { colors } = useAppTheme();
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [profileExtra, setProfileExtra] = useState<ProfileExtra>(null);
 
   async function openConversation(targetUserId: string) {
     try {
       const result = await api.createConversation({ targetUserId });
-      rootNavigation.navigate('Conversation', { conversationId: result.data.id });
+      rootNavigation.navigate('Conversation', {
+        conversationId: result.data.id,
+      });
     } catch (error) {
       Alert.alert('Could not start conversation', apiErrorMessage(error));
     }
   }
-  return <>
-    <Tabs.Navigator
-      initialRouteName="Home"
-      screenOptions={(props) => tabOptions(colors, isDark, props)}
-      backBehavior="history"
-      safeAreaInsets={{ bottom: 0 }}
-    >
-      <Tabs.Screen name="Home">
-        {({ navigation }) => (
-          <HomeFeedScreen
-            onExplore={() => navigation.navigate('Discover')}
-            onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
-            onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
-            onOpenNotifications={() => rootNavigation.navigate('MainTabs', { screen: 'Dialog' })}
-          />
-        )}
-      </Tabs.Screen>
-      <Tabs.Screen name="Discover">
-        {({ navigation }) => <DiscoverScreen
-          onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
-          onOpenProfile={(person: DiscoverPerson) => navigation.navigate('Profile', {
-            initialFollowing: person.following,
-            userId: person.userId,
-          })}
-          userId={user.uid}
-        />}
-      </Tabs.Screen>
-      <Tabs.Screen name="Create">
-        {({ navigation, route }) => (
-          <CreateReviewScreen
-            initialVenueId={route.params?.venueId}
-            onClose={() => {
-              navigation.setParams({ venueId: undefined });
-              navigation.navigate('Home');
-            }}
-            onPublished={() => {
-              navigation.setParams({ venueId: undefined });
-              navigation.navigate('Home');
-            }}
-            userId={user.uid}
-          />
-        )}
-      </Tabs.Screen>
-      <Tabs.Screen
-        name="Dialog"
-        options={{
-          tabBarBadge: unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.primary, color: colors.onPrimary, fontSize: 10 },
-        }}
+  return (
+    <>
+      <Tabs.Navigator
+        initialRouteName="Home"
+        screenOptions={(props) => tabOptions(colors, props)}
+        backBehavior="history"
+        safeAreaInsets={{ bottom: 0 }}
       >
-        {() => (
-          <ConversationsScreen
-            onNewActivity={() => rootNavigation.navigate('NewActivity')}
-            onOpenConversation={(conversationId) => rootNavigation.navigate('Conversation', { conversationId })}
-            userId={user.uid}
-          />
-        )}
-      </Tabs.Screen>
-      <Tabs.Screen name="Profile">
-        {({ navigation, route }) => {
-          const targetUserId = route.params?.userId ?? user.uid;
-          return <ProfileScreen
-            currentUserId={user.uid}
-            fallbackName={user.displayName ?? 'Your profile'}
-            initialFollowing={route.params?.initialFollowing}
-            onBack={() => {
-              navigation.setParams({ initialFollowing: undefined, userId: undefined });
-              navigation.navigate('Discover');
-            }}
-            onMessage={(targetId) => void openConversation(targetId)}
-            onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
-            onSettings={() => setSettingsVisible(true)}
-            targetUserId={targetUserId}
-          />;
-        }}
-      </Tabs.Screen>
-    </Tabs.Navigator>
-    <ProfileSettingsSheet
-      onClose={() => setSettingsVisible(false)}
-      onLeaderboard={() => rootNavigation.navigate('Leaderboard')}
-      onLogout={logout}
-      onRecap={() => rootNavigation.navigate('Recap', { mode: 'ready' })}
-      visible={settingsVisible}
-    />
-  </>;
+        <Tabs.Screen name="Home">
+          {({ navigation }) => (
+            <HomeFeedScreen
+              onExplore={() => navigation.navigate('Discover')}
+              onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
+              onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
+              onOpenNotifications={() => rootNavigation.navigate('Notifications')}
+              onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+            />
+          )}
+        </Tabs.Screen>
+        <Tabs.Screen name="Discover">
+          {({ navigation }) => (
+            <DiscoverScreen
+              appliedFilters={discoverFilters}
+              onOpenAI={() => rootNavigation.navigate('TastesAI')}
+              onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
+              onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+              onOpenProfile={(person: DiscoverPerson) =>
+                navigation.navigate('Profile', {
+                  initialFollowing: person.following,
+                  userId: person.userId,
+                })
+              }
+              userId={user.uid}
+            />
+          )}
+        </Tabs.Screen>
+        <Tabs.Screen name="Create">
+          {({ navigation, route }) => (
+            <CreateReviewScreen
+              initialVenueId={route.params?.venueId}
+              onClose={() => {
+                navigation.setParams({ venueId: undefined });
+                navigation.navigate('Home');
+              }}
+              onPublished={() => {
+                navigation.setParams({ venueId: undefined });
+                navigation.navigate('Home');
+              }}
+              userId={user.uid}
+            />
+          )}
+        </Tabs.Screen>
+        <Tabs.Screen
+          name="Dialog"
+          options={{
+            tabBarBadge: unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: colors.primary,
+              color: colors.onPrimary,
+              fontSize: 10,
+            },
+          }}
+        >
+          {() => (
+            <ConversationsScreen
+              onNewActivity={() => rootNavigation.navigate('NewActivity')}
+              onNewGroup={() => rootNavigation.navigate('NewGroup')}
+              onOpenConversation={(conversationId) =>
+                rootNavigation.navigate('Conversation', { conversationId })
+              }
+              onOpenRequests={() => rootNavigation.navigate('Requests')}
+              userId={user.uid}
+            />
+          )}
+        </Tabs.Screen>
+        <Tabs.Screen name="Profile">
+          {({ navigation, route }) => {
+            const targetUserId = route.params?.userId ?? user.uid;
+            return (
+              <ProfileScreen
+                currentUserId={user.uid}
+                fallbackName={user.displayName ?? 'Your profile'}
+                initialFollowing={route.params?.initialFollowing}
+                onBack={() => {
+                  navigation.setParams({
+                    initialFollowing: undefined,
+                    userId: undefined,
+                  });
+                  navigation.navigate('Discover');
+                }}
+                onMessage={(targetId) => void openConversation(targetId)}
+                onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
+                onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+                onSettings={() => setSettingsVisible(true)}
+                targetUserId={targetUserId}
+              />
+            );
+          }}
+        </Tabs.Screen>
+      </Tabs.Navigator>
+      <ProfileSettingsSheet
+        onClose={() => setSettingsVisible(false)}
+        onFollowers={() => setProfileExtra('followers')}
+        onLeaderboard={() => rootNavigation.navigate('Leaderboard')}
+        onLogout={logout}
+        onNotifications={() => setProfileExtra('notifications')}
+        onRecap={() => rootNavigation.navigate('Recap', { mode: 'ready' })}
+        onRewards={() => setProfileExtra('rewards')}
+        visible={settingsVisible}
+      />
+      <ProfileExtras
+        onClose={() => setProfileExtra(null)}
+        screen={profileExtra}
+        visible={profileExtra !== null}
+      />
+    </>
+  );
 }
 
 export function ProductNavigator({ user }: { user: User }) {
   const { colors, isDark } = useAppTheme();
+  const [discoverFilters, setDiscoverFilters] = useState<string[]>([]);
   const navigationTheme = useMemo<Theme>(() => {
     const base = isDark ? DarkTheme : DefaultTheme;
     return {
@@ -250,7 +312,9 @@ export function ProductNavigator({ user }: { user: User }) {
     <NavigationContainer linking={linking} theme={navigationTheme}>
       <RootStack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="MainTabs">
-          {({ navigation }) => <MainTabs user={user} rootNavigation={navigation} />}
+          {({ navigation }) => (
+            <MainTabs discoverFilters={discoverFilters} user={user} rootNavigation={navigation} />
+          )}
         </RootStack.Screen>
         <RootStack.Screen name="Comments">
           {({ navigation, route }) => (
@@ -263,7 +327,12 @@ export function ProductNavigator({ user }: { user: User }) {
           )}
         </RootStack.Screen>
         <RootStack.Screen name="Leaderboard">
-          {({ navigation }) => <PaginatedLeaderboardScreen onBack={navigation.goBack} />}
+          {({ navigation }) => (
+            <PaginatedLeaderboardScreen
+              onAddFriends={() => navigation.navigate('MainTabs', { screen: 'Discover' })}
+              onBack={navigation.goBack}
+            />
+          )}
         </RootStack.Screen>
         <RootStack.Screen name="Place">
           {({ navigation, route }) => (
@@ -272,7 +341,12 @@ export function ProductNavigator({ user }: { user: User }) {
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Discover' });
               }}
-              onWriteReview={() => navigation.navigate('MainTabs', { screen: 'Create', params: { venueId: route.params.venueId } })}
+              onWriteReview={() =>
+                navigation.navigate('MainTabs', {
+                  screen: 'Create',
+                  params: { venueId: route.params.venueId },
+                })
+              }
               userId={user.uid}
               venueId={route.params.venueId}
             />
@@ -294,14 +368,80 @@ export function ProductNavigator({ user }: { user: User }) {
           {({ navigation }) => (
             <NewActivityScreen
               onBack={navigation.goBack}
-              onCreated={(activityId) => navigation.replace('Conversation', { conversationId: activityId })}
+              onCreated={(activityId) =>
+                navigation.replace('Conversation', {
+                  conversationId: activityId,
+                })
+              }
               userId={user.uid}
             />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="ActivityDetails">
           {({ navigation, route }) => (
-            <ActivityDetailsScreen activityId={route.params.activityId} onBack={navigation.goBack} />
+            <ActivityDetailsScreen
+              activityId={route.params.activityId}
+              onBack={navigation.goBack}
+            />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="Notifications">
+          {({ navigation }) => (
+            <NotificationsScreen
+              onBack={navigation.goBack}
+              onOpenTarget={(item) => {
+                if (item.targetType === 'comments' && item.targetId)
+                  navigation.navigate('Comments', { reviewId: item.targetId });
+                else if (item.targetType === 'profile' && item.targetId)
+                  navigation.navigate('MainTabs', {
+                    screen: 'Profile',
+                    params: { userId: item.targetId },
+                  });
+                else if (item.targetType === 'activity' && item.targetId)
+                  navigation.navigate('ActivityDetails', {
+                    activityId: item.targetId,
+                  });
+                else if (item.targetType === 'recap')
+                  navigation.navigate('Recap', { mode: 'ready' });
+              }}
+            />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="TastesAI">
+          {({ navigation }) => (
+            <TastesAIScreen
+              onBack={navigation.goBack}
+              onOpenPlace={(venueId) => navigation.navigate('Place', { venueId })}
+              userId={user.uid}
+            />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="Requests">
+          {({ navigation }) => <RequestsScreen onBack={navigation.goBack} />}
+        </RootStack.Screen>
+        <RootStack.Screen name="NewGroup">
+          {({ navigation }) => (
+            <NewGroupScreen
+              onBack={navigation.goBack}
+              onCreated={(groupId) => navigation.replace('GroupDetails', { groupId, admin: true })}
+            />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="GroupDetails">
+          {({ navigation, route }) => (
+            <GroupDetailsScreen groupId={route.params.groupId} onBack={navigation.goBack} />
+          )}
+        </RootStack.Screen>
+        <RootStack.Screen name="DiscoverFilters">
+          {({ navigation }) => (
+            <DiscoverFiltersScreen
+              initialValues={discoverFilters}
+              onApply={(values) => {
+                setDiscoverFilters(values);
+                navigation.goBack();
+              }}
+              onBack={navigation.goBack}
+            />
           )}
         </RootStack.Screen>
       </RootStack.Navigator>
@@ -312,7 +452,12 @@ export function ProductNavigator({ user }: { user: User }) {
 const styles = StyleSheet.create({
   tabLabel: { fontSize: 12, marginTop: 1 },
   tabBar: { height: 70, paddingTop: 8, paddingBottom: 5, borderTopWidth: 0 },
-  tabIcon: { width: 28, height: 25, alignItems: 'center', justifyContent: 'center' },
+  tabIcon: {
+    width: 28,
+    height: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   createTabItem: { marginTop: -8 },
   createIconBorder: {
     width: 60,
@@ -326,6 +471,5 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#B82F29',
   },
 });

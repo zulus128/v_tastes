@@ -3,6 +3,7 @@ import {
   createUserProfileInputSchema,
   getLeaderboardInputSchema,
   updateProfilePhotoInputSchema,
+  type MonthlyRecapResult,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
@@ -39,6 +40,12 @@ export const completeOnboarding = onCall(callableOptions, async (request) => {
 
   await userRef.set({
     onboardingVersion: input.version,
+    tastePreferences: {
+      favoriteDish: input.favoriteDish ?? null,
+      favoriteVenueId: input.favoriteVenueId ?? null,
+    },
+    onboardingInvitedContactCount: input.invitedContactCount,
+    appearance: input.appearance,
     onboardingCompletedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
@@ -46,27 +53,76 @@ export const completeOnboarding = onCall(callableOptions, async (request) => {
   return { onboardingVersion: input.version };
 });
 
+export const getMonthlyRecap = onCall(callableOptions, async (request): Promise<MonthlyRecapResult> => {
+  const uid = requireUserId(request);
+  const now = new Date();
+  const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const month = now.toLocaleDateString('en-US', { month: 'long' });
+  const previousMonth = previous.toLocaleDateString('en-US', { month: 'long' });
+  const recap = await db.collection('users').doc(uid).collection('monthlyRecaps').doc('current').get();
+
+  if (!recap.exists) {
+    return {
+      month,
+      previousMonth,
+      ready: false,
+      placesVisited: 0,
+      previousPlacesVisited: 0,
+      areasExplored: 0,
+      previousAreasExplored: 0,
+      reviewsWritten: 0,
+      previousReviewsWritten: 0,
+      followersGained: 0,
+      favoriteArea: '',
+      topPlaces: [],
+      topDishes: [],
+    };
+  }
+
+  const number = (field: string) => Math.max(0, Number(recap.get(field) ?? 0));
+  return {
+    month: String(recap.get('month') ?? month),
+    previousMonth: String(recap.get('previousMonth') ?? previousMonth),
+    ready: recap.get('ready') === true,
+    placesVisited: number('placesVisited'),
+    previousPlacesVisited: number('previousPlacesVisited'),
+    areasExplored: number('areasExplored'),
+    previousAreasExplored: number('previousAreasExplored'),
+    reviewsWritten: number('reviewsWritten'),
+    previousReviewsWritten: number('previousReviewsWritten'),
+    followersGained: number('followersGained'),
+    favoriteArea: String(recap.get('favoriteArea') ?? ''),
+    topPlaces: Array.isArray(recap.get('topPlaces')) ? recap.get('topPlaces') : [],
+    topDishes: Array.isArray(recap.get('topDishes')) ? recap.get('topDishes') : [],
+  };
+});
+
 export const getLeaderboard = onCall(callableOptions, async (request) => {
-  requireUserId(request);
+  const uid = requireUserId(request);
   const input = parseInput(getLeaderboardInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
+  const currentProfile = await db.collection('users').doc(uid).get();
+  const following = input.audience === 'friends'
+    ? await db.collection('users').doc(uid).collection('following').get()
+    : null;
+  const visibleIds = new Set([uid, ...(following?.docs.map((document) => document.id) ?? [])]);
+  const city = String(currentProfile.get('city') ?? '').trim().toLocaleLowerCase();
 
-  let leaderboardQuery = db
+  const leaderboardQuery = db
     .collection('users')
     .where('status', '==', 'active')
     .orderBy(input.period === 'month' ? 'monthlyXp' : 'xp', 'desc')
     .orderBy(FieldPath.documentId(), 'asc');
 
-  if (cursor) {
-    if (typeof cursor.value !== 'number') {
-      throw new HttpsError('invalid-argument', 'The leaderboard cursor is invalid.');
-    }
-    leaderboardQuery = leaderboardQuery.startAfter(cursor.value, cursor.id);
-  }
-
-  const snapshot = await leaderboardQuery.limit(input.limit + 1).get();
-  const pageDocs = snapshot.docs.slice(0, input.limit);
-  const startPosition = cursor?.position ?? 0;
+  const snapshot = await leaderboardQuery.limit(250).get();
+  const eligibleDocs = snapshot.docs.filter((document) => input.audience === 'all'
+    || (input.audience === 'friends'
+      ? visibleIds.has(document.id)
+      : Boolean(city) && String(document.get('city') ?? '').trim().toLocaleLowerCase() === city));
+  const startIndex = cursor ? eligibleDocs.findIndex((document) => document.id === cursor.id) + 1 : 0;
+  if (cursor && startIndex === 0) throw new HttpsError('invalid-argument', 'The leaderboard cursor is invalid.');
+  const pageDocs = eligibleDocs.slice(startIndex, startIndex + input.limit);
+  const startPosition = startIndex;
   const xpField = input.period === 'month' ? 'monthlyXp' : 'xp';
   const last = pageDocs.at(-1);
 
@@ -79,7 +135,7 @@ export const getLeaderboard = onCall(callableOptions, async (request) => {
       xp: Number(document.get(xpField) ?? 0),
       rank: startPosition + index + 1,
     })),
-    nextCursor: snapshot.size > input.limit && last
+    nextCursor: eligibleDocs.length > startIndex + input.limit && last
       ? encodeCursor({
           id: last.id,
           value: Number(last.get(xpField) ?? 0),

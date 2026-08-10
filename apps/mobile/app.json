@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
+      "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
@@ -42,10 +43,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#560E0B",
-          "image": "./assets/onboarding/logo.png",
+          "backgroundColor": "#F2EFEA",
+          "image": "./assets/onboarding/splash-logo-light.png",
           "imageWidth": 189,
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#2B0706",
+            "image": "./assets/onboarding/logo.png"
+          }
         }
       ],
       [
@@ -72,7 +77,8 @@
         {
           "color": "#B82F29"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

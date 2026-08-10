@@ -4,6 +4,7 @@ import {
   type TastesApiError,
 } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { CompleteOnboardingInput } from '@tastes/contracts';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -35,7 +36,7 @@ interface SessionContextValue {
   state: SessionState;
   api: TastesApi;
   refresh: () => Promise<void>;
-  completeOnboarding: () => Promise<void>;
+  completeOnboarding: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -81,7 +82,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       if (result.data.profileExists && !result.data.onboardingComplete) {
         const legacyComplete = await AsyncStorage.getItem(`tastes:post-signup-onboarding:${user.uid}`);
         if (legacyComplete === 'complete') {
-          await api.completeOnboarding({ version: 1 });
+          await api.completeOnboarding({ version: 1, invitedContactCount: 0, appearance: 'system' });
           await AsyncStorage.removeItem(`tastes:post-signup-onboarding:${user.uid}`);
           setState({ status: 'authenticated', user });
           return;
@@ -113,9 +114,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (auth.currentUser) await loadStatus(auth.currentUser);
   }, [loadStatus]);
 
-  const completeOnboarding = useCallback(async () => {
+  const completeOnboarding = useCallback(async (input: Partial<Omit<CompleteOnboardingInput, 'version'>> = {}) => {
     if (!auth.currentUser) return;
-    await api.completeOnboarding({ version: 1 });
+    await api.completeOnboarding({ version: 1, invitedContactCount: 0, appearance: 'system', ...input });
     track('onboarding_completed', { version: 1 });
     setState({ status: 'authenticated', user: auth.currentUser });
   }, [api]);

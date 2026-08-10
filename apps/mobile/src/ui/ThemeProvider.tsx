@@ -26,6 +26,8 @@ const shared = {
 export const colorThemes = {
   dark: {
     ...shared,
+    brandGradientStart: '#560E0B',
+    brandGradientEnd: '#4C1816',
     background: '#080808',
     canvas: '#161616',
     surface: '#161616',
@@ -45,6 +47,8 @@ export const colorThemes = {
   },
   light: {
     ...shared,
+    brandGradientStart: '#F5D6CF',
+    brandGradientEnd: '#FED1D0',
     background: '#F6F6F6',
     canvas: '#F2EFEA',
     surface: '#FFFFFF',
@@ -104,16 +108,18 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
-  const resolvedTheme: ResolvedTheme = preference === 'system'
-    ? (systemScheme === 'light' ? 'light' : 'dark')
-    : preference;
-  const value = useMemo<ThemeContextValue>(() => ({
-    colors: colorThemes[resolvedTheme],
-    isDark: resolvedTheme === 'dark',
-    preference,
-    resolvedTheme,
-    setPreference,
-  }), [preference, resolvedTheme, setPreference]);
+  const resolvedTheme: ResolvedTheme =
+    preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference;
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      colors: colorThemes[resolvedTheme],
+      isDark: resolvedTheme === 'dark',
+      preference,
+      resolvedTheme,
+      setPreference,
+    }),
+    [preference, resolvedTheme, setPreference],
+  );
 
   if (!hydrated) return null;
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

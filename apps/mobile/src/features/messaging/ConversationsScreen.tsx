@@ -1,5 +1,5 @@
 import type { ConversationSummary } from '@tastes/contracts';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
+import { useTastesApi } from '../../session/SessionProvider';
 
 function relativeTime(iso: string): string {
   const elapsed = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -72,19 +73,26 @@ function ConversationRow({
 
 export function ConversationsScreen({
   onNewActivity,
+  onNewGroup,
   onOpenConversation,
+  onOpenRequests,
   userId,
 }: {
   onNewActivity: () => void;
+  onNewGroup: () => void;
   onOpenConversation: (conversationId: string) => void;
+  onOpenRequests: () => void;
   userId: string;
 }) {
+  const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [search, setSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
+  const [requestCount, setRequestCount] = useState(0);
+  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => undefined); return () => { active = false; }; }, [api]);
   const inbox = useConversationInbox(userId);
   const pendingInvitation = inbox.data.find((conversation) => (
     conversation.kind === 'activity'
@@ -118,7 +126,7 @@ export function ConversationsScreen({
             <Text style={styles.searchIcon}>⌕</Text>
             <TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} />
           </View>
-          <Text style={styles.requests}>Requests <Text style={styles.requestsCount}>(0)</Text></Text>
+          <Pressable onPress={onOpenRequests}><Text style={styles.requests}>Requests {requestCount > 0 ? <Text style={styles.requestsCount}>({requestCount})</Text> : null}</Text></Pressable>
         </View>
       </View>
       {inbox.loading ? (
@@ -152,6 +160,7 @@ export function ConversationsScreen({
       <NewDialogSheet
         onClose={() => setNewDialogOpen(false)}
         onNewActivity={onNewActivity}
+        onNewGroup={onNewGroup}
         onOpenConversation={onOpenConversation}
         visible={newDialogOpen}
       />

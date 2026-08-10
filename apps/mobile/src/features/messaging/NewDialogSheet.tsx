@@ -10,11 +10,13 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 export function NewDialogSheet({
   onClose,
   onNewActivity,
+  onNewGroup,
   onOpenConversation,
   visible,
 }: {
   onClose: () => void;
   onNewActivity: () => void;
+  onNewGroup: () => void;
   onOpenConversation: (conversationId: string) => void;
   visible: boolean;
 }) {
@@ -68,7 +70,7 @@ export function NewDialogSheet({
             <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
           </View>
           <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
-          <Pressable disabled style={[styles.action, styles.groupAction, styles.groupDisabled]}>
+          <Pressable onPress={() => { onClose(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
             <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
           </Pressable>
           <Pressable onPress={() => { onClose(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
@@ -109,7 +111,7 @@ function createStyles(colors: ThemeColors) {
     sheet: { maxHeight: '80%', minHeight: 570, paddingHorizontal: 16, borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
     searchBox: { height: 40, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, marginRight: 8, fontSize: 21 }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-    action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, groupDisabled: { opacity: 0.65 }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
+    action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
     section: { color: colors.textMuted, marginTop: 25, marginBottom: 10, fontSize: 12 }, loader: { marginTop: 35 }, empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
     person: { height: 76, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' }, personPressed: { opacity: 0.7 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.skeleton }, avatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' }, copy: { flex: 1, marginLeft: 10 }, name: { color: colors.text, fontSize: 15, fontWeight: '600' }, handle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
   });

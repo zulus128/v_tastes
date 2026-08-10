@@ -6,17 +6,23 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 export function ProfileSettingsSheet({
   onClose,
   onLeaderboard,
+  onFollowers,
   onLogout,
+  onNotifications,
   onRecap,
+  onRewards,
   visible,
 }: {
   onClose: () => void;
   onLeaderboard: () => void;
+  onFollowers: () => void;
   onLogout: () => Promise<void>;
+  onNotifications: () => void;
   onRecap: () => void;
+  onRewards: () => void;
   visible: boolean;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -64,6 +70,15 @@ export function ProfileSettingsSheet({
           </View>
 
           <View style={styles.group}>
+            <Pressable onPress={() => open(onFollowers)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <Text style={styles.rowText}>Followers</Text><Text style={styles.chevron}>›</Text>
+            </Pressable><View style={styles.divider} />
+            <Pressable onPress={() => open(onRewards)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <Text style={styles.rowText}>Rewards & achievements</Text><Text style={styles.chevron}>›</Text>
+            </Pressable><View style={styles.divider} />
+            <Pressable onPress={() => open(onNotifications)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <Text style={styles.rowText}>Notifications</Text><Text style={styles.chevron}>›</Text>
+            </Pressable><View style={styles.divider} />
             <Pressable onPress={() => open(onLeaderboard)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
               <Text style={styles.rowText}>Leaderboard</Text>
               <Text style={styles.chevron}>›</Text>
@@ -73,6 +88,11 @@ export function ProfileSettingsSheet({
               <Text style={styles.rowText}>Monthly recap</Text>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
+          </View>
+
+          <Text style={styles.sectionLabel}>APPEARANCE</Text>
+          <View style={styles.themeRow}>
+            {(['light', 'dark', 'system'] as const).map((value) => <Pressable key={value} onPress={() => void setPreference(value)} style={[styles.themeOption, preference === value && styles.themeActive]}><Text style={[styles.themeText, preference === value && styles.themeTextActive]}>{value === 'system' ? 'Automatic' : value[0].toUpperCase() + value.slice(1)}</Text></Pressable>)}
           </View>
 
           <Pressable
@@ -107,6 +127,12 @@ function createStyles(colors: ThemeColors) {
     logout: { height: 52, marginTop: 22, borderWidth: 1, borderColor: colors.danger, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
     logoutText: { color: colors.danger, fontSize: 16, fontWeight: '700' },
     logoutHint: { marginTop: 9, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+    sectionLabel: { marginTop: 18, marginBottom: 7, color: colors.textMuted, fontSize: 11 },
+    themeRow: { height: 48, padding: 4, flexDirection: 'row', borderRadius: 24, backgroundColor: colors.surface },
+    themeOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+    themeActive: { backgroundColor: colors.primary },
+    themeText: { color: colors.textMuted, fontSize: 12 },
+    themeTextActive: { color: colors.onPrimary, fontWeight: '700' },
     pressed: { opacity: 0.7 },
     disabled: { opacity: 0.55 },
   });

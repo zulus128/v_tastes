@@ -9,7 +9,6 @@ import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvi
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import type { FeedItem, Page } from '@tastes/contracts';
 import type {
-  HideReviewInput,
   ReportReviewInput,
 } from '@tastes/contracts';
 

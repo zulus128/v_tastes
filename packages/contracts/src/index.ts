@@ -223,6 +223,7 @@ export const getMessagesInputSchema = pageInputSchema.extend({
 
 export const getLeaderboardInputSchema = pageInputSchema.extend({
   period: z.enum(['month', 'allTime']).default('month'),
+  audience: z.enum(['all', 'friends', 'local']).default('all'),
 });
 
 export const getVenuesInputSchema = pageInputSchema.extend({
@@ -245,6 +246,34 @@ export const getPlaceReviewsInputSchema = getPlaceInputSchema.extend({
 
 export const completeOnboardingInputSchema = z.object({
   version: z.number().int().positive(),
+  favoriteDish: z.string().trim().min(1).max(80).optional(),
+  favoriteVenueId: z.string().trim().min(1).max(128).optional(),
+  invitedContactCount: z.number().int().nonnegative().max(1000).default(0),
+  appearance: z.enum(['light', 'dark', 'system']).default('system'),
+});
+
+export const askTastesAiInputSchema = z.object({
+  prompt: z.string().trim().min(1).max(500),
+  location: z.string().trim().min(1).max(120).optional(),
+});
+
+export const notificationInputSchema = z.object({ notificationId: z.string().min(1).max(128) });
+export const requestInputSchema = z.object({ requestId: z.string().min(1).max(128), response: z.enum(['accepted', 'declined']) });
+export const createGroupInputSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  memberIds: z.array(z.string().min(1).max(128)).min(2).max(50),
+});
+export const groupInputSchema = z.object({ groupId: z.string().min(1).max(128) });
+export const updateGroupMembersInputSchema = groupInputSchema.extend({ memberIds: z.array(z.string().min(1).max(128)).max(50) });
+export const updateNotificationPreferencesInputSchema = z.object({
+  push: z.boolean(), comments: z.boolean(), followers: z.boolean(), activities: z.boolean(),
+});
+export const reportCommentInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  reviewId: z.string().min(1).max(128),
+  commentId: z.string().min(1).max(128),
+  reason: reportReasonSchema.default('Inappropriate'),
+  details: z.string().trim().max(300).optional(),
 });
 
 export const phoneNumberSchema = z.string().trim().regex(
@@ -306,6 +335,14 @@ export type ListConversationsInput = z.infer<typeof listConversationsInputSchema
 export type GetMessagesInput = z.infer<typeof getMessagesInputSchema>;
 export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
 export type CompleteOnboardingInput = z.infer<typeof completeOnboardingInputSchema>;
+export type AskTastesAiInput = z.infer<typeof askTastesAiInputSchema>;
+export type NotificationInput = z.infer<typeof notificationInputSchema>;
+export type RequestInput = z.infer<typeof requestInputSchema>;
+export type CreateGroupInput = z.infer<typeof createGroupInputSchema>;
+export type GroupInput = z.infer<typeof groupInputSchema>;
+export type UpdateGroupMembersInput = z.infer<typeof updateGroupMembersInputSchema>;
+export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesInputSchema>;
+export type ReportCommentInput = z.infer<typeof reportCommentInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
 export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
@@ -321,6 +358,47 @@ export interface VerifyPhoneOtpResult {
   customToken: string;
   isNewUser: boolean;
 }
+
+export interface TastesAiPlace {
+  id: string;
+  name: string;
+  description: string;
+  rating: number;
+  price: string;
+  cuisine: string;
+}
+
+export interface TastesAiAnswer {
+  id: string;
+  text: string;
+  followUps: string[];
+  places: TastesAiPlace[];
+}
+
+export interface AppNotification { id: string; kind: 'comment' | 'follow' | 'invite' | 'reward' | 'system'; title: string; body: string; targetType: 'comments' | 'profile' | 'activity' | 'recap' | null; targetId: string | null; unread: boolean; createdAt: string; }
+export interface AppRequest { id: string; kind: 'activity' | 'group'; title: string; body: string; senderName: string; targetId: string; createdAt: string; }
+export interface MonthlyRecapPlace { venueId: string; name: string; address: string; rating: number; imageUrl: string | null; area: string; }
+export interface MonthlyRecapDish { name: string; rating: number; imageUrl: string | null; }
+export interface MonthlyRecapResult {
+  month: string;
+  previousMonth: string;
+  ready: boolean;
+  placesVisited: number;
+  previousPlacesVisited: number;
+  areasExplored: number;
+  previousAreasExplored: number;
+  reviewsWritten: number;
+  previousReviewsWritten: number;
+  followersGained: number;
+  favoriteArea: string;
+  topPlaces: MonthlyRecapPlace[];
+  topDishes: MonthlyRecapDish[];
+}
+export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
+export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; createdAt: string; }
+export interface NotificationPreferences { push: boolean; comments: boolean; followers: boolean; activities: boolean; }
+export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
+export interface ProfileExtrasResult { followers: Array<{ userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean }>; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
 
 export interface Page<T> {
   items: T[];

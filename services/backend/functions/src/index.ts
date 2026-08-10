@@ -1,4 +1,6 @@
 export { healthCheck } from './modules/health/functions';
+export { askTastesAi } from './modules/ai/functions';
+export { clearNotifications, createGroup, getGroup, getProfileExtras, leaveGroup, listNotifications, listRequests, markNotificationRead, reportComment, respondToRequest, updateGroupMembers, updateNotificationPreferences } from './modules/community/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
 export { followUser, unfollowUser } from './modules/social/functions';
 export {
@@ -34,6 +36,7 @@ export {
 } from './modules/discover/functions';
 export {
   completeOnboarding,
+  getMonthlyRecap,
   createUserProfile,
   getLeaderboard,
   getSessionStatus,

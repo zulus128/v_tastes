@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import type { MonthlyRecapDish, MonthlyRecapResult } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import type { User } from 'firebase/auth';
@@ -54,6 +55,7 @@ import starsBackground from '../../../assets/recap/story/stars-background.png';
 import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { useTastesApi } from '../../session/SessionProvider';
 
 type RecapStep =
   | 'loading'
@@ -84,15 +86,15 @@ type Place = {
   rating: string;
 };
 
-const month = 'June';
-const shareMessage = 'My June Tastes recap: 15 places visited, 2 new areas explored, and 132 new followers.';
-const places: Place[] = [
-  { image: placeTerrace, title: 'Gemini750 Restaurant', address: '2972 Westheimer Rd. Santa Ana…', rating: '5.0' },
-  { image: placeDining, title: 'Gemini750 Restaurant', address: '2972 Westheimer Rd. Santa Ana…', rating: '3.0' },
-  { image: placeGarden, title: 'Gemini750 Restaurant', address: '2972 Westheimer Rd. Santa Ana…', rating: '2.6' },
-  { image: placeLounge, title: 'Gemini750 Restaurant', address: '2972 Westheimer Rd. Santa Ana…', rating: '2.0' },
-  { image: placeTerrace, title: 'Gemini750 Restaurant', address: '2972 Westheimer Rd. Santa Ana…', rating: '2.0' },
-];
+function recapPlaces(recap: MonthlyRecapResult): Place[] {
+  const fallbackImages = [placeTerrace, placeDining, placeGarden, placeLounge];
+  return recap.topPlaces.map((place, index) => ({
+    image: place.imageUrl ? { uri: place.imageUrl } : fallbackImages[index % fallbackImages.length]!,
+    title: place.name,
+    address: place.address,
+    rating: place.rating.toFixed(1),
+  }));
+}
 
 const progressByStep: Partial<Record<RecapStep, number>> = {
   placeGuess: 1,
@@ -108,19 +110,31 @@ const progressByStep: Partial<Record<RecapStep, number>> = {
 };
 
 export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
+  const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [step, setStep] = useState<RecapStep>('loading');
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [placeGuess, setPlaceGuess] = useState<number | null>(null);
-  const [areaGuess, setAreaGuess] = useState<'Belgravia' | 'Mayfair' | null>(null);
+  const [areaGuess, setAreaGuess] = useState<string | null>(null);
   const [ratingGuess, setRatingGuess] = useState(1);
+  const [recap, setRecap] = useState<MonthlyRecapResult | null>(null);
 
   useEffect(() => {
-    if (step !== 'loading') return;
-    const timer = setTimeout(() => setStep(mode === 'lowData' ? 'lowData' : 'intro'), 1200);
+    let active = true;
+    void api.getMonthlyRecap().then((response) => {
+      if (active) setRecap(response.data);
+    }).catch(() => {
+      if (active) setRecap({ month: new Date().toLocaleDateString('en-US', { month: 'long' }), previousMonth: '', ready: false, placesVisited: 0, previousPlacesVisited: 0, areasExplored: 0, previousAreasExplored: 0, reviewsWritten: 0, previousReviewsWritten: 0, followersGained: 0, favoriteArea: '', topPlaces: [], topDishes: [] });
+    });
+    return () => { active = false; };
+  }, [api]);
+
+  useEffect(() => {
+    if (step !== 'loading' || !recap) return;
+    const timer = setTimeout(() => setStep(mode === 'lowData' || !recap.ready ? 'lowData' : 'intro'), 450);
     return () => clearTimeout(timer);
-  }, [mode, step]);
+  }, [mode, recap, step]);
 
   useEffect(() => {
     if (placeGuess === null || step !== 'placeGuess') return;
@@ -135,12 +149,13 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
   }, [step]);
 
   async function shareRecap(channel: string) {
+    if (!recap) return;
     if (channel === 'Copy link') {
-      await Clipboard.setStringAsync(`https://tastes.app/recap/${month.toLowerCase()}`);
+      await Clipboard.setStringAsync(`https://tastes.app/recap/${recap.month.toLowerCase()}`);
       Alert.alert('Link copied');
       return;
     }
-    await Share.share({ message: shareMessage, title: 'Monthly Recap' });
+    await Share.share({ message: `My ${recap.month} Tastes recap: ${recap.placesVisited} places visited, ${recap.areasExplored} areas explored, and ${recap.followersGained} new followers.`, title: 'Monthly Recap' });
   }
 
   const progress = progressByStep[step];
@@ -166,29 +181,30 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
           onPress={() => setConfirmingClose(true)}
         />
 
-        {step === 'loading' ? <LoadingScreen /> : null}
-        {step === 'lowData' ? <LowDataScreen onExplore={onClose} /> : null}
+        {step === 'loading' ? <LoadingScreen month={recap?.month} /> : null}
+        {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
         {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
-        {step === 'placeGuess' ? <PlaceGuessScreen selected={placeGuess} onSelect={setPlaceGuess} /> : null}
-        {step === 'placeResult' ? <PlaceResultScreen onNext={() => setStep('areaGuess')} /> : null}
+        {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
+        {step === 'placeResult' && recap ? <PlaceResultScreen count={recap.placesVisited} places={recapPlaces(recap)} onNext={() => setStep('areaGuess')} /> : null}
         {step === 'areaGuess' ? (
-          <AreaGuessScreen onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
+          <AreaGuessScreen favoriteArea={recap?.favoriteArea || 'Belgravia'} onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
         ) : null}
         {step === 'areaResult' ? (
-          <AreaResultScreen guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
+          <AreaResultScreen areas={recap?.areasExplored ?? 0} favoriteArea={recap?.favoriteArea || 'Belgravia'} guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
         ) : null}
         {step === 'ratingGuess' ? (
           <RatingGuessScreen selected={ratingGuess} onChange={setRatingGuess} onSelect={() => setStep('ratingFeedback')} />
         ) : null}
         {step === 'ratingFeedback' ? <RatingFeedbackScreen correct={ratingGuess === 1} /> : null}
-        {step === 'ranking' ? <RankingScreen onNext={() => setStep('favorites')} /> : null}
-        {step === 'favorites' ? <FavoritesScreen onNext={() => setStep('followers')} /> : null}
-        {step === 'followers' ? <FollowersScreen onNext={() => setStep('comparison')} /> : null}
-        {step === 'comparison' ? <ComparisonScreen onNext={() => setStep('share')} /> : null}
-        {step === 'share' ? <ShareCard user={user} onShare={shareRecap} /> : null}
+        {step === 'ranking' && recap ? <RankingScreen places={recapPlaces(recap)} onNext={() => setStep('favorites')} /> : null}
+        {step === 'favorites' && recap ? <FavoritesScreen dishes={recap.topDishes} onNext={() => setStep('followers')} /> : null}
+        {step === 'followers' && recap ? <FollowersScreen count={recap.followersGained} month={recap.month} onNext={() => setStep('comparison')} /> : null}
+        {step === 'comparison' && recap ? <ComparisonScreen recap={recap} onNext={() => setStep('share')} /> : null}
+        {step === 'share' && recap ? <ShareCard recap={recap} user={user} onShare={shareRecap} /> : null}
       </ImageBackground>
 
       <CloseConfirmation
+        month={recap?.month}
         visible={confirmingClose}
         onKeepWatching={() => setConfirmingClose(false)}
         onLeave={onClose}
@@ -226,19 +242,19 @@ function StoryProgress({ completed }: { completed: number }) {
   );
 }
 
-function LoadingScreen() {
+function LoadingScreen({ month }: { month?: string }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.centerContent}>
       <ActivityIndicator color={colors.text} size="large" style={styles.loader} />
       <Text style={styles.centerTitle}>Crunching your month…</Text>
-      <Text style={styles.centerSubtitle}>We're putting together your {month} recap.</Text>
+      <Text style={styles.centerSubtitle}>We're putting together your {month ?? 'monthly'} recap.</Text>
     </View>
   );
 }
 
-function LowDataScreen({ onExplore }: { onExplore: () => void }) {
+function LowDataScreen({ month, onExplore }: { month?: string; onExplore: () => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
@@ -246,7 +262,7 @@ function LowDataScreen({ onExplore }: { onExplore: () => void }) {
       <View style={styles.centerContent}>
         <Image source={lockIcon} resizeMode="contain" style={styles.lockIcon} />
         <Text style={styles.centerTitle}>Your recap isn't ready yet</Text>
-        <Text style={styles.centerSubtitle}>Visit a few more places this month to unlock your {month} recap.</Text>
+        <Text style={styles.centerSubtitle}>Visit a few more places this month to unlock your {month ?? 'monthly'} recap.</Text>
       </View>
       <RecapButton label="Explore places" onPress={onExplore} />
     </>
@@ -295,14 +311,14 @@ function TiltedPhoto({ source, rating, style }: { source: ImageSourcePropType; r
   );
 }
 
-function PlaceGuessScreen({ selected, onSelect }: { selected: number | null; onSelect: (value: number) => void }) {
+function PlaceGuessScreen({ actual, selected, onSelect }: { actual: number; selected: number | null; onSelect: (value: number) => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.questionContent}>
       <ScreenHeading title={"How many places do you think\nyou've visited this month"} subtitle="Take a guess!" />
       <View style={styles.answerList}>
-        {[15, 5, 1].map((value) => (
+        {[actual, Math.max(1, actual - 5), Math.max(1, actual - 10)].filter((value, index, values) => values.indexOf(value) === index).map((value) => (
           <Pressable
             key={value}
             accessibilityState={{ selected: selected === value }}
@@ -322,18 +338,18 @@ function PlaceGuessScreen({ selected, onSelect }: { selected: number | null; onS
   );
 }
 
-function PlaceResultScreen({ onNext }: { onNext: () => void }) {
+function PlaceResultScreen({ count, onNext, places: resultPlaces }: { count: number; onNext: () => void; places: Place[] }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <Text style={styles.resultTitle}>You guessed it!</Text>
       <View style={styles.placeResultBadge}>
-        <View style={styles.resultBadge}><Text style={styles.resultBadgeNumber}>5</Text><Text style={styles.resultBadgeUnit}>places</Text></View>
+        <View style={styles.resultBadge}><Text style={styles.resultBadgeNumber}>{count}</Text><Text style={styles.resultBadgeUnit}>places</Text></View>
       </View>
       <View style={styles.placeSheet}>
         <ScrollView contentContainerStyle={styles.placeList} showsVerticalScrollIndicator={false}>
-          {places.map((place, index) => <PlaceCard key={`${place.title}-${index}`} place={place} compact />)}
+          {resultPlaces.map((place, index) => <PlaceCard key={`${place.title}-${index}`} place={place} compact />)}
         </ScrollView>
       </View>
       <RecapButton label="Next" onPress={onNext} />
@@ -341,14 +357,14 @@ function PlaceResultScreen({ onNext }: { onNext: () => void }) {
   );
 }
 
-function AreaGuessScreen({ onSelect }: { onSelect: (value: 'Belgravia' | 'Mayfair') => void }) {
+function AreaGuessScreen({ favoriteArea, onSelect }: { favoriteArea: string; onSelect: (value: string) => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <View style={styles.areaHeading}><ScreenHeading title="What area you been to more?" subtitle="Choose one 👇" /></View>
-      <Pressable onPress={() => onSelect('Belgravia')} style={styles.areaOptionTop}>
-        <Text style={styles.areaOption}>★  Belgravia</Text><View style={styles.areaRule} />
+      <Pressable onPress={() => onSelect(favoriteArea)} style={styles.areaOptionTop}>
+        <Text style={styles.areaOption}>★  {favoriteArea}</Text><View style={styles.areaRule} />
       </Pressable>
       <Image source={mapChoice} resizeMode="contain" style={styles.choiceMap} />
       <Pressable onPress={() => onSelect('Mayfair')} style={styles.areaOptionBottom}>
@@ -358,15 +374,15 @@ function AreaGuessScreen({ onSelect }: { onSelect: (value: 'Belgravia' | 'Mayfai
   );
 }
 
-function AreaResultScreen({ guessed, onNext }: { guessed: string; onNext: () => void }) {
+function AreaResultScreen({ areas, favoriteArea, guessed, onNext }: { areas: number; favoriteArea: string; guessed: string; onNext: () => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const correct = guessed === 'Belgravia';
+  const correct = guessed === favoriteArea;
   return (
     <>
       <View style={[styles.feedbackPill, correct && styles.feedbackPillCorrect]}>
         <Text style={[styles.feedbackPillText, correct && styles.feedbackPillTextCorrect]}>
-          {correct ? 'You got it! Belgravia' : `Almost! You guessed ${guessed}`}
+          {correct ? `You got it! ${favoriteArea}` : `Almost! You guessed ${guessed}`}
         </Text>
       </View>
       <View style={styles.resultMapWrap}>
@@ -375,8 +391,8 @@ function AreaResultScreen({ guessed, onNext }: { guessed: string; onNext: () => 
       </View>
       <View style={styles.areaResultCopy}>
         <Text style={styles.areaResultTitle}>You explored</Text>
-        <View style={styles.resultBadge}><Text style={styles.resultBadgeNumber}>3</Text><Text style={styles.resultBadgeUnit}>areas</Text></View>
-        <Text style={styles.areaResultPlace}>In Belgravia</Text>
+        <View style={styles.resultBadge}><Text style={styles.resultBadgeNumber}>{areas}</Text><Text style={styles.resultBadgeUnit}>areas</Text></View>
+        <Text style={styles.areaResultPlace}>In {favoriteArea}</Text>
       </View>
       <RecapButton label="Next" onPress={onNext} />
     </>
@@ -444,14 +460,14 @@ function RatingFeedbackScreen({ correct }: { correct: boolean }) {
   );
 }
 
-function RankingScreen({ onNext }: { onNext: () => void }) {
+function RankingScreen({ onNext, places: rankedPlaces }: { onNext: () => void; places: Place[] }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <View style={styles.rankingHeading}><ScreenHeading title="Here’s how they ranked" subtitle="See how they scored" /></View>
       <View style={styles.rankingList}>
-        {places.slice(0, 3).map((place, index) => <PlaceCard key={index} place={place} />)}
+        {rankedPlaces.slice(0, 3).map((place, index) => <PlaceCard key={index} place={place} />)}
       </View>
       <RecapButton label="Next" onPress={onNext} />
     </>
@@ -481,14 +497,10 @@ function RatingTag({ value }: { value: string }) {
   return <View style={styles.ratingTag}><Text style={styles.ratingTagText}>★ {value}</Text></View>;
 }
 
-function FavoritesScreen({ onNext }: { onNext: () => void }) {
+function FavoritesScreen({ dishes, onNext }: { dishes: MonthlyRecapDish[]; onNext: () => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const dishes = [
-    ['Grilled Salmon with Lemon', '5.0', foodRamen],
-    ['Sushi Roll', '4.6', placeGarden],
-    ['Grilled Salmon with Lemon', '4.2', foodRamen],
-  ] as const;
+  const fallbackDishImages = [foodRamen, placeGarden, foodCupcake];
   return (
     <>
       <Image source={foodCupcake} style={styles.foodCupcake} />
@@ -497,11 +509,11 @@ function FavoritesScreen({ onNext }: { onNext: () => void }) {
       <Image source={foodRamen} style={styles.foodRamen} />
       <View style={styles.favoriteHeading}><ScreenHeading title={"Your favorite\ndish this month"} subtitle="Here are your top 3 picks" /></View>
       <View style={styles.dishList}>
-        {dishes.map(([name, rating, source], index) => (
-          <View key={`${name}-${index}`} style={styles.dishRow}>
-            <Image source={source} style={styles.dishAvatar} />
-            <Text style={styles.dishName}>{name}</Text>
-            <RatingTag value={rating} />
+        {dishes.map((dish, index) => (
+          <View key={`${dish.name}-${index}`} style={styles.dishRow}>
+            <Image source={dish.imageUrl ? { uri: dish.imageUrl } : fallbackDishImages[index % fallbackDishImages.length]} style={styles.dishAvatar} />
+            <Text style={styles.dishName}>{dish.name}</Text>
+            <RatingTag value={dish.rating.toFixed(1)} />
           </View>
         ))}
       </View>
@@ -510,7 +522,7 @@ function FavoritesScreen({ onNext }: { onNext: () => void }) {
   );
 }
 
-function FollowersScreen({ onNext }: { onNext: () => void }) {
+function FollowersScreen({ count, month, onNext }: { count: number; month: string; onNext: () => void }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const people = [['AC', '#4C698F'], ['SR', '#23766E'], ['LW', '#79507D'], ['ED', '#9A7544']] as const;
@@ -524,26 +536,26 @@ function FollowersScreen({ onNext }: { onNext: () => void }) {
             </View>
           ))}
         </View>
-        <Text style={styles.followerCount}>+132</Text>
+        <Text style={styles.followerCount}>+{count}</Text>
         <Text style={styles.followerCaption}>new followers in {month}</Text>
-        <Text style={styles.followerFootnote}>Including Alex, Sofia &amp; 130 others</Text>
+        <Text style={styles.followerFootnote}>{count > 2 ? `Including Alex, Sofia & ${count - 2} others` : 'Your community is growing'}</Text>
       </View>
       <RecapButton label="Next" onPress={onNext} />
     </>
   );
 }
 
-function ComparisonScreen({ onNext }: { onNext: () => void }) {
+function ComparisonScreen({ onNext, recap }: { onNext: () => void; recap: MonthlyRecapResult }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <>
       <View style={styles.comparisonContent}>
-        <ScreenHeading title="June vs May" subtitle="See how they scored" />
+        <ScreenHeading title={`${recap.month} vs ${recap.previousMonth}`} subtitle="See how they scored" />
         <View style={styles.comparisonTable}>
-          <ComparisonRow label="Places visited" value="15" delta="↑ 4" positive />
-          <ComparisonRow label="New areas explored" value="2" delta="↑ 1" positive />
-          <ComparisonRow label="Reviews written" value="9" delta="↓ 2" />
+          <ComparisonRow label="Places visited" value={String(recap.placesVisited)} delta={deltaLabel(recap.placesVisited, recap.previousPlacesVisited)} positive={recap.placesVisited >= recap.previousPlacesVisited} />
+          <ComparisonRow label="New areas explored" value={String(recap.areasExplored)} delta={deltaLabel(recap.areasExplored, recap.previousAreasExplored)} positive={recap.areasExplored >= recap.previousAreasExplored} />
+          <ComparisonRow label="Reviews written" value={String(recap.reviewsWritten)} delta={deltaLabel(recap.reviewsWritten, recap.previousReviewsWritten)} positive={recap.reviewsWritten >= recap.previousReviewsWritten} />
         </View>
       </View>
       <RecapButton label="Next" showArrow={false} onPress={onNext} />
@@ -567,7 +579,9 @@ function ComparisonRow({ label, value, delta, positive = false }: { label: strin
   );
 }
 
-function ShareCard({ onShare, user }: { onShare: (channel: string) => void; user?: User }) {
+function deltaLabel(current: number, previous: number) { const difference = current - previous; return `${difference >= 0 ? '↑' : '↓'} ${Math.abs(difference)}`; }
+
+function ShareCard({ onShare, recap, user }: { onShare: (channel: string) => void; recap: MonthlyRecapResult; user?: User }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const profileSource: ImageSourcePropType = user?.photoURL ? { uri: user.photoURL } : avatar;
@@ -581,9 +595,9 @@ function ShareCard({ onShare, user }: { onShare: (channel: string) => void; user
       </View>
       <Text style={styles.recapTitle}>Monthly Recap</Text>
       <View style={styles.metrics}>
-        <Metric icon={placesIcon} label="Places visited" value="15" />
-        <Metric icon={areasIcon} label="New neighborhoods explored" value="2" />
-        <Metric icon={followersIcon} label="Followers gained" value="132" />
+        <Metric icon={placesIcon} label="Places visited" value={String(recap.placesVisited)} />
+        <Metric icon={areasIcon} label="New neighborhoods explored" value={String(recap.areasExplored)} />
+        <Metric icon={followersIcon} label="Followers gained" value={String(recap.followersGained)} />
       </View>
       <Text style={styles.shareHeading}>Share your recap</Text>
       <View style={styles.shareOptions}>
@@ -664,10 +678,12 @@ function RecapButton({
 }
 
 function CloseConfirmation({
+  month,
   visible,
   onKeepWatching,
   onLeave,
 }: {
+  month?: string;
   visible: boolean;
   onKeepWatching: () => void;
   onLeave: () => void;
@@ -680,7 +696,7 @@ function CloseConfirmation({
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>Leave recap?</Text>
-          <Text style={styles.sheetCopy}>You can watch your {month} recap again anytime from your profile.</Text>
+          <Text style={styles.sheetCopy}>You can watch your {month ?? 'monthly'} recap again anytime from your profile.</Text>
           <Pressable onPress={onKeepWatching} style={({ pressed }) => [styles.keepButton, pressed && styles.pressed]}>
             <Text style={styles.keepLabel}>Keep watching</Text>
           </Pressable>

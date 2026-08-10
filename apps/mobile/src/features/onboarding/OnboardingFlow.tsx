@@ -1,6 +1,9 @@
 import { createTastesApi } from '@tastes/firebase-client';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithCustomToken } from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithCustomToken } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -32,6 +35,8 @@ import { toE164PhoneNumber } from './phone-number';
 
 type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
 type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked' | 'failure' | 'sign-in-failed';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface Challenge {
   id: string;
@@ -71,6 +76,16 @@ export function OnboardingFlow() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const otpInput = useRef<TextInput>(null);
+  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const selectedGoogleClientId = Platform.select({ ios: googleIosClientId, android: googleAndroidClientId, default: googleWebClientId });
+  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
+    clientId: selectedGoogleClientId ?? googleWebClientId ?? 'not-configured.apps.googleusercontent.com',
+    iosClientId: googleIosClientId,
+    androidClientId: googleAndroidClientId,
+    webClientId: googleWebClientId,
+  });
 
   useEffect(() => {
     const timeout = setTimeout(() => setScreen('consent'), 1_250);
@@ -82,6 +97,49 @@ export function OnboardingFlow() {
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [challenge]);
+
+  useEffect(() => {
+    if (googleResponse?.type !== 'success') return;
+    const idToken = googleResponse.params.id_token;
+    if (!idToken) {
+      Alert.alert('Google sign-in failed', 'Google did not return an identity token.');
+      return;
+    }
+    setBusy(true);
+    void signInWithCredential(auth, GoogleAuthProvider.credential(idToken))
+      .catch((error: unknown) => Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.'))
+      .finally(() => setBusy(false));
+  }, [googleResponse]);
+
+  const signInWithGoogle = async () => {
+    if (!selectedGoogleClientId && !googleWebClientId) {
+      Alert.alert('Google sign-in needs configuration', 'Add an OAuth client ID to EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID or EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID.');
+      return;
+    }
+    if (!googleRequest) return;
+    await promptGoogle();
+  };
+
+  const signInWithApple = async () => {
+    if (Platform.OS !== 'ios' || !await AppleAuthentication.isAvailableAsync()) {
+      Alert.alert('Apple sign-in unavailable', 'Sign in with Apple is available on supported Apple devices.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await AppleAuthentication.signInAsync({
+        requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
+      });
+      if (!result.identityToken) throw new Error('Apple did not return an identity token.');
+      await signInWithCredential(auth, new OAuthProvider('apple.com').credential({ idToken: result.identityToken }));
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Apple sign-in failed', error instanceof Error ? error.message : 'Please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const resendSeconds = challenge
     ? Math.max(0, Math.ceil((Date.parse(challenge.resendAvailableAt) - now) / 1_000))
@@ -158,7 +216,7 @@ export function OnboardingFlow() {
   }
 
   if (screen === 'entry') return <EntryScreen />;
-  if (screen === 'consent') return <ConsentScreen onPhone={() => setScreen('phone')} />;
+  if (screen === 'consent') return <ConsentScreen busy={busy} onApple={signInWithApple} onGoogle={signInWithGoogle} onPhone={() => setScreen('phone')} />;
   if (screen === 'country') {
     return (
       <CountryScreen
@@ -215,15 +273,20 @@ function EntryScreen() {
   const { isDark } = useAppTheme();
   const styles = useOnboardingStyles();
   return (
-    <LinearGradient colors={isDark ? ['#560E0B', '#000000'] : ['#F7E8E4', '#F2EFEA']} style={styles.fullScreen}>
-      <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.entryPattern} style={styles.centered}>
+    <LinearGradient colors={isDark ? ['#560E0B', '#000000'] : ['#F2EFEA', '#F2EFEA']} style={styles.fullScreen}>
+      <ImageBackground
+        source={pattern}
+        resizeMode="cover"
+        imageStyle={{ opacity: isDark ? 0.04 : 0.05, tintColor: isDark ? '#FFFFFF' : '#000000' }}
+        style={styles.centered}
+      >
         <TastesLogo width={189} />
       </ImageBackground>
     </LinearGradient>
   );
 }
 
-function ConsentScreen({ onPhone }: { onPhone: () => void }) {
+function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; onApple: () => void; onGoogle: () => void; onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
   const { height, width } = useWindowDimensions();
   const styles = useOnboardingStyles();
@@ -238,7 +301,6 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
     { left: width * 0.31, top: pinTop(287) },
     { left: width * 0.81, top: pinTop(319) },
   ];
-  const unavailable = (provider: string) => Alert.alert(`${provider} sign-in`, 'This provider is not configured in the local test build yet.');
   return (
     <View style={styles.fullScreen}>
       <View style={[styles.heroLayer, { height: heroHeight }]}>
@@ -263,9 +325,9 @@ function ConsentScreen({ onPhone }: { onPhone: () => void }) {
             <View style={styles.socialSection}>
               <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
               <View style={styles.socialRow}>
-                <SocialButton icon={google} label="Google" onPress={() => unavailable('Google')} />
+                <SocialButton icon={google} label="Google" onPress={busy ? () => undefined : onGoogle} />
                 {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
-                <SocialButton icon={apple} label="Apple" onPress={() => unavailable('Apple')} tint={colors.text} />
+                <SocialButton icon={apple} label="Apple" onPress={busy ? () => undefined : onApple} tint={colors.text} />
               </View>
               <Text style={styles.legal}>By continuing you agree to our <Text style={styles.legalLink}>Terms of Service</Text> & <Text style={styles.legalLink}>Privacy Policy</Text></Text>
             </View>
@@ -458,9 +520,6 @@ function OtpScreen(props: {
 const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // pattern.png is dark linework on a transparent field, meant as a faint
-  // texture (Figma uses ~4-8% opacity here), not a bold full-strength layer.
-  entryPattern: { opacity: 0.06 },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
   hero: { width: '100%', height: '100%' },
   ratingPin: { position: 'absolute', zIndex: 0, width: 44, height: 68, alignItems: 'center' },

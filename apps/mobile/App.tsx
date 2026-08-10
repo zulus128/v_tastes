@@ -1,7 +1,7 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
@@ -20,9 +20,12 @@ configureObservability();
 function AppGate() {
   const { state, completeOnboarding, logout, refresh } = useSession();
   const { colors, isDark } = useAppTheme();
+  const splashHidden = useRef(false);
 
-  useEffect(() => {
-    if (state.status !== 'booting') SplashScreen.hide();
+  const onRootLayout = useCallback(() => {
+    if (state.status === 'booting' || splashHidden.current) return;
+    splashHidden.current = true;
+    SplashScreen.hide();
   }, [state.status]);
 
   useEffect(() => {
@@ -34,12 +37,12 @@ function AppGate() {
   if (state.status === 'booting') return null;
 
   if (state.status === 'anonymous') {
-    return <View style={[styles.root, { backgroundColor: colors.background }]}><StatusBar style={isDark ? 'light' : 'dark'} /><OnboardingFlow /></View>;
+    return <View onLayout={onRootLayout} style={[styles.root, { backgroundColor: colors.background }]}><StatusBar style={isDark ? 'light' : 'dark'} /><OnboardingFlow /></View>;
   }
 
   if (state.status === 'error') {
     return (
-      <View style={[styles.error, { backgroundColor: colors.canvas }]}>
+      <View onLayout={onRootLayout} style={[styles.error, { backgroundColor: colors.canvas }]}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <Text style={[styles.errorTitle, { color: colors.text }]}>Could not load your account</Text>
         <Text style={[styles.errorBody, { color: colors.textMuted }]}>{state.error.message}</Text>
@@ -55,7 +58,7 @@ function AppGate() {
 
   if (state.status === 'onboarding') {
     return (
-      <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View onLayout={onRootLayout} style={[styles.root, { backgroundColor: colors.background }]}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <PostSignupOnboardingFlow
           onAuthenticationRequired={logout}
@@ -66,7 +69,7 @@ function AppGate() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View onLayout={onRootLayout} style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <ProductNavigator user={state.user} />
     </View>

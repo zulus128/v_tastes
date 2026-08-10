@@ -1,6 +1,7 @@
 import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,9 +14,10 @@ import {
   Text,
   TextInput,
   View,
+  Modal,
   type ImageSourcePropType,
 } from 'react-native';
-import mapImage from '../../../assets/discover/map.png';
+import MapView, { Marker, type Region } from 'react-native-maps';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
@@ -102,24 +104,17 @@ function venueToPlace(venue: Venue): Place {
   };
 }
 
-const MAP_BOUNDS = { latMin: 40.95, latMax: 41.08, lonMin: 28.96, lonMax: 29.08 };
-
-function clampPercent(value: number): number {
-  return Math.min(88, Math.max(8, value));
-}
-
-function projectToMap(latitude?: number, longitude?: number): { left: `${number}%`; top: `${number}%` } {
-  if (latitude == null || longitude == null) return { left: '50%', top: '50%' };
-  const left = clampPercent(((longitude - MAP_BOUNDS.lonMin) / (MAP_BOUNDS.lonMax - MAP_BOUNDS.lonMin)) * 100);
-  const top = clampPercent(((MAP_BOUNDS.latMax - latitude) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * 100);
-  return { left: `${left}%`, top: `${top}%` };
-}
-
 export function DiscoverScreen({
+  appliedFilters,
+  onOpenAI,
+  onOpenFilters,
   onOpenPlace,
   onOpenProfile,
   userId,
 }: {
+  appliedFilters: string[];
+  onOpenAI: () => void;
+  onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (person: DiscoverPerson) => void;
   userId: string;
@@ -134,6 +129,7 @@ export function DiscoverScreen({
   const feedQuery = useDiscoverFeed(userId);
   const toggleFollow = useToggleFollow(userId);
   const [followPendingId, setFollowPendingId] = useState<string | null>(null);
+  const [seeAllPlaces, setSeeAllPlaces] = useState<Venue[] | null>(null);
 
   function selectTab(value: DiscoverTab) {
     setTab(value);
@@ -177,8 +173,8 @@ export function DiscoverScreen({
           <TrendingLoading />
         ) : feedQuery.isError ? (
           <View style={styles.centerState}>
-            <Text style={styles.stateTitle}>Could not load Discover</Text>
-            <Text style={styles.stateCopy}>{feedQuery.error.message}</Text>
+            <Text style={styles.stateTitle}>{/network|offline|unavailable/i.test(feedQuery.error.message) ? 'You’re offline' : 'Could not load Discover'}</Text>
+            <Text style={styles.stateCopy}>{/network|offline|unavailable/i.test(feedQuery.error.message) ? 'Reconnect to refresh trending places. Your saved places are still available.' : feedQuery.error.message}</Text>
             <Pressable onPress={() => void feedQuery.refetch()} style={styles.retry}>
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
@@ -191,6 +187,7 @@ export function DiscoverScreen({
             onSave={setSaveTarget}
             onOpenPlace={onOpenPlace}
             onToggleFollow={handleToggleFollow}
+            onSeeAll={setSeeAllPlaces}
             savedVenueIds={savedVenueIds}
           />
         )
@@ -198,7 +195,9 @@ export function DiscoverScreen({
       {tab === 'places' && favouritesOpen ? <FavouritesPane onOpenPlace={onOpenPlace} userId={userId} /> : null}
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
+          appliedFilters={appliedFilters}
           onOpenFavourites={() => setFavouritesOpen(true)}
+          onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
           onSave={setSaveTarget}
           savedVenueIds={savedVenueIds}
@@ -212,6 +211,10 @@ export function DiscoverScreen({
         userId={userId}
         visible={saveTarget !== null}
       />
+      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={styles.aiFab}>
+        <Text style={styles.aiFabMark}>T</Text><Text style={styles.aiFabText}>Ask AI</Text>
+      </Pressable>
+      <SeeAllPlacesModal onClose={() => setSeeAllPlaces(null)} onOpenPlace={onOpenPlace} onSave={setSaveTarget} savedVenueIds={savedVenueIds} venues={seeAllPlaces} />
     </View>
   );
 }
@@ -252,6 +255,7 @@ function TrendingFeed({
   onSave,
   onOpenPlace,
   onToggleFollow,
+  onSeeAll,
   savedVenueIds,
 }: {
   feed: DiscoverFeed;
@@ -260,6 +264,7 @@ function TrendingFeed({
   onSave: (place: SaveablePlace) => void;
   onOpenPlace: (venueId: string) => void;
   onToggleFollow: (person: DiscoverPerson) => void;
+  onSeeAll: (venues: Venue[]) => void;
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
@@ -312,7 +317,7 @@ function TrendingFeed({
 
       {feed.trending.length > 0 ? (
         <>
-          <SectionLabel title="Trending near you" subtitle="Highly rated within 1 mi" />
+          <SectionLabel title="Trending near you" subtitle="Highly rated within 1 mi" onSeeAll={() => onSeeAll(feed.trending)} />
           <ScrollView
             contentContainerStyle={styles.horizontalContent}
             horizontal
@@ -426,13 +431,17 @@ function TrendingFeed({
 }
 
 function PlacesMap({
+  appliedFilters,
   onOpenFavourites,
+  onOpenFilters,
   onOpenPlace,
   onSave,
   savedVenueIds,
   userId,
 }: {
+  appliedFilters: string[];
   onOpenFavourites: () => void;
+  onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
   onSave: (place: SaveablePlace) => void;
   savedVenueIds: Set<string>;
@@ -442,6 +451,13 @@ function PlacesMap({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
+  const [locationEnabled, setLocationEnabled] = useState(true);
+  const [layer, setLayer] = useState<'default' | 'transit' | 'satellite'>('default');
+  const [layersOpen, setLayersOpen] = useState(false);
+  const mapRef = useRef<MapView | null>(null);
+  const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
+  const [sort, setSort] = useState<'best' | 'top' | 'nearest' | 'reviewed' | 'newest'>('best');
+  const [sortOpen, setSortOpen] = useState(false);
   const catalogueQuery = useDiscoverVenues(userId);
   const venuesQuery = useDiscoverVenues(userId, activeFilter ?? {});
   const catalogueVenues = catalogueQuery.data?.pages.flatMap((page) => page.items) ?? [];
@@ -462,22 +478,35 @@ function PlacesMap({
   const filtered = venues.filter((venue) => {
     const query = search.trim().toLowerCase();
     if (query && !venue.name.toLowerCase().includes(query)) return false;
+    const cuisines = appliedFilters.filter((value) => /🇮🇹|🇯🇵|🇬🇪|🇹🇭|🇺🇸|🇮🇳|🇲🇽|🇨🇳/.test(value)).map((value) => value.split(' ')[0]?.toLowerCase());
+    if (cuisines.length > 0 && !cuisines.some((value) => value && venue.category?.toLowerCase().includes(value))) return false;
+    const prices = appliedFilters.filter((value) => /^\${1,4}$/.test(value));
+    if (prices.length > 0 && !prices.includes('$'.repeat(venue.priceLevel ?? 1))) return false;
+    if (appliedFilters.includes('Vegetarian 🥦') && !['cafe', 'italian', 'japanese'].includes(venue.category?.toLowerCase() ?? '')) return false;
+    if (appliedFilters.includes('Vegan 🌱') && !['cafe', 'mexican'].includes(venue.category?.toLowerCase() ?? '')) return false;
+    if (appliedFilters.includes('Gluten free') && !['japanese', 'mexican'].includes(venue.category?.toLowerCase() ?? '')) return false;
+    if (appliedFilters.includes('Date night') && (venue.priceLevel ?? 1) < 2) return false;
+    if (appliedFilters.includes('With friends') && (venue.reviewCount ?? 0) < 200) return false;
+    if (appliedFilters.includes('Quick bite') && (venue.priceLevel ?? 1) > 2) return false;
+    if (appliedFilters.includes('Open late') && venue.category?.toLowerCase() === 'cafe') return false;
     return true;
-  });
+  }).sort((left, right) => sort === 'top' ? (right.rating ?? 0) - (left.rating ?? 0) : sort === 'nearest' ? (left.distanceKm ?? 999) - (right.distanceKm ?? 999) : sort === 'reviewed' ? (right.reviewCount ?? 0) - (left.reviewCount ?? 0) : sort === 'newest' ? Number(right.discoverTags?.includes('new')) - Number(left.discoverTags?.includes('new')) : ((right.rating ?? 0) * 10 + (right.reviewCount ?? 0) / 100) - ((left.rating ?? 0) * 10 + (left.reviewCount ?? 0) / 100));
+
+  async function toggleLocation() { if (locationEnabled) { setLocationEnabled(false); return; } const permission = await Location.requestForegroundPermissionsAsync(); if (permission.status === 'granted') { const position = await Location.getCurrentPositionAsync(); const next = { latitude: position.coords.latitude, longitude: position.coords.longitude, latitudeDelta: 0.045, longitudeDelta: 0.045 }; setRegion(next); mapRef.current?.animateToRegion(next, 450); setLocationEnabled(true); } else Alert.alert('Location is off', 'Enable location in Settings or keep browsing the selected city.'); }
+  function zoom(multiplier: number) { const next = { ...region, latitudeDelta: Math.min(0.8, Math.max(0.008, region.latitudeDelta * multiplier)), longitudeDelta: Math.min(0.8, Math.max(0.008, region.longitudeDelta * multiplier)) }; setRegion(next); mapRef.current?.animateToRegion(next, 240); }
 
   return (
     <View style={styles.mapScreen}>
-      <Image source={mapImage} style={styles.mapImage} />
-      {filtered.map((venue) => {
-        const position = projectToMap(venue.latitude, venue.longitude);
-        return <MapPin key={venue.id} left={position.left} onPress={() => onOpenPlace(venue.id)} top={position.top} value={(venue.rating ?? 0).toFixed(1)} />;
-      })}
+      <MapView ref={mapRef} initialRegion={region} mapType={layer === 'satellite' ? 'hybrid' : 'standard'} onRegionChangeComplete={setRegion} showsCompass={false} showsMyLocationButton={false} showsTraffic={layer === 'transit'} showsUserLocation={locationEnabled} style={styles.mapNative}>{filtered.filter((venue) => venue.latitude != null && venue.longitude != null).map((venue) => <Marker coordinate={{ latitude: venue.latitude!, longitude: venue.longitude! }} key={venue.id} onPress={() => onOpenPlace(venue.id)}><View style={styles.mapPin}><Text style={styles.mapPinText}>{(venue.rating ?? 0).toFixed(1)}</Text><View style={styles.mapPinTip} /></View></Marker>)}</MapView>
+      {!locationEnabled ? <Pressable onPress={() => void toggleLocation()} style={styles.locationBanner}><Text style={styles.locationBannerTitle}>Location is off</Text><Text style={styles.locationBannerCopy}>Turn on location to discover places and friends near you.</Text></Pressable> : null}
+      {layer !== 'default' ? <View style={styles.layerBadge}><Text style={styles.layerBadgeText}>{layer === 'transit' ? 'Transit' : 'Satellite'} map</Text></View> : null}
       <View style={styles.mapControls}>
-        <Text style={styles.mapControl}>+</Text>
-        <Text style={styles.mapControl}>−</Text>
-        <Text style={styles.mapControl}>⌖</Text>
-        <Text style={styles.mapControl}>▱</Text>
+        <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.65)}><Text style={styles.mapControl}>+</Text></Pressable>
+        <Pressable accessibilityLabel="Zoom out" onPress={() => zoom(1.5)}><Text style={styles.mapControl}>−</Text></Pressable>
+        <Pressable accessibilityLabel={locationEnabled ? 'Disable location' : 'Enable location'} onPress={() => void toggleLocation()}><Text style={[styles.mapControl, !locationEnabled && styles.mapControlActive]}>⌖</Text></Pressable>
+        <Pressable accessibilityLabel="Map layers" onPress={() => setLayersOpen((value) => !value)}><Text style={[styles.mapControl, layersOpen && styles.mapControlActive]}>▱</Text></Pressable>
       </View>
+      {layersOpen ? <View style={styles.layersMenu}>{(['default', 'transit', 'satellite'] as const).map((value) => <Pressable key={value} onPress={() => { setLayer(value); setLayersOpen(false); }} style={[styles.layerOption, layer === value && styles.layerOptionActive]}><Text style={styles.layerOptionText}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>)}</View> : null}
       <View style={styles.mapSheet}>
         <View style={styles.sheetHandle} />
         <View style={styles.mapSearchRow}>
@@ -492,7 +521,7 @@ function PlacesMap({
             />
             <Text style={styles.voiceGlyph}>●</Text>
           </View>
-          <Text style={styles.filterGlyph}>☷</Text>
+          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><Text style={styles.filterGlyph}>☷</Text></Pressable>
           <Pressable accessibilityLabel="Open favourites" hitSlop={10} onPress={onOpenFavourites}>
             <Text style={[styles.filterGlyph, styles.favouritesGlyph]}>♥</Text>
           </Pressable>
@@ -502,6 +531,7 @@ function PlacesMap({
           horizontal
           showsHorizontalScrollIndicator={false}
         >
+          {appliedFilters.length > 0 ? <Pressable onPress={onOpenFilters} style={[styles.filterChip, styles.filterChipActive]}><Text style={[styles.filterText, styles.filterTextActive]}>{appliedFilters.length} filters</Text></Pressable> : null}
           {filters.map((filter) => {
             const active = activeFilter?.key === filter.key;
             return (
@@ -515,6 +545,7 @@ function PlacesMap({
             );
           })}
         </ScrollView>
+        <Pressable onPress={() => setSortOpen(true)} style={styles.mapSort}><Text style={styles.mapSortText}>Sort by: {sort === 'best' ? 'Best match' : sort === 'top' ? 'Top rated' : sort === 'nearest' ? 'Nearest first' : sort === 'reviewed' ? 'Most reviewed' : 'Newest'} ▾</Text></Pressable>
         {venuesQuery.isPending ? (
           <View style={styles.placesStatus}><ActivityIndicator color={colors.primary} /></View>
         ) : venuesQuery.isError ? (
@@ -553,6 +584,7 @@ function PlacesMap({
           </ScrollView>
         )}
       </View>
+      <Modal animationType="fade" transparent visible={sortOpen} onRequestClose={() => setSortOpen(false)}><Pressable onPress={() => setSortOpen(false)} style={styles.sortScrim}><View style={styles.sortMenu}><Text style={styles.sortTitle}>Sort by</Text>{([['best', 'Best match'], ['top', 'Top rated'], ['nearest', 'Nearest first'], ['reviewed', 'Most reviewed'], ['newest', 'Newest']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setSort(value); setSortOpen(false); }} style={styles.sortOption}><Text style={styles.sortOptionText}>{label}</Text><Text style={styles.sortOptionText}>{sort === value ? '●' : '○'}</Text></Pressable>)}</View></Pressable></Modal>
     </View>
   );
 }
@@ -564,6 +596,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
   const peopleQuery = useDiscoverPeople(userId);
   const toggleFollow = useToggleFollow(userId);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [seeMore, setSeeMore] = useState(false);
 
   function handleFollow(person: DiscoverPerson) {
     if (person.userId === userId || toggleFollow.isPending) return;
@@ -609,7 +642,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
         <>
           {trending.length > 0 ? (
             <>
-              <PeopleSectionHeader subtitle="Gaining followers this week" title="🔥 Trending tastemakers" />
+              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Gaining followers this week" title="🔥 Trending tastemakers" />
               <ScrollView
                 contentContainerStyle={styles.peopleCarousel}
                 horizontal
@@ -631,7 +664,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
 
           {freshPeople.length > 0 ? (
             <>
-              <PeopleSectionHeader subtitle="Just joined the community" title="New on Tastes" />
+              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Just joined the community" title="New on Tastes" />
               <View style={styles.compactPeople}>
                 {freshPeople.map((person) => (
                   <CompactPerson
@@ -649,7 +682,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
 
           {suggested.length > 0 ? (
             <>
-              <PeopleSectionHeader subtitle="Based on mutual connections" title="Similar to people you follow" />
+              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Based on mutual connections" title="Similar to people you follow" />
               <View style={styles.profileList}>
                 {suggested.map((person) => (
                   <ProfileSuggestion
@@ -670,19 +703,26 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
           ) : null}
         </>
       )}
+      <Modal animationType="slide" visible={seeMore} onRequestClose={() => setSeeMore(false)}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={() => setSeeMore(false)} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending tastemakers</Text><View style={styles.headerAction} /></View><ScrollView contentContainerStyle={styles.profileList}>{[...trending, ...freshPeople, ...suggested].map((person) => <ProfileSuggestion following={person.following} key={person.userId} onFollow={() => handleFollow(person)} onOpen={() => { setSeeMore(false); onOpenProfile(person); }} pending={toggleFollow.isPending || pendingId === person.userId} person={person} />)}</ScrollView></View></Modal>
     </ScrollView>
   );
 }
 
-function SectionLabel({ subtitle, title }: { subtitle: string; title: string }) {
+function SectionLabel({ onSeeAll, subtitle, title }: { onSeeAll?: () => void; subtitle: string; title: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionLabel}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+      <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.sectionSubtitle}>{subtitle}</Text></View>
+      {onSeeAll ? <Pressable onPress={onSeeAll}><Text style={styles.seeMoreLink}>See all →</Text></Pressable> : null}
     </View>
   );
+}
+
+function SeeAllPlacesModal({ onClose, onOpenPlace, onSave, savedVenueIds, venues }: { onClose: () => void; onOpenPlace: (id: string) => void; onSave: (place: SaveablePlace) => void; savedVenueIds: Set<string>; venues: Venue[] | null }) {
+  const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]); const [query, setQuery] = useState('');
+  const visible = (venues ?? []).filter((venue) => venue.name.toLowerCase().includes(query.toLowerCase()));
+  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: 16 }]}><Text style={styles.searchGlyph}>⌕</Text><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 10 }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
 }
 
 function RatingPill({ value }: { value: string }) {
@@ -867,18 +907,7 @@ function HiddenGem({ onOpen, place }: { onOpen: () => void; place: Place }) {
   );
 }
 
-function MapPin({ left, onPress, top, value }: { left: `${number}%`; onPress: () => void; top: `${number}%`; value: string }) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <Pressable onPress={onPress} style={[styles.mapPin, { left, top }]}>
-      <Text style={styles.mapPinText}>{value}</Text>
-      <View style={styles.mapPinTip} />
-    </Pressable>
-  );
-}
-
-function PeopleSectionHeader({ subtitle, title }: { subtitle: string; title: string }) {
+function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore: () => void; subtitle: string; title: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -887,7 +916,7 @@ function PeopleSectionHeader({ subtitle, title }: { subtitle: string; title: str
         <Text style={styles.peopleSectionTitle}>{title}</Text>
         <Text style={styles.peopleSectionSubtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.seeMoreLink}>See more →</Text>
+      <Pressable onPress={onSeeMore}><Text style={styles.seeMoreLink}>See more →</Text></Pressable>
     </View>
   );
 }
@@ -1009,7 +1038,12 @@ function ProfileSuggestion({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
+  aiFab: { position: 'absolute', right: 16, bottom: 18, height: 48, paddingHorizontal: 15, flexDirection: 'row', gap: 7, alignItems: 'center', borderRadius: 24, backgroundColor: colors.primary, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6 },
+  aiFabMark: { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', backgroundColor: '#FFFFFF', color: colors.primary, fontSize: 13, lineHeight: 24, fontWeight: '900', textAlign: 'center' },
+  aiFabText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   header: { height: 106, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
+  headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
+  back: { color: colors.text, fontSize: 38, lineHeight: 40 },
   switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 999, backgroundColor: colors.surfaceRaised },
   switchOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
   switchOptionActive: { backgroundColor: '#D9DDE5' },
@@ -1057,7 +1091,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   ratingPill: { height: 20, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center' },
   ratingText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   imageMetaText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
-  sectionLabel: { height: 58, paddingHorizontal: 16, paddingTop: 18 },
+  sectionLabel: { height: 58, paddingHorizontal: 16, paddingTop: 18, flexDirection: 'row', alignItems: 'flex-start' },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   sectionSubtitle: { marginTop: 2, color: colors.textSecondary, fontSize: 13 },
   horizontalContent: { paddingHorizontal: 16, gap: 10 },
@@ -1128,15 +1162,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   gemName: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gemMeta: { color: colors.textSecondary, fontSize: 11 },
   mapScreen: { flex: 1, backgroundColor: '#161616', overflow: 'hidden' },
-  mapImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', resizeMode: 'cover' },
-  mapPin: { position: 'absolute', width: 42, height: 42, borderRadius: 21, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center', shadowColor: '#FF4757', shadowOpacity: 0.65, shadowRadius: 10 },
+  mapNative: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  mapPin: { width: 42, height: 42, marginBottom: 8, borderRadius: 21, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center', shadowColor: '#FF4757', shadowOpacity: 0.65, shadowRadius: 10 },
   mapPinText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   mapPinTip: { position: 'absolute', bottom: -4, width: 10, height: 10, backgroundColor: '#FF4757', transform: [{ rotate: '45deg' }] },
   mapControls: { position: 'absolute', top: 94, right: 16, gap: 8 },
   mapControl: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(22,22,22,0.9)', color: '#FFFFFF', fontSize: 22, lineHeight: 40, textAlign: 'center', overflow: 'hidden' },
+  mapControlActive: { backgroundColor: colors.primary },
+  locationBanner: { position: 'absolute', top: 94, left: 16, right: 72, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, backgroundColor: 'rgba(22,22,22,0.94)' },
+  locationBannerTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  locationBannerCopy: { marginTop: 3, color: '#C9C9C9', fontSize: 11, lineHeight: 15 },
+  layerBadge: { position: 'absolute', top: 52, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: 'rgba(22,22,22,0.86)' },
+  layerBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  layersMenu: { position: 'absolute', top: 94, right: 66, width: 130, padding: 6, gap: 4, borderRadius: 14, backgroundColor: 'rgba(22,22,22,0.96)' },
+  layerOption: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
+  layerOptionActive: { backgroundColor: colors.primary },
+  layerOptionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 330, paddingTop: 8, paddingHorizontal: 16, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: colors.canvas },
   sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { height: 49, marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  mapSort: { alignSelf: 'flex-end', marginTop: 3, marginBottom: 3, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 13, backgroundColor: colors.surfaceRaised },
+  mapSortText: { color: colors.textSecondary, fontSize: 11 },
+  sortScrim: { flex: 1, justifyContent: 'flex-end', padding: 16, backgroundColor: 'rgba(0,0,0,0.65)' },
+  sortMenu: { padding: 18, borderRadius: 22, backgroundColor: colors.surface },
+  sortTitle: { marginBottom: 8, color: colors.text, fontSize: 18, fontWeight: '700' },
+  sortOption: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  sortOptionText: { color: colors.text, fontSize: 15 },
   mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
   searchGlyph: { color: colors.textSecondary, fontSize: 21 },
   mapSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },

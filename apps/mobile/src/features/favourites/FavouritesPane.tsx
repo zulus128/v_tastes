@@ -49,6 +49,7 @@ export function FavouritesPane({ onOpenPlace, userId }: { onOpenPlace: (venueId:
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [editor, setEditor] = useState<FolderEditor | null>(null);
   const [folderMenu, setFolderMenu] = useState<FavouriteFolder | null>(null);
+  const [sort, setSort] = useState<'top' | 'nearest' | 'newest'>('top');
 
   const folders = favourites.data?.folders ?? [];
   const allPlaces = favourites.data?.places ?? [];
@@ -155,16 +156,16 @@ export function FavouritesPane({ onOpenPlace, userId }: { onOpenPlace: (venueId:
         <>
           <View style={styles.sortRow}>
             <Text style={styles.countText}>{places.length} {places.length === 1 ? 'place' : 'places'}</Text>
-            <View style={styles.sortPill}>
-              <Text style={styles.sortText}>Sort by: Top rated</Text>
+            <Pressable onPress={() => Alert.alert('Sort by', undefined, [{ text: 'Top rated', onPress: () => setSort('top') }, { text: 'Nearest first', onPress: () => setSort('nearest') }, { text: 'Newest', onPress: () => setSort('newest') }, { text: 'Cancel', style: 'cancel' }])} style={styles.sortPill}>
+              <Text style={styles.sortText}>Sort by: {sort === 'top' ? 'Top rated' : sort === 'nearest' ? 'Nearest first' : 'Newest'}</Text>
               <Text style={styles.sortChevron}>▾</Text>
-            </View>
+            </Pressable>
           </View>
           <ScrollView
             contentContainerStyle={styles.placeList}
             showsVerticalScrollIndicator={false}
           >
-            {[...places].sort((left, right) => right.rating - left.rating).map((place, index) => (
+            {[...places].sort((left, right) => sort === 'top' ? right.rating - left.rating : sort === 'nearest' ? left.distanceKm - right.distanceKm : right.venueId.localeCompare(left.venueId)).map((place, index) => (
               <FavouriteCard
                 key={place.venueId}
                 index={index}
