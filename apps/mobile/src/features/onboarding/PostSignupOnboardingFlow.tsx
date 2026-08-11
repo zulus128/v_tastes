@@ -75,6 +75,7 @@ import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, functions, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
+import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
 type Screen =
@@ -416,12 +417,12 @@ export function PostSignupOnboardingFlow({
     setBusy(true);
     try {
       await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
-      await onComplete({
-        favoriteDish: dish ?? undefined,
-        favoriteVenueId: place ?? undefined,
+      await onComplete(buildCompletionInput({
+        dish,
+        place,
         invitedContactCount: invitedCount,
         appearance: automatic ? 'system' : (darkMode ? 'dark' : 'light'),
-      });
+      }));
     } catch (error) {
       if (isUnauthenticated(error)) {
         await onAuthenticationRequired();

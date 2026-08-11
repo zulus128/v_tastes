@@ -14,19 +14,33 @@ import { SessionProvider, useSession } from './src/session/SessionProvider';
 import { ThemeProvider, useAppTheme } from './src/ui/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
-SplashScreen.setOptions({ duration: 300, fade: true });
+SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
+
+const splashStartedAt = Date.now();
+const minimumSplashDurationMs = 2_000;
 
 function AppGate() {
   const { state, completeOnboarding, logout, refresh } = useSession();
   const { colors, isDark } = useAppTheme();
   const splashHidden = useRef(false);
+  const splashHideTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const onRootLayout = useCallback(() => {
     if (state.status === 'booting' || splashHidden.current) return;
     splashHidden.current = true;
-    SplashScreen.hide();
+    const remainingDuration = Math.max(
+      0,
+      minimumSplashDurationMs - (Date.now() - splashStartedAt),
+    );
+    splashHideTimeout.current = setTimeout(() => {
+      void SplashScreen.hideAsync();
+    }, remainingDuration);
   }, [state.status]);
+
+  useEffect(() => () => {
+    if (splashHideTimeout.current) clearTimeout(splashHideTimeout.current);
+  }, []);
 
   useEffect(() => {
     if (state.status === 'authenticated') return undefined;

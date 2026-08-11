@@ -14,7 +14,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSContactsUsageDescription": "Tastes uses your contacts to help you find and invite friends."
+        "NSContactsUsageDescription": "Tastes uses your contacts to help you find and invite friends.",
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
       },
       "appleTeamId": "7TTF49AXF6"
     },
@@ -50,6 +54,17 @@
           "dark": {
             "backgroundColor": "#2B0706",
             "image": "./assets/onboarding/logo.png"
+          },
+          "ios": {
+            "backgroundColor": "#F2EFEA",
+            "image": "./assets/onboarding/splash-screen-light.png",
+            "imageWidth": 402,
+            "resizeMode": "cover",
+            "enableFullScreenImage_legacy": true,
+            "dark": {
+              "backgroundColor": "#000000",
+              "image": "./assets/onboarding/splash-screen-dark.png"
+            }
           }
         }
       ],

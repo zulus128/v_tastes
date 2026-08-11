@@ -45,6 +45,15 @@ STRESS_SCROLL_COUNT=300 pnpm seed
 STRESS_SCROLL_CLEANUP=true pnpm seed
 ```
 
+For an image-heavy feed test, create up to 500 isolated reviews with two unique
+remote dish-image URLs per card. Open Home → Friends after seeding. Cleanup removes
+only fixture documents and the Storage objects referenced by those documents:
+
+```bash
+STRESS_IMAGE_COUNT=300 pnpm seed
+STRESS_IMAGE_CLEANUP=true pnpm seed
+```
+
 Useful focused commands:
 
 ```bash

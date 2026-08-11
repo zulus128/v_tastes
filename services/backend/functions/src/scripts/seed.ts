@@ -1,9 +1,15 @@
 const seedRemote = process.env.SEED_REMOTE === 'true';
 const stressScrollCount = Number(process.env.STRESS_SCROLL_COUNT ?? 0);
 const stressScrollCleanup = process.env.STRESS_SCROLL_CLEANUP === 'true';
+const stressImageCount = Number(process.env.STRESS_IMAGE_COUNT ?? 0);
+const stressImageCleanup = process.env.STRESS_IMAGE_CLEANUP === 'true';
 
 if (!Number.isInteger(stressScrollCount) || stressScrollCount < 0 || stressScrollCount > 1_000) {
   throw new Error('STRESS_SCROLL_COUNT must be an integer between 0 and 1000.');
+}
+
+if (!Number.isInteger(stressImageCount) || stressImageCount < 0 || stressImageCount > 500) {
+  throw new Error('STRESS_IMAGE_COUNT must be an integer between 0 and 500.');
 }
 
 if (seedRemote) {
@@ -582,6 +588,90 @@ async function main() {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   }));
+
+  if (stressImageCount > 0 || stressImageCleanup) {
+    const stressReviews = await db.collection('reviews')
+      .where('source', '==', 'stress-image-scroll')
+      .get();
+    const bucket = getStorage().bucket();
+    const stressPhotoPaths = stressReviews.docs.flatMap((document) => {
+      const dishReviews = document.get('dishReviews');
+      if (!Array.isArray(dishReviews)) return [];
+      return dishReviews.flatMap((dish: unknown) => {
+        if (typeof dish !== 'object' || dish === null || !('photoPath' in dish)) return [];
+        return typeof dish.photoPath === 'string' ? [dish.photoPath] : [];
+      });
+    });
+    for (let start = 0; start < stressPhotoPaths.length; start += 20) {
+      await Promise.all(stressPhotoPaths.slice(start, start + 20).map((photoPath) =>
+        bucket.file(photoPath).delete({ ignoreNotFound: true })));
+    }
+    const cleanupWriter = db.bulkWriter();
+    stressReviews.docs.forEach((document) => cleanupWriter.delete(document.ref));
+    await cleanupWriter.close();
+
+    // Remove files created by the original version of this fixture, which used
+    // a path that authenticated mobile clients are not permitted to read.
+    await bucket.deleteFiles({ prefix: 'seed-media/stress-reviews/' });
+
+    if (stressImageCount > 0) {
+      const workspaceRoot = resolve(__dirname, '../../../../..');
+      const imageAssets = [seedMedia.venues.sushi, seedMedia.venues.tacos] as const;
+      const imageBuffers = await Promise.all(imageAssets.map((assetPath) =>
+        readFile(resolve(workspaceRoot, assetPath))));
+      const stressAuthors = ['discover-kristin', 'discover-cameron', 'discover-wade'] as const;
+
+      for (let start = 0; start < stressImageCount; start += 20) {
+        const indexes = Array.from(
+          { length: Math.min(20, stressImageCount - start) },
+          (_, offset) => start + offset,
+        );
+        await Promise.all(indexes.map(async (index) => {
+          const reviewNumber = String(index + 1).padStart(4, '0');
+          const authorId = stressAuthors[index % stressAuthors.length]!;
+          const author = usersById.get(authorId)!;
+          const venue = venues[index % venues.length]!;
+          const reviewId = `stress-image-scroll-${reviewNumber}`;
+          const dishReviews = await Promise.all([0, 1].map(async (imageIndex) => {
+            const photoPath = `review-images/${authorId}/${reviewId}/dish-${imageIndex + 1}.jpg`;
+            const token = seedDownloadToken(photoPath);
+            await bucket.file(photoPath).save(imageBuffers[(index + imageIndex) % imageBuffers.length]!, {
+              resumable: false,
+              metadata: {
+                contentType: 'image/jpeg',
+                cacheControl: 'public,max-age=31536000,immutable',
+                metadata: { firebaseStorageDownloadTokens: token },
+              },
+            });
+            return {
+              id: `stress-dish-${imageIndex + 1}`,
+              title: imageIndex === 0 ? `Chef special ${reviewNumber}` : `Late-night plate ${reviewNumber}`,
+              rating: 4 + ((index + imageIndex) % 10) / 10,
+              photoPath,
+            };
+          }));
+
+          await db.collection('reviews').doc(reviewId).set({
+            authorId,
+            authorDisplayName: author.displayName,
+            venueId: venue.id,
+            venueName: venue.name,
+            venueCity: venue.city,
+            rating: 4 + (index % 10) / 10,
+            text: `Image-heavy stress review ${index + 1}. Two uncached dish photos exercise network loading, decoding, virtualization, and fast flings.`,
+            tags: ['Stress test', index % 2 === 0 ? 'Photo review' : 'Fast scroll'],
+            dishReviews,
+            status: 'published',
+            reactionCount: index % 37,
+            commentCount: index % 9,
+            source: 'stress-image-scroll',
+            createdAt: Timestamp.fromMillis(Date.now() - index * 1_000),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }));
+      }
+    }
+  }
 
   const localTestProfileIds = [
     'phone_ND8NpcfJMs4TlHoGzE9o7G4JO_XRzXis4G56p5AF',
