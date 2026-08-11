@@ -74,8 +74,9 @@ export function ChatScreen({
         void api.markConversationRead({
           conversationId,
           throughMessageId: details.lastMessageId,
-        }).catch(() => {
+        }).catch((error) => {
           lastMarkedRead.current = null;
+          setConversationError(error instanceof Error ? error : new Error('Could not mark the conversation as read.'));
         });
       }
     },

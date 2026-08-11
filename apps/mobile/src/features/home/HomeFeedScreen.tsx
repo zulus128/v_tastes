@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
+import { captureException } from '../../infrastructure/observability';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -54,7 +55,8 @@ function DishPhoto({ photoPath }: { photoPath: string }) {
       .then((nextUri) => {
         if (active) setUri(nextUri);
       })
-      .catch(() => {
+      .catch((error) => {
+        captureException(error, { operation: 'load-review-dish-photo', photoPath });
         if (active) setUri(undefined);
       });
     return () => {

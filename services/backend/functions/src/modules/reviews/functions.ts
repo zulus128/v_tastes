@@ -116,6 +116,7 @@ export const getComments = onCall(callableOptions, async (request) => {
   let commentsQuery = review.ref
     .collection('comments')
     .where('status', '==', 'published')
+    .where('parentCommentId', '==', null)
     .orderBy('createdAt', 'desc')
     .orderBy(FieldPath.documentId(), 'desc');
 
@@ -124,26 +125,63 @@ export const getComments = onCall(callableOptions, async (request) => {
   }
 
   const snapshot = await commentsQuery.limit(input.limit + 1).get();
-  const pageDocs = snapshot.docs.slice(0, input.limit);
-  const last = pageDocs.at(-1);
-  const reactionDocuments = pageDocs.length > 0
-    ? await db.getAll(...pageDocs.map((document) => document.ref.collection('reactions').doc(uid)))
-    : [];
+  const rootDocuments = snapshot.docs.slice(0, input.limit);
+  const last = rootDocuments.at(-1);
+  const rootIdChunks = Array.from(
+    { length: Math.ceil(rootDocuments.length / 30) },
+    (_, index) => rootDocuments.slice(index * 30, index * 30 + 30).map((document) => document.id),
+  );
+  const replySnapshots = await Promise.all(rootIdChunks.map((rootIds) => review.ref
+    .collection('comments')
+    .where('status', '==', 'published')
+    .where('parentCommentId', 'in', rootIds)
+    .get()));
+  const replyDocuments = replySnapshots.flatMap((replySnapshot) => replySnapshot.docs);
+  const pageDocuments = [...rootDocuments, ...replyDocuments];
+  const [reactionDocuments, author, reviewReaction] = await Promise.all([
+    pageDocuments.length > 0
+      ? db.getAll(...pageDocuments.map((document) => document.ref.collection('reactions').doc(uid)))
+      : Promise.resolve([]),
+    db.collection('users').doc(String(review.get('authorId'))).get(),
+    review.ref.collection('reactions').doc(uid).get(),
+  ]);
   const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const toComment = (document: QueryDocumentSnapshot) => ({
+    id: document.id,
+    reviewId: input.reviewId,
+    authorId: String(document.get('authorId')),
+    authorDisplayName: String(document.get('authorDisplayName')),
+    parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+    reactionCount: Number(document.get('reactionCount') ?? 0),
+    replyCount: Number(document.get('replyCount') ?? 0),
+    reacted: reactedIds.has(document.id),
+    text: String(document.get('text')),
+    createdAt: timestampToIso(document.get('createdAt')),
+  });
 
   return {
-    items: pageDocs.map((document) => ({
-      id: document.id,
-      reviewId: input.reviewId,
-      authorId: String(document.get('authorId')),
-      authorDisplayName: String(document.get('authorDisplayName')),
-      parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
-      reactionCount: Number(document.get('reactionCount') ?? 0),
-      replyCount: Number(document.get('replyCount') ?? 0),
-      reacted: reactedIds.has(document.id),
-      text: String(document.get('text')),
-      createdAt: timestampToIso(document.get('createdAt')),
-    })),
+    review: {
+      id: review.id,
+      authorId: String(review.get('authorId')),
+      authorDisplayName: String(review.get('authorDisplayName')),
+      authorUsername: author.exists && author.get('username') ? String(author.get('username')) : null,
+      authorPhotoUrl: author.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
+      venueId: String(review.get('venueId')),
+      venueName: String(review.get('venueName')),
+      rating: Number(review.get('rating')),
+      text: String(review.get('text')),
+      tags: Array.isArray(review.get('tags')) ? review.get('tags') : [],
+      dishReviews: Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') : [],
+      status: 'published' as const,
+      commentCount: Number(review.get('commentCount') ?? 0),
+      reactionCount: Number(review.get('reactionCount') ?? 0),
+      reacted: reviewReaction.exists,
+      createdAt: timestampToIso(review.get('createdAt')),
+    },
+    items: [
+      ...rootDocuments.map(toComment),
+      ...replyDocuments.map(toComment).sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+    ],
     nextCursor: snapshot.size > input.limit && last
       ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
       : null,
@@ -248,6 +286,9 @@ export const addComment = onCall(callableOptions, async (request) => {
     if (parentRef && (!parentComment?.exists || parentComment.get('status') !== 'published')) {
       throw new HttpsError('not-found', 'The parent comment was not found.');
     }
+    if (parentComment?.get('parentCommentId')) {
+      throw new HttpsError('failed-precondition', 'Replies can only be added to top-level comments.');
+    }
 
     await enforceRateLimit(transaction, uid, 'add-comment', 30, 60_000);
     transaction.create(commentRef, {
@@ -300,13 +341,40 @@ export const deleteComment = onCall(callableOptions, async (request) => {
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const commentRef = reviewRef.collection('comments').doc(input.commentId);
   await db.runTransaction(async (transaction) => {
-    const comment = await transaction.get(commentRef);
+    const [review, comment] = await Promise.all([
+      transaction.get(reviewRef),
+      transaction.get(commentRef),
+    ]);
+    if (!review.exists || review.get('status') !== 'published') throw new HttpsError('not-found', 'The review was not found.');
     if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
     if (comment.get('authorId') !== uid) throw new HttpsError('permission-denied', 'You can only delete your own comments.');
-    transaction.update(commentRef, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
-    transaction.update(reviewRef, { commentCount: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
+    const replies = comment.get('parentCommentId')
+      ? null
+      : await transaction.get(reviewRef.collection('comments')
+        .where('status', '==', 'published')
+        .where('parentCommentId', '==', input.commentId));
+    if (replies && replies.size > 450) {
+      throw new HttpsError('resource-exhausted', 'This comment thread is too large to delete at once.');
+    }
     const parentId = comment.get('parentCommentId');
-    if (parentId) transaction.update(reviewRef.collection('comments').doc(String(parentId)), { replyCount: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
+    const parentRef = parentId ? reviewRef.collection('comments').doc(String(parentId)) : null;
+    const parent = parentRef ? await transaction.get(parentRef) : null;
+    const deletedCount = 1 + (replies?.size ?? 0);
+    transaction.update(commentRef, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+    replies?.docs.forEach((reply) => transaction.update(reply.ref, {
+      status: 'deleted',
+      updatedAt: FieldValue.serverTimestamp(),
+    }));
+    transaction.update(reviewRef, {
+      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - deletedCount),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    if (parentRef && parent?.exists && parent.get('status') === 'published') {
+      transaction.update(parentRef, {
+        replyCount: Math.max(0, Number(parent.get('replyCount') ?? 0) - 1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
   });
   return { id: input.commentId };
 });

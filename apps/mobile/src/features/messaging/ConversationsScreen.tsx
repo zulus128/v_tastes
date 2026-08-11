@@ -2,6 +2,7 @@ import type { ConversationSummary } from '@tastes/contracts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -92,7 +93,7 @@ export function ConversationsScreen({
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState(0);
-  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => undefined); return () => { active = false; }; }, [api]);
+  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => { if (active) Alert.alert('Could not load requests', 'Open Requests to try again.'); }); return () => { active = false; }; }, [api]);
   const inbox = useConversationInbox(userId);
   const pendingInvitation = inbox.data.find((conversation) => (
     conversation.kind === 'activity'

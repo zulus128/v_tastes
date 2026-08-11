@@ -30,7 +30,7 @@ export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => vo
   const visibleRequests = tab === 'activity' ? requests.filter((item) => !normalized || `${item.title} ${item.body} ${item.senderName}`.toLowerCase().includes(normalized)) : [];
   useEffect(() => { let active = true; void Promise.all([api.listNotifications(), api.listRequests()]).then(([notifications, pendingRequests]) => { if (active) { setItems(notifications.data); setRequests(pendingRequests.data); } }).catch(() => Alert.alert('Could not load notifications', 'Please try again.')).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [api]);
 
-  async function open(item: AppNotification) { if (item.unread) { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate)); await api.markNotificationRead({ notificationId: item.id }).catch(() => undefined); } onOpenTarget(item); }
+  async function open(item: AppNotification) { if (item.unread) { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate)); try { await api.markNotificationRead({ notificationId: item.id }); } catch { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: true } : candidate)); Alert.alert('Could not mark notification as read', 'Please try again.'); } } onOpenTarget(item); }
   async function clear() { await api.clearNotifications(); setItems([]); }
   async function respond(item: AppRequest, response: 'accepted' | 'declined') { await api.respondToRequest({ requestId: item.id, response }); setRequests((current) => current.filter((candidate) => candidate.id !== item.id)); }
 

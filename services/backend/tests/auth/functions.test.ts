@@ -372,6 +372,37 @@ describe('authenticated session and paginated reads', () => {
     await callFunction('addComment', commentCommand, second.token);
     expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(1);
 
+    const reply = await callFunction<{ id: string }>('addComment', {
+      idempotencyKey: 'comment-reply-command-001',
+      reviewId: firstReview.id,
+      parentCommentId: firstComment.id,
+      text: 'A complete branch',
+    }, first.token);
+    const commentReaction = {
+      idempotencyKey: 'comment-reaction-command-001',
+      reviewId: firstReview.id,
+      commentId: firstComment.id,
+      reaction: 'like',
+    };
+    expect(await callFunction('reactToComment', commentReaction, first.token)).toEqual({
+      active: true,
+      reactionCount: 1,
+    });
+    expect(await callFunction('reactToComment', commentReaction, first.token)).toEqual({
+      active: true,
+      reactionCount: 1,
+    });
+    const thread = await callFunction<{
+      items: Array<{ id: string; parentCommentId: string | null }>;
+      review: { id: string; authorUsername: string | null; dishReviews: unknown[] };
+    }>('getComments', { reviewId: firstReview.id, limit: 1 }, second.token);
+    expect(thread.review).toMatchObject({
+      id: firstReview.id,
+      authorUsername: 'review.author',
+      dishReviews: reviewCommand.dishReviews,
+    });
+    expect(thread.items.map((comment) => comment.id)).toEqual([firstComment.id, reply.id]);
+
     const report = await callFunction<{ id: string }>(
       'reportComment',
       {
@@ -391,6 +422,14 @@ describe('authenticated session and paginated reads', () => {
       contentId: firstComment.id,
       status: 'pending',
     });
+
+    await callFunction('deleteComment', {
+      reviewId: firstReview.id,
+      commentId: firstComment.id,
+    }, second.token);
+    expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(0);
+    expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(firstComment.id).get()).get('status')).toBe('deleted');
+    expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(reply.id).get()).get('status')).toBe('deleted');
 
     await db
       .collection('reviews')
@@ -476,6 +515,9 @@ describe('authenticated session and paginated reads', () => {
         {
           authorId: 'seed-author',
           authorDisplayName: 'Demo User',
+          parentCommentId: null,
+          reactionCount: 0,
+          replyCount: 0,
           text: `Comment ${index}`,
           status: 'published',
           createdAt: Timestamp.fromMillis(base - index),
@@ -793,6 +835,66 @@ describe('messaging callables', () => {
       0,
     );
     expect((await db.collection('_pushTokens').get()).size).toBe(0);
+  }, 15_000);
+
+  it('returns sorted place reviews and geo-aware Tastes AI recommendations', async () => {
+    const user = await authenticatedUser();
+    const friend = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Recommendation User',
+      username: 'recommendation.user',
+      city: 'Istanbul',
+    }, user.token);
+    await callFunction('createUserProfile', {
+      displayName: 'Food Friend',
+      username: 'food.friend',
+      city: 'Istanbul',
+    }, friend.token);
+    const userDocument = (await db.collection('users').where('username', '==', 'recommendation.user').limit(1).get()).docs[0];
+    const friendDocument = (await db.collection('users').where('username', '==', 'food.friend').limit(1).get()).docs[0];
+    if (!userDocument || !friendDocument) throw new Error('Expected recommendation profiles.');
+    await userDocument.ref.update({ favoriteCuisines: ['Japanese'] });
+    await userDocument.ref.collection('following').doc(friendDocument.id).set({ followedAt: Timestamp.now() });
+    await Promise.all([
+      db.collection('venues').doc('nearby-sushi').set({
+        name: 'Nearby Sushi', city: 'Istanbul', category: 'Japanese', status: 'active',
+        latitude: 41.015, longitude: 28.98, rating: 4.8, priceLevel: 3,
+        placeTags: ['romantic', 'date-night'],
+      }),
+      db.collection('venues').doc('far-sushi').set({
+        name: 'Far Sushi', city: 'Ankara', category: 'Japanese', status: 'active',
+        latitude: 39.9334, longitude: 32.8597, rating: 5, priceLevel: 4,
+        placeTags: ['romantic'],
+      }),
+    ]);
+    await Promise.all([
+      db.collection('reviews').doc('friend-place-review').set({
+        authorId: friendDocument.id, authorDisplayName: 'Food Friend', venueId: 'nearby-sushi',
+        venueName: 'Nearby Sushi', rating: 5, text: 'Excellent omakase', status: 'published',
+        reactionCount: 9, commentCount: 2, tags: ['date-night'], dishNames: ['Omakase'],
+        dishReviews: [], createdAt: Timestamp.fromMillis(Date.now() - 1_000),
+      }),
+      db.collection('reviews').doc('other-place-review').set({
+        authorId: 'another-user', authorDisplayName: 'Another User', venueId: 'nearby-sushi',
+        venueName: 'Nearby Sushi', rating: 3, text: 'Solid lunch', status: 'published',
+        reactionCount: 1, commentCount: 0, tags: ['casual'], dishNames: ['Ramen'],
+        dishReviews: [], createdAt: Timestamp.fromMillis(Date.now() - 2_000),
+      }),
+    ]);
+
+    const reviews = await callFunction<Array<{ id: string; rating: number }>>('getPlaceReviews', {
+      venueId: 'nearby-sushi', sort: 'highest', scope: 'friends',
+    }, user.token);
+    expect(reviews).toEqual([expect.objectContaining({ id: 'friend-place-review', rating: 5 })]);
+
+    const answer = await callFunction<{ places: Array<{ id: string; distanceKm: number | null }> }>('askTastesAi', {
+      prompt: 'A romantic Japanese dinner nearby', location: 'Istanbul',
+      latitude: 41.015, longitude: 28.979,
+    }, user.token);
+    expect(answer.places[0]).toMatchObject({ id: 'nearby-sushi' });
+    expect(answer.places.some((place) => place.id === 'far-sushi')).toBe(false);
+    expect(answer.places[0]?.distanceKm).toBeTypeOf('number');
   }, 15_000);
 });
 

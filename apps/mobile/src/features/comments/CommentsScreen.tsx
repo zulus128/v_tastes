@@ -1,9 +1,13 @@
-import type { Comment, ReportReason } from '@tastes/contracts';
+import type { Comment, CommentReview, ReportReason } from '@tastes/contracts';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Clipboard from 'expo-clipboard';
-import { useMemo, useState } from 'react';
+import { getDownloadURL, ref as storageRef } from 'firebase/storage';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -13,6 +17,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { storage } from '../../infrastructure/firebase';
+import { captureException } from '../../infrastructure/observability';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
@@ -29,6 +35,48 @@ const commentReportReasons: Array<{ label: string; value: ReportReason }> = [
   { label: 'False information', value: 'Misinformation' },
   { label: 'Something else', value: 'Something else' },
 ];
+
+const tagLabels: Record<string, string> = {
+  casual: 'Casual',
+  'date-night': 'Date night',
+  birthday: 'Birthday',
+  children: 'With children',
+};
+
+function DishPhoto({ path, styles }: { path: string; styles: ReturnType<typeof createStyles> }) {
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+  useEffect(() => {
+    let active = true;
+    setState({ failed: false });
+    void getDownloadURL(storageRef(storage, path)).then((uri) => {
+      if (active) setState({ uri, failed: false });
+    }).catch((error) => {
+      captureException(error, { operation: 'load-comments-review-photo', path });
+      if (active) setState({ failed: true });
+    });
+    return () => { active = false; };
+  }, [path]);
+  if (state.uri) return <Image source={{ uri: state.uri }} style={styles.dishImage} />;
+  return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
+}
+
+function MainReview({ onReact, reacting, review }: { onReact: () => void; reacting: boolean; review: CommentReview }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return <View style={styles.mainReview}>
+    <View style={styles.reviewAuthorRow}>
+      {review.authorPhotoUrl ? <Image source={{ uri: review.authorPhotoUrl }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><Text style={styles.reviewAvatarInitial}>{review.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
+      <View style={styles.reviewAuthorCopy}><Text style={styles.reviewAuthor}>{review.authorDisplayName}</Text><Text style={styles.reviewUsername}>{review.authorUsername ? `@${review.authorUsername}` : 'Tastes member'}</Text></View>
+      <Text style={styles.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+    </View>
+    <View style={styles.reviewBody}>
+      <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(review.rating)))}<Text style={styles.reviewEmptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(review.rating)))}</Text></Text></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
+      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <View style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>} showsHorizontalScrollIndicator={false} /></View> : null}
+      <Text style={styles.reviewText}>{review.text}</Text>
+      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact}><Text style={[styles.reviewAction, review.reacted && styles.reviewActionActive]}>♥ {review.reactionCount}</Text></Pressable><Text style={styles.reviewAction}>◯ {review.commentCount}</Text><Pressable onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}><Text style={styles.reviewAction}>↗</Text></Pressable></View>
+    </View>
+  </View>;
+}
 
 function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport }: { item: Comment; nested?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void }) {
   const { colors } = useAppTheme();
@@ -72,11 +120,13 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
   const [reportSent, setReportSent] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
+  const [reviewReacting, setReviewReacting] = useState(false);
   const query = useComments(reviewId);
   const mutation = useAddComment(reviewId);
   const reaction = useReactToComment(reviewId);
   const deletion = useDeleteComment(reviewId);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const review = query.data?.pages[0]?.review;
   const rootItems = items.filter((item) => !item.parentCommentId);
   const repliesByParent = new Map<string, Comment[]>();
   items.filter((item) => item.parentCommentId).forEach((item) => {
@@ -103,6 +153,19 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
     } catch { Alert.alert('Could not send report', 'Please try again.'); } finally { setReporting(false); }
   }
 
+  async function reactToMainReview() {
+    if (!review || reviewReacting) return;
+    setReviewReacting(true);
+    try {
+      await api.reactToReview({ idempotencyKey: createIdempotencyKey('comments-review-reaction'), reviewId, reaction: 'like' });
+      await query.refetch();
+    } catch (error) {
+      Alert.alert('Could not update reaction', apiErrorMessage(error));
+    } finally {
+      setReviewReacting(false);
+    }
+  }
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -114,9 +177,10 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
         <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
       ) : (
         <FlatList
-          contentContainerStyle={[styles.content, items.length === 0 && styles.emptyContent]}
+          contentContainerStyle={styles.content}
           data={rootItems}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={review ? <View><MainReview onReact={() => void reactToMainReview()} reacting={reviewReacting} review={review} /><Text style={styles.commentsHeading}>Comments</Text></View> : null}
           ListEmptyComponent={<Text style={styles.empty}>No comments yet. Be the first.</Text>}
           ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
           onEndReached={() => {
@@ -127,9 +191,10 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
           renderItem={({ item }) => {
             const replies = repliesByParent.get(item.id) ?? [];
             const hidden = hiddenReplies.has(item.id);
-            return <View><CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} />
+            const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
+            return <View><CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} />
               {replies.length > 0 ? <Pressable onPress={() => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} style={styles.repliesToggle}><Text style={styles.repliesToggleText}>{hidden ? `Show ${replies.length} replies` : 'Hide replies'}</Text></Pressable> : null}
-              {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} />) : null}
+              {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} />) : null}
             </View>;
           }}
         />
@@ -165,8 +230,36 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backText: { color: colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
   title: { color: colors.text, fontSize: 17, fontWeight: '700' },
   content: { paddingBottom: 88 },
-  emptyContent: { flexGrow: 1, justifyContent: 'center' },
   empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
+  mainReview: { marginBottom: 16, backgroundColor: colors.background },
+  reviewAuthorRow: { minHeight: 72, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
+  reviewAvatar: { width: 40, height: 40, borderRadius: 20 },
+  reviewAvatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+  reviewAvatarInitial: { color: colors.onPrimary, fontWeight: '800' },
+  reviewAuthorCopy: { flex: 1, marginLeft: 8, gap: 3 },
+  reviewAuthor: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  reviewUsername: { color: colors.textMuted, fontSize: 13 },
+  reviewDate: { color: colors.textMuted, fontSize: 13 },
+  reviewBody: { paddingTop: 14, gap: 16 },
+  reviewVenueRow: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+  reviewVenueCopy: { flex: 1, gap: 4 },
+  reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  reviewStars: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
+  reviewEmptyStars: { color: colors.textMuted },
+  reviewTag: { overflow: 'hidden', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, color: colors.text, fontSize: 12, backgroundColor: colors.surfaceRaised },
+  dishes: { gap: 9, paddingHorizontal: 16 },
+  dishCard: { width: 150, height: 150, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
+  dishImage: { width: '100%', height: '100%' },
+  dishImageFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: colors.surfaceRaised },
+  dishImageFallbackText: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
+  dishShade: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.18)' },
+  dishTitle: { position: 'absolute', top: 10, left: 10, right: 10, color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  dishRating: { position: 'absolute', left: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, borderTopRightRadius: 12, color: '#fff', fontSize: 13, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)' },
+  reviewText: { paddingHorizontal: 16, color: colors.text, fontSize: 14, lineHeight: 19 },
+  reviewActions: { paddingHorizontal: 16, paddingBottom: 4, flexDirection: 'row', gap: 18 },
+  reviewAction: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+  reviewActionActive: { color: colors.primary },
+  commentsHeading: { paddingHorizontal: 16, paddingBottom: 10, color: colors.text, fontSize: 18, fontWeight: '700' },
   row: { padding: 16, flexDirection: 'row', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
   nestedRow: { marginLeft: 46, paddingTop: 10, paddingBottom: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45312E' },

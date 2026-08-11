@@ -59,6 +59,7 @@ export function TastesAIScreen({
   const requestId = useRef(0);
   const [failure, setFailure] = useState<'offline' | 'failed' | 'location' | null>(null);
   const [city, setCity] = useState<string | null>(null);
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [lastPrompt, setLastPrompt] = useState('');
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function TastesAIScreen({
     const currentRequest = ++requestId.current;
     try {
       const answer = await api
-        .askTastesAi({ prompt, ...(city ? { location: city } : {}) })
+        .askTastesAi({ prompt, ...(city ? { location: city } : {}), ...(coordinates ?? {}) })
         .then((response) => response.data);
       if (currentRequest !== requestId.current) return;
       const next = {
@@ -132,9 +133,9 @@ export function TastesAIScreen({
   async function enableLocation() {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (permission.status === 'granted') {
-      const result = await Location.reverseGeocodeAsync(
-        (await Location.getCurrentPositionAsync()).coords,
-      );
+      const position = await Location.getCurrentPositionAsync();
+      const result = await Location.reverseGeocodeAsync(position.coords);
+      setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
       setCity(result[0]?.city ?? 'Nearby');
       setFailure(null);
     }
@@ -193,6 +194,7 @@ export function TastesAIScreen({
                   <Pressable
                     onPress={() => {
                       setCity('Istanbul');
+                      setCoordinates(null);
                       setFailure(null);
                     }}
                     style={styles.suggestion}

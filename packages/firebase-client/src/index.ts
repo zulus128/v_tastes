@@ -4,7 +4,7 @@ import type {
   AppNotification,
   AppRequest,
   ApiErrorCode,
-  Comment,
+  CommentsPage,
   CompleteOnboardingInput,
   ConversationSummary,
   CreateActivityInput,
@@ -296,7 +296,7 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     createReview: (input: CreateReviewInput) =>
       invoke<CreateReviewInput, IdResult>('createReview', input),
     getComments: (input: GetCommentsInput) =>
-      invoke<GetCommentsInput, Page<Comment>>('getComments', input),
+      invoke<GetCommentsInput, CommentsPage>('getComments', input),
     addComment: (input: AddCommentInput) =>
       invoke<AddCommentInput, IdResult>('addComment', input),
     reactToComment: (input: ReactToCommentInput) =>

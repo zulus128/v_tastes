@@ -921,8 +921,8 @@ async function main() {
     const ownReviewId = `seed-own-${stableSeedKey(profileId)}-1`;
     const authorName = String(localProfilesById.get(profileId)?.get('displayName') ?? 'Tastes tester');
     return [
-      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-kristin-comment').set({ authorId: 'discover-kristin', authorDisplayName: 'Kristin Watson', text: 'This convinced me to book the counter.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 70 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
-      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-author-reply').set({ authorId: profileId, authorDisplayName: authorName, text: 'Do it — the chef makes the whole evening special.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 55 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-kristin-comment').set({ authorId: 'discover-kristin', authorDisplayName: 'Kristin Watson', parentCommentId: null, reactionCount: 0, replyCount: 1, text: 'This convinced me to book the counter.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 70 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('reviews').doc(ownReviewId).collection('comments').doc('seed-author-reply').set({ authorId: profileId, authorDisplayName: authorName, parentCommentId: 'seed-kristin-comment', reactionCount: 0, replyCount: 0, text: 'Do it — the chef makes the whole evening special.', status: 'published', source: 'seed', createdAt: Timestamp.fromMillis(Date.now() - 55 * 60_000), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
       db.collection('reviews').doc(ownReviewId).collection('reactions').doc('discover-kristin').set({ userId: 'discover-kristin', reaction: 'like', source: 'seed', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
     ];
   }));

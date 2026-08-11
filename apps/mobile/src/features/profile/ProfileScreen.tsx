@@ -21,6 +21,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { storage } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { captureException } from '../../infrastructure/observability';
 import { useTastesApi } from '../../session/SessionProvider';
 import { Screen } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -67,9 +68,11 @@ export function ProfileScreen({
   const [filterOpen, setFilterOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'highest' | 'recent'>('all');
   const [mapVenues, setMapVenues] = useState<Venue[]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReload, setMapReload] = useState(0);
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
-  useEffect(() => { if (activeTab !== 'map') return; let active = true; void api.getVenues({ limit: 50 }).then((response) => { if (active) setMapVenues(response.data.items); }).catch(() => undefined); return () => { active = false; }; }, [activeTab, api]);
+  useEffect(() => { if (activeTab !== 'map') return; let active = true; setMapError(null); void api.getVenues({ limit: 50 }).then((response) => { if (active) setMapVenues(response.data.items); }).catch((error) => { if (active) setMapError(apiErrorMessage(error)); }); return () => { active = false; }; }, [activeTab, api, mapReload]);
 
   async function toggleFollow() {
     if (followPending) return;
@@ -118,7 +121,7 @@ export function ProfileScreen({
       await uploadBytes(storageRef(storage, photoPath), await response.blob(), { contentType: 'image/jpeg' });
       await api.updateProfilePhoto({ photoPath });
       if (profile.photoPath && profile.photoPath !== photoPath) {
-        void deleteObject(storageRef(storage, profile.photoPath)).catch(() => undefined);
+        void deleteObject(storageRef(storage, profile.photoPath)).catch((error) => captureException(error, { operation: 'delete-old-profile-photo' }));
       }
     } catch (error) {
       Alert.alert('Could not update photo', apiErrorMessage(error));
@@ -222,7 +225,7 @@ export function ProfileScreen({
         ) : activeTab === 'map' ? (
           <View style={styles.mapPane}>
             <MapView initialRegion={{ latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 }} style={styles.map}>{visibleReviews.map((review) => { const venue = mapVenues.find((candidate) => candidate.id === review.venueId); return venue?.latitude != null && venue.longitude != null ? <Marker coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} key={review.id} onPress={() => onOpenPlace(review.venueId)} title={venue.name}><View style={styles.mapPin}><Text style={styles.mapPinText}>{review.rating.toFixed(1)}</Text></View></Marker> : null; })}</MapView>
-            {visibleReviews.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Your taste map is waiting</Text><Text style={styles.emptyCopy}>Reviewed places will appear here.</Text></View> : null}
+            {mapError ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{mapError}</Text><Pressable onPress={() => setMapReload((value) => value + 1)} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable></View> : visibleReviews.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Your taste map is waiting</Text><Text style={styles.emptyCopy}>Reviewed places will appear here.</Text></View> : null}
           </View>
         ) : own ? (
           <View style={styles.wishlistPane}><FavouritesPane onOpenPlace={onOpenPlace} userId={currentUserId} /></View>
@@ -260,6 +263,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   mapPin: { width: 44, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   mapPinText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   mapEmpty: { position: 'absolute', left: 24, right: 24, bottom: 24, padding: 18, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(8,8,8,0.82)' },
+  retryButton: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 18, backgroundColor: colors.primary },
+  retryText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
   wishlistPane: { height: 720, marginTop: -8 },
   filterBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   filterSheet: { paddingHorizontal: 18, paddingBottom: 34, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },

@@ -273,6 +273,10 @@ export const completeOnboardingInputSchema = z.object({
 export const askTastesAiInputSchema = z.object({
   prompt: z.string().trim().min(1).max(500),
   location: z.string().trim().min(1).max(120).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
+  message: 'Latitude and longitude must be provided together.',
 });
 
 export const notificationInputSchema = z.object({ notificationId: z.string().min(1).max(128) });
@@ -387,6 +391,7 @@ export interface TastesAiPlace {
   rating: number;
   price: string;
   cuisine: string;
+  distanceKm: number | null;
 }
 
 export interface TastesAiAnswer {
@@ -442,6 +447,16 @@ export interface Comment {
   reacted: boolean;
   text: string;
   createdAt: string;
+}
+
+export interface CommentReview extends FeedItem {
+  authorPhotoUrl: string | null;
+  authorUsername: string | null;
+  reacted: boolean;
+}
+
+export interface CommentsPage extends Page<Comment> {
+  review: CommentReview;
 }
 
 export interface LeaderboardEntry {

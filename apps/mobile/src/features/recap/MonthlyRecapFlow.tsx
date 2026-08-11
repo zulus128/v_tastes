@@ -119,16 +119,19 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
   const [areaGuess, setAreaGuess] = useState<string | null>(null);
   const [ratingGuess, setRatingGuess] = useState(1);
   const [recap, setRecap] = useState<MonthlyRecapResult | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoadError(false);
     void api.getMonthlyRecap().then((response) => {
       if (active) setRecap(response.data);
     }).catch(() => {
-      if (active) setRecap({ month: new Date().toLocaleDateString('en-US', { month: 'long' }), previousMonth: '', ready: false, placesVisited: 0, previousPlacesVisited: 0, areasExplored: 0, previousAreasExplored: 0, reviewsWritten: 0, previousReviewsWritten: 0, followersGained: 0, favoriteArea: '', topPlaces: [], topDishes: [] });
+      if (active) setLoadError(true);
     });
     return () => { active = false; };
-  }, [api]);
+  }, [api, loadAttempt]);
 
   useEffect(() => {
     if (step !== 'loading' || !recap) return;
@@ -181,7 +184,7 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
           onPress={() => setConfirmingClose(true)}
         />
 
-        {step === 'loading' ? <LoadingScreen month={recap?.month} /> : null}
+        {step === 'loading' ? loadError ? <RecapLoadError onRetry={() => setLoadAttempt((value) => value + 1)} /> : <LoadingScreen month={recap?.month} /> : null}
         {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
         {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
         {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
@@ -252,6 +255,12 @@ function LoadingScreen({ month }: { month?: string }) {
       <Text style={styles.centerSubtitle}>We're putting together your {month ?? 'monthly'} recap.</Text>
     </View>
   );
+}
+
+function RecapLoadError({ onRetry }: { onRetry: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  return <><View style={styles.centerContent}><Text style={styles.centerTitle}>Couldn’t load your recap</Text><Text style={styles.centerSubtitle}>Check your connection and try again.</Text></View><RecapButton label="Try again" onPress={onRetry} /></>;
 }
 
 function LowDataScreen({ month, onExplore }: { month?: string; onExplore: () => void }) {

@@ -3,6 +3,7 @@ import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
+import { captureException } from '../../infrastructure/observability';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
@@ -15,19 +16,19 @@ const tagLabels: Record<string, string> = {
 };
 
 function DishPhoto({ path }: { path: string }) {
-  const [uri, setUri] = useState<string>();
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
 
   useEffect(() => {
     let active = true;
     void getDownloadURL(storageRef(storage, path)).then((value) => {
-      if (active) setUri(value);
-    }).catch(() => undefined);
+      if (active) setState({ uri: value, failed: false });
+    }).catch((error) => { captureException(error, { operation: 'load-profile-review-photo', path }); if (active) setState({ failed: true }); });
     return () => { active = false; };
   }, [path]);
 
-  return uri
-    ? <Image source={{ uri }} style={staticStyles.dishImage} />
-    : <View style={staticStyles.dishImagePlaceholder} />;
+  return state.uri
+    ? <Image source={{ uri: state.uri }} style={staticStyles.dishImage} />
+    : <View style={staticStyles.dishImagePlaceholder}>{state.failed ? <Text style={staticStyles.dishImageError}>Photo unavailable</Text> : null}</View>;
 }
 
 export function ProfileReviewCard({
@@ -122,4 +123,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 const staticStyles = StyleSheet.create({
   dishImage: { width: 150, height: 150 },
   dishImagePlaceholder: { width: 150, height: 150, backgroundColor: '#222222' },
+  dishImageError: { margin: 'auto', color: '#AEB4C0', fontSize: 11, textAlign: 'center' },
 });
