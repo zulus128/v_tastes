@@ -1,4 +1,10 @@
 const seedRemote = process.env.SEED_REMOTE === 'true';
+const stressScrollCount = Number(process.env.STRESS_SCROLL_COUNT ?? 0);
+const stressScrollCleanup = process.env.STRESS_SCROLL_CLEANUP === 'true';
+
+if (!Number.isInteger(stressScrollCount) || stressScrollCount < 0 || stressScrollCount > 1_000) {
+  throw new Error('STRESS_SCROLL_COUNT must be an integer between 0 and 1000.');
+}
 
 if (seedRemote) {
   if (process.env.GCLOUD_PROJECT !== 'tastes-934e6') {
@@ -748,6 +754,44 @@ async function main() {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   }));
+
+  if (stressScrollCount > 0 || stressScrollCleanup) {
+    const stressReviewRef = db.collection('reviews').doc('discover-review-gemini');
+    const stressComments = await stressReviewRef.collection('comments')
+      .where('source', '==', 'stress-scroll')
+      .get();
+    const cleanupWriter = db.bulkWriter();
+    stressComments.docs.forEach((document) => cleanupWriter.delete(document.ref));
+    await cleanupWriter.close();
+
+    if (stressScrollCount > 0) {
+      const stressAuthors = ['discover-kristin', 'discover-cameron', 'discover-wade', 'discover-brooklyn'];
+      const writer = db.bulkWriter();
+      for (let index = 0; index < stressScrollCount; index += 1) {
+        const id = `stress-scroll-${String(index + 1).padStart(4, '0')}`;
+        const authorId = stressAuthors[index % stressAuthors.length]!;
+        const author = usersById.get(authorId);
+        const isReply = index % 5 === 4;
+        const parentIndex = index - 4;
+        writer.set(stressReviewRef.collection('comments').doc(id), {
+          authorId,
+          authorDisplayName: author?.displayName ?? 'Tastes tester',
+          parentCommentId: isReply ? `stress-scroll-${String(parentIndex + 1).padStart(4, '0')}` : null,
+          reactionCount: index % 13,
+          replyCount: !isReply && index % 5 === 0 && index + 4 < stressScrollCount ? 1 : 0,
+          text: isReply
+            ? `Stress-test reply ${index + 1}: checking that threaded pagination keeps its parent.`
+            : `Stress-test comment ${index + 1}: a deterministic long-list fixture for scrolling and prefetch checks.`,
+          status: 'published',
+          source: 'stress-scroll',
+          createdAt: Timestamp.fromMillis(Date.now() - (index + 1) * 15_000),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      await writer.close();
+    }
+    await stressReviewRef.set({ commentCount: 2 + stressScrollCount }, { merge: true });
+  }
 
   const commentReactionSeeds: Array<[reviewId: string, commentId: string, userId: string]> = [
     ['discover-review-gemini', 'comment-1', 'discover-cameron'],

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   ImageBackground,
   KeyboardAvoidingView,
@@ -373,9 +374,21 @@ function PlaceSelector({
         {query.isPending ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError ? (
           <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
         ) : (
-          <ScrollView keyboardShouldPersistTaps="handled">
-            {filtered.map((venue) => (
-              <Pressable key={venue.id} onPress={() => onSelect(venue)} style={styles.row}>
+          <FlatList
+            data={filtered}
+            initialNumToRender={8}
+            keyExtractor={(venue) => venue.id}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={<Text style={styles.empty}>No places match your search.</Text>}
+            ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.more} /> : null}
+            maxToRenderPerBatch={8}
+            onEndReached={() => {
+              if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            windowSize={7}
+            renderItem={({ item: venue }) => (
+              <Pressable onPress={() => onSelect(venue)} style={styles.row}>
                 <Image source={venueImage(venue.imageUrl)} style={styles.rowImage} />
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={styles.rowName}>{venue.name}</Text>
@@ -384,10 +397,8 @@ function PlaceSelector({
                 </View>
                 <Text style={styles.add}>⊕</Text>
               </Pressable>
-            ))}
-            {filtered.length === 0 ? <Text style={styles.empty}>No places match your search.</Text> : null}
-            {query.hasNextPage ? <Pressable onPress={() => void query.fetchNextPage()} style={styles.more}><Text style={styles.moreText}>Load more places</Text></Pressable> : null}
-          </ScrollView>
+            )}
+          />
         )}
       </View>
     </Modal>

@@ -36,6 +36,15 @@ pnpm seed
 pnpm smoke
 ```
 
+For a repeatable long-comments stress test, seed up to 1,000 isolated comments on the
+`discover-review-gemini` fixture. The command replaces only documents whose source is
+`stress-scroll`; cleanup leaves the normal demo data intact:
+
+```bash
+STRESS_SCROLL_COUNT=300 pnpm seed
+STRESS_SCROLL_CLEANUP=true pnpm seed
+```
+
 Useful focused commands:
 
 ```bash

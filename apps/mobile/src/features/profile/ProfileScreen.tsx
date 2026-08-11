@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
@@ -143,96 +144,97 @@ export function ProfileScreen({
     review.venueName.toLowerCase().includes(normalizedSearch)
       || review.text.toLowerCase().includes(normalizedSearch)
   ));
+  const sortedReviews = [...visibleReviews].sort((left, right) => filter === 'highest'
+    ? right.rating - left.rating
+    : filter === 'recent'
+      ? new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      : 0);
+  const profileHeader = (
+    <ProfileHeader
+      followPending={followPending}
+      following={following}
+      onAvatarPress={() => void chooseProfilePhoto()}
+      onBack={onBack}
+      onMessage={() => onMessage(targetUserId)}
+      onFollowers={() => setExtra('followers')}
+      onFollowing={() => setExtra('following')}
+      onRewards={() => setExtra('rewards')}
+      onShare={() => void Share.share({
+        message: `See ${profile.displayName} on Tastes: https://tastes.app/profile/${targetUserId}`,
+        url: `https://tastes.app/profile/${targetUserId}`,
+      })}
+      onSettings={onSettings}
+      onToggleFollow={() => void toggleFollow()}
+      own={own}
+      profile={profile}
+      reviewCount={profile.reviewCount}
+      uploadingPhoto={uploadingPhoto}
+    />
+  );
+  const controls = (
+    <View style={[styles.controls, { backgroundColor: colors.canvas }]}>
+      <View style={styles.switcher}>
+        {(['reviews', 'map', 'wishlist'] as const).map((tab) => (
+          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.switchOption, activeTab === tab && styles.switchActive]}>
+            <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
+              {tab === 'wishlist' ? 'Wishlist' : tab[0].toUpperCase() + tab.slice(1)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.searchBar}>
+        <SearchIcon width={24} height={24} />
+        <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
+        <Pressable accessibilityLabel="Filter profile" onPress={() => setFilterOpen(true)}><Text style={styles.tuneGlyph}>☷</Text></Pressable>
+      </View>
+    </View>
+  );
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
-        <ProfileHeader
-          followPending={followPending}
-          following={following}
-          onAvatarPress={() => void chooseProfilePhoto()}
-          onBack={onBack}
-          onMessage={() => onMessage(targetUserId)}
-        onFollowers={() => setExtra('followers')}
-        onFollowing={() => setExtra('following')}
-        onRewards={() => setExtra('rewards')}
-        onShare={() => void Share.share({
-          message: `See ${profile.displayName} on Tastes: https://tastes.app/profile/${targetUserId}`,
-          url: `https://tastes.app/profile/${targetUserId}`,
-        })}
-          onSettings={onSettings}
-          onToggleFollow={() => void toggleFollow()}
-          own={own}
-          profile={profile}
-          reviewCount={profileReviews.reviews.length}
-          uploadingPhoto={uploadingPhoto}
+      {activeTab === 'reviews' ? (
+        <FlatList
+          contentContainerStyle={[styles.content, styles.reviewList]}
+          data={sortedReviews}
+          initialNumToRender={6}
+          keyExtractor={(review) => review.id}
+          maxToRenderPerBatch={6}
+          ListHeaderComponent={<>{profileHeader}{controls}</>}
+          ListEmptyComponent={!profileReviews.loading ? <View style={styles.empty}><Text style={styles.emptyTitle}>No reviews yet</Text><Text style={styles.emptyCopy}>{own ? 'Your reviews will appear here.' : 'This person has not posted a review yet.'}</Text></View> : null}
+          ListFooterComponent={profileReviews.loading || profileReviews.loadingMore ? <ActivityIndicator color={colors.primary} style={styles.listLoader} /> : profileReviews.error ? <Pressable onPress={() => void profileReviews.loadMore()} style={styles.retryButton}><Text style={styles.retryText}>Try loading more</Text></Pressable> : null}
+          onEndReached={() => void profileReviews.loadMore()}
+          onEndReachedThreshold={0.5}
+          windowSize={7}
+          renderItem={({ item: review }) => <ProfileReviewCard
+            item={review}
+            onComments={() => onOpenComments(review.id)}
+            onMore={() => Alert.alert(review.venueName, 'Review actions', [
+              { text: 'Open comments', onPress: () => onOpenComments(review.id) },
+              { text: 'Share', onPress: () => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` }) },
+              { text: 'Cancel', style: 'cancel' },
+            ])}
+            onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+            onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
+            profile={profile}
+          />}
+          showsVerticalScrollIndicator={false}
         />
-
-        <View style={[styles.controls, { backgroundColor: colors.canvas }]}>
-          <View style={styles.switcher}>
-            {(['reviews', 'map', 'wishlist'] as const).map((tab) => (
-              <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[styles.switchOption, activeTab === tab && styles.switchActive]}
-              >
-                <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
-                  {tab === 'wishlist' ? 'Wishlist' : tab[0].toUpperCase() + tab.slice(1)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.searchBar}>
-            <SearchIcon width={24} height={24} />
-            <TextInput
-              onChangeText={setSearch}
-              placeholder="Search"
-              placeholderTextColor={colors.textMuted}
-              style={styles.searchInput}
-              value={search}
-            />
-            <Pressable accessibilityLabel="Filter profile" onPress={() => setFilterOpen(true)}><Text style={styles.tuneGlyph}>☷</Text></Pressable>
-          </View>
-        </View>
-
-        {activeTab === 'reviews' ? (
-          <View style={styles.reviewList}>
-            {profileReviews.loading ? <ActivityIndicator color={colors.primary} style={styles.listLoader} /> : null}
-            {!profileReviews.loading && visibleReviews.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptyTitle}>No reviews yet</Text>
-                <Text style={styles.emptyCopy}>
-                  {own ? 'Your reviews will appear here.' : 'This person has not posted a review yet.'}
-                </Text>
-              </View>
-            ) : null}
-            {[...visibleReviews].sort((left, right) => filter === 'highest' ? right.rating - left.rating : filter === 'recent' ? new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() : 0).map((review) => (
-              <ProfileReviewCard
-                item={review}
-                key={review.id}
-                onComments={() => onOpenComments(review.id)}
-                onMore={() => Alert.alert(review.venueName, 'Review actions', [
-                  { text: 'Open comments', onPress: () => onOpenComments(review.id) },
-                  { text: 'Share', onPress: () => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` }) },
-                  { text: 'Cancel', style: 'cancel' },
-                ])}
-                onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
-                onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
-                profile={profile}
-              />
-            ))}
-          </View>
-        ) : activeTab === 'map' ? (
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[1]}>
+          {profileHeader}
+          {controls}
+          {activeTab === 'map' ? (
           <View style={styles.mapPane}>
             <MapView initialRegion={{ latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 }} style={styles.map}>{visibleReviews.map((review) => { const venue = mapVenues.find((candidate) => candidate.id === review.venueId); return venue?.latitude != null && venue.longitude != null ? <Marker coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} key={review.id} onPress={() => onOpenPlace(review.venueId)} title={venue.name}><View style={styles.mapPin}><Text style={styles.mapPinText}>{review.rating.toFixed(1)}</Text></View></Marker> : null; })}</MapView>
             {mapError ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{mapError}</Text><Pressable onPress={() => setMapReload((value) => value + 1)} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable></View> : visibleReviews.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Your taste map is waiting</Text><Text style={styles.emptyCopy}>Reviewed places will appear here.</Text></View> : null}
           </View>
-        ) : own ? (
+          ) : own ? (
           <View style={styles.wishlistPane}><FavouritesPane onOpenPlace={onOpenPlace} userId={currentUserId} /></View>
         ) : (
           <View style={styles.empty}><Text style={styles.emptyTitle}>Wishlist is private</Text><Text style={styles.emptyCopy}>Saved places are only visible to their owner.</Text></View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
+      )}
       <ProfileExtras onClose={() => setExtra(null)} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
       <Modal animationType="slide" onRequestClose={() => setFilterOpen(false)} transparent visible={filterOpen}>
         <Pressable onPress={() => setFilterOpen(false)} style={styles.filterBackdrop}><Pressable onPress={(event) => event.stopPropagation()} style={styles.filterSheet}><View style={styles.filterHandle} /><Text style={styles.filterTitle}>Filter reviews</Text>{([['all', 'All reviews'], ['highest', 'Highest rated'], ['recent', 'Most recent']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setFilter(value); setFilterOpen(false); }} style={styles.filterRow}><Text style={styles.filterLabel}>{label}</Text><Text style={styles.filterRadio}>{filter === value ? '●' : '○'}</Text></Pressable>)}</Pressable></Pressable>

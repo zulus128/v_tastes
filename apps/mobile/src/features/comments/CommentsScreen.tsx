@@ -179,7 +179,9 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
         <FlatList
           contentContainerStyle={styles.content}
           data={rootItems}
+          initialNumToRender={10}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={10}
           ListHeaderComponent={review ? <View><MainReview onReact={() => void reactToMainReview()} reacting={reviewReacting} review={review} /><Text style={styles.commentsHeading}>Comments</Text></View> : null}
           ListEmptyComponent={<Text style={styles.empty}>No comments yet. Be the first.</Text>}
           ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
@@ -187,6 +189,7 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.5}
+          windowSize={7}
           refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
           renderItem={({ item }) => {
             const replies = repliesByParent.get(item.id) ?? [];

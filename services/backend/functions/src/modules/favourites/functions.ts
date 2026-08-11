@@ -1,17 +1,18 @@
 import {
   createFolderInputSchema,
   deleteFolderInputSchema,
+  getFavouritesInputSchema,
   renameFolderInputSchema,
   saveVenueInputSchema,
   unsaveVenueInputSchema,
 } from '@tastes/contracts';
-import { FieldValue } from 'firebase-admin/firestore';
-import type { Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { enforceRateLimit, idempotentDocumentId } from '../../shared/mutations';
 import { callableOptions } from '../../shared/options';
+import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
@@ -28,26 +29,36 @@ async function requireActiveProfile(uid: string) {
 
 export const getFavourites = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
+  const input = parseInput(getFavouritesInputSchema, request.data ?? {});
+  const cursor = decodeCursor(input.cursor);
   await requireActiveProfile(uid);
   const userRef = db.collection('users').doc(uid);
-  const [foldersSnapshot, savedSnapshot] = await Promise.all([
-    userRef.collection('folders').orderBy('createdAt', 'asc').get(),
-    userRef.collection('savedVenues').orderBy('createdAt', 'desc').get(),
-  ]);
-  const venueRefs = savedSnapshot.docs.map((document) =>
+  const foldersSnapshot = await userRef.collection('folders').orderBy('createdAt', 'asc').get();
+  let savedQuery = userRef.collection('savedVenues')
+    .orderBy('createdAt', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc');
+  if (cursor) savedQuery = savedQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+  const savedSnapshot = await savedQuery.limit(input.limit + 1).get();
+  const pageDocs = savedSnapshot.docs.slice(0, input.limit);
+  const venueRefs = pageDocs.map((document) =>
     db.collection('venues').doc(String(document.get('venueId') ?? document.id)));
   const venueSnapshots = venueRefs.length > 0 ? await db.getAll(...venueRefs) : [];
   const venuesById = new Map(venueSnapshots.map((venue) => [venue.id, venue]));
-  const folderCounts = new Map<string, number>();
+  const folderCounts = new Map(await Promise.all(foldersSnapshot.docs.map(async (folder) => {
+    const aggregate = await userRef.collection('savedVenues')
+      .where('folderIds', 'array-contains', folder.id)
+      .count()
+      .get();
+    return [folder.id, aggregate.data().count] as const;
+  })));
 
-  const places = savedSnapshot.docs.flatMap((document) => {
+  const places = pageDocs.flatMap((document) => {
     const venueId = String(document.get('venueId') ?? document.id);
     const venue = venuesById.get(venueId);
     if (!venue?.exists || venue.get('status') !== 'active') return [];
     const folderIds = Array.isArray(document.get('folderIds'))
       ? (document.get('folderIds') as unknown[]).filter((value): value is string => typeof value === 'string')
       : [];
-    folderIds.forEach((folderId) => folderCounts.set(folderId, (folderCounts.get(folderId) ?? 0) + 1));
     return [{
       venueId,
       folderIds,
@@ -72,6 +83,12 @@ export const getFavourites = onCall(callableOptions, async (request) => {
       createdAt: timestampToIso(document.get('createdAt')),
     })),
     places,
+    nextCursor: savedSnapshot.size > input.limit && pageDocs.length > 0
+      ? encodeCursor({
+          id: pageDocs.at(-1)!.id,
+          value: timestampToIso(pageDocs.at(-1)!.get('createdAt')),
+        })
+      : null,
   };
 });
 

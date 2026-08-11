@@ -404,13 +404,16 @@ export function HomeFeedScreen({
         <FlatList
           contentContainerStyle={styles.content}
           data={items}
+          initialNumToRender={6}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={6}
           ListHeaderComponent={!recommendationHidden && recommendationQuery.data?.forYou[0] ? <Pressable onLongPress={() => setRecommendationMenu(true)} onPress={() => onOpenPlace(recommendationQuery.data!.forYou[0]!.id)} style={styles.recommendation}><Image source={recommendationQuery.data.forYou[0].imageUrl ? { uri: recommendationQuery.data.forYou[0].imageUrl } : avatar} style={styles.recommendationImage} /><View style={styles.recommendationCopy}><Text style={styles.recommendationEyebrow}>RECOMMENDED FOR YOU</Text><Text style={styles.recommendationTitle}>{recommendationQuery.data.forYou[0].name}</Text><Text style={styles.recommendationMeta}>{recommendationQuery.data.forYou[0].category} · ★ {recommendationQuery.data.forYou[0].rating?.toFixed(1)}</Text><Text style={styles.recommendationReason}>Because it matches your tastes and saves</Text></View></Pressable> : null}
           ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.45}
+          windowSize={7}
           refreshControl={
             <RefreshControl
               refreshing={query.isRefetching && !query.isFetchingNextPage}

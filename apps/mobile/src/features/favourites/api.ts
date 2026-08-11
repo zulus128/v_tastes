@@ -1,5 +1,8 @@
-import type { FavouriteFolder, FavouritesResult } from '@tastes/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { FavouriteFolder } from '@tastes/contracts';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 
@@ -7,10 +10,39 @@ export const favouritesQueryKey = (userId: string) => ['favourites', userId] as 
 
 export function useFavourites(userId: string) {
   const api = useTastesApi();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: favouritesQueryKey(userId),
-    queryFn: async () => (await api.getFavourites()).data,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (await api.getFavourites({ cursor: pageParam, limit: 20 })).data,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => ({
+      folders: data.pages[0]?.folders ?? [],
+      places: data.pages.flatMap((page) => page.places),
+      nextCursor: data.pages.at(-1)?.nextCursor ?? null,
+    }),
   });
+}
+
+export function useSavedVenue(userId: string, venueId: string | null | undefined) {
+  const [state, setState] = useState<{ folderIds: string[]; loading: boolean; saved: boolean }>({
+    folderIds: [],
+    loading: Boolean(venueId),
+    saved: false,
+  });
+  useEffect(() => {
+    if (!venueId) {
+      setState({ folderIds: [], loading: false, saved: false });
+      return undefined;
+    }
+    setState((current) => ({ ...current, loading: true }));
+    return onSnapshot(doc(firestore, 'users', userId, 'savedVenues', venueId), (snapshot) => {
+      const folderIds = Array.isArray(snapshot.data()?.folderIds)
+        ? snapshot.data()!.folderIds.filter((value: unknown): value is string => typeof value === 'string')
+        : [];
+      setState({ folderIds, loading: false, saved: snapshot.exists() });
+    }, () => setState({ folderIds: [], loading: false, saved: false }));
+  }, [userId, venueId]);
+  return state;
 }
 
 export function useCreateFolder(userId: string) {
@@ -60,11 +92,7 @@ export function useUnsaveVenue(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (venueId: string) => (await api.unsaveVenue({ venueId })).data,
-    onSuccess: (_, venueId) => {
-      queryClient.setQueryData<FavouritesResult>(favouritesQueryKey(userId), (current) => current
-        ? { ...current, places: current.places.filter((place) => place.venueId !== venueId) }
-        : current);
-    },
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
   });
 }
 

@@ -337,11 +337,14 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
           <FlatList
             contentContainerStyle={styles.rankingListContent}
             data={ranking}
+            initialNumToRender={12}
             keyExtractor={(item) => item.userId}
+            maxToRenderPerBatch={12}
             onEndReached={() => {
               if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
             }}
             onEndReachedThreshold={0.5}
+            windowSize={7}
             refreshControl={(
               <RefreshControl
                 refreshing={query.isRefetching && !query.isFetchingNextPage}

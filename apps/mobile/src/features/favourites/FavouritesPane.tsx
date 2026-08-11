@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -29,6 +30,7 @@ import {
   useFavourites,
   useRenameFolder,
   useSaveVenue,
+  useSavedVenue,
   useUnsaveVenue,
 } from './api';
 
@@ -161,21 +163,29 @@ export function FavouritesPane({ onOpenPlace, userId }: { onOpenPlace: (venueId:
               <Text style={styles.sortChevron}>▾</Text>
             </Pressable>
           </View>
-          <ScrollView
+          <FlatList
             contentContainerStyle={styles.placeList}
-            showsVerticalScrollIndicator={false}
-          >
-            {[...places].sort((left, right) => sort === 'top' ? right.rating - left.rating : sort === 'nearest' ? left.distanceKm - right.distanceKm : right.venueId.localeCompare(left.venueId)).map((place, index) => (
+            data={[...places].sort((left, right) => sort === 'top' ? right.rating - left.rating : sort === 'nearest' ? left.distanceKm - right.distanceKm : right.savedAt.localeCompare(left.savedAt))}
+            initialNumToRender={8}
+            keyExtractor={(place) => place.venueId}
+            maxToRenderPerBatch={8}
+            ListFooterComponent={favourites.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
+            onEndReached={() => {
+              if (favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            windowSize={7}
+            renderItem={({ item: place, index }) => (
               <FavouriteCard
-                key={place.venueId}
                 index={index}
                 onOpen={() => onOpenPlace(place.venueId)}
                 onUnsave={() => unsaveVenue.mutate(place.venueId)}
                 place={place}
                 styles={styles}
               />
-            ))}
-          </ScrollView>
+            )}
+            showsVerticalScrollIndicator={false}
+          />
         </>
       ) : null}
 
@@ -211,20 +221,20 @@ export function SaveToFolderSheet({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const favourites = useFavourites(userId);
+  const savedVenue = useSavedVenue(userId, place?.venueId);
   const saveVenue = useSaveVenue(userId);
   const createFolder = useCreateFolder(userId);
-  const existing = favourites.data?.places.find((item) => item.venueId === place?.venueId);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
   const [folderName, setFolderName] = useState('');
 
   useEffect(() => {
     if (visible) {
-      setSelected(new Set(existing?.folderIds ?? []));
+      setSelected(new Set(savedVenue.folderIds));
       setCreating(false);
       setFolderName('');
     }
-  }, [existing?.folderIds, visible]);
+  }, [savedVenue.folderIds, visible]);
 
   async function createAndSelect() {
     const name = folderName.trim();
@@ -553,6 +563,7 @@ function createStyles(colors: ThemeColors) {
     sortText: { color: colors.text, fontSize: 13, fontWeight: '600' },
     sortChevron: { color: colors.textMuted, fontSize: 13 },
     placeList: { padding: 6, paddingHorizontal: 16, gap: 12, paddingBottom: 32 },
+    pageLoader: { paddingVertical: 20 },
     placeCard: { minHeight: 154, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
     cardImageWrap: { width: 86, height: 86, borderRadius: 12, overflow: 'hidden' },
     cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },

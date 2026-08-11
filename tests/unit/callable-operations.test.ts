@@ -3,6 +3,7 @@ import { callableOperationNames } from '../../packages/firebase-client/src';
 import * as backendExports from '../../services/backend/functions/src';
 
 const nonCallableExports = new Set([
+  'ingestMobileTelemetry',
   'pushMessageNotification',
   'resetMonthlyXp',
 ]);

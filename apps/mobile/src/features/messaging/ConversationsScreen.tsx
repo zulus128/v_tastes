@@ -1,4 +1,5 @@
 import type { ConversationSummary } from '@tastes/contracts';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -95,7 +96,21 @@ export function ConversationsScreen({
   const [requestCount, setRequestCount] = useState(0);
   useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => { if (active) Alert.alert('Could not load requests', 'Open Requests to try again.'); }); return () => { active = false; }; }, [api]);
   const inbox = useConversationInbox(userId);
-  const pendingInvitation = inbox.data.find((conversation) => (
+  const conversationHistory = useInfiniteQuery({
+    queryKey: ['conversations', userId, 'history'],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (
+      await api.listConversations({ cursor: pageParam, limit: 50 })
+    ).data,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  const inboxItems = useMemo(() => {
+    const byId = new Map<string, ConversationSummary>();
+    conversationHistory.data?.pages.flatMap((page) => page.items).forEach((conversation) => byId.set(conversation.id, conversation));
+    inbox.data.forEach((conversation) => byId.set(conversation.id, conversation));
+    return [...byId.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }, [conversationHistory.data?.pages, inbox.data]);
+  const pendingInvitation = inboxItems.find((conversation) => (
     conversation.kind === 'activity'
     && conversation.invitationStatus === 'pending'
     && conversation.activityId !== suppressedInviteId
@@ -105,7 +120,7 @@ export function ConversationsScreen({
     if (pendingActivityId) setSuppressedInviteId(pendingActivityId);
   }, [pendingActivityId]);
   const normalizedSearch = search.trim().toLowerCase();
-  const conversations = inbox.data.filter((conversation) => (
+  const conversations = inboxItems.filter((conversation) => (
     !normalizedSearch
     || conversation.title?.toLowerCase().includes(normalizedSearch)
     || conversation.otherParticipant?.displayName.toLowerCase().includes(normalizedSearch)
@@ -130,18 +145,20 @@ export function ConversationsScreen({
           <Pressable onPress={onOpenRequests}><Text style={styles.requests}>Requests {requestCount > 0 ? <Text style={styles.requestsCount}>({requestCount})</Text> : null}</Text></Pressable>
         </View>
       </View>
-      {inbox.loading ? (
+      {inbox.loading && conversationHistory.isPending ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-      ) : inbox.error && inbox.data.length === 0 ? (
+      ) : (inbox.error ?? conversationHistory.error) && inboxItems.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.stateTitle}>Could not load messages</Text>
-          <Text style={styles.stateCopy}>{inbox.error.message}</Text>
+          <Text style={styles.stateCopy}>{(inbox.error ?? conversationHistory.error)?.message}</Text>
         </View>
       ) : (
         <FlatList
           contentContainerStyle={[styles.listContent, conversations.length === 0 && styles.emptyContent]}
           data={conversations}
+          initialNumToRender={10}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={10}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={(
             <View style={styles.empty}>
@@ -152,6 +169,12 @@ export function ConversationsScreen({
               </Text>
             </View>
           )}
+          ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
+          onEndReached={() => {
+            if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          windowSize={7}
           renderItem={({ item }) => (
             <ConversationRow conversation={item} onOpen={() => onOpenConversation(item.id)} styles={styles} />
           )}

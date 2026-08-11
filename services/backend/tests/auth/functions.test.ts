@@ -45,6 +45,17 @@ async function callFunction<T>(name: string, data: unknown, token?: string): Pro
   return payload.result as T;
 }
 
+async function postTelemetry(payload: unknown, token?: string): Promise<Response> {
+  return fetch(`${FUNCTIONS_URL}/ingestMobileTelemetry`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function authenticatedUser() {
   const challenge = await requestOtp(uniquePhone());
   const verified = await callFunction<{ customToken: string }>('verifyPhoneOtp', {
@@ -93,6 +104,45 @@ beforeEach(async () => {
     fetch(FIRESTORE_EMULATOR_URL, { method: 'DELETE' }),
     fetch(AUTH_EMULATOR_URL, { method: 'DELETE' }),
   ]);
+});
+
+describe('mobile observability endpoint', () => {
+  it('requires Firebase authentication', async () => {
+    const response = await postTelemetry({ kind: 'event', event: 'app_opened' });
+    expect(response.status).toBe(401);
+  });
+
+  it('accepts authenticated events and exceptions', async () => {
+    const user = await authenticatedUser();
+    const eventResponse = await postTelemetry(
+      {
+        kind: 'event',
+        event: 'screen_opened',
+        timestamp: new Date().toISOString(),
+        context: { screen: 'discover', count: 3 },
+      },
+      user.token,
+    );
+    expect(eventResponse.status).toBe(202);
+    await expect(eventResponse.json()).resolves.toEqual({ accepted: true });
+
+    const errorResponse = await postTelemetry(
+      {
+        kind: 'exception',
+        name: 'Error',
+        message: 'Test exception',
+        stack: 'Error: Test exception',
+      },
+      user.token,
+    );
+    expect(errorResponse.status).toBe(202);
+  });
+
+  it('rejects malformed telemetry', async () => {
+    const user = await authenticatedUser();
+    const response = await postTelemetry({ kind: 'event', event: '' }, user.token);
+    expect(response.status).toBe(400);
+  });
 });
 
 describe('phone OTP callables', () => {
@@ -275,6 +325,56 @@ describe('authenticated session and paginated reads', () => {
       placesVisited: 0,
     });
   });
+
+  it('paginates favourites and notifications and clears every notification', async () => {
+    const user = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'Long List User',
+      username: 'long.list.user',
+      city: 'Istanbul',
+    }, user.token);
+    const userDocument = (await db.collection('users').where('username', '==', 'long.list.user').limit(1).get()).docs[0];
+    if (!userDocument) throw new Error('Expected the long-list profile.');
+    const userRef = userDocument.ref;
+    const batch = db.batch();
+    for (let index = 0; index < 3; index += 1) {
+      const venueId = `paged-venue-${index}`;
+      batch.set(db.collection('venues').doc(venueId), {
+        name: `Paged venue ${index}`,
+        city: 'Istanbul',
+        status: 'active',
+      });
+      batch.set(userRef.collection('savedVenues').doc(venueId), {
+        venueId,
+        folderIds: [],
+        createdAt: Timestamp.fromMillis(Date.now() - index * 1_000),
+      });
+    }
+    for (let index = 0; index < 205; index += 1) {
+      batch.set(userRef.collection('notifications').doc(`notification-${String(index).padStart(3, '0')}`), {
+        kind: 'system',
+        title: `Notification ${index}`,
+        body: 'Pagination fixture',
+        unread: true,
+        createdAt: Timestamp.fromMillis(Date.now() - index * 1_000),
+      });
+    }
+    await batch.commit();
+
+    const favourites = await callFunction<{ places: Array<{ venueId: string }>; nextCursor: string | null }>('getFavourites', { limit: 2 }, user.token);
+    expect(favourites.places).toHaveLength(2);
+    expect(favourites.nextCursor).toBeTruthy();
+    const nextFavourites = await callFunction<{ places: Array<{ venueId: string }>; nextCursor: string | null }>('getFavourites', { limit: 2, cursor: favourites.nextCursor }, user.token);
+    expect(nextFavourites.places).toHaveLength(1);
+
+    const notifications = await callFunction<{ items: Array<{ id: string }>; nextCursor: string | null }>('listNotifications', { limit: 20 }, user.token);
+    expect(notifications.items).toHaveLength(20);
+    expect(notifications.nextCursor).toBeTruthy();
+    const cleared = await callFunction<{ cleared: number }>('clearNotifications', {}, user.token);
+    expect(cleared.cleared).toBe(205);
+    expect((await userRef.collection('notifications').get()).empty).toBe(true);
+  }, 15_000);
 
   it('writes social edges and applies XP and idempotency exactly once', async () => {
     const first = await authenticatedUser();
@@ -692,6 +792,20 @@ describe('authenticated session and paginated reads', () => {
       token,
     );
     expect(cafes.items).toHaveLength(3);
+
+    const paginatedCafeIds: string[] = [];
+    let cafeCursor: string | null = null;
+    for (let page = 0; page < 3; page += 1) {
+      const cafePage = await callFunction<{
+        items: Array<{ id: string }>;
+        nextCursor: string | null;
+      }>('getVenues', { category: 'Cafe', limit: 1, cursor: cafeCursor }, token);
+      expect(cafePage.items).toHaveLength(1);
+      paginatedCafeIds.push(cafePage.items[0]!.id);
+      cafeCursor = cafePage.nextCursor;
+    }
+    expect(new Set(paginatedCafeIds).size).toBe(3);
+
     const trending = await callFunction<{ items: Array<{ id: string }> }>(
       'getVenues',
       { tag: 'trending', limit: 20 },
@@ -883,10 +997,19 @@ describe('messaging callables', () => {
       }),
     ]);
 
-    const reviews = await callFunction<Array<{ id: string; rating: number }>>('getPlaceReviews', {
-      venueId: 'nearby-sushi', sort: 'highest', scope: 'friends',
+    const reviews = await callFunction<{ items: Array<{ id: string; rating: number }>; nextCursor: string | null }>('getPlaceReviews', {
+      venueId: 'nearby-sushi', sort: 'highest', scope: 'all', limit: 1,
     }, user.token);
-    expect(reviews).toEqual([expect.objectContaining({ id: 'friend-place-review', rating: 5 })]);
+    expect(reviews.items).toEqual([expect.objectContaining({ id: 'friend-place-review', rating: 5 })]);
+    expect(reviews.nextCursor).toBeTruthy();
+    const nextReviews = await callFunction<{ items: Array<{ id: string; rating: number }>; nextCursor: string | null }>('getPlaceReviews', {
+      venueId: 'nearby-sushi', sort: 'highest', scope: 'all', limit: 1, cursor: reviews.nextCursor,
+    }, user.token);
+    expect(nextReviews.items).toEqual([expect.objectContaining({ id: 'other-place-review', rating: 3 })]);
+    const friendReviews = await callFunction<{ items: Array<{ id: string }>; nextCursor: string | null }>('getPlaceReviews', {
+      venueId: 'nearby-sushi', sort: 'recent', scope: 'friends', limit: 20,
+    }, user.token);
+    expect(friendReviews.items.map((review) => review.id)).toEqual(['friend-place-review']);
 
     const answer = await callFunction<{ places: Array<{ id: string; distanceKm: number | null }> }>('askTastesAi', {
       prompt: 'A romantic Japanese dinner nearby', location: 'Istanbul',

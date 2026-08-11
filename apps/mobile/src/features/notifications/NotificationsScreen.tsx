@@ -24,14 +24,33 @@ export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => vo
   const [requests, setRequests] = useState<AppRequest[]>([]);
   const [tab, setTab] = useState<'activity' | 'badges'>('activity');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const normalized = query.trim().toLowerCase();
   const visible = items.filter((item) => (tab === 'badges' ? item.kind === 'reward' : item.kind !== 'reward') && (!normalized || `${item.title} ${item.body}`.toLowerCase().includes(normalized)));
   const visibleRequests = tab === 'activity' ? requests.filter((item) => !normalized || `${item.title} ${item.body} ${item.senderName}`.toLowerCase().includes(normalized)) : [];
-  useEffect(() => { let active = true; void Promise.all([api.listNotifications(), api.listRequests()]).then(([notifications, pendingRequests]) => { if (active) { setItems(notifications.data); setRequests(pendingRequests.data); } }).catch(() => Alert.alert('Could not load notifications', 'Please try again.')).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [api]);
+  useEffect(() => { let active = true; void Promise.all([api.listNotifications({ limit: 20 }), api.listRequests()]).then(([notifications, pendingRequests]) => { if (active) { setItems(notifications.data.items); setNextCursor(notifications.data.nextCursor); setRequests(pendingRequests.data); } }).catch(() => Alert.alert('Could not load notifications', 'Please try again.')).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [api]);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const response = await api.listNotifications({ cursor: nextCursor, limit: 20 });
+      setItems((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...response.data.items.filter((item) => !known.has(item.id))];
+      });
+      setNextCursor(response.data.nextCursor);
+    } catch {
+      Alert.alert('Could not load more notifications', 'Please try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function open(item: AppNotification) { if (item.unread) { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate)); try { await api.markNotificationRead({ notificationId: item.id }); } catch { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: true } : candidate)); Alert.alert('Could not mark notification as read', 'Please try again.'); } } onOpenTarget(item); }
-  async function clear() { await api.clearNotifications(); setItems([]); }
+  async function clear() { await api.clearNotifications(); setItems([]); setNextCursor(null); }
   async function respond(item: AppRequest, response: 'accepted' | 'declined') { await api.respondToRequest({ requestId: item.id, response }); setRequests((current) => current.filter((candidate) => candidate.id !== item.id)); }
 
   return (
@@ -54,7 +73,10 @@ export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => vo
       {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} /> : <FlatList
         contentContainerStyle={[styles.content, visible.length === 0 && visibleRequests.length === 0 && styles.emptyContent]}
         data={visible}
+        initialNumToRender={12}
         keyExtractor={(item) => item.id}
+        maxToRenderPerBatch={12}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
         ListHeaderComponent={visibleRequests.length > 0 ? <View>{visibleRequests.map((item) => <View key={item.id} style={[styles.row, styles.requestRow]}><View style={[styles.avatar, styles.requestAvatar]}><Text style={styles.requestAvatarText}>+</Text></View><View style={styles.copy}><Text style={styles.rowTitle}>{item.senderName}</Text><Text style={styles.body}>{item.body}</Text><View style={styles.requestActions}><Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}><Text style={styles.acceptText}>Accept</Text></Pressable><Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}><Text style={styles.declineText}>Decline</Text></Pressable></View></View></View>)}</View> : null}
         ListEmptyComponent={visibleRequests.length === 0 ? (
           <View style={styles.empty}>
@@ -76,6 +98,9 @@ export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => vo
             {item.unread ? <View style={styles.dot} /> : null}
           </Pressable>
         )}
+        onEndReached={() => void loadMore()}
+        onEndReachedThreshold={0.5}
+        windowSize={7}
         showsVerticalScrollIndicator={false}
       />}
     </View>

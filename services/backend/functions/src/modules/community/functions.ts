@@ -1,6 +1,7 @@
 import {
   createGroupInputSchema,
   groupInputSchema,
+  listNotificationsInputSchema,
   notificationInputSchema,
   reportCommentInputSchema,
   requestInputSchema,
@@ -10,13 +11,15 @@ import {
   type AppNotification,
   type AppRequest,
   type ProfileExtrasResult,
+  type Page,
   type TastesGroup,
 } from '@tastes/contracts';
-import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
+import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
@@ -49,16 +52,22 @@ function reviewText(document: FirebaseFirestore.QueryDocumentSnapshot): string {
 
 export const listNotifications = onCall(
   callableOptions,
-  async (request): Promise<AppNotification[]> => {
+  async (request): Promise<Page<AppNotification>> => {
     const uid = requireUserId(request);
-    const snapshot = await db
+    const input = parseInput(listNotificationsInputSchema, request.data ?? {});
+    const cursor = decodeCursor(input.cursor);
+    let notificationsQuery = db
       .collection('users')
       .doc(uid)
       .collection('notifications')
       .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
-    return snapshot.docs.map(
+      .orderBy(FieldPath.documentId(), 'desc');
+    if (cursor) {
+      notificationsQuery = notificationsQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+    }
+    const snapshot = await notificationsQuery.limit(input.limit + 1).get();
+    const pageDocs = snapshot.docs.slice(0, input.limit);
+    const items = pageDocs.map(
       (doc) =>
         ({
           id: doc.id,
@@ -71,6 +80,12 @@ export const listNotifications = onCall(
           createdAt: timestampToIso(doc.get('createdAt')),
         }) as AppNotification,
     );
+    return {
+      items,
+      nextCursor: snapshot.size > input.limit && pageDocs.length > 0
+        ? encodeCursor({ id: pageDocs.at(-1)!.id, value: timestampToIso(pageDocs.at(-1)!.get('createdAt')) })
+        : null,
+    };
   },
 );
 
@@ -88,11 +103,17 @@ export const markNotificationRead = onCall(callableOptions, async (request) => {
 
 export const clearNotifications = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
-  const docs = await db.collection('users').doc(uid).collection('notifications').limit(200).get();
-  const batch = db.batch();
-  docs.docs.forEach((doc) => batch.delete(doc.ref));
-  await batch.commit();
-  return { cleared: docs.size };
+  const notifications = db.collection('users').doc(uid).collection('notifications');
+  let cleared = 0;
+  while (true) {
+    const docs = await notifications.limit(400).get();
+    if (docs.empty) break;
+    const batch = db.batch();
+    docs.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    cleared += docs.size;
+  }
+  return { cleared };
 });
 
 export const listRequests = onCall(callableOptions, async (request): Promise<AppRequest[]> => {

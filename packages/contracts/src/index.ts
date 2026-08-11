@@ -232,6 +232,9 @@ export const getCommentsInputSchema = pageInputSchema.extend({
   reviewId: z.string().min(1),
 });
 
+export const getFavouritesInputSchema = pageInputSchema;
+export const listNotificationsInputSchema = pageInputSchema;
+
 export const listConversationsInputSchema = pageInputSchema;
 
 export const getMessagesInputSchema = pageInputSchema.extend({
@@ -257,7 +260,7 @@ export const getPlaceInputSchema = z.object({
 
 export const placeReviewSortSchema = z.enum(['highest', 'lowest', 'popular', 'recent', 'oldest']);
 
-export const getPlaceReviewsInputSchema = getPlaceInputSchema.extend({
+export const getPlaceReviewsInputSchema = getPlaceInputSchema.merge(pageInputSchema).extend({
   sort: placeReviewSortSchema.default('recent'),
   scope: z.enum(['all', 'friends']).default('all'),
 });
@@ -352,9 +355,11 @@ export type RenameFolderInput = z.infer<typeof renameFolderInputSchema>;
 export type DeleteFolderInput = z.infer<typeof deleteFolderInputSchema>;
 export type SaveVenueInput = z.infer<typeof saveVenueInputSchema>;
 export type UnsaveVenueInput = z.infer<typeof unsaveVenueInputSchema>;
+export type GetFavouritesInput = z.infer<typeof getFavouritesInputSchema>;
 export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
+export type ListNotificationsInput = z.infer<typeof listNotificationsInputSchema>;
 export type ListConversationsInput = z.infer<typeof listConversationsInputSchema>;
 export type GetMessagesInput = z.infer<typeof getMessagesInputSchema>;
 export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
@@ -550,6 +555,7 @@ export interface FavouritePlace {
 export interface FavouritesResult {
   folders: FavouriteFolder[];
   places: FavouritePlace[];
+  nextCursor: string | null;
 }
 
 export interface SaveVenueResult {

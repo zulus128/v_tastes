@@ -7,14 +7,15 @@ import type {
   DiscoverTag,
   PlaceDetails,
   PlaceReview,
+  Page,
   Venue,
 } from '@tastes/contracts';
-import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { FieldPath, Timestamp, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
-import { decodeCursor, encodeCursor } from '../../shared/pagination';
+import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
@@ -193,13 +194,15 @@ export const getVenues = onCall(callableOptions, async (request) => {
   if (input.tag) {
     venuesQuery = venuesQuery.where('discoverTags', 'array-contains', input.tag);
   }
-  venuesQuery = venuesQuery.orderBy('rating', 'desc');
+  venuesQuery = venuesQuery
+    .orderBy('rating', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc');
 
   if (cursor) {
     if (typeof cursor.value !== 'number') {
       throw new HttpsError('invalid-argument', 'The venues cursor is invalid.');
     }
-    venuesQuery = venuesQuery.startAfter(cursor.value);
+    venuesQuery = venuesQuery.startAfter(cursor.value, cursor.id);
   }
 
   const snapshot = await venuesQuery.limit(input.limit + 1).get();
@@ -258,17 +261,37 @@ export const getPlace = onCall(callableOptions, async (request) => {
 
 export const getPlaceReviews = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
-  const { venueId, sort, scope } = parseInput(getPlaceReviewsInputSchema, request.data);
+  const input = parseInput(getPlaceReviewsInputSchema, request.data);
+  const { venueId, sort, scope } = input;
+  const cursor = decodeCursor(input.cursor);
   const venue = await db.collection('venues').doc(venueId).get();
   if (!venue.exists || venue.get('status') !== 'active') {
     throw new HttpsError('not-found', 'The place was not found.');
   }
-  const reviews = await db.collection('reviews')
+  const ordering = {
+    highest: { field: 'rating', direction: 'desc' },
+    lowest: { field: 'rating', direction: 'asc' },
+    popular: { field: 'reactionCount', direction: 'desc' },
+    recent: { field: 'createdAt', direction: 'desc' },
+    oldest: { field: 'createdAt', direction: 'asc' },
+  }[sort] as { field: 'rating' | 'reactionCount' | 'createdAt'; direction: FirebaseFirestore.OrderByDirection };
+  let reviewsQuery = db.collection('reviews')
     .where('venueId', '==', venueId)
     .where('status', '==', 'published')
-    .limit(50)
-    .get();
-  const authors = [...new Set(reviews.docs.map((document) => String(document.get('authorId'))))];
+    .orderBy(ordering.field, ordering.direction)
+    .orderBy(FieldPath.documentId(), ordering.direction);
+  if (cursor) {
+    const value = ordering.field === 'createdAt'
+      ? Timestamp.fromDate(cursorDate(cursor.value))
+      : cursor.value;
+    if (ordering.field !== 'createdAt' && typeof value !== 'number') {
+      throw new HttpsError('invalid-argument', 'The place reviews cursor is invalid.');
+    }
+    reviewsQuery = reviewsQuery.startAfter(value, cursor.id);
+  }
+  const reviews = await reviewsQuery.limit(input.limit + 1).get();
+  const pageDocs = reviews.docs.slice(0, input.limit);
+  const authors = [...new Set(pageDocs.map((document) => String(document.get('authorId'))))];
   const authorDocs = authors.length > 0
     ? await db.getAll(...authors.map((id) => db.collection('users').doc(id)))
     : [];
@@ -276,7 +299,7 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
   const friendIds = scope === 'friends'
     ? new Set((await db.collection('users').doc(uid).collection('following').get()).docs.map((document) => document.id))
     : null;
-  const items: PlaceReview[] = reviews.docs.filter((document) => !friendIds || friendIds.has(String(document.get('authorId')))).map((document) => {
+  const items: PlaceReview[] = pageDocs.filter((document) => !friendIds || friendIds.has(String(document.get('authorId')))).map((document) => {
     const author = authorById.get(String(document.get('authorId')));
     return {
       id: document.id,
@@ -299,12 +322,17 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
         : [],
     };
   });
-  const compare = {
-    highest: (a: PlaceReview, b: PlaceReview) => b.rating - a.rating,
-    lowest: (a: PlaceReview, b: PlaceReview) => a.rating - b.rating,
-    popular: (a: PlaceReview, b: PlaceReview) => b.reactionCount - a.reactionCount,
-    recent: (a: PlaceReview, b: PlaceReview) => b.createdAt.localeCompare(a.createdAt),
-    oldest: (a: PlaceReview, b: PlaceReview) => a.createdAt.localeCompare(b.createdAt),
-  }[sort];
-  return items.sort(compare);
+  const last = pageDocs.at(-1);
+  const result: Page<PlaceReview> = {
+    items,
+    nextCursor: reviews.size > input.limit && last
+      ? encodeCursor({
+          id: last.id,
+          value: ordering.field === 'createdAt'
+            ? timestampToIso(last.get(ordering.field))
+            : Number(last.get(ordering.field) ?? 0),
+        })
+      : null,
+  };
+  return result;
 });

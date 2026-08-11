@@ -1,5 +1,6 @@
 import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,7 +50,21 @@ export function ChatScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
   const api = useTastesApi();
-  const messages = useConversationMessages(conversationId, userId);
+  const realtimeMessages = useConversationMessages(conversationId, userId);
+  const messageHistory = useInfiniteQuery({
+    queryKey: ['messages', conversationId, 'history'],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (
+      await api.getMessages({ conversationId, cursor: pageParam, limit: 50 })
+    ).data,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  const messageItems = useMemo(() => {
+    const byId = new Map<string, ChatMessage>();
+    messageHistory.data?.pages.flatMap((page) => page.items).forEach((message) => byId.set(message.id, message));
+    realtimeMessages.data.forEach((message) => byId.set(message.id, message));
+    return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }, [messageHistory.data?.pages, realtimeMessages.data]);
   const [participant, setParticipant] = useState<ConversationParticipant | null>(null);
   const [activity, setActivity] = useState<{ id: string; title: string } | null>(null);
   const [activityPreviewOpen, setActivityPreviewOpen] = useState(false);
@@ -98,7 +113,7 @@ export function ChatScreen({
     }
   }
 
-  const error = conversationError ?? messages.error;
+  const error = conversationError ?? realtimeMessages.error ?? messageHistory.error;
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -131,19 +146,21 @@ export function ChatScreen({
         </Pressable>
       </View>
 
-      {messages.loading ? (
+      {realtimeMessages.loading && messageHistory.isPending ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-      ) : error && messages.data.length === 0 ? (
+      ) : error && messageItems.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.stateTitle}>Could not load conversation</Text>
           <Text style={styles.stateCopy}>{error.message}</Text>
         </View>
       ) : (
         <FlatList
-          contentContainerStyle={[styles.messagesContent, messages.data.length === 0 && styles.emptyMessages]}
-          data={messages.data}
-          inverted={messages.data.length > 0}
+          contentContainerStyle={[styles.messagesContent, messageItems.length === 0 && styles.emptyMessages]}
+          data={messageItems}
+          initialNumToRender={16}
+          inverted={messageItems.length > 0}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={12}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={(
@@ -152,6 +169,12 @@ export function ChatScreen({
               <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
             </View>
           )}
+          ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} /> : null}
+          onEndReached={() => {
+            if (messageHistory.hasNextPage && !messageHistory.isFetchingNextPage) void messageHistory.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          windowSize={9}
           renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} styles={styles} />}
           showsVerticalScrollIndicator={false}
         />

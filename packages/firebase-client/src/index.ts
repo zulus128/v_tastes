@@ -19,6 +19,7 @@ import type {
   DiscoverPeopleResult,
   FeedItem,
   FavouritesResult,
+  GetFavouritesInput,
   FollowResult,
   FollowUserInput,
   GetCommentsInput,
@@ -33,6 +34,7 @@ import type {
   LeaderboardEntry,
   HideReviewInput,
   ListConversationsInput,
+  ListNotificationsInput,
   MarkConversationReadInput,
   MarkConversationReadResult,
   ReportReviewInput,
@@ -279,8 +281,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<RegisterPushTokenInput, PushTokenResult>('registerPushToken', input),
     unregisterPushToken: (input: UnregisterPushTokenInput) =>
       invoke<UnregisterPushTokenInput, PushTokenResult>('unregisterPushToken', input),
-    getFavourites: () =>
-      invoke<Record<string, never>, FavouritesResult>('getFavourites', {}),
+    getFavourites: (input: GetFavouritesInput = { limit: 20 }) =>
+      invoke<GetFavouritesInput, FavouritesResult>('getFavourites', input),
     createFolder: (input: CreateFolderInput) =>
       invoke<CreateFolderInput, IdResult>('createFolder', input),
     renameFolder: (input: RenameFolderInput) =>
@@ -320,10 +322,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     getPlace: (input: GetPlaceInput) =>
       invoke<GetPlaceInput, PlaceDetails>('getPlace', input),
     getPlaceReviews: (input: GetPlaceReviewsInput) =>
-      invoke<GetPlaceReviewsInput, PlaceReview[]>('getPlaceReviews', input),
+      invoke<GetPlaceReviewsInput, Page<PlaceReview>>('getPlaceReviews', input),
     askTastesAi: (input: AskTastesAiInput) =>
       invoke<AskTastesAiInput, TastesAiAnswer>('askTastesAi', input),
-    listNotifications: () => invoke<Record<string, never>, AppNotification[]>('listNotifications', {}),
+    listNotifications: (input: ListNotificationsInput = { limit: 20 }) => invoke<ListNotificationsInput, Page<AppNotification>>('listNotifications', input),
     markNotificationRead: (input: NotificationInput) => invoke<NotificationInput, IdResult>('markNotificationRead', input),
     clearNotifications: () => invoke<Record<string, never>, { cleared: number }>('clearNotifications', {}),
     listRequests: () => invoke<Record<string, never>, AppRequest[]>('listRequests', {}),

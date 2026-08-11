@@ -1,3 +1,5 @@
+import { auth } from './firebase';
+
 export type ObservabilityContext = Record<string, string | number | boolean | null | undefined>;
 
 export interface ObservabilitySink {
@@ -21,16 +23,26 @@ export function configureObservability() {
   if (!endpoint) return;
 
   const send = (kind: 'exception' | 'event', payload: Record<string, unknown>) => {
-    void fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        kind,
-        platform: 'mobile',
-        timestamp: new Date().toISOString(),
-        ...payload,
-      }),
-    }).catch((error) => {
+    void (async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const token = await user.getIdToken();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          kind,
+          platform: 'mobile',
+          timestamp: new Date().toISOString(),
+          ...payload,
+        }),
+      });
+      if (!response.ok) throw new Error(`Observability endpoint returned ${response.status}`);
+    })().catch((error) => {
       if (__DEV__) console.error('[tastes] observability delivery failed', error);
     });
   };

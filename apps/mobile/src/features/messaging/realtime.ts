@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 
 const INBOX_LIMIT = 50;
-const MESSAGE_LIMIT = 100;
+const MESSAGE_LIMIT = 50;
 
 type RealtimeState<T> = {
   data: T;

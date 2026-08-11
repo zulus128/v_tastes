@@ -2,16 +2,19 @@ import type { FeedItem } from '@tastes/contracts';
 import {
   collection,
   doc,
+  documentId,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
+  startAfter,
   where,
   type DocumentData,
   type QueryDocumentSnapshot,
   type Timestamp,
 } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 
 export type ProfileData = {
@@ -86,21 +89,74 @@ export function useProfile(userId: string, fallbackName: string) {
 export function useProfileReviews(userId: string) {
   const [reviews, setReviews] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const lastDocument = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const hasLoadedMore = useRef(false);
 
-  useEffect(() => onSnapshot(
-    query(
+  const baseQuery = useCallback(() => query(
       collection(firestore, 'reviews'),
       where('status', '==', 'published'),
       where('authorId', '==', userId),
       orderBy('createdAt', 'desc'),
+      orderBy(documentId(), 'desc'),
       limit(20),
-    ),
+    ), [userId]);
+
+  useEffect(() => {
+    hasLoadedMore.current = false;
+    lastDocument.current = null;
+    setReviews([]);
+    setLoading(true);
+    return onSnapshot(
+      baseQuery(),
     (snapshot) => {
-      setReviews(snapshot.docs.map(reviewFromDocument));
+      const latest = snapshot.docs.map(reviewFromDocument);
+      setReviews((current) => {
+        const latestIds = new Set(latest.map((review) => review.id));
+        return [...latest, ...current.filter((review) => !latestIds.has(review.id))];
+      });
+      if (!hasLoadedMore.current) {
+        lastDocument.current = snapshot.docs.at(-1) ?? null;
+        setHasMore(snapshot.size === 20);
+      }
+      setError(null);
       setLoading(false);
     },
-    () => setLoading(false),
-  ), [userId]);
+      (cause) => { setError(cause); setLoading(false); },
+    );
+  }, [baseQuery]);
 
-  return { loading, reviews };
+  const loadMore = useCallback(async () => {
+    if (!lastDocument.current || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const cursor = lastDocument.current;
+      const snapshot = await getDocs(query(
+        collection(firestore, 'reviews'),
+        where('status', '==', 'published'),
+        where('authorId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        orderBy(documentId(), 'desc'),
+        startAfter(cursor.get('createdAt'), cursor.id),
+        limit(20),
+      ));
+      const next = snapshot.docs.map(reviewFromDocument);
+      hasLoadedMore.current = true;
+      setReviews((current) => {
+        const known = new Set(current.map((review) => review.id));
+        return [...current, ...next.filter((review) => !known.has(review.id))];
+      });
+      lastDocument.current = snapshot.docs.at(-1) ?? lastDocument.current;
+      setHasMore(snapshot.size === 20);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error('Could not load more reviews.'));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadingMore, userId]);
+
+  return { error, hasMore, loadMore, loading, loadingMore, reviews };
 }

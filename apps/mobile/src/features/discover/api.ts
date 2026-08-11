@@ -58,9 +58,14 @@ export function usePlace(venueId: string) {
 
 export function usePlaceReviews(venueId: string, sort: 'highest' | 'lowest' | 'popular' | 'recent' | 'oldest', scope: 'all' | 'friends' = 'all') {
   const api = useTastesApi();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: placeReviewsQueryKey(venueId, sort, scope),
-    queryFn: async () => (await api.getPlaceReviews({ venueId, sort, scope })).data,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (
+      await api.getPlaceReviews({ venueId, sort, scope, cursor: pageParam, limit: 20 })
+    ).data,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.items),
   });
 }
 

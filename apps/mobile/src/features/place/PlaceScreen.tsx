@@ -1,13 +1,13 @@
 import type { PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
-import { useFavourites, useSaveVenue, useUnsaveVenue } from '../favourites/api';
+import { useSavedVenue, useSaveVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -41,10 +41,10 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const [activePhoto, setActivePhoto] = useState(0);
   const details = usePlace(venueId);
   const reviews = usePlaceReviews(venueId, sort, reviewScope);
-  const favourites = useFavourites(userId);
+  const savedVenue = useSavedVenue(userId, venueId);
   const save = useSaveVenue(userId);
   const unsave = useUnsaveVenue(userId);
-  const saved = favourites.data?.places.some((place) => place.venueId === venueId) ?? false;
+  const saved = savedVenue.saved;
   const busy = save.isPending || unsave.isPending;
   async function reactToReview(reviewId: string) {
     if (reactingId) return;
@@ -71,36 +71,45 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const place = details.data;
   const photos = place.photoUrls.length > 0 ? place.photoUrls : [place.venue.imageUrl ?? ''];
   const photoCount = place.photoCount > 0 ? place.photoCount : photos.length;
+  const hero = <View style={styles.hero}>
+    <ScrollView horizontal onMomentumScrollEnd={(event) => setActivePhoto(Math.round(event.nativeEvent.contentOffset.x / width))} pagingEnabled showsHorizontalScrollIndicator={false}>
+      {photos.map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={[styles.heroImage, { width }]} />)}
+    </ScrollView>
+    <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
+    <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
+    <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + 12 }]}><Text style={styles.back}>‹</Text></Pressable>
+    <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + 12 }]}>
+      {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={18} width={18} />}
+    </Pressable>
+    <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
+    <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
+  </View>;
+  const intro = <View style={styles.content}>
+    <View style={styles.badges}><Text style={styles.primaryBadge}>Popular</Text><Text style={styles.primaryBadge}>★ {place.venue.rating?.toFixed(1) ?? '–'}</Text><Text style={styles.count}>{place.venue.reviewCount ?? 0} reviews</Text></View>
+    <Text style={styles.title}>{place.venue.name}</Text>
+    <Text style={styles.address}>{place.venue.address ?? place.venue.city}</Text>
+    <View style={styles.chips}>{(place.chips.length > 0 ? place.chips : [place.venue.category, '$'.repeat(place.venue.priceLevel ?? 1), (place.venue.distanceKm ?? 0).toFixed(1) + ' km']).map((value) => <Text key={value} style={styles.chip}>{value}</Text>)}</View>
+    <View style={styles.tabs}>{(['overview', 'reviews'] as const).map((value) => <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabActive]}><Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{value === 'overview' ? 'Overview' : 'Reviews'}</Text></Pressable>)}</View>
+    {tab === 'overview'
+      ? <Overview details={place} openHours={() => setSheet('hours')} openPhotos={() => setSheet('photos')} styles={styles} />
+      : <ReviewsHeader error={reviews.isError ? apiErrorMessage(reviews.error) : null} loading={reviews.isPending} openSort={() => setSheet('sort')} retry={() => void reviews.refetch()} scope={reviewScope} setScope={setReviewScope} sort={sort} styles={styles} />}
+  </View>;
   return (
     <View style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <ScrollView
-            horizontal
-            onMomentumScrollEnd={(event) => setActivePhoto(Math.round(event.nativeEvent.contentOffset.x / width))}
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-          >
-            {photos.map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={[styles.heroImage, { width }]} />)}
-          </ScrollView>
-          <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
-          <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
-          <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + 12 }]}><Text style={styles.back}>‹</Text></Pressable>
-          <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + 12 }]}>
-            {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={18} width={18} />}
-          </Pressable>
-          <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
-          <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
-        </View>
-        <View style={styles.content}>
-          <View style={styles.badges}><Text style={styles.primaryBadge}>Popular</Text><Text style={styles.primaryBadge}>★ {place.venue.rating?.toFixed(1) ?? '–'}</Text><Text style={styles.count}>{place.venue.reviewCount ?? 0} reviews</Text></View>
-          <Text style={styles.title}>{place.venue.name}</Text>
-          <Text style={styles.address}>{place.venue.address ?? place.venue.city}</Text>
-          <View style={styles.chips}>{(place.chips.length > 0 ? place.chips : [place.venue.category, '$'.repeat(place.venue.priceLevel ?? 1), (place.venue.distanceKm ?? 0).toFixed(1) + ' km']).map((value) => <Text key={value} style={styles.chip}>{value}</Text>)}</View>
-          <View style={styles.tabs}>{(['overview', 'reviews'] as const).map((value) => <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabActive]}><Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{value === 'overview' ? 'Overview' : 'Reviews'}</Text></Pressable>)}</View>
-          {tab === 'overview' ? <Overview details={place} openHours={() => setSheet('hours')} openPhotos={() => setSheet('photos')} styles={styles} /> : <Reviews error={reviews.isError ? apiErrorMessage(reviews.error) : null} items={reviews.data ?? []} loading={reviews.isPending} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(review) => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })} openSort={() => setSheet('sort')} reactingId={reactingId} retry={() => void reviews.refetch()} scope={reviewScope} setScope={setReviewScope} sort={sort} styles={styles} />}
-        </View>
-      </ScrollView>
+      {tab === 'overview' ? <ScrollView showsVerticalScrollIndicator={false}>{hero}{intro}</ScrollView> : <FlatList
+        data={reviews.data ?? []}
+        initialNumToRender={8}
+        keyExtractor={(review) => review.id}
+        maxToRenderPerBatch={8}
+        ListHeaderComponent={<>{hero}{intro}</>}
+        ListEmptyComponent={!reviews.isPending && !reviews.isError ? <Text style={styles.empty}>No reviews yet.</Text> : null}
+        ListFooterComponent={reviews.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 18 }} /> : null}
+        onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetchingNextPage) void reviews.fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        windowSize={7}
+        renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastes.app/reviews/${item.id}` })} reactingId={reactingId} styles={styles} />}
+        showsVerticalScrollIndicator={false}
+      />}
       <Pressable onPress={onWriteReview} style={styles.reviewButton}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
       {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
       <Hours visible={sheet === 'hours'} close={() => setSheet(null)} hours={place.openingHours} styles={styles} />
@@ -121,16 +130,19 @@ function Overview({ details, openHours, openPhotos, styles }: { details: NonNull
   </View>;
 }
 
-function Reviews({ error, items, loading, onComments, onReact, onShare, openSort, reactingId, retry, scope, setScope, sort, styles }: { error: string | null; items: NonNullable<ReturnType<typeof usePlaceReviews>['data']>; loading: boolean; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; openSort: () => void; reactingId: string | null; retry: () => void; scope: 'all' | 'friends'; setScope: (scope: 'all' | 'friends') => void; sort: PlaceReviewSort; styles: ReturnType<typeof createStyles> }) {
+function ReviewsHeader({ error, loading, openSort, retry, scope, setScope, sort, styles }: { error: string | null; loading: boolean; openSort: () => void; retry: () => void; scope: 'all' | 'friends'; setScope: (scope: 'all' | 'friends') => void; sort: PlaceReviewSort; styles: ReturnType<typeof createStyles> }) {
   if (loading) return <View style={styles.status}><ActivityIndicator color={styles.primaryBadge.backgroundColor as string} /></View>;
   if (error) return <View style={styles.status}><Text style={styles.errorCopy}>{error}</Text><Pressable onPress={retry}><Text style={styles.retry}>Try again</Text></Pressable></View>;
   return <View style={styles.section}>
     <View style={styles.reviewTools}><Pressable onPress={() => setScope('all')}><Text style={[styles.friends, scope === 'all' && styles.all]}>All</Text></Pressable><Pressable onPress={() => setScope('friends')}><Text style={[styles.friends, scope === 'friends' && styles.all]}>Friends</Text></Pressable><Pressable onPress={openSort}><Text style={styles.sort}>⇅ {sorts[sort]}</Text></Pressable></View>
-    {items.length === 0 ? <Text style={styles.empty}>No reviews yet.</Text> : items.map((review) => <View key={review.id} style={styles.review}>
+  </View>;
+}
+
+function ReviewCard({ item: review, onComments, onReact, onShare, reactingId, styles }: { item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reactingId: string | null; styles: ReturnType<typeof createStyles> }) {
+  return <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}><Image source={personImage(review.authorPhotoUrl)} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{relativeTime(review.createdAt)}</Text></View>
       <Text style={styles.stars}>{'★'.repeat(Math.round(review.rating))}</Text><Text style={styles.reviewText}>{review.text}</Text>
       {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)}><Text style={styles.metrics}>♡ {review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)}><Text style={styles.metrics}>◯ {review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)}><Text style={styles.metrics}>↗</Text></Pressable></View>
-    </View>)}
   </View>;
 }
 
@@ -176,7 +188,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 95 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', gap: 8 }, chip: { color: colors.text, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7, fontSize: 11, fontWeight: '600' },
   tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 9, paddingTop: 10 },
   detail: { minHeight: 58, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', borderRadius: 29, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailText: { flex: 1, color: colors.textSecondary, fontSize: 13 }, arrow: { color: colors.textMuted, fontSize: 23 }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 18 }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
-  reviewTools: { height: 34, padding: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderRadius: 17, backgroundColor: colors.surfaceRaised }, all: { color: '#111', backgroundColor: '#D9DDE5', borderRadius: 13, paddingHorizontal: 20, paddingVertical: 5, fontSize: 10, fontWeight: '700', overflow: 'hidden' }, friends: { color: colors.textMuted, fontSize: 10, textAlign: 'center', paddingHorizontal: 16, paddingVertical: 5 }, sort: { color: colors.text, fontSize: 10, paddingRight: 7 }, review: { gap: 6, padding: 11, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewer: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 29, height: 29, borderRadius: 15 }, author: { flex: 1, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 11, fontWeight: '700' }, authorHandle: { color: colors.textMuted, fontSize: 9 }, reviewDate: { color: colors.textMuted, fontSize: 9 }, stars: { color: colors.primary, fontSize: 12 }, reviewText: { color: colors.textSecondary, fontSize: 11, lineHeight: 15 }, dishes: { color: colors.text, fontSize: 10, fontWeight: '600' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metrics: { color: colors.textMuted, fontSize: 10 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
+  reviewTools: { height: 34, padding: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderRadius: 17, backgroundColor: colors.surfaceRaised }, all: { color: '#111', backgroundColor: '#D9DDE5', borderRadius: 13, paddingHorizontal: 20, paddingVertical: 5, fontSize: 10, fontWeight: '700', overflow: 'hidden' }, friends: { color: colors.textMuted, fontSize: 10, textAlign: 'center', paddingHorizontal: 16, paddingVertical: 5 }, sort: { color: colors.text, fontSize: 10, paddingRight: 7 }, review: { gap: 6, padding: 11, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewListCard: { marginHorizontal: 16, marginBottom: 10 }, reviewer: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 29, height: 29, borderRadius: 15 }, author: { flex: 1, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 11, fontWeight: '700' }, authorHandle: { color: colors.textMuted, fontSize: 9 }, reviewDate: { color: colors.textMuted, fontSize: 9 }, stars: { color: colors.primary, fontSize: 12 }, reviewText: { color: colors.textSecondary, fontSize: 11, lineHeight: 15 }, dishes: { color: colors.text, fontSize: 10, fontWeight: '600' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metrics: { color: colors.textMuted, fontSize: 10 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
