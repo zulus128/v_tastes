@@ -33,10 +33,16 @@ function DishPhoto({ path }: { path: string }) {
 export function ProfileReviewCard({
   item,
   onComments,
+  onMore,
+  onReact,
+  onShare,
   profile,
 }: {
   item: FeedItem;
   onComments: () => void;
+  onMore: () => void;
+  onReact: () => void;
+  onShare: () => void;
   profile: ProfileData;
 }) {
   const { colors } = useAppTheme();
@@ -53,7 +59,7 @@ export function ProfileReviewCard({
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
         </View>
         <Text style={styles.reviewDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-        <Text style={styles.moreGlyph}>⋮</Text>
+        <Pressable accessibilityLabel="Review actions" onPress={onMore}><Text style={styles.moreGlyph}>⋮</Text></Pressable>
       </View>
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
@@ -79,9 +85,9 @@ export function ProfileReviewCard({
         ) : null}
         <Text numberOfLines={4} style={styles.reviewText}>{item.text}</Text>
         <View style={styles.metrics}>
-          <Text style={styles.metric}>♡ {item.reactionCount}</Text>
+          <Pressable onPress={onReact}><Text style={styles.metric}>♡ {item.reactionCount}</Text></Pressable>
           <Pressable onPress={onComments}><Text style={styles.metric}>◯ {item.commentCount}</Text></Pressable>
-          <Text style={styles.metric}>↗</Text>
+          <Pressable onPress={onShare}><Text style={styles.metric}>↗</Text></Pressable>
         </View>
       </View>
     </View>

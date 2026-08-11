@@ -108,6 +108,7 @@ interface ContactCandidate {
   id: string;
   name: string;
   handle: string;
+  phoneNumber: string | null;
   invited: boolean;
 }
 
@@ -153,35 +154,6 @@ const placeFilters = [
   { icon: filterBar, label: 'Bar' },
   { icon: filterReviews, label: 'My Reviews' },
 ] as const;
-const placeCandidates = [
-  {
-    id: 'gemini-popular',
-    name: 'Gemini750 Restaurant',
-    address: '2464 Royal Ln. Mesa, New Jersey 45463',
-    image: placeGeminiPopular,
-    rating: '4.3',
-    reviews: '389 reviews',
-    popular: true,
-  },
-  {
-    id: 'wasabi',
-    name: 'Wasabi by Morimoto',
-    address: '123 Main Street, Apt 4B, New York, NY 10001, USA',
-    image: placeWasabi,
-    rating: '3.0',
-    reviews: '35 reviews',
-    popular: false,
-  },
-  {
-    id: 'gemini',
-    name: 'Gemini750 Restaurant',
-    address: '742 Evergreen Terrace, Apartment 12B, Springfield, IL 62704, United States of America',
-    image: placeGemini,
-    rating: '2.0',
-    reviews: '34 reviews',
-    popular: false,
-  },
-] as const;
 type PlaceCandidate = {
   id: string;
   name: string;
@@ -190,15 +162,10 @@ type PlaceCandidate = {
   rating: string;
   reviews: string;
   popular: boolean;
-  category?: string;
+  category: string;
+  price: string;
+  distance: string;
 };
-const fallbackContacts: ContactCandidate[] = [
-  { id: 'alex', name: 'Alex Carter', handle: '@alexc', invited: false },
-  { id: 'sofia', name: 'Sofia Rossi', handle: '@sofiar', invited: true },
-  { id: 'liam', name: 'Liam Walsh', handle: '@liamw', invited: false },
-  { id: 'emma', name: 'Emma Dubois', handle: '@emmad', invited: false },
-  { id: 'noah', name: 'Noah Bianchi', handle: '@noahb', invited: false },
-];
 
 function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -269,13 +236,15 @@ export function PostSignupOnboardingFlow({
   const [photoSheet, setPhotoSheet] = useState(false);
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
-  const [placeQuery, setPlaceQuery] = useState('Restaurant');
+  const [placeQuery, setPlaceQuery] = useState('');
   const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['trending']));
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [placeLoading, setPlaceLoading] = useState(false);
-  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>([...placeCandidates]);
+  const [placeError, setPlaceError] = useState<string | null>(null);
+  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>([]);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
-  const [contacts, setContacts] = useState(fallbackContacts);
+  const [contacts, setContacts] = useState<ContactCandidate[]>([]);
   const [busy, setBusy] = useState(false);
 
   function togglePlaceFilter(label: string) {
@@ -377,6 +346,7 @@ export function PostSignupOnboardingFlow({
   function enterPlaces() {
     navigate('place');
     setPlaceLoading(true);
+    setPlaceError(null);
     void api.getVenues({ limit: 20 }).then((response) => {
       const mapped = response.data.items.map((venue, index): PlaceCandidate => ({
         id: venue.id,
@@ -386,23 +356,26 @@ export function PostSignupOnboardingFlow({
         rating: (venue.rating ?? 0).toFixed(1),
         reviews: `${venue.reviewCount ?? 0} reviews`,
         popular: venue.discoverTags?.includes('trending') ?? false,
-        category: venue.category,
+        category: venue.category ?? 'Restaurant',
+        price: '$'.repeat(venue.priceLevel ?? 2),
+        distance: `${(venue.distanceKm ?? 0).toFixed(1)} km`,
       }));
-      if (mapped.length > 0) setAvailablePlaces(mapped);
-    }).catch(() => undefined).finally(() => setPlaceLoading(false));
+      setAvailablePlaces(mapped);
+    }).catch((error) => setPlaceError(apiErrorMessage(error))).finally(() => setPlaceLoading(false));
   }
 
   async function requestContacts() {
     const permission = await Contacts.requestPermissionsAsync();
     if (permission.status === 'granted') {
-      const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name] });
+      const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers] });
       const mapped = result.data.filter((item) => item.name).slice(0, 20).map((item) => ({
         id: item.id,
         name: item.name,
         handle: slug(item.name),
+        phoneNumber: item.phoneNumbers?.[0]?.number ?? null,
         invited: false,
       }));
-      if (mapped.length) setContacts(mapped);
+      setContacts(mapped);
       navigate('contacts');
       return;
     }
@@ -421,6 +394,22 @@ export function PostSignupOnboardingFlow({
 
   async function shareInvite() {
     await Share.share({ message: 'Join me on Tastes: https://tastes.app/invite' });
+  }
+
+  async function textInvite(phoneNumber?: string | null) {
+    const message = encodeURIComponent('Join me on Tastes: https://tastes.app/invite');
+    const separator = Platform.OS === 'ios' ? '&' : '?';
+    await Linking.openURL(`sms:${phoneNumber ?? ''}${separator}body=${message}`);
+  }
+
+  async function inviteContact(contact: ContactCandidate) {
+    try {
+      if (contact.phoneNumber) await textInvite(contact.phoneNumber);
+      else await shareInvite();
+      setContacts((items) => items.map((item) => item.id === contact.id ? { ...item, invited: true } : item));
+    } catch (error) {
+      Alert.alert('Could not open invite', apiErrorMessage(error));
+    }
   }
 
   async function finishOnboarding() {
@@ -541,9 +530,11 @@ export function PostSignupOnboardingFlow({
               <TextInput value={placeQuery} onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.placeholder} style={styles.placeSearchInput} />
               {placeQuery.length > 0 ? <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={() => setPlaceQuery('')} style={styles.placeClear}><Image source={searchClose} style={styles.placeClearIcon} /></Pressable> : <View style={styles.placeClearSpacer} />}
             </View>
-            <PlaceTuningIcon color={colors.text} style={styles.tuningIcon} />
+            <Pressable accessibilityLabel="Toggle place filters" accessibilityRole="button" onPress={() => setFiltersExpanded((value) => !value)}>
+              <PlaceTuningIcon color={colors.text} style={styles.tuningIcon} />
+            </Pressable>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+          {filtersExpanded ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {placeFilters.map(({ icon, label }) => {
               const active = placeFilterSet.has(label.toLowerCase());
               return <Pressable accessibilityRole="button" key={label} onPress={() => togglePlaceFilter(label)} style={[styles.filter, active && styles.filterActive]}>
@@ -555,7 +546,7 @@ export function PostSignupOnboardingFlow({
               <Image source={filterFriends} style={[styles.filterIcon, !placeFilterSet.has('friends') && styles.filterDimmed]} />
               <Text style={[styles.filterText, !placeFilterSet.has('friends') && styles.filterDimmed]}>Friends</Text>
             </Pressable>
-          </ScrollView>
+          </ScrollView> : null}
         </View>
         {placeLoading ? (
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
@@ -571,8 +562,10 @@ export function PostSignupOnboardingFlow({
               </View>
             ))}
           </ScrollView>
+        ) : placeError ? (
+          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>Couldn’t load places</Text><Text style={styles.emptyText}>{placeError}</Text><Pressable onPress={enterPlaces}><Text style={styles.retryText}>Try again</Text></Pressable></View>
         ) : noResults ? (
-          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search — we're adding new spots in your city every week.</Text></View>
+          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search or clear a filter.</Text></View>
         ) : (
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
             {filteredPlaces.map((item) => {
@@ -590,7 +583,7 @@ export function PostSignupOnboardingFlow({
                       <Text numberOfLines={2} style={styles.venueAddress}>{item.address}</Text>
                       <View style={styles.ratingRow}><View style={styles.ratingTag}><Image source={ratingStar} style={styles.ratingStar} /><Text style={styles.ratingValue}>{item.rating}</Text></View><Text style={styles.reviews}>{item.reviews}</Text></View>
                     </View>
-                    <View style={styles.venueTagsRow}><View style={styles.venueTag}><View style={styles.venueTagContent}><Text style={styles.venueTagText}>Italian</Text><Image source={flagItaly} style={styles.venueFlag} /></View></View><View style={styles.venueTag}><Text style={styles.venueTagText}>$$</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>1,2 km</Text></View></View>
+                    <View style={styles.venueTagsRow}><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.category}</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.price}</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.distance}</Text></View></View>
                   </View>
                 </Pressable>
               );
@@ -645,7 +638,7 @@ export function PostSignupOnboardingFlow({
         <ScrollView>{contacts.map((contact, index) => <View key={contact.id} style={styles.contactRow}>
           <View style={[styles.avatar, { backgroundColor: ['#263854', '#24504c', '#4b315d', '#5a4427', '#2f5438'][index % 5] }]}><Text style={styles.avatarText}>{initials(contact.name)}</Text></View>
           <View style={styles.contactCopy}><Text style={styles.contactName}>{contact.name}</Text><Text style={styles.contactHandle}>{contact.handle}</Text></View>
-          <Pressable onPress={() => setContacts((items) => items.map((item) => item.id === contact.id ? { ...item, invited: true } : item))} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
+          <Pressable onPress={() => inviteContact(contact)} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
         </View>)}</ScrollView>
       </View><PrimaryButton label="Done" onPress={() => navigate('invite')} style={styles.bottomButton} />
     </PatternScreen>;
@@ -656,7 +649,7 @@ export function PostSignupOnboardingFlow({
       <Header onBack={back} onSkip={() => navigate('notifications')} />
       <View style={styles.invitePage}><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
         {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
-        <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => navigate('contacts')} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
+        <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
       </View><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
     </PatternScreen>;
   }
@@ -777,6 +770,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   emptyIcon: { width: 44, height: 44 },
   emptyTitle: { color: colors.text, fontWeight: '600', fontSize: 16, marginTop: 12 },
   emptyText: { color: colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 7 },
+  retryText: { color: colors.primary, fontSize: 14, fontWeight: '600', marginTop: 14 },
   styleCard: { position: 'absolute', top: 196, left: 16, right: 16, backgroundColor: colors.surface, borderRadius: 17, padding: 20 },
   previews: { flexDirection: 'row', gap: 18 },
   previewChoice: { flex: 1, alignItems: 'center' },

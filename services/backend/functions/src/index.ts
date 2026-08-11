@@ -44,12 +44,14 @@ export {
 } from './modules/users/functions';
 export {
   addComment,
+  deleteComment,
   createReview,
   getComments,
   getFeed,
   hideReview,
   reportReview,
   reactToReview,
+  reactToComment,
 } from './modules/reviews/functions';
 export {
   banUser,

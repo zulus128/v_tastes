@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { TastesAiAnswer, TastesAiPlace } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,12 +21,11 @@ import assistantImage from '../../../assets/ai/assistant.png';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { type AiAnswer, type AiPlace } from './mock';
 
 type AiExchange = {
   id: string;
   prompt: string;
-  answer: AiAnswer;
+  answer: TastesAiAnswer;
   createdAt: string;
 };
 
@@ -377,7 +377,7 @@ function PlaceCard({
   index: number;
   onOpen: () => void;
   onSave: () => void;
-  place: AiPlace;
+  place: TastesAiPlace;
   styles: ReturnType<typeof createStyles>;
 }) {
   const gradients = [

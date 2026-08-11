@@ -9,9 +9,9 @@ import tiramisuBadge from '../../../assets/profile/tiramisu.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
 
-export type ProfileExtra = 'followers' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
+export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
 
-export function ProfileExtras({ onClose, screen, visible }: { onClose: () => void; screen: ProfileExtra; visible: boolean }) {
+export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onClose: () => void; screen: ProfileExtra; targetUserId?: string; visible: boolean }) {
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -25,10 +25,11 @@ export function ProfileExtras({ onClose, screen, visible }: { onClose: () => voi
   const [detailReward, setDetailReward] = useState<RewardProgress | null>(null);
   const activeScreen = detail ?? screen;
   const handleBack = () => detail ? setDetail(null) : onClose();
-  useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras().then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setPush(p.push); setComments(p.comments); setFollowers(p.followers); setActivities(p.activities); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, visible]);
+  useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras(targetUserId ? { targetUserId } : {}).then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setPush(p.push); setComments(p.comments); setFollowers(p.followers); setActivities(p.activities); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, targetUserId, visible]);
   const savePreferences = (next: { push: boolean; comments: boolean; followers: boolean; activities: boolean }) => { setPush(next.push); setComments(next.comments); setFollowers(next.followers); setActivities(next.activities); void api.updateNotificationPreferences(next); };
 
   const title = activeScreen === 'followers' ? 'Followers'
+    : activeScreen === 'following' ? 'Following'
     : activeScreen === 'notifications' ? 'Notifications'
       : activeScreen === 'rewardDetails' ? 'Reward details'
         : activeScreen === 'achievement' ? 'Achievement'
@@ -38,10 +39,10 @@ export function ProfileExtras({ onClose, screen, visible }: { onClose: () => voi
     <Modal animationType="slide" onRequestClose={handleBack} visible={visible}>
       <View style={styles.screen}>
         <View style={styles.header}><Pressable onPress={handleBack} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>{title}</Text><View style={styles.headerButton} /></View>
-        {activeScreen === 'followers' ? (
+        {activeScreen === 'followers' || activeScreen === 'following' ? (
           <ScrollView contentContainerStyle={styles.peopleList}>
-            <Text style={styles.section}>FOLLOWERS ({data?.followers.length ?? 0})</Text>
-            {!data ? <ActivityIndicator color={colors.primary} /> : data.followers.map((person) => <View key={person.userId} style={styles.person}><View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View><View style={styles.personCopy}><Text style={styles.personName}>{person.displayName}</Text><Text style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View><Pressable onPress={() => void (person.following ? api.unfollowUser({ targetUserId: person.userId }) : api.followUser({ targetUserId: person.userId })).then(() => setData((current) => current ? { ...current, followers: current.followers.map((candidate) => candidate.userId === person.userId ? { ...candidate, following: !candidate.following } : candidate) } : current))} style={[styles.follow, person.following && styles.following]}><Text style={styles.followText}>{person.following ? 'Following' : 'Follow'}</Text></Pressable></View>)}
+            <Text style={styles.section}>{activeScreen.toUpperCase()} ({data?.[activeScreen].length ?? 0})</Text>
+            {!data ? <ActivityIndicator color={colors.primary} /> : data[activeScreen].map((person) => <View key={person.userId} style={styles.person}><View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View><View style={styles.personCopy}><Text style={styles.personName}>{person.displayName}</Text><Text style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View><Pressable onPress={() => void (person.following ? api.unfollowUser({ targetUserId: person.userId }) : api.followUser({ targetUserId: person.userId })).then(() => setData((current) => current ? { ...current, [activeScreen]: current[activeScreen].map((candidate) => candidate.userId === person.userId ? { ...candidate, following: !candidate.following } : candidate) } : current))} style={[styles.follow, person.following && styles.following]}><Text style={styles.followText}>{person.following ? 'Following' : 'Follow'}</Text></Pressable></View>)}
           </ScrollView>
         ) : activeScreen === 'notifications' ? (
           <ScrollView contentContainerStyle={styles.settings}>

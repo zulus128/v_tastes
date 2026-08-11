@@ -273,7 +273,7 @@ export function SaveToFolderSheet({
               <CloseCircle color={colors.text} height={24} width={24} />
             </Pressable>
           </View>
-          <FolderSelectionRow checked label="All places" onPress={() => undefined} styles={styles} />
+          <FolderSelectionRow checked={selected.size === 0} label="All places" onPress={() => setSelected(new Set())} styles={styles} />
           {(favourites.data?.folders ?? []).map((folder) => (
             <FolderSelectionRow
               key={folder.id}

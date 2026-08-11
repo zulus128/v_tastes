@@ -64,7 +64,7 @@ export function NewDialogSheet({
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <Pressable onPress={onClose} style={styles.backdrop}>
-        <Pressable onPress={() => undefined} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.header}>
             <Text style={styles.title}>New Dialog</Text>
             <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>

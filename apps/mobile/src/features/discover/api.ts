@@ -5,7 +5,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 export const discoverFeedQueryKey = (userId: string) => ['discover', 'feed', userId] as const;
 export const discoverPeopleQueryKey = (userId: string) => ['discover', 'people', userId] as const;
 export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
-export const placeReviewsQueryKey = (venueId: string, sort: string) => ['place', venueId, 'reviews', sort] as const;
+export const placeReviewsQueryKey = (venueId: string, sort: string, scope = 'all') => ['place', venueId, 'reviews', sort, scope] as const;
 export type DiscoverVenueFilter = {
   category?: string;
   tag?: DiscoverTag;
@@ -56,11 +56,11 @@ export function usePlace(venueId: string) {
   });
 }
 
-export function usePlaceReviews(venueId: string, sort: 'highest' | 'lowest' | 'popular' | 'recent' | 'oldest') {
+export function usePlaceReviews(venueId: string, sort: 'highest' | 'lowest' | 'popular' | 'recent' | 'oldest', scope: 'all' | 'friends' = 'all') {
   const api = useTastesApi();
   return useQuery({
-    queryKey: placeReviewsQueryKey(venueId, sort),
-    queryFn: async () => (await api.getPlaceReviews({ venueId, sort })).data,
+    queryKey: placeReviewsQueryKey(venueId, sort, scope),
+    queryFn: async () => (await api.getPlaceReviews({ venueId, sort, scope })).data,
   });
 }
 

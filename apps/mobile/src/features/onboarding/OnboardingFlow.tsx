@@ -11,6 +11,7 @@ import {
   Image,
   ImageBackground,
   Keyboard,
+  Linking,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -329,7 +330,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
                 {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
                 <SocialButton icon={apple} label="Apple" onPress={busy ? () => undefined : onApple} tint={colors.text} />
               </View>
-              <Text style={styles.legal}>By continuing you agree to our <Text style={styles.legalLink}>Terms of Service</Text> & <Text style={styles.legalLink}>Privacy Policy</Text></Text>
+              <Text style={styles.legal}>By continuing you agree to our <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastes.app/terms')} style={styles.legalLink}>Terms of Service</Text> & <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastes.app/privacy')} style={styles.legalLink}>Privacy Policy</Text></Text>
             </View>
           </ScrollView>
         </ImageBackground>

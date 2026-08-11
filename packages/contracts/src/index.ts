@@ -94,7 +94,24 @@ export const createReviewInputSchema = z.object({
 export const addCommentInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   reviewId: z.string().min(1),
+  parentCommentId: z.string().min(1).max(128).nullable().optional(),
   text: z.string().trim().min(1).max(1_000),
+});
+
+export const reactToCommentInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  reviewId: z.string().min(1),
+  commentId: z.string().min(1).max(128),
+  reaction: z.enum(['like']),
+});
+
+export const deleteCommentInputSchema = z.object({
+  reviewId: z.string().min(1),
+  commentId: z.string().min(1).max(128),
+});
+
+export const profileExtrasInputSchema = z.object({
+  targetUserId: z.string().min(1).max(128).optional(),
 });
 
 export const reactToReviewInputSchema = z.object({
@@ -242,6 +259,7 @@ export const placeReviewSortSchema = z.enum(['highest', 'lowest', 'popular', 're
 
 export const getPlaceReviewsInputSchema = getPlaceInputSchema.extend({
   sort: placeReviewSortSchema.default('recent'),
+  scope: z.enum(['all', 'friends']).default('all'),
 });
 
 export const completeOnboardingInputSchema = z.object({
@@ -310,6 +328,8 @@ export type ReviewTag = z.infer<typeof reviewTagSchema>;
 export type DishReviewInput = z.infer<typeof dishReviewInputSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
+export type ReactToCommentInput = z.infer<typeof reactToCommentInputSchema>;
+export type DeleteCommentInput = z.infer<typeof deleteCommentInputSchema>;
 export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type HideReviewInput = z.infer<typeof hideReviewInputSchema>;
 export type ReportReason = z.infer<typeof reportReasonSchema>;
@@ -343,6 +363,7 @@ export type GroupInput = z.infer<typeof groupInputSchema>;
 export type UpdateGroupMembersInput = z.infer<typeof updateGroupMembersInputSchema>;
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesInputSchema>;
 export type ReportCommentInput = z.infer<typeof reportCommentInputSchema>;
+export type ProfileExtrasInput = z.infer<typeof profileExtrasInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
 export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
@@ -398,7 +419,8 @@ export interface GroupMember { userId: string; displayName: string; username: st
 export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; createdAt: string; }
 export interface NotificationPreferences { push: boolean; comments: boolean; followers: boolean; activities: boolean; }
 export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
-export interface ProfileExtrasResult { followers: Array<{ userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean }>; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
+export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
+export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
 
 export interface Page<T> {
   items: T[];
@@ -414,6 +436,10 @@ export interface Comment {
   reviewId: string;
   authorId: string;
   authorDisplayName: string;
+  parentCommentId: string | null;
+  reactionCount: number;
+  replyCount: number;
+  reacted: boolean;
   text: string;
   createdAt: string;
 }

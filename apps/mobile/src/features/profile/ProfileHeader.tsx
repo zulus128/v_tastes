@@ -34,7 +34,9 @@ export function ProfileHeader({
   onBack,
   onMessage,
   onFollowers,
+  onFollowing,
   onRewards,
+  onShare,
   onSettings,
   onToggleFollow,
   own,
@@ -48,7 +50,9 @@ export function ProfileHeader({
   onBack: () => void;
   onMessage: () => void;
   onFollowers: () => void;
+  onFollowing: () => void;
   onRewards: () => void;
+  onShare: () => void;
   onSettings: () => void;
   onToggleFollow: () => void;
   own: boolean;
@@ -73,7 +77,7 @@ export function ProfileHeader({
         <Text numberOfLines={1} style={styles.username}>
           {profile.username ? `@${profile.username}` : profile.displayName}
         </Text>
-        <Pressable accessibilityLabel="Share profile" style={styles.topAction}>
+        <Pressable accessibilityLabel="Share profile" onPress={onShare} style={styles.topAction}>
           <ShareIcon width={24} height={24} />
         </Pressable>
       </View>
@@ -90,7 +94,7 @@ export function ProfileHeader({
         <View style={styles.statDivider} />
         <Stat label="Followers" onPress={onFollowers} value={profile.followerCount} />
         <View style={styles.statDivider} />
-        <Stat label="Following" value={profile.followingCount} />
+        <Stat label="Following" onPress={onFollowing} value={profile.followingCount} />
       </View>
       {!own ? (
         <View style={styles.publicActions}>

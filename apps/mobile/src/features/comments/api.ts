@@ -3,6 +3,7 @@ import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvi
 
 export interface AddCommentCommand {
   idempotencyKey: string;
+  parentCommentId?: string | null;
   text: string;
 }
 
@@ -18,6 +19,26 @@ export function useComments(reviewId: string) {
     },
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: reviewId.length > 0,
+  });
+}
+
+export function useReactToComment(reviewId: string) {
+  const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ commentId, idempotencyKey }: { commentId: string; idempotencyKey: string }) => api.reactToComment({ reviewId, commentId, idempotencyKey, reaction: 'like' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['comments', userId, reviewId] }),
+  });
+}
+
+export function useDeleteComment(reviewId: string) {
+  const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => api.deleteComment({ reviewId, commentId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['comments', userId, reviewId] }),
   });
 }
 

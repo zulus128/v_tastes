@@ -727,9 +727,10 @@ async function main() {
   }));
 
   const commentSeeds = [
-    { id: 'comment-1', reviewId: 'discover-review-gemini', authorId: 'discover-kristin', text: 'Adding this to my list.' },
-    { id: 'comment-2', reviewId: 'discover-review-gemini', authorId: 'discover-wade', text: 'The Tuesday special is excellent.' },
-    { id: 'comment-3', reviewId: 'discover-review-morimoto', authorId: 'discover-cameron', text: 'Counter seats are the move.' },
+    { id: 'comment-1', reviewId: 'discover-review-gemini', authorId: 'discover-kristin', parentCommentId: null, reactionCount: 2, replyCount: 1, text: 'Adding this to my list.' },
+    { id: 'comment-1-reply', reviewId: 'discover-review-gemini', authorId: 'discover-wade', parentCommentId: 'comment-1', reactionCount: 1, replyCount: 0, text: 'Book the terrace if the weather is good.' },
+    { id: 'comment-2', reviewId: 'discover-review-gemini', authorId: 'discover-wade', parentCommentId: null, reactionCount: 3, replyCount: 0, text: 'The Tuesday special is excellent.' },
+    { id: 'comment-3', reviewId: 'discover-review-morimoto', authorId: 'discover-cameron', parentCommentId: null, reactionCount: 1, replyCount: 0, text: 'Counter seats are the move.' },
   ];
   await Promise.all(commentSeeds.map((comment, index) => {
     const author = usersById.get(comment.authorId);
@@ -737,6 +738,9 @@ async function main() {
     return db.collection('reviews').doc(comment.reviewId).collection('comments').doc(comment.id).set({
       authorId: comment.authorId,
       authorDisplayName: author.displayName,
+      parentCommentId: comment.parentCommentId,
+      reactionCount: comment.reactionCount,
+      replyCount: comment.replyCount,
       text: comment.text,
       status: 'published',
       source: 'seed',
@@ -744,6 +748,24 @@ async function main() {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
   }));
+
+  const commentReactionSeeds: Array<[reviewId: string, commentId: string, userId: string]> = [
+    ['discover-review-gemini', 'comment-1', 'discover-cameron'],
+    ['discover-review-gemini', 'comment-1', 'discover-wade'],
+    ['discover-review-gemini', 'comment-1-reply', 'discover-kristin'],
+    ['discover-review-gemini', 'comment-2', 'discover-kristin'],
+    ['discover-review-gemini', 'comment-2', 'discover-cameron'],
+    ['discover-review-gemini', 'comment-2', 'discover-brooklyn'],
+    ['discover-review-morimoto', 'comment-3', 'discover-kristin'],
+  ];
+  await Promise.all(commentReactionSeeds.map(([reviewId, commentId, userId]) =>
+    db.collection('reviews').doc(reviewId).collection('comments').doc(commentId).collection('reactions').doc(userId).set({
+      userId,
+      reaction: 'like',
+      source: 'seed',
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true }),
+  ));
 
   const reactionSeeds: Array<[reviewId: string, userId: string]> = [
     ['discover-review-gemini', 'discover-kristin'],

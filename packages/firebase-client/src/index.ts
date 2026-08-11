@@ -14,6 +14,7 @@ import type {
   CreateReviewInput,
   CreateUserProfileInput,
   DeleteFolderInput,
+  DeleteCommentInput,
   DiscoverFeed,
   DiscoverPeopleResult,
   FeedItem,
@@ -41,6 +42,7 @@ import type {
   Page,
   ProfilePhotoResult,
   ReactToReviewInput,
+  ReactToCommentInput,
   RespondToActivityInvitationInput,
   RegisterPushTokenInput,
   RenameFolderInput,
@@ -61,6 +63,7 @@ import type {
   GroupInput,
   NotificationInput,
   ProfileExtrasResult,
+  ProfileExtrasInput,
   RequestInput,
   UpdateGroupMembersInput,
   UpdateNotificationPreferencesInput,
@@ -102,6 +105,8 @@ export const callableOperationNames = [
   'createReview',
   'getComments',
   'addComment',
+  'reactToComment',
+  'deleteComment',
   'reactToReview',
   'hideReview',
   'reportReview',
@@ -294,6 +299,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<GetCommentsInput, Page<Comment>>('getComments', input),
     addComment: (input: AddCommentInput) =>
       invoke<AddCommentInput, IdResult>('addComment', input),
+    reactToComment: (input: ReactToCommentInput) =>
+      invoke<ReactToCommentInput, ReactionResult>('reactToComment', input),
+    deleteComment: (input: DeleteCommentInput) =>
+      invoke<DeleteCommentInput, IdResult>('deleteComment', input),
     reactToReview: (input: ReactToReviewInput) =>
       invoke<ReactToReviewInput, ReactionResult>('reactToReview', input),
     hideReview: (input: HideReviewInput) =>
@@ -323,7 +332,7 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     getGroup: (input: GroupInput) => invoke<GroupInput, TastesGroup>('getGroup', input),
     updateGroupMembers: (input: UpdateGroupMembersInput) => invoke<UpdateGroupMembersInput, IdResult>('updateGroupMembers', input),
     leaveGroup: (input: GroupInput) => invoke<GroupInput, IdResult>('leaveGroup', input),
-    getProfileExtras: () => invoke<Record<string, never>, ProfileExtrasResult>('getProfileExtras', {}),
+    getProfileExtras: (input: ProfileExtrasInput = {}) => invoke<ProfileExtrasInput, ProfileExtrasResult>('getProfileExtras', input),
     getMonthlyRecap: () => invoke<Record<string, never>, MonthlyRecapResult>('getMonthlyRecap', {}),
     updateNotificationPreferences: (input: UpdateNotificationPreferencesInput) => invoke<UpdateNotificationPreferencesInput, NotificationPreferences>('updateNotificationPreferences', input),
     reportComment: (input: ReportCommentInput) => invoke<ReportCommentInput, IdResult>('reportComment', input),

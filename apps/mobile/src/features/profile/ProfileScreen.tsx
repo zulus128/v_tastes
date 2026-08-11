@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,7 @@ import SearchIcon from '../../../assets/profile/search.svg';
 import MapView, { Marker } from 'react-native-maps';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { storage } from '../../infrastructure/firebase';
+import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { Screen } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -148,8 +150,13 @@ export function ProfileScreen({
           onAvatarPress={() => void chooseProfilePhoto()}
           onBack={onBack}
           onMessage={() => onMessage(targetUserId)}
-          onFollowers={() => setExtra('followers')}
-          onRewards={() => setExtra('rewards')}
+        onFollowers={() => setExtra('followers')}
+        onFollowing={() => setExtra('following')}
+        onRewards={() => setExtra('rewards')}
+        onShare={() => void Share.share({
+          message: `See ${profile.displayName} on Tastes: https://tastes.app/profile/${targetUserId}`,
+          url: `https://tastes.app/profile/${targetUserId}`,
+        })}
           onSettings={onSettings}
           onToggleFollow={() => void toggleFollow()}
           own={own}
@@ -201,6 +208,13 @@ export function ProfileScreen({
                 item={review}
                 key={review.id}
                 onComments={() => onOpenComments(review.id)}
+                onMore={() => Alert.alert(review.venueName, 'Review actions', [
+                  { text: 'Open comments', onPress: () => onOpenComments(review.id) },
+                  { text: 'Share', onPress: () => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` }) },
+                  { text: 'Cancel', style: 'cancel' },
+                ])}
+                onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+                onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
                 profile={profile}
               />
             ))}
@@ -216,9 +230,9 @@ export function ProfileScreen({
           <View style={styles.empty}><Text style={styles.emptyTitle}>Wishlist is private</Text><Text style={styles.emptyCopy}>Saved places are only visible to their owner.</Text></View>
         )}
       </ScrollView>
-      <ProfileExtras onClose={() => setExtra(null)} screen={extra} visible={extra !== null} />
+      <ProfileExtras onClose={() => setExtra(null)} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
       <Modal animationType="slide" onRequestClose={() => setFilterOpen(false)} transparent visible={filterOpen}>
-        <Pressable onPress={() => setFilterOpen(false)} style={styles.filterBackdrop}><Pressable onPress={() => undefined} style={styles.filterSheet}><View style={styles.filterHandle} /><Text style={styles.filterTitle}>Filter reviews</Text>{([['all', 'All reviews'], ['highest', 'Highest rated'], ['recent', 'Most recent']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setFilter(value); setFilterOpen(false); }} style={styles.filterRow}><Text style={styles.filterLabel}>{label}</Text><Text style={styles.filterRadio}>{filter === value ? '●' : '○'}</Text></Pressable>)}</Pressable></Pressable>
+        <Pressable onPress={() => setFilterOpen(false)} style={styles.filterBackdrop}><Pressable onPress={(event) => event.stopPropagation()} style={styles.filterSheet}><View style={styles.filterHandle} /><Text style={styles.filterTitle}>Filter reviews</Text>{([['all', 'All reviews'], ['highest', 'Highest rated'], ['recent', 'Most recent']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setFilter(value); setFilterOpen(false); }} style={styles.filterRow}><Text style={styles.filterLabel}>{label}</Text><Text style={styles.filterRadio}>{filter === value ? '●' : '○'}</Text></Pressable>)}</Pressable></Pressable>
       </Modal>
     </Screen>
   );

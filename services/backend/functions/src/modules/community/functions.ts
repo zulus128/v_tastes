@@ -6,6 +6,7 @@ import {
   requestInputSchema,
   updateGroupMembersInputSchema,
   updateNotificationPreferencesInputSchema,
+  profileExtrasInputSchema,
   type AppNotification,
   type AppRequest,
   type ProfileExtrasResult,
@@ -248,15 +249,18 @@ export const leaveGroup = onCall(callableOptions, async (request) => {
 export const getProfileExtras = onCall(
   callableOptions,
   async (request): Promise<ProfileExtrasResult> => {
-    const uid = requireUserId(request);
-    const userRef = db.collection('users').doc(uid);
-    const [profile, followers, following, reviews] = await Promise.all([
+    const viewerId = requireUserId(request);
+    const input = parseInput(profileExtrasInputSchema, request.data ?? {});
+    const profileId = input.targetUserId ?? viewerId;
+    const userRef = db.collection('users').doc(profileId);
+    const [profile, followers, following, viewerFollowing, reviews] = await Promise.all([
       userRef.get(),
       userRef.collection('followers').limit(100).get(),
-      userRef.collection('following').get(),
+      userRef.collection('following').limit(100).get(),
+      db.collection('users').doc(viewerId).collection('following').get(),
       db
         .collection('reviews')
-        .where('authorId', '==', uid)
+        .where('authorId', '==', profileId)
         .where('status', '==', 'published')
         .limit(200)
         .get(),
@@ -270,7 +274,12 @@ export const getProfileExtras = onCall(
           ...followers.docs.map((document) => db.collection('users').doc(document.id)),
         )
       : [];
-    const followingIds = new Set(following.docs.map((document) => document.id));
+    const followingProfiles = following.size
+      ? await db.getAll(
+          ...following.docs.map((document) => db.collection('users').doc(document.id)),
+        )
+      : [];
+    const viewerFollowingIds = new Set(viewerFollowing.docs.map((document) => document.id));
     const venueIds = [
       ...new Set(reviews.docs.map((review) => String(review.get('venueId') ?? '')).filter(Boolean)),
     ];
@@ -309,7 +318,14 @@ export const getProfileExtras = onCall(
         displayName: String(follower.get('displayName') ?? 'Tastes user'),
         username: follower.get('username') ? String(follower.get('username')) : null,
         photoUrl: follower.get('photoUrl') ? String(follower.get('photoUrl')) : null,
-        following: followingIds.has(follower.id),
+        following: viewerFollowingIds.has(follower.id),
+      })),
+      following: followingProfiles.map((followed) => ({
+        userId: followed.id,
+        displayName: String(followed.get('displayName') ?? 'Tastes user'),
+        username: followed.get('username') ? String(followed.get('username')) : null,
+        photoUrl: followed.get('photoUrl') ? String(followed.get('photoUrl')) : null,
+        following: viewerFollowingIds.has(followed.id),
       })),
       level: Math.max(1, Math.floor(xp / 250) + 1),
       xp,

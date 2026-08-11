@@ -257,8 +257,8 @@ export const getPlace = onCall(callableOptions, async (request) => {
 });
 
 export const getPlaceReviews = onCall(callableOptions, async (request) => {
-  requireUserId(request);
-  const { venueId, sort } = parseInput(getPlaceReviewsInputSchema, request.data);
+  const uid = requireUserId(request);
+  const { venueId, sort, scope } = parseInput(getPlaceReviewsInputSchema, request.data);
   const venue = await db.collection('venues').doc(venueId).get();
   if (!venue.exists || venue.get('status') !== 'active') {
     throw new HttpsError('not-found', 'The place was not found.');
@@ -273,7 +273,10 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
     ? await db.getAll(...authors.map((id) => db.collection('users').doc(id)))
     : [];
   const authorById = new Map(authorDocs.map((document) => [document.id, document]));
-  const items: PlaceReview[] = reviews.docs.map((document) => {
+  const friendIds = scope === 'friends'
+    ? new Set((await db.collection('users').doc(uid).collection('following').get()).docs.map((document) => document.id))
+    : null;
+  const items: PlaceReview[] = reviews.docs.filter((document) => !friendIds || friendIds.has(String(document.get('authorId')))).map((document) => {
     const author = authorById.get(String(document.get('authorId')));
     return {
       id: document.id,

@@ -197,6 +197,7 @@ function MainTabs({
               appliedFilters={discoverFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
               onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
+              onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
               onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
               onOpenProfile={(person: DiscoverPerson) =>
                 navigation.navigate('Profile', {
@@ -285,6 +286,7 @@ function MainTabs({
       <ProfileExtras
         onClose={() => setProfileExtra(null)}
         screen={profileExtra}
+        targetUserId={user.uid}
         visible={profileExtra !== null}
       />
     </>
@@ -331,6 +333,7 @@ export function ProductNavigator({ user }: { user: User }) {
             <PaginatedLeaderboardScreen
               onAddFriends={() => navigation.navigate('MainTabs', { screen: 'Discover' })}
               onBack={navigation.goBack}
+              onEditProfile={() => navigation.navigate('MainTabs', { screen: 'Profile' })}
             />
           )}
         </RootStack.Screen>
@@ -347,6 +350,7 @@ export function ProductNavigator({ user }: { user: User }) {
                   params: { venueId: route.params.venueId },
                 })
               }
+              onOpenComments={(reviewId) => navigation.navigate('Comments', { reviewId })}
               userId={user.uid}
               venueId={route.params.venueId}
             />

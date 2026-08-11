@@ -1,10 +1,12 @@
 import {
   addCommentInputSchema,
   createReviewInputSchema,
+  deleteCommentInputSchema,
   getCommentsInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
   reactToReviewInputSchema,
+  reactToCommentInputSchema,
   reportReviewInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -103,7 +105,7 @@ export const getFeed = onCall(callableOptions, async (request) => {
 });
 
 export const getComments = onCall(callableOptions, async (request) => {
-  requireUserId(request);
+  const uid = requireUserId(request);
   const input = parseInput(getCommentsInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
   const review = await db.collection('reviews').doc(input.reviewId).get();
@@ -124,6 +126,10 @@ export const getComments = onCall(callableOptions, async (request) => {
   const snapshot = await commentsQuery.limit(input.limit + 1).get();
   const pageDocs = snapshot.docs.slice(0, input.limit);
   const last = pageDocs.at(-1);
+  const reactionDocuments = pageDocs.length > 0
+    ? await db.getAll(...pageDocs.map((document) => document.ref.collection('reactions').doc(uid)))
+    : [];
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
 
   return {
     items: pageDocs.map((document) => ({
@@ -131,6 +137,10 @@ export const getComments = onCall(callableOptions, async (request) => {
       reviewId: input.reviewId,
       authorId: String(document.get('authorId')),
       authorDisplayName: String(document.get('authorDisplayName')),
+      parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      replyCount: Number(document.get('replyCount') ?? 0),
+      reacted: reactedIds.has(document.id),
       text: String(document.get('text')),
       createdAt: timestampToIso(document.get('createdAt')),
     })),
@@ -215,12 +225,16 @@ export const addComment = onCall(callableOptions, async (request) => {
   const commentRef = reviewRef.collection('comments').doc(
     idempotentDocumentId(uid, `comment:${input.reviewId}`, input.idempotencyKey),
   );
+  const parentRef = input.parentCommentId
+    ? reviewRef.collection('comments').doc(input.parentCommentId)
+    : null;
 
   await db.runTransaction(async (transaction) => {
-    const [user, review, existingComment] = await Promise.all([
+    const [user, review, existingComment, parentComment] = await Promise.all([
       transaction.get(userRef),
       transaction.get(reviewRef),
       transaction.get(commentRef),
+      parentRef ? transaction.get(parentRef) : Promise.resolve(null),
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
@@ -231,11 +245,17 @@ export const addComment = onCall(callableOptions, async (request) => {
     if (!review.exists || review.get('status') !== 'published') {
       throw new HttpsError('not-found', 'The review was not found.');
     }
+    if (parentRef && (!parentComment?.exists || parentComment.get('status') !== 'published')) {
+      throw new HttpsError('not-found', 'The parent comment was not found.');
+    }
 
     await enforceRateLimit(transaction, uid, 'add-comment', 30, 60_000);
     transaction.create(commentRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
+      parentCommentId: input.parentCommentId ?? null,
+      reactionCount: 0,
+      replyCount: 0,
       text: input.text,
       status: 'published',
       createdAt: FieldValue.serverTimestamp(),
@@ -245,9 +265,50 @@ export const addComment = onCall(callableOptions, async (request) => {
       commentCount: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    if (parentRef) transaction.update(parentRef, { replyCount: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() });
   });
 
   return { id: commentRef.id };
+});
+
+export const reactToComment = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(reactToCommentInputSchema, request.data);
+  const commentRef = db.collection('reviews').doc(input.reviewId).collection('comments').doc(input.commentId);
+  const reactionRef = commentRef.collection('reactions').doc(uid);
+  const idempotencyRef = db.collection('_idempotency').doc(idempotentDocumentId(uid, `comment-reaction:${input.commentId}`, input.idempotencyKey));
+  return db.runTransaction(async (transaction) => {
+    const [comment, reaction, idempotency] = await Promise.all([
+      transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
+    ]);
+    if (idempotency.exists) return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount')) };
+    if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+    const currentCount = Number(comment.get('reactionCount') ?? 0);
+    const active = !reaction.exists;
+    const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
+    if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
+    else transaction.delete(reactionRef);
+    transaction.update(commentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    transaction.create(idempotencyRef, { active, reactionCount, createdAt: FieldValue.serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000) });
+    return { active, reactionCount };
+  });
+});
+
+export const deleteComment = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(deleteCommentInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const commentRef = reviewRef.collection('comments').doc(input.commentId);
+  await db.runTransaction(async (transaction) => {
+    const comment = await transaction.get(commentRef);
+    if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+    if (comment.get('authorId') !== uid) throw new HttpsError('permission-denied', 'You can only delete your own comments.');
+    transaction.update(commentRef, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+    transaction.update(reviewRef, { commentCount: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
+    const parentId = comment.get('parentCommentId');
+    if (parentId) transaction.update(reviewRef.collection('comments').doc(String(parentId)), { replyCount: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() });
+  });
+  return { id: input.commentId };
 });
 
 export const reactToReview = onCall(callableOptions, async (request) => {

@@ -58,7 +58,7 @@ export function ProfileSettingsSheet({
       <Pressable accessibilityLabel="Close settings" onPress={onClose} style={styles.backdrop}>
         <Pressable
           accessibilityViewIsModal
-          onPress={() => undefined}
+          onPress={(event) => event.stopPropagation()}
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}
         >
           <View style={styles.handle} />

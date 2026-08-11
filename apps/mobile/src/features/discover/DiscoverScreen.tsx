@@ -10,6 +10,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -35,6 +36,8 @@ import {
 } from '../favourites/FavouritesPane';
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { useTastesApi } from '../../session/SessionProvider';
+import { createIdempotencyKey } from '../../infrastructure/idempotency';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
@@ -108,6 +111,7 @@ export function DiscoverScreen({
   appliedFilters,
   onOpenAI,
   onOpenFilters,
+  onOpenComments,
   onOpenPlace,
   onOpenProfile,
   userId,
@@ -115,6 +119,7 @@ export function DiscoverScreen({
   appliedFilters: string[];
   onOpenAI: () => void;
   onOpenFilters: () => void;
+  onOpenComments: (reviewId: string) => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (person: DiscoverPerson) => void;
   userId: string;
@@ -186,6 +191,8 @@ export function DiscoverScreen({
             followPendingId={followPendingId}
             onSave={setSaveTarget}
             onOpenPlace={onOpenPlace}
+            onOpenComments={onOpenComments}
+            onOpenProfile={onOpenProfile}
             onToggleFollow={handleToggleFollow}
             onSeeAll={setSeeAllPlaces}
             savedVenueIds={savedVenueIds}
@@ -254,6 +261,8 @@ function TrendingFeed({
   followPendingId,
   onSave,
   onOpenPlace,
+  onOpenComments,
+  onOpenProfile,
   onToggleFollow,
   onSeeAll,
   savedVenueIds,
@@ -263,12 +272,17 @@ function TrendingFeed({
   followPendingId: string | null;
   onSave: (place: SaveablePlace) => void;
   onOpenPlace: (venueId: string) => void;
+  onOpenComments: (reviewId: string) => void;
+  onOpenProfile: (person: DiscoverPerson) => void;
   onToggleFollow: (person: DiscoverPerson) => void;
   onSeeAll: (venues: Venue[]) => void;
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
+  const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
   const hasContent = Boolean(
     hero
@@ -373,10 +387,17 @@ function TrendingFeed({
                 avatar={avatarSource(review.authorPhotoUrl)}
                 image={venueImage(review.venueImageUrl)}
                 key={review.id}
+                onComments={() => onOpenComments(review.id)}
+                onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('discover-reaction'), reviewId: review.id, reaction: 'like' }).then((result) => {
+                  setReactionCounts((counts) => ({ ...counts, [review.id]: result.data.reactionCount }));
+                  setReactedReviews((current) => { const next = new Set(current); if (result.data.active) next.add(review.id); else next.delete(review.id); return next; });
+                }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+                onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
                 onOpen={() => onOpenPlace(review.venueId)}
                 place={review.venueName}
                 rating={review.rating.toFixed(1)}
-                reactionCount={review.reactionCount}
+                reactionCount={reactionCounts[review.id] ?? review.reactionCount}
+                reacted={reactedReviews.has(review.id)}
                 text={review.text}
                 time={timeAgo(review.createdAt)}
                 commentCount={review.commentCount}
@@ -391,6 +412,7 @@ function TrendingFeed({
           <SectionLabel title="Popular reviewer" subtitle="Trusted voice in your neighborhood" />
           <TopReviewer
             onFollow={() => onToggleFollow(topReviewer)}
+            onOpen={() => onOpenProfile(topReviewer)}
             pending={followPending || followPendingId === topReviewer.userId}
             person={topReviewer}
           />
@@ -803,7 +825,11 @@ function ReviewCard({
   text,
   time,
   commentCount,
+  onComments,
+  onReact,
+  onShare,
   onOpen,
+  reacted,
 }: {
   author: string;
   avatar: ImageSourcePropType;
@@ -814,7 +840,11 @@ function ReviewCard({
   text: string;
   time: string;
   commentCount: number;
+  onComments: () => void;
+  onReact: () => void;
+  onShare: () => void;
   onOpen: () => void;
+  reacted: boolean;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -832,8 +862,9 @@ function ReviewCard({
         </View>
         <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
         <View style={styles.reviewFooter}>
-          <Text style={styles.reviewAction}>♥ {reactionCount}</Text>
-          <Text style={styles.reviewAction}>◯ {commentCount}</Text>
+          <Pressable onPress={(event) => { event.stopPropagation(); onReact(); }}><Text style={[styles.reviewAction, reacted && { color: colors.primary }]}>♥ {reactionCount}</Text></Pressable>
+          <Pressable onPress={(event) => { event.stopPropagation(); onComments(); }}><Text style={styles.reviewAction}>◯ {commentCount}</Text></Pressable>
+          <Pressable onPress={(event) => { event.stopPropagation(); onShare(); }}><Text style={styles.reviewAction}>↗</Text></Pressable>
           <Text style={styles.reviewTime}>{time}</Text>
         </View>
       </View>
@@ -841,7 +872,7 @@ function ReviewCard({
   );
 }
 
-function TopReviewer({ onFollow, pending, person }: { onFollow: () => void; pending: boolean; person: DiscoverPerson }) {
+function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => void; onOpen: () => void; pending: boolean; person: DiscoverPerson }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -869,7 +900,7 @@ function TopReviewer({ onFollow, pending, person }: { onFollow: () => void; pend
         <Pressable disabled={pending} onPress={onFollow} style={[styles.followWide, pending && styles.pressed]}>
           <Text style={styles.followWideText}>{person.following ? 'Following' : 'Follow'}</Text>
         </Pressable>
-        <Pressable style={styles.profileButton}><Text style={styles.profileButtonText}>View profile</Text></Pressable>
+        <Pressable onPress={onOpen} style={styles.profileButton}><Text style={styles.profileButtonText}>View profile</Text></Pressable>
       </View>
     </LinearGradient>
   );

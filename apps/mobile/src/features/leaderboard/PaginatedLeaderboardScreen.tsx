@@ -260,7 +260,7 @@ function LeaderboardLoadingState({ styles }: { styles: ReturnType<typeof createS
   );
 }
 
-function LeaderboardEmptyState({ audience, onAddFriends, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; styles: ReturnType<typeof createStyles> }) {
+function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; onEditProfile: () => void; styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={styles.emptyState}>
       <Image source={emptyFriendsIcon} resizeMode="contain" style={styles.emptyIcon} />
@@ -268,7 +268,7 @@ function LeaderboardEmptyState({ audience, onAddFriends, styles }: { audience: '
       <Text style={styles.emptyCopy}>{audience === 'friends' ? "Add friends to see who's topping the Tastes charts this week." : 'Set your city in your profile to join the local leaderboard.'}</Text>
       <Pressable
         accessibilityRole="button"
-        onPress={onAddFriends}
+        onPress={audience === 'friends' ? onAddFriends : onEditProfile}
         style={({ pressed }) => [styles.addFriends, pressed && styles.pressed]}
       >
         <Text style={styles.addFriendsText}>{audience === 'friends' ? 'Add friends' : 'Edit profile'}</Text>
@@ -277,7 +277,7 @@ function LeaderboardEmptyState({ audience, onAddFriends, styles }: { audience: '
   );
 }
 
-export function PaginatedLeaderboardScreen({ onAddFriends, onBack }: { onAddFriends: () => void; onBack: () => void }) {
+export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile }: { onAddFriends: () => void; onBack: () => void; onEditProfile: () => void }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
@@ -326,7 +326,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack }: { onAddFrie
           </Pressable>
         </View>
       ) : items.length === 0 ? (
-        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} styles={styles} />
+        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} onEditProfile={onEditProfile} styles={styles} />
       ) : (
         <>
           <View style={styles.podium}>
