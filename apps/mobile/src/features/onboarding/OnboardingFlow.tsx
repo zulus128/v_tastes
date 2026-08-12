@@ -294,8 +294,9 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   const compact = height <= 700 || width <= 340;
   const panelHeight = compact ? 390 : 414;
   const heroHeight = height - panelHeight;
+  const heroOverflow = 48;
   const heroScale = Math.min(1, heroHeight / 387);
-  const pinTop = (top: number) => top * heroScale - (1 - heroScale) * 34;
+  const pinTop = (top: number) => top * heroScale - (1 - heroScale) * 34 - heroOverflow / 2;
   const pinPositions = [
     { left: width * 0.17, top: pinTop(109) },
     { left: width * 0.70, top: pinTop(121) },
@@ -305,7 +306,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   return (
     <View style={styles.fullScreen}>
       <View style={[styles.heroLayer, { height: heroHeight }]}>
-        <Image source={hero} resizeMode="cover" style={styles.hero} />
+        <Image source={hero} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
         <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
         <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
         <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
@@ -318,7 +319,9 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
               <TastesLogo width={compact ? 80 : 98} />
               <View style={styles.consentCopy}>
                 <Text style={styles.consentTitle}>Discover the best places!</Text>
-                <Text style={styles.consentSubtitle}>Rate dishes and restaurants to get personalized recommendations</Text>
+                <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>
+                  Rate dishes and restaurants to get personalized{`\n`}recommendations
+                </Text>
                 <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
               </View>
               <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
@@ -522,7 +525,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
-  hero: { width: '100%', height: '100%' },
+  hero: { position: 'absolute', left: 0, right: 0, width: '100%' },
   ratingPin: { position: 'absolute', zIndex: 0, width: 44, height: 68, alignItems: 'center' },
   ratingBubble: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.2, borderColor: colors.onPrimary, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   ratingLabel: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
@@ -535,7 +538,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   consentPrimary: { gap: compact ? 12 : 24, alignItems: 'center' },
   consentCopy: { gap: 8, alignItems: 'center' },
   consentTitle: { color: colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },
-  consentSubtitle: { color: colors.textSecondary, fontSize: 16, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+  consentSubtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
   pager: { height: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
   pagerActive: { width: 15, height: 6, borderRadius: 3, backgroundColor: colors.text },
   pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted },
