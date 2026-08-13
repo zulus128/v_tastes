@@ -16,10 +16,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import SendIcon from '../../../assets/ai/send.svg';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { Screen } from '../../ui/components';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
 
 function messageTime(iso: string): string {
@@ -111,23 +113,35 @@ export function ChatScreen({
 
   useEffect(() => () => {
     if (typingTimer.current) clearTimeout(typingTimer.current);
-    if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false });
+    // Typing presence is best-effort. The conversation may be deleted while
+    // this screen is closing, so never let cleanup create an unhandled promise.
+    if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false }).catch(() => undefined);
   }, [api, conversationId]);
+
+  function updateTypingStatus(typing: boolean) {
+    void api.setTypingStatus({ conversationId, typing }).catch((error) => {
+      // A stale/deleted conversation is already handled by the screen's
+      // realtime and history subscriptions. Typing status must not show a
+      // React Native error overlay for this non-critical race.
+      if ((error as { code?: string }).code === 'not-found') return;
+      setConversationError(error instanceof Error ? error : new Error('Could not update typing status.'));
+    });
+  }
 
   function updateText(value: string) {
     if (!text && value) setIdempotencyKey(createIdempotencyKey('message'));
     setText(value);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     if (!value.trim()) {
-      if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false });
+      if (typingActive.current) updateTypingStatus(false);
       typingActive.current = false;
       return;
     }
-    if (!typingActive.current) void api.setTypingStatus({ conversationId, typing: true });
+    if (!typingActive.current) updateTypingStatus(true);
     typingActive.current = true;
     typingTimer.current = setTimeout(() => {
       typingActive.current = false;
-      void api.setTypingStatus({ conversationId, typing: false });
+      updateTypingStatus(false);
     }, 1_500);
   }
 
@@ -140,7 +154,7 @@ export function ChatScreen({
       setText('');
       if (typingTimer.current) clearTimeout(typingTimer.current);
       typingActive.current = false;
-      void api.setTypingStatus({ conversationId, typing: false });
+      updateTypingStatus(false);
       setIdempotencyKey(createIdempotencyKey('message'));
     } catch (error) {
       Alert.alert('Could not send message', apiErrorMessage(error));
@@ -151,11 +165,12 @@ export function ChatScreen({
 
   const error = conversationError ?? realtimeMessages.error ?? messageHistory.error;
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-      style={styles.screen}
-    >
+    <Screen style={styles.screen}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+        style={styles.screen}
+      >
       <View style={styles.header}>
         <Pressable accessibilityLabel="Back" hitSlop={12} onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
@@ -189,6 +204,7 @@ export function ChatScreen({
         </View>
       ) : (
         <FlatList
+          style={styles.messages}
           contentContainerStyle={[styles.messagesContent, messageItems.length === 0 && styles.emptyMessages]}
           data={messageItems}
           initialNumToRender={16}
@@ -232,7 +248,7 @@ export function ChatScreen({
           onPress={() => void send()}
           style={({ pressed }) => [styles.send, (!text.trim() || sending) && styles.sendDisabled, pressed && styles.sendPressed]}
         >
-          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <Text style={styles.sendText}>↑</Text>}
+          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={16.667} width={16.667} />}
         </Pressable>
       </View>
       <ActivityInviteModal
@@ -241,13 +257,14 @@ export function ChatScreen({
         userId={userId}
         visible={activityPreviewOpen && Boolean(activity)}
       />
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.canvas },
+    screen: { flex: 1 },
     header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background },
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
     backText: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300', marginTop: -3 },
@@ -258,6 +275,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     headerCopy: { flex: 1, marginLeft: 4, marginRight: 8, alignItems: 'center' },
     headerName: { color: colors.text, fontSize: 17, fontWeight: '500', textAlign: 'center' },
     headerUsername: { color: colors.textMuted, marginTop: 1, fontSize: 11 },
+    messages: { flex: 1 },
     messagesContent: { paddingHorizontal: 14, paddingVertical: 12 },
     emptyMessages: { flexGrow: 1 },
     emptyState: { flex: 1, padding: 34, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: 1 }] },
@@ -277,7 +295,6 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     sendDisabled: { opacity: 0.45 },
     sendPressed: { backgroundColor: colors.primaryPressed },
-    sendText: { color: colors.onPrimary, fontSize: 25, lineHeight: 27, fontWeight: '700' },
     center: { flex: 1, padding: 32, alignItems: 'center', justifyContent: 'center' },
     stateTitle: { color: colors.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
     stateCopy: { color: colors.textMuted, marginTop: 7, fontSize: 14, lineHeight: 20, textAlign: 'center' },

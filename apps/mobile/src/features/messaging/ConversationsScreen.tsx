@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -15,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -33,10 +36,14 @@ function relativeTime(iso: string): string {
 
 function ConversationRow({
   conversation,
+  deleting,
+  onDelete,
   onOpen,
   styles,
 }: {
   conversation: ConversationSummary;
+  deleting: boolean;
+  onDelete: () => void;
   onOpen: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -45,31 +52,60 @@ function ConversationRow({
     ? conversation.title ?? (conversation.kind === 'activity' ? 'Activity' : 'Group')
     : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
+  const translateX = useMemo(() => new Animated.Value(0), []);
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+    ),
+    onPanResponderMove: (_, gesture) => {
+      translateX.setValue(Math.max(-82, Math.min(0, gesture.dx)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start(() => {
+        if (gesture.dx < -64 && !deleting) onDelete();
+      });
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+    },
+  }), [deleting, onDelete, translateX]);
   return (
-    <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-      {participant?.photoUrl ? (
-        <Image source={{ uri: participant.photoUrl }} style={styles.avatar} />
-      ) : (
-        <View style={styles.avatarFallback}>
-          <Text style={styles.avatarInitial}>{conversation.kind === 'activity' ? '◷' : title.slice(0, 1).toUpperCase()}</Text>
-        </View>
-      )}
-      <View style={styles.rowCopy}>
-        <View style={styles.rowHeading}>
-          <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{title}</Text>
-          <Text style={[styles.time, unread && styles.unreadTime]}>{relativeTime(conversation.updatedAt)}</Text>
-        </View>
-        <View style={styles.previewRow}>
-          <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
-            {conversation.kind !== 'direct' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
-            {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : conversation.kind === 'group' ? 'Group created' : 'Conversation started')}
-          </Text>
-          {unread ? (
-            <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(conversation.unreadCount, 99)}</Text></View>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
+    <View style={styles.swipeRow}>
+      <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
+        <Pressable accessibilityLabel={`Delete conversation with ${title}`} accessibilityRole="button" disabled={deleting} onPress={onDelete} style={styles.deleteButton}>
+          {deleting ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.deleteIcon}>⌫</Text><Text style={styles.deleteText}>Delete</Text></>}
+        </Pressable>
+      </Animated.View>
+      <Animated.View style={[styles.swipeContent, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+        <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+          {participant?.photoUrl ? (
+            <Image source={{ uri: participant.photoUrl }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitial}>{conversation.kind === 'activity' ? '◷' : title.slice(0, 1).toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.rowCopy}>
+            <View style={styles.rowHeading}>
+              <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{title}</Text>
+              <Text style={[styles.time, unread && styles.unreadTime]}>{relativeTime(conversation.updatedAt)}</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
+                {conversation.kind !== 'direct' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
+                {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : conversation.kind === 'group' ? 'Group created' : 'Conversation started')}
+              </Text>
+              {unread ? (
+                <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(conversation.unreadCount, 99)}</Text></View>
+              ) : null}
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -94,6 +130,7 @@ export function ConversationsScreen({
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => { if (active) Alert.alert('Could not load requests', 'Open Requests to try again.'); }); return () => { active = false; }; }, [api]);
   const inbox = useConversationInbox(userId);
   const conversationHistory = useInfiniteQuery({
@@ -127,8 +164,20 @@ export function ConversationsScreen({
     || conversation.otherParticipant?.username?.toLowerCase().includes(normalizedSearch)
   ));
 
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    setDeletingId(conversationId);
+    try {
+      await api.hideConversation({ conversationId });
+      await conversationHistory.refetch();
+    } catch {
+      Alert.alert('Could not delete dialog', 'Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  }, [api, conversationHistory]);
+
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <View style={styles.headerButton} />
@@ -154,6 +203,7 @@ export function ConversationsScreen({
         </View>
       ) : (
         <FlatList
+          style={styles.list}
           contentContainerStyle={[styles.listContent, conversations.length === 0 && styles.emptyContent]}
           data={conversations}
           initialNumToRender={10}
@@ -176,7 +226,7 @@ export function ConversationsScreen({
           onEndReachedThreshold={0.5}
           windowSize={7}
           renderItem={({ item }) => (
-            <ConversationRow conversation={item} onOpen={() => onOpenConversation(item.id)} styles={styles} />
+            <ConversationRow conversation={item} deleting={deletingId === item.id} onDelete={() => void deleteConversation(item.id)} onOpen={() => onOpenConversation(item.id)} styles={styles} />
           )}
           showsVerticalScrollIndicator={false}
         />
@@ -194,13 +244,13 @@ export function ConversationsScreen({
         userId={userId}
         visible={Boolean(pendingActivityId)}
       />
-    </View>
+    </Screen>
   );
 }
 
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.canvas },
+    screen: { flex: 1 },
     header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
     titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
@@ -212,13 +262,25 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
     requests: { color: colors.textSecondary, fontSize: 14 }, requestsCount: { color: colors.primary },
     listContent: { paddingTop: 10, paddingBottom: 24 },
+    list: { flex: 1 },
     emptyContent: { flexGrow: 1 },
+    swipeRow: {
+      minHeight: 82,
+      overflow: 'hidden',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    swipeContent: {},
+    deleteAction: { position: 'absolute', top: 0, right: -82, bottom: 0, width: 82, backgroundColor: colors.danger },
+    deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    deleteIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 24 },
+    deleteText: { marginTop: 2, color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
     row: { minHeight: 82, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
     rowPressed: { backgroundColor: colors.surfaceRaised },
     avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.skeleton },
     avatarFallback: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     avatarInitial: { color: colors.onPrimary, fontSize: 21, fontWeight: '700' },
-    rowCopy: { flex: 1, height: 64, marginLeft: 13, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+    rowCopy: { flex: 1, height: 64, marginLeft: 13, justifyContent: 'center' },
     rowHeading: { flexDirection: 'row', alignItems: 'center' },
     name: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '600' },
     unreadName: { fontWeight: '800' },

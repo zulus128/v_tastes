@@ -215,6 +215,8 @@ export const conversationInputSchema = z.object({
   conversationId: z.string().min(1).max(128),
 });
 
+export const hideConversationInputSchema = conversationInputSchema;
+
 export const markConversationReadInputSchema = conversationInputSchema.extend({
   throughMessageId: z.string().min(1).max(128),
 });
@@ -429,6 +431,7 @@ export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 export type RespondToActivityInvitationInput = z.infer<typeof respondToActivityInvitationInputSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
+export type HideConversationInput = z.infer<typeof hideConversationInputSchema>;
 export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
 export type SetTypingStatusInput = z.infer<typeof setTypingStatusInputSchema>;
 export type RegisterPushTokenInput = z.infer<typeof registerPushTokenInputSchema>;

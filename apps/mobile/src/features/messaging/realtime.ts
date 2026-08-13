@@ -112,6 +112,11 @@ function summaryFromDocument(
   };
 }
 
+function isVisibleInInbox(document: QueryDocumentSnapshot<DocumentData>, userId: string): boolean {
+  const hiddenFor = document.data().hiddenFor;
+  return !Array.isArray(hiddenFor) || !hiddenFor.includes(userId);
+}
+
 export function useConversationInbox(userId: string): RealtimeState<ConversationSummary[]> {
   const [state, setState] = useState<RealtimeState<ConversationSummary[]>>({
     data: [],
@@ -131,7 +136,7 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
       limit(INBOX_LIMIT),
     );
     const unsubscribe = onSnapshot(inboxQuery, (snapshot) => {
-      void Promise.all(snapshot.docs.map(async (conversation) => {
+      void Promise.all(snapshot.docs.filter((conversation) => isVisibleInInbox(conversation, userId)).map(async (conversation) => {
         if (conversation.data().kind === 'activity' || conversation.data().kind === 'group') {
           return summaryFromDocument(conversation, userId, null);
         }

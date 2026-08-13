@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   createConversationInputSchema,
   getMessagesInputSchema,
+  hideConversationInputSchema,
   listConversationsInputSchema,
   markConversationReadInputSchema,
   registerPushTokenInputSchema,
@@ -162,7 +163,10 @@ export const listConversations = onCall(callableOptions, async (request) => {
   }
 
   const snapshot = await query.limit(input.limit + 1).get();
-  const pageDocuments = snapshot.docs.slice(0, input.limit);
+  const sourceDocuments = snapshot.docs.slice(0, input.limit);
+  const pageDocuments = sourceDocuments.filter(
+    (document) => !((document.get('hiddenFor') as unknown[]) ?? []).includes(uid),
+  );
   const rows = pageDocuments.map((document) => {
     const participantIds = requireParticipant(document, uid);
     const rawKind = document.get('kind');
@@ -179,7 +183,7 @@ export const listConversations = onCall(callableOptions, async (request) => {
     ? await db.getAll(...profileIds.map((userId) => db.collection('users').doc(userId)))
     : [];
   const profiles = new Map(profileSnapshots.map((profile) => [profile.id, profile]));
-  const last = pageDocuments.at(-1);
+  const last = sourceDocuments.at(-1);
 
   return {
     items: rows.map((row) => {
@@ -326,6 +330,7 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       },
       'messageCount', FieldValue.increment(1),
       'updatedAt', now,
+      'hiddenFor', FieldValue.arrayRemove(...participantIds),
       new FieldPath('typing', uid), FieldValue.delete(),
     );
     for (const recipientId of recipientIds) {
@@ -348,6 +353,25 @@ export const sendMessage = onCall(callableOptions, async (request) => {
   });
 
   return { id: messageRef.id };
+});
+
+export const hideConversation = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(hideConversationInputSchema, request.data);
+  const conversationRef = db.collection('conversations').doc(input.conversationId);
+
+  await db.runTransaction(async (transaction) => {
+    const conversation = await transaction.get(conversationRef);
+    requireParticipant(conversation, uid);
+    transaction.update(
+      conversationRef,
+      'hiddenFor', FieldValue.arrayUnion(uid),
+      new FieldPath('unreadCounts', uid), 0,
+      new FieldPath('typing', uid), FieldValue.delete(),
+    );
+  });
+
+  return { id: conversationRef.id };
 });
 
 export const markConversationRead = onCall(callableOptions, async (request) => {

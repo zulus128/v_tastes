@@ -12,6 +12,7 @@ export {
 export {
   createConversation,
   getMessages,
+  hideConversation,
   listConversations,
   markConversationRead,
   pushMessageNotification,

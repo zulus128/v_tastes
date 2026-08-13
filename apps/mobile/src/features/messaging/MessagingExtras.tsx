@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { Screen } from '../../ui/components';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
   const api = useTastesApi();
@@ -49,7 +50,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
     setRequests([]);
   };
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen}>
       <Header
         action={requests.length ? 'Delete all' : undefined}
         onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
@@ -95,7 +96,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
           )}
         />
       )}
-    </View>
+    </Screen>
   );
 }
 
@@ -148,7 +149,7 @@ export function NewGroupScreen({
     }
   };
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen}>
       <Header
         onBack={onBack}
         styles={styles}
@@ -219,7 +220,7 @@ export function NewGroupScreen({
           {creating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createGroupText}>Create group</Text>}
         </Pressable>
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -245,10 +246,10 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   }, [api, groupId]);
   if (!group)
     return (
-      <View style={styles.screen}>
+      <Screen style={styles.screen}>
         <Header onBack={onBack} styles={styles} title="Group details" />
         <ActivityIndicator color={colors.primary} style={styles.loader} />
-      </View>
+      </Screen>
     );
   const admin = currentUserId === group.adminId;
   const update = async (ids: string[]) => {
@@ -259,7 +260,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     (candidate) => !group.members.some((member) => member.userId === candidate.userId),
   );
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen}>
       <Header onBack={onBack} styles={styles} title="Group details" />
       <ScrollView contentContainerStyle={styles.details}>
         <View style={styles.groupAvatarLarge}>
@@ -347,7 +348,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
           <Text style={styles.dangerText}>{admin ? 'Delete group' : 'Leave group'}</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
@@ -421,7 +422,7 @@ function Empty({
 
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.canvas },
+    screen: { flex: 1 },
     header: {
       height: safeTop + 62,
       paddingTop: safeTop,
