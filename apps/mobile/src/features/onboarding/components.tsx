@@ -62,6 +62,8 @@ export function BackButton({ onPress }: { onPress: () => void }) {
 export function PrimaryButton({
   label,
   icon,
+  iconSize = 20,
+  contentGap = 6,
   loading = false,
   disabled = false,
   onPress,
@@ -69,6 +71,8 @@ export function PrimaryButton({
 }: {
   label: string;
   icon?: ImageSourcePropType;
+  iconSize?: number;
+  contentGap?: number;
   loading?: boolean;
   disabled?: boolean;
   onPress: () => void;
@@ -96,7 +100,7 @@ export function PrimaryButton({
           pressed && styles.pressed,
         ]}
       >
-        {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={styles.primaryContent}>{icon ? <Image source={icon} style={styles.primaryIcon} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
+        {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={[styles.primaryContent, { gap: contentGap }]}>{icon ? <Image source={icon} style={{ width: iconSize, height: iconSize }} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
       </Pressable>
     </LinearGradient>
   );
@@ -134,8 +138,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: { fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
-  primaryContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  primaryIcon: { width: 20, height: 20 },
+  primaryContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.35 },
   pressed: { opacity: 0.82 },
 });

@@ -644,9 +644,11 @@ export function PostSignupOnboardingFlow({
   if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" alignSubtitleLeft onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
-    <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
-    <View style={styles.readyCopy}><Text style={styles.title}>You're ready!</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
-    <PrimaryButton icon={startRating} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
+    <View style={styles.readyContent}>
+      <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
+      <View style={styles.readyCopy}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
+      <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
+    </View>
   </LinearGradient>;
 }
 
@@ -792,7 +794,10 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   actionText: { color: colors.text, fontSize: 13, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
-  reviewCollage: { width: 402, height: 288, marginTop: 170, alignSelf: 'center' },
-  readyCopy: { alignItems: 'center', paddingHorizontal: 32, marginTop: 24 },
-  readyButton: { marginHorizontal: 36, marginTop: 24 },
+  readyContent: { position: 'absolute', top: 170, left: 16, right: 16, alignItems: 'center' },
+  reviewCollage: { width: 402, height: 287.378 },
+  readyCopy: { width: '100%', height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24 },
+  readyTitle: { width: '100%', color: '#FFFFFF', fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
+  readySubtitle: { width: '100%', color: '#AAB2C5', fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+  readyButton: { width: 330, marginTop: 24 },
 });
