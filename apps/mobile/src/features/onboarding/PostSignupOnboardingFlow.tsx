@@ -42,13 +42,6 @@ import filterFriends from '../../../assets/onboarding/filter-friends.png';
 import filterRestaurant from '../../../assets/onboarding/filter-restaurant.png';
 import filterReviews from '../../../assets/onboarding/filter-reviews.png';
 import filterTrending from '../../../assets/onboarding/filter-trending.png';
-import flagFrance from '../../../assets/onboarding/flag-france.png';
-import flagItaly from '../../../assets/onboarding/flag-italy.png';
-import flagMonaco from '../../../assets/onboarding/flag-monaco.png';
-import flagPortugal from '../../../assets/onboarding/flag-portugal.png';
-import flagSpain from '../../../assets/onboarding/flag-spain.png';
-import flagSwitzerland from '../../../assets/onboarding/flag-switzerland.png';
-import flagUae from '../../../assets/onboarding/flag-uae.png';
 import flagUk from '../../../assets/onboarding/flag-uk.png';
 import inviteContacts from '../../../assets/onboarding/invite-contacts.png';
 import inviteMessage from '../../../assets/onboarding/invite-message.png';
@@ -75,6 +68,7 @@ import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, functions, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
+import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 
@@ -114,29 +108,6 @@ interface ContactCandidate {
   userId?: string;
   following?: boolean;
 }
-
-const cities = [
-  [flagMonaco, 'Monaco', 'Monaco'],
-  [flagUk, 'London', 'United Kingdom'],
-  [flagFrance, 'Paris', 'France'],
-  [flagFrance, 'Nice', 'France'],
-  [flagFrance, 'Cannes', 'France'],
-  [flagItaly, 'Milan', 'Italy'],
-  [flagSpain, 'Barcelona', 'Spain'],
-  [flagSwitzerland, 'Geneva', 'Switzerland'],
-  [flagUae, 'Dubai', 'UAE'],
-  [flagPortugal, 'Lisbon', 'Portugal'],
-] as const;
-const countryFlags: Record<string, ImageSourcePropType> = {
-  AE: flagUae,
-  CH: flagSwitzerland,
-  ES: flagSpain,
-  FR: flagFrance,
-  GB: flagUk,
-  IT: flagItaly,
-  MC: flagMonaco,
-  PT: flagPortugal,
-};
 
 const dishes = [
   { label: 'Burgers', icon: dishBurgers },
@@ -234,7 +205,6 @@ export function PostSignupOnboardingFlow({
   const [username, setUsername] = useState('');
   const [city, setCity] = useState('London');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
-  const [citySearch, setCitySearch] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [dish, setDish] = useState<string | null>(null);
@@ -463,18 +433,9 @@ export function PostSignupOnboardingFlow({
   const invitedCount = contacts.filter((item) => item.invited).length;
 
   if (screen === 'city') {
-    const filtered = cities.filter((item) => item[1].toLowerCase().includes(citySearch.toLowerCase()));
     return <PatternScreen>
       <Header onBack={back} />
-      <View style={styles.listPage}>
-        <Text style={styles.listTitle}>Select city</Text>
-        <TextInput autoFocus value={citySearch} onChangeText={setCitySearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.search} />
-        <ScrollView keyboardShouldPersistTaps="handled">
-          {filtered.map(([flag, name, country]) => <Pressable key={name} onPress={() => { setCity(name); setCityFlag(flag); back(); }} style={styles.cityRow}>
-            <Image source={flag} style={styles.cityFlag} /><Text style={styles.cityName}>{name}</Text><Text style={styles.cityCountry}>{country}</Text>
-          </Pressable>)}
-        </ScrollView>
-      </View>
+      <CityPicker onSelect={(name, flag) => { setCity(name); setCityFlag(flag); back(); }} />
     </PatternScreen>;
   }
 

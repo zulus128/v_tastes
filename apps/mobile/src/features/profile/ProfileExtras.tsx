@@ -1,6 +1,6 @@
 import type { ProfileExtrasResult, RewardProgress } from '@tastes/contracts';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import burgerBadge from '../../../assets/profile/burger-lover.png';
 import cityBadge from '../../../assets/profile/city-explorer.png';
@@ -8,6 +8,7 @@ import matchaBadge from '../../../assets/profile/matcha-hunter.png';
 import tiramisuBadge from '../../../assets/profile/tiramisu.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
+import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 
 export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
 
@@ -23,8 +24,9 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
   const [detail, setDetail] = useState<'rewardDetails' | 'achievement' | null>(null);
   const [data, setData] = useState<ProfileExtrasResult | null>(null);
   const [detailReward, setDetailReward] = useState<RewardProgress | null>(null);
+  const slide = useRef<SideSlideScreenHandle>(null);
   const activeScreen = detail ?? screen;
-  const handleBack = () => detail ? setDetail(null) : onClose();
+  const handleBack = () => detail ? setDetail(null) : slide.current?.close();
   useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras(targetUserId ? { targetUserId } : {}).then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setEnabled(p.enabled); setPush(p.push); setEmail(p.email); setSms(p.sms); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, targetUserId, visible]);
   const savePreferences = (next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) => { setEnabled(next.enabled); setPush(next.push); setEmail(next.email); setSms(next.sms); void api.updateNotificationPreferences(next).catch(() => Alert.alert('Could not save notification settings', 'Please try again.')); };
 
@@ -36,7 +38,7 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
           : 'Rewards';
 
   return (
-    <Modal animationType="slide" onRequestClose={handleBack} visible={visible}>
+    <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
         <View style={styles.header}><Pressable onPress={handleBack} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>{title}</Text><View style={styles.headerButton} /></View>
         {activeScreen === 'followers' || activeScreen === 'following' ? (
@@ -49,7 +51,6 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
             <Setting label="Enable notifications" onChange={(value) => savePreferences({ enabled: value, push, email, sms })} styles={styles} value={enabled} />
             <View style={styles.notificationGap} />
             <Setting disabled={!enabled} label="Push notifications" onChange={(value) => savePreferences({ enabled, push: value, email, sms })} styles={styles} value={push} />
-            <Setting disabled={!enabled} label="Email notifications" onChange={(value) => savePreferences({ enabled, push, email: value, sms })} styles={styles} value={email} />
             <Setting disabled={!enabled} label="SMS notifications" onChange={(value) => savePreferences({ enabled, push, email, sms: value })} styles={styles} value={sms} />
           </ScrollView>
         ) : activeScreen === 'rewardDetails' || activeScreen === 'achievement' ? (
@@ -62,7 +63,7 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
           </ScrollView>
         )}
       </View>
-    </Modal>
+    </SideSlideScreen>
   );
 }
 

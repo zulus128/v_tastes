@@ -1,10 +1,14 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { UpdateProfileSettingsInput, Venue } from '@tastes/contracts';
-import { useEffect, useMemo, useState } from 'react';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
   Modal,
   Pressable,
   ScrollView,
@@ -15,8 +19,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
+import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import backIcon from '../../../assets/onboarding/back.png';
+import pattern from '../../../assets/onboarding/pattern-screen.png';
+import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
+import SignOutIcon from '../../../assets/profile/sign-out.svg';
 import { useTastesApi } from '../../session/SessionProvider';
+import { storage } from '../../infrastructure/firebase';
+import { captureException } from '../../infrastructure/observability';
+import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { profileAvatarSource } from './avatar';
 
@@ -57,6 +71,11 @@ export function ProfileSettingsSheet({
   const [placeQuery, setPlaceQuery] = useState('');
   const [places, setPlaces] = useState<Venue[]>([]);
   const [searching, setSearching] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const settingsSlide = useRef<SideSlideScreenHandle>(null);
+  const placeSlide = useRef<SideSlideScreenHandle>(null);
+  const citySlide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -102,11 +121,61 @@ export function ProfileSettingsSheet({
       await api.updateProfileSettings(input);
       setEditing(null);
       setPlaceOpen(false);
+      setCityOpen(false);
     } catch (error) {
       Alert.alert('Could not update profile', apiErrorMessage(error));
     } finally {
       setSaving(false);
     }
+  }
+
+  async function chooseProfilePhoto(camera: boolean) {
+    if (!profile || uploadingPhoto) return;
+    const permission = camera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', `Allow ${camera ? 'camera' : 'photo library'} access to update your profile photo.`);
+      return;
+    }
+    const result = camera
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const cropSize = Math.min(asset.width, asset.height);
+    const photoPath = `profile-images/${userId}/avatar-${Date.now()}.jpg`;
+    setUploadingPhoto(true);
+    try {
+      const optimized = await manipulateAsync(asset.uri, [
+        { crop: {
+          originX: Math.max(0, (asset.width - cropSize) / 2),
+          originY: Math.max(0, (asset.height - cropSize) / 2),
+          width: cropSize,
+          height: cropSize,
+        } },
+        { resize: { width: 512, height: 512 } },
+      ], { compress: 0.78, format: SaveFormat.JPEG });
+      const response = await fetch(optimized.uri);
+      await uploadBytes(storageRef(storage, photoPath), await response.blob(), { contentType: 'image/jpeg' });
+      await api.updateProfilePhoto({ photoPath });
+      if (profile.photoPath && profile.photoPath !== photoPath) {
+        void deleteObject(storageRef(storage, profile.photoPath)).catch((error) => captureException(error, { operation: 'delete-old-profile-photo' }));
+      }
+    } catch (error) {
+      Alert.alert('Could not update photo', apiErrorMessage(error));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  function editPhoto() {
+    Alert.alert('Edit photo', undefined, [
+      { text: 'Take Photo', onPress: () => void chooseProfilePhoto(true) },
+      { text: 'Choose from Library', onPress: () => void chooseProfilePhoto(false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   async function saveField() {
@@ -119,26 +188,40 @@ export function ProfileSettingsSheet({
     await save({ [editing]: value });
   }
 
-  const rows: Array<{ field?: EditableField; label: string; value?: string; onPress?: () => void }> = profile ? [
+  function confirmLogout() {
+    Alert.alert('Sign out?', 'You will need to sign in with your phone number again.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => void onLogout() },
+    ]);
+  }
+
+  const rows: Array<{ field?: EditableField; label: string; value?: string; valueFlag?: ReturnType<typeof cityFlag>; onPress?: () => void }> = profile ? [
     { field: 'displayName', label: 'Name', value: profile.displayName },
     { field: 'username', label: 'Username', value: profile.username ? `@${profile.username}` : 'Add username' },
     { field: 'favoriteDish', label: 'Favourite Dish', value: profile.favoriteDish ?? 'Select a dish' },
     { label: 'Favourite place', value: favoritePlace, onPress: () => setPlaceOpen(true) },
-    { field: 'city', label: 'City', value: profile.city ?? 'Select a city' },
-    { label: 'Notifications', onPress: () => { onClose(); onNotifications(); } },
+    { label: 'City', value: profile.city ?? 'Select a city', valueFlag: cityFlag(profile.city ?? ''), onPress: () => setCityOpen(true) },
+    { label: 'Notifications', onPress: onNotifications },
   ] : [];
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
-      <View style={styles.screen}>
+    <>
+    <SideSlideScreen onRequestClose={onClose} ref={settingsSlide} visible={visible}>
+      <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={pattern} style={styles.screen}>
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View>
+        <View pointerEvents="none" style={styles.backgroundLift} />
         <View style={styles.header}>
-          <Pressable accessibilityLabel="Back" onPress={onClose} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable>
-          <Text style={styles.title}>Settings</Text><View style={styles.headerButton} />
+          <Pressable accessibilityLabel="Back" hitSlop={8} onPress={() => settingsSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+          <Text style={styles.title}>Settings</Text>
+          <Pressable accessibilityLabel="Sign out" hitSlop={8} onPress={confirmLogout} style={styles.headerButton}><SignOutIcon height={24} width={24} /></Pressable>
         </View>
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Image source={profileAvatarSource(profile)} style={styles.avatar} />
-            <Text style={styles.editPhoto}>Edit photo</Text>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
+              <Image source={profileAvatarSource(profile)} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
+              {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
+            </Pressable>
+            <Pressable disabled={uploadingPhoto} onPress={editPhoto}><Text style={styles.editPhoto}>Edit photo</Text></Pressable>
             <View style={styles.rows}>
               {rows.map((row) => (
                 <Pressable
@@ -148,17 +231,23 @@ export function ProfileSettingsSheet({
                 >
                   <Text style={styles.rowLabel}>{row.label}</Text>
                   {row.value ? <Text numberOfLines={1} style={styles.rowValue}>{row.value}</Text> : null}
+                  {row.valueFlag ? <Image source={row.valueFlag} style={styles.cityFlag} /> : null}
                   <Text style={styles.chevron}>›</Text>
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastes.app' })} style={styles.invite}>
-              <Text style={styles.inviteText}>Invite a Friend</Text>
-            </Pressable>
-            <Pressable onPress={() => void onLogout()} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable>
           </ScrollView>
         )}
-      </View>
+        <LinearGradient colors={['rgba(22,22,22,0)', '#161616']} pointerEvents="box-none" style={styles.actions}>
+          <View style={styles.inviteRing}>
+            <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastes.app' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
+              <InviteUsersIcon height={24} width={24} />
+              <Text style={styles.inviteText}>Invite a Friend</Text>
+            </Pressable>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
+    </SideSlideScreen>
 
       <Modal animationType="fade" onRequestClose={() => setEditing(null)} transparent visible={editing !== null}>
         <Pressable onPress={() => setEditing(null)} style={styles.modalBackdrop}>
@@ -172,9 +261,9 @@ export function ProfileSettingsSheet({
         </Pressable>
       </Modal>
 
-      <Modal animationType="slide" onRequestClose={() => setPlaceOpen(false)} visible={placeOpen}>
+      <SideSlideScreen onRequestClose={() => setPlaceOpen(false)} ref={placeSlide} visible={placeOpen}>
         <View style={styles.screen}>
-          <View style={styles.header}><Pressable onPress={() => setPlaceOpen(false)} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>Favourite place</Text><View style={styles.headerButton} /></View>
+          <View style={styles.header}><Pressable onPress={() => placeSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>Favourite place</Text><View style={styles.headerButton} /></View>
           <View style={styles.placeContent}>
             <TextInput autoFocus onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={placeQuery} />
             {searching ? <ActivityIndicator color={colors.primary} style={styles.searchLoader} /> : places.map((place) => (
@@ -184,31 +273,44 @@ export function ProfileSettingsSheet({
             ))}
           </View>
         </View>
-      </Modal>
-    </Modal>
+      </SideSlideScreen>
+
+      <SideSlideScreen onRequestClose={() => setCityOpen(false)} ref={citySlide} visible={cityOpen}>
+        <View style={styles.screen}>
+          <View style={styles.header}><Pressable onPress={() => citySlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>City</Text><View style={styles.headerButton} /></View>
+          <CityPicker onSelect={(name) => void save({ city: name })} topPadding={24} />
+        </View>
+      </SideSlideScreen>
+    </>
   );
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.canvas },
-    header: { height: safeTop + 58, paddingTop: safeTop, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background },
-    headerButton: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
-    back: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300' },
-    title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
+    screen: { flex: 1, backgroundColor: '#161616' },
+    patternImage: { opacity: 1 },
+    darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },
+    backgroundLift: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(255,255,255,0.057)' },
+    header: { zIndex: 2, height: safeTop + 48, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: '#080808' },
+    headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    backIcon: { width: 24, height: 24, tintColor: '#FFFFFF' },
+    title: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
     loader: { flex: 1 },
-    content: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: safeBottom + 30, alignItems: 'center' },
-    avatar: { width: 92, height: 92, borderRadius: 46, backgroundColor: colors.surface },
-    editPhoto: { marginTop: 10, marginBottom: 24, color: colors.text, fontSize: 14, fontWeight: '600' },
-    rows: { width: '100%', gap: 10 },
-    row: { minHeight: 50, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', borderRadius: 25, backgroundColor: colors.surface },
-    rowLabel: { color: colors.text, fontSize: 15, fontWeight: '600' },
-    rowValue: { flex: 1, marginLeft: 12, color: colors.textSecondary, fontSize: 13, textAlign: 'right' },
-    chevron: { marginLeft: 8, color: colors.textMuted, fontSize: 27, lineHeight: 29 },
-    invite: { width: '100%', height: 52, marginTop: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: colors.primary },
-    inviteText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    signOut: { marginTop: 20, padding: 12 },
-    signOutText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
+    content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: safeBottom + 116, alignItems: 'center' },
+    avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#161616' },
+    photoUploading: { opacity: 0.55 },
+    photoLoader: { position: 'absolute', inset: 0 },
+    editPhoto: { marginTop: 10, marginBottom: 10, color: '#FFFFFF', fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
+    rows: { width: '100%', gap: 6 },
+    row: { width: '100%', height: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 100, backgroundColor: '#080808' },
+    rowLabel: { flex: 1, color: '#FFFFFF', fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41 },
+    rowValue: { maxWidth: '55%', marginLeft: 8, color: 'rgba(255,255,255,0.50)', fontSize: 15, fontWeight: '500', textAlign: 'right' },
+    cityFlag: { width: 18, height: 18, marginLeft: 5 },
+    chevron: { width: 8, marginLeft: 8, color: 'rgba(255,255,255,0.50)', fontSize: 27, lineHeight: 29 },
+    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingBottom: Math.max(24, safeBottom), alignItems: 'center', justifyContent: 'center' },
+    inviteRing: { width: 330, height: 54, padding: 5, borderRadius: 36, backgroundColor: '#4C1816' },
+    invite: { flex: 1, paddingHorizontal: 20, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#B82F29' },
+    inviteText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
     pressed: { opacity: 0.72 },
     modalBackdrop: { flex: 1, padding: 16, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.76)' },
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
