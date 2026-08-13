@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -23,6 +24,9 @@ import socialLocked from '../../../assets/rewards/social-starter-locked.png';
 import spreadDetail from '../../../assets/rewards/spread-word-detail.png';
 import spreadLocked from '../../../assets/rewards/spread-word-locked.png';
 import closeIcon from '../../../assets/favourites/close-folder.png';
+import SearchIcon from '../../../assets/profile/followers-search.svg';
+import TrashIcon from '../../../assets/profile/followers-trash.svg';
+import VoiceIcon from '../../../assets/profile/followers-voice.svg';
 import BackIcon from '../../../assets/leaderboard/back.svg';
 import rewardPattern from '../../../assets/onboarding/pattern.png';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -68,11 +72,13 @@ function rewardViews(data: ProfileExtrasResult | null): RewardView[] {
 
 export function ProfileExtras({
   onClose,
+  own = false,
   screen,
   targetUserId,
   visible,
 }: {
   onClose: () => void;
+  own?: boolean;
   screen: ProfileExtra;
   targetUserId?: string;
   visible: boolean;
@@ -86,6 +92,8 @@ export function ProfileExtras({
   const [email, setEmail] = useState(true);
   const [sms, setSms] = useState(false);
   const [data, setData] = useState<ProfileExtrasResult | null>(null);
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [removingFollowerId, setRemovingFollowerId] = useState<string | null>(null);
   const [detailReward, setDetailReward] = useState<RewardView | null>(null);
   const [achievementReward, setAchievementReward] = useState<RewardView | null>(null);
   const slide = useRef<SideSlideScreenHandle>(null);
@@ -111,6 +119,8 @@ export function ProfileExtras({
     if (!visible) {
       setDetailReward(null);
       setAchievementReward(null);
+      setPeopleSearch('');
+      setRemovingFollowerId(null);
     }
   }, [visible]);
 
@@ -127,28 +137,81 @@ export function ProfileExtras({
     : screen === 'following' ? 'Following'
       : screen === 'notifications' ? 'Notifications'
         : 'Rewards';
+  const connections = data?.[screen === 'following' ? 'following' : 'followers'] ?? [];
+  const normalizedSearch = peopleSearch.trim().toLocaleLowerCase();
+  const visibleConnections = normalizedSearch
+    ? connections.filter((person) => `${person.displayName} ${person.username ?? ''}`.toLocaleLowerCase().includes(normalizedSearch))
+    : connections;
+
+  const confirmRemoveFollower = (userId: string, displayName: string) => {
+    Alert.alert('Remove follower?', `${displayName} will no longer follow you.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          setRemovingFollowerId(userId);
+          void api.removeFollower({ followerUserId: userId })
+            .then(() => setData((current) => current ? {
+              ...current,
+              followers: current.followers.filter((person) => person.userId !== userId),
+            } : current))
+            .catch(() => Alert.alert('Could not remove follower', 'Please try again.'))
+            .finally(() => setRemovingFollowerId(null));
+        },
+      },
+    ]);
+  };
 
   return (
     <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
-            <BackIcon height={16} width={9} />
-          </Pressable>
-          <Text style={styles.title}>{title}</Text>
-          <View style={styles.headerButton} />
+        <View style={[styles.header, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
+          <View style={styles.headerTitleRow}>
+            <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
+              <BackIcon height={16} width={9} />
+            </Pressable>
+            <Text style={styles.title}>{title}</Text>
+            <View style={styles.headerButton} />
+          </View>
+          {screen === 'followers' || screen === 'following' ? (
+            <View style={styles.searchField}>
+              <SearchIcon height={24} width={24} />
+              <TextInput
+                accessibilityLabel={`Search ${title.toLocaleLowerCase()}`}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setPeopleSearch}
+                placeholder="Search"
+                placeholderTextColor="rgba(217,221,229,0.4)"
+                style={styles.searchInput}
+                value={peopleSearch}
+              />
+              <Pressable accessibilityLabel="Voice search" hitSlop={8} style={styles.voiceButton}>
+                <VoiceIcon height={24} width={24} />
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         {screen === 'followers' || screen === 'following' ? (
-          <ScrollView contentContainerStyle={styles.peopleList}>
-            <Text style={styles.sectionLabel}>{screen.toUpperCase()} ({data?.[screen].length ?? 0})</Text>
-            {!data ? <ActivityIndicator color={colors.primary} /> : data[screen].map((person) => (
+          <ScrollView contentContainerStyle={styles.peopleList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {!data ? <ActivityIndicator color={colors.primary} style={styles.peopleLoading} /> : visibleConnections.map((person) => (
               <View key={person.userId} style={styles.person}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
-                <View style={styles.personCopy}><Text style={styles.personName}>{person.displayName}</Text><Text style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View>
-                <Pressable onPress={() => void (person.following ? api.unfollowUser({ targetUserId: person.userId }) : api.followUser({ targetUserId: person.userId })).then(() => setData((current) => current ? { ...current, [screen]: current[screen].map((candidate) => candidate.userId === person.userId ? { ...candidate, following: !candidate.following } : candidate) } : current))} style={[styles.follow, person.following && styles.following]}>
-                  <Text style={styles.followText}>{person.following ? 'Following' : 'Follow'}</Text>
-                </Pressable>
+                {person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} /> : (
+                  <View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
+                )}
+                <View style={styles.personCopy}><Text numberOfLines={1} style={styles.personName}>{person.displayName}</Text><Text numberOfLines={1} style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View>
+                {screen === 'followers' && own ? (
+                  <Pressable
+                    accessibilityLabel={`Remove ${person.displayName}`}
+                    disabled={removingFollowerId === person.userId}
+                    onPress={() => confirmRemoveFollower(person.userId, person.displayName)}
+                    style={styles.removeFollower}
+                  >
+                    {removingFollowerId === person.userId ? <ActivityIndicator color="#FFFFFF" size="small" /> : <TrashIcon height={25} width={24} />}
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </ScrollView>
@@ -264,20 +327,24 @@ function Setting({ disabled = false, label, onChange, styles, value }: { disable
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#161616' },
-    header: { height: safeTop + 60, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    header: { height: safeTop + 60, paddingTop: safeTop, backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+    peopleHeader: { height: safeTop + 106 },
+    headerTitleRow: { height: 60, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center' },
     headerButton: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
     title: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
-    sectionLabel: { marginTop: 18, marginBottom: 8, color: colors.textMuted, fontSize: 12 },
-    peopleList: { paddingHorizontal: 16, paddingBottom: 30 },
-    person: { height: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-    avatarText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-    personCopy: { flex: 1, marginLeft: 11 },
-    personName: { color: colors.text, fontSize: 15, fontWeight: '600' },
-    handle: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
-    follow: { minWidth: 82, height: 34, paddingHorizontal: 12, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-    following: { borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-    followText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+    searchField: { height: 39, marginHorizontal: 16, marginBottom: 12, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.08)' },
+    searchInput: { flex: 1, height: 39, padding: 0, color: '#D9DDE5', fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
+    voiceButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+    peopleList: { paddingBottom: Math.max(30, safeBottom) },
+    peopleLoading: { marginTop: 32 },
+    person: { height: 76, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#45474B' },
+    avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    avatarImage: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#262626' },
+    avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+    personCopy: { flex: 1, height: 38, justifyContent: 'center', gap: 4 },
+    personName: { color: '#FFFFFF', fontSize: 15, lineHeight: 18, fontWeight: '600', letterSpacing: -0.41 },
+    handle: { color: '#D9D9D9', fontSize: 13, lineHeight: 16, letterSpacing: -0.24 },
+    removeFollower: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     settings: { paddingHorizontal: 16, paddingBottom: 30 },
     notificationGap: { height: 14 },
     setting: { height: 60, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },

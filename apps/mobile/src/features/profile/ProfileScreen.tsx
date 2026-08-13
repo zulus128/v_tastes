@@ -448,7 +448,7 @@ export function ProfileScreen({
         own={own}
         profile={profile}
       />
-      <ProfileExtras onClose={() => setExtra(null)} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
+      <ProfileExtras onClose={() => setExtra(null)} own={own} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
       <Modal animationType="fade" onRequestClose={() => setSelectedReview(null)} transparent visible={selectedReview !== null && !editingReview}>
         <Pressable onPress={() => setSelectedReview(null)} style={styles.reviewActionBackdrop}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>

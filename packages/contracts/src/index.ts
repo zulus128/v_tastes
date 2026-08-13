@@ -186,6 +186,10 @@ export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
 
+export const removeFollowerInputSchema = z.object({
+  followerUserId: z.string().min(1).max(128),
+});
+
 export const createConversationInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
@@ -426,6 +430,7 @@ export type ReportReviewInput = z.infer<typeof reportReviewInputSchema>;
 export type ReactToContentInput = z.infer<typeof reactToContentInputSchema>;
 export type ReportContentInput = z.infer<typeof reportContentInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
+export type RemoveFollowerInput = z.infer<typeof removeFollowerInputSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
 export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 export type RespondToActivityInvitationInput = z.infer<typeof respondToActivityInvitationInputSchema>;

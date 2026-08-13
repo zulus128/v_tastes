@@ -417,6 +417,12 @@ describe('authenticated session and paginated reads', () => {
     });
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(true);
     expect((await author.ref.collection('followers').doc(reader.id).get()).exists).toBe(true);
+    expect(await callFunction('removeFollower', { followerUserId: reader.id }, first.token)).toEqual({
+      following: false,
+    });
+    expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
+    expect((await author.ref.collection('followers').doc(reader.id).get()).exists).toBe(false);
+    await callFunction('followUser', { targetUserId: author.id }, second.token);
 
     const reviewCommand = {
       idempotencyKey: 'review-command-0001',

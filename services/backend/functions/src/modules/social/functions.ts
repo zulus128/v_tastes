@@ -1,4 +1,4 @@
-import { followUserInputSchema, importContactsInputSchema, type ImportContactsResult } from '@tastes/contracts';
+import { followUserInputSchema, importContactsInputSchema, removeFollowerInputSchema, type ImportContactsResult } from '@tastes/contracts';
 import { getAuth, type UserIdentifier, type UserRecord } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -123,6 +123,41 @@ export const unfollowUser = onCall(callableOptions, async (request) => {
     if (target.exists) {
       transaction.update(targetRef, {
         followerCount: Math.max(0, Number(target.get('followerCount') ?? 0) - 1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    return { following: false };
+  });
+});
+
+export const removeFollower = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(removeFollowerInputSchema, request.data);
+  const userRef = db.collection('users').doc(uid);
+  const followerRef = db.collection('users').doc(input.followerUserId);
+  const incomingRef = userRef.collection('followers').doc(input.followerUserId);
+  const outgoingRef = followerRef.collection('following').doc(uid);
+
+  return db.runTransaction(async (transaction) => {
+    const [user, follower, incoming] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(followerRef),
+      transaction.get(incomingRef),
+    ]);
+    if (!incoming.exists) return { following: false };
+
+    await enforceRateLimit(transaction, uid, 'remove-follower', 60, 60_000);
+    transaction.delete(incomingRef);
+    transaction.delete(outgoingRef);
+    if (user.exists) {
+      transaction.update(userRef, {
+        followerCount: Math.max(0, Number(user.get('followerCount') ?? 0) - 1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    if (follower.exists) {
+      transaction.update(followerRef, {
+        followingCount: Math.max(0, Number(follower.get('followingCount') ?? 0) - 1),
         updatedAt: FieldValue.serverTimestamp(),
       });
     }

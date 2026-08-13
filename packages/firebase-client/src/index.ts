@@ -23,6 +23,7 @@ import type {
   GetFavouritesInput,
   FollowResult,
   FollowUserInput,
+  RemoveFollowerInput,
   GetCommentsInput,
   GetFeedInput,
   GetLeaderboardInput,
@@ -100,6 +101,7 @@ export const callableOperationNames = [
   'updateProfilePhoto',
   'followUser',
   'unfollowUser',
+  'removeFollower',
   'createConversation',
   'listActivityCandidates',
   'createActivity',
@@ -290,6 +292,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<FollowUserInput, FollowResult>('followUser', input),
     unfollowUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('unfollowUser', input),
+    removeFollower: (input: RemoveFollowerInput) =>
+      invoke<RemoveFollowerInput, FollowResult>('removeFollower', input),
     createConversation: (input: CreateConversationInput) =>
       invoke<CreateConversationInput, IdResult>('createConversation', input),
     listActivityCandidates: () =>
