@@ -27,6 +27,7 @@ import photoIcon from '../../../assets/leaderboard/xp-photo.png';
 import reviewIcon from '../../../assets/leaderboard/xp-review.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
+import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useLeaderboard } from './api';
 
@@ -302,6 +303,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
       resizeMode="cover"
       style={styles.screen}
     >
+      <PatternBackgroundLift />
       <LeaderboardHeader audience={audience} onAudience={setAudience} onBack={onBack} onInfo={() => setShowXp(true)} styles={styles} />
       {!query.isPending && items.length > 0 ? (
         <View style={styles.periodArea}>

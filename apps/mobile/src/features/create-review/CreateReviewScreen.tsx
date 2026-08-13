@@ -31,6 +31,7 @@ import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.s
 import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
@@ -130,6 +131,7 @@ export function CreateReviewScreen({
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ImageBackground imageStyle={styles.patternImage} source={pattern} style={styles.screen}>
+        <PatternBackgroundLift />
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: 112 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"

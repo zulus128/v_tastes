@@ -43,9 +43,16 @@ export function Screen({
       resizeMode="stretch"
       style={[styles.screen, { backgroundColor: colors.canvas }, style]}
     >
+      <PatternBackgroundLift />
       {children}
     </ImageBackground>
   );
+}
+
+/** Keeps every dark patterned surface at the same sampled #161616 base. */
+export function PatternBackgroundLift() {
+  const { isDark } = useAppTheme();
+  return isDark ? <View pointerEvents="none" style={styles.patternBackgroundLift} /> : null;
 }
 
 export function PrimaryButton({
@@ -127,6 +134,14 @@ const styles = StyleSheet.create({
     // Faint texture, not a bold layer — matches the ~4-8% opacity Figma uses
     // for this same linework elsewhere.
     opacity: 0.06,
+  },
+  patternBackgroundLift: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(255,255,255,0.057)',
   },
   center: { flex: 1, minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
   title: { fontSize: 21, fontWeight: '700', textAlign: 'center' },

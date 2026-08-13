@@ -17,6 +17,7 @@ import patternDark from '../../../assets/onboarding/pattern-screen.png';
 import patternLight from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import { onboardingTheme as theme } from './theme';
 import { useAppTheme } from '../../ui/ThemeProvider';
+import { PatternBackgroundLift } from '../../ui/components';
 
 export function PatternScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { colors, isDark } = useAppTheme();
@@ -36,6 +37,7 @@ export function PatternScreen({ children, style }: PropsWithChildren<{ style?: S
             <Image resizeMode="cover" source={patternLight} style={styles.darkPatternBoost} />
           </View>
         ) : null}
+        <PatternBackgroundLift />
         {children}
       </ImageBackground>
     </View>

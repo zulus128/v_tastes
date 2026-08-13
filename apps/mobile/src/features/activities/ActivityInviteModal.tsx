@@ -19,6 +19,7 @@ import restaurantImage from '../../../assets/discover/restaurant.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { firestore } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
+import { PatternBackgroundLift } from '../../ui/components';
 
 type Member = {
   id: string;
@@ -187,6 +188,7 @@ export function ActivityInviteModal({
     <Modal animationType="fade" onRequestClose={pending ? undefined : onClose} transparent visible={visible}>
       <View style={styles.overlay}>
         <ImageBackground imageStyle={styles.patternImage} source={pattern} style={styles.sheet}>
+          <PatternBackgroundLift />
           {loadError ? (
             <View style={styles.errorState}>
               <Text style={styles.errorTitle}>Could not load activity</Text>

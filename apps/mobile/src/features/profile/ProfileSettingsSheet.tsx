@@ -29,6 +29,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
+import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
@@ -209,7 +210,7 @@ export function ProfileSettingsSheet({
     <SideSlideScreen onRequestClose={onClose} ref={settingsSlide} visible={visible}>
       <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={pattern} style={styles.screen}>
         <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View>
-        <View pointerEvents="none" style={styles.backgroundLift} />
+        <PatternBackgroundLift />
         <View style={styles.header}>
           <Pressable accessibilityLabel="Back" hitSlop={8} onPress={() => settingsSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
           <Text style={styles.title}>Settings</Text>
@@ -290,7 +291,6 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     screen: { flex: 1, backgroundColor: '#161616' },
     patternImage: { opacity: 1 },
     darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },
-    backgroundLift: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(255,255,255,0.057)' },
     header: { zIndex: 2, height: safeTop + 48, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: '#080808' },
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     backIcon: { width: 24, height: 24, tintColor: '#FFFFFF' },

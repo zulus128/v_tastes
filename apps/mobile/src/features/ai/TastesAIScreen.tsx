@@ -18,6 +18,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import assistantImage from '../../../assets/ai/assistant.png';
+import bottomGlow from '../../../assets/ai/bottom-glow.png';
+import SendIcon from '../../../assets/ai/send.svg';
+import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
+import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -30,6 +34,29 @@ type AiExchange = {
 };
 
 const HISTORY_KEY = '@tastes/ai-history';
+const QUICK_PROMPTS = [
+  { label: '⭐ Top rated', prompt: 'Show me the top-rated restaurants nearby' },
+  { label: '🍔 Fast food', prompt: 'Find good fast food nearby' },
+  { label: '☕ Coffee nearby', prompt: 'Find a great coffee shop nearby' },
+  { label: '🍣 Sushi spots', prompt: 'Show me the best sushi spots nearby' },
+  { label: '🍜 Asian food', prompt: 'Recommend Asian restaurants nearby' },
+  { label: '🥗 Healthy food', prompt: 'Find healthy food nearby' },
+] as const;
+
+function AiMark() {
+  return (
+    <View style={markStyles.container}>
+      <AiMouthPink height={10} style={markStyles.pink} width={13} />
+      <AiMouthOutline height={13} style={markStyles.outline} width={18} />
+    </View>
+  );
+}
+
+const markStyles = StyleSheet.create({
+  container: { width: 20, height: 18 },
+  pink: { position: 'absolute', top: 6, left: 4 },
+  outline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
+});
 
 export function TastesAIScreen({
   onBack,
@@ -143,10 +170,13 @@ export function TastesAIScreen({
 
   return (
     <LinearGradient
-      colors={[colors.brandGradientStart, colors.canvas, colors.canvas]}
-      locations={[0, 0.54, 1]}
+      colors={['#560E0B', '#080808']}
       style={styles.screen}
     >
+      <View pointerEvents="none" style={styles.backgroundDim} />
+      <View pointerEvents="none" style={styles.bottomGlow}>
+        <Image source={bottomGlow} style={styles.bottomGlowImage} />
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.screen}
@@ -156,9 +186,7 @@ export function TastesAIScreen({
             <Text style={styles.back}>‹</Text>
           </Pressable>
           <View style={styles.brand}>
-            <View style={styles.brandMark}>
-              <Text style={styles.brandMarkText}>T</Text>
-            </View>
+            <AiMark />
             <Text style={styles.title}>Tastes AI</Text>
           </View>
           <Pressable
@@ -179,7 +207,9 @@ export function TastesAIScreen({
                   ? 'You’re offline'
                   : 'Couldn’t get an answer.'}
             </Text>
-            <Image resizeMode="contain" source={assistantImage} style={styles.assistant} />
+            <View style={styles.assistantCrop}>
+              <Image resizeMode="contain" source={assistantImage} style={styles.assistant} />
+            </View>
             <Text style={styles.heroCopy}>
               {failure === 'location'
                 ? 'Tastes AI suggests places near you. Turn on location, or pick a city instead.'
@@ -212,25 +242,30 @@ export function TastesAIScreen({
         ) : !exchange && !asking ? (
           <View style={styles.empty}>
             <Text style={styles.heroTitle}>Discover where to eat...</Text>
-            <Image resizeMode="contain" source={assistantImage} style={styles.assistant} />
+            <View style={styles.assistantCrop}>
+              <Image resizeMode="contain" source={assistantImage} style={styles.assistant} />
+            </View>
             <Text style={styles.heroCopy}>
-              Find the best restaurants near you with recommendations based on{' '}
+              {'Find the best restaurants near you\nwith AI recommendations based on\n'}
               <Text style={styles.accent}>your taste</Text>
             </Text>
-            <View style={styles.suggestions}>
-              {[
-                'A short, romantic dinner nearby',
-                'Great sushi for a group',
-                'Something casual and open late',
-              ].map((suggestion) => (
+            <View style={styles.quickPrompts}>
+              <View style={styles.quickPromptsTitleRow}>
+                <View style={styles.quickPromptsDivider} />
+                <Text style={styles.quickPromptsTitle}>FAST BUTTONS</Text>
+                <View style={styles.quickPromptsDivider} />
+              </View>
+              <View style={styles.quickPromptsGrid}>
+                {QUICK_PROMPTS.map(({ label, prompt }) => (
                 <Pressable
-                  key={suggestion}
-                  onPress={() => void ask(suggestion)}
-                  style={styles.suggestion}
+                  key={label}
+                  onPress={() => void ask(prompt)}
+                  style={styles.quickPrompt}
                 >
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                  <Text style={styles.quickPromptText}>{label}</Text>
                 </Pressable>
               ))}
+              </View>
             </View>
           </View>
         ) : (
@@ -244,9 +279,7 @@ export function TastesAIScreen({
             {exchange && !asking ? (
               <View style={styles.answer}>
                 <View style={styles.aiHeading}>
-                  <View style={styles.smallMark}>
-                    <Text style={styles.smallMarkText}>T</Text>
-                  </View>
+                  <AiMark />
                   <Text style={styles.aiName}>Tastes AI</Text>
                 </View>
                 <Text style={styles.answerText}>{exchange.answer.text}</Text>
@@ -314,7 +347,7 @@ export function TastesAIScreen({
             }
             style={[styles.send, !asking && !text.trim() && styles.sendDisabled]}
           >
-            <Text style={styles.sendText}>{asking ? '■' : '↑'}</Text>
+            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={16.667} width={16.667} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -358,9 +391,7 @@ function Thinking({ color, styles }: { color: string; styles: ReturnType<typeof 
   return (
     <View style={styles.thinking}>
       <View style={styles.aiHeading}>
-        <View style={styles.smallMark}>
-          <Text style={styles.smallMarkText}>T</Text>
-        </View>
+        <AiMark />
         <Text style={styles.aiName}>Tastes AI</Text>
       </View>
       <ActivityIndicator color={color} />
@@ -478,7 +509,7 @@ function HistoryModal({
                 style={styles.historyRow}
               >
                 <View style={styles.historyRowIcon}>
-                  <Text style={styles.smallMarkText}>T</Text>
+                  <AiMark />
                 </View>
                 <View style={styles.historyCopy}>
                   <Text numberOfLines={1} style={styles.historyPrompt}>
@@ -549,6 +580,23 @@ function HistoryModal({
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
+    backgroundDim: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    bottomGlow: {
+      position: 'absolute',
+      left: '50%',
+      width: 454.4,
+      height: 454.4,
+      bottom: -155.7,
+      transform: [{ translateX: -227.2 }],
+    },
+    bottomGlowImage: { width: '100%', height: '100%' },
     header: {
       height: safeTop + 66,
       paddingTop: safeTop + 6,
@@ -573,29 +621,27 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 4,
+      gap: 8,
     },
-    brandMark: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary,
-    },
-    brandMarkText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
     title: { color: colors.text, fontSize: 17, fontWeight: '600' },
     historyLink: { color: colors.textSecondary, fontSize: 13 },
-    empty: { flex: 1, paddingHorizontal: 24, alignItems: 'center' },
+    empty: { flex: 1, paddingHorizontal: 16, alignItems: 'center' },
     heroTitle: {
-      marginTop: 36,
+      marginTop: 6,
       color: colors.text,
       fontSize: 24,
       fontWeight: '800',
       textAlign: 'center',
       letterSpacing: 0.4,
     },
-    assistant: { width: 250, height: 240, marginTop: -4 },
+    assistantCrop: {
+      width: 380,
+      height: 300,
+      marginTop: 30,
+      marginBottom: 25,
+      overflow: 'hidden',
+    },
+    assistant: { position: 'absolute', top: -20, left: 0, width: 380, height: 380 },
     heroCopy: {
       maxWidth: 365,
       color: colors.textSecondary,
@@ -618,6 +664,13 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       fontSize: 13,
       textAlign: 'center',
     },
+    quickPrompts: { width: '100%', marginTop: 'auto', paddingBottom: 20 },
+    quickPromptsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    quickPromptsDivider: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+    quickPromptsTitle: { color: colors.textMuted, fontSize: 12, letterSpacing: 0.6 },
+    quickPromptsGrid: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 6, rowGap: 8 },
+    quickPrompt: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.08)' },
+    quickPromptText: { color: colors.text, fontSize: 12 },
     chatContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 18 },
     userBubble: {
       maxWidth: '82%',
@@ -638,15 +691,6 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       backgroundColor: 'rgba(8,8,8,0.32)',
     },
     aiHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    smallMark: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary,
-    },
-    smallMarkText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
     aiName: { color: colors.text, fontSize: 14, fontWeight: '700' },
     answerText: {
       marginTop: 12,
@@ -762,7 +806,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       gap: 8,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      backgroundColor: 'rgba(8,8,8,0.58)',
+      backgroundColor: 'rgba(8,8,8,0.24)',
     },
     input: {
       flex: 1,
@@ -782,7 +826,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       justifyContent: 'center',
       backgroundColor: colors.primary,
     },
-    sendDisabled: { opacity: 0.45 },
+    sendDisabled: { backgroundColor: '#8E2926' },
     sendText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
     toast: {
       position: 'absolute',

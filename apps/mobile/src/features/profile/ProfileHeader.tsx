@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import burgerBadge from '../../../assets/profile/burger-lover.png';
-import cityBadge from '../../../assets/profile/city-explorer.png';
+import BurgerBadge from '../../../assets/profile/reward-burger.svg';
+import CityBadge from '../../../assets/profile/reward-city.svg';
 import followIcon from '../../../assets/profile/follow.png';
-import levelBadge from '../../../assets/profile/level.png';
-import matchaBadge from '../../../assets/profile/matcha-hunter.png';
+import LevelBadge from '../../../assets/profile/reward-level.svg';
+import MatchaBadge from '../../../assets/profile/reward-matcha.svg';
 import messageIcon from '../../../assets/profile/message.png';
-import tiramisuBadge from '../../../assets/profile/tiramisu.png';
+import TiramisuBadge from '../../../assets/profile/reward-tiramisu.svg';
 import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
@@ -14,7 +14,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
 
-const badgeAssets = [levelBadge, burgerBadge, tiramisuBadge, matchaBadge, cityBadge];
+const badgeAssets = [LevelBadge, BurgerBadge, TiramisuBadge, MatchaBadge, CityBadge];
 const badgeLabels = ['Level', 'Burger Lover', 'Tiramisu Connaisseur', 'Matcha Hunter', 'City Explorer'];
 
 function Stat({ label, onPress, value }: { label: string; onPress?: () => void; value: number }) {
@@ -124,9 +124,10 @@ export function ProfileHeader({
         </ScrollView>
       ) : null}
       <Pressable accessibilityLabel="Open rewards" onPress={onRewards} style={styles.badges}>
-        {badgeAssets.map((asset, index) => (
+        {badgeAssets.map((BadgeArt, index) => (
           <View key={badgeLabels[index]} style={styles.badge}>
-            <Image resizeMode="contain" source={asset} style={styles.badgeImage} />
+            <BadgeArt width={59} height={59} />
+            <Text numberOfLines={2} style={styles.badgeLabel}>{badgeLabels[index]}</Text>
           </View>
         ))}
       </Pressable>
@@ -157,9 +158,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   messageActionText: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
   chips: { minWidth: '100%', paddingHorizontal: 10, paddingTop: 14, gap: 6, justifyContent: 'center' },
   chip: { paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 39, overflow: 'hidden', backgroundColor: '#161616', color: colors.text, fontSize: 14 },
-  badges: { height: 86, marginTop: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  badge: { width: 68, height: 84, alignItems: 'center', justifyContent: 'center' },
-  badgeImage: { width: 68, height: 84 },
+  badges: { height: 82, marginTop: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  badge: { width: 68, alignItems: 'center' },
+  badgeLabel: { width: 72, marginTop: 4, color: colors.text, fontSize: 10, lineHeight: 10, fontWeight: '400', letterSpacing: -0.12, textAlign: 'center' },
 });
 
 const staticStyles = StyleSheet.create({

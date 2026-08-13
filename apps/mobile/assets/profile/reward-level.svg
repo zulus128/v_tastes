@@ -1,0 +1,8 @@
+<svg width="59" height="59" viewBox="0 0 59 59" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="29.5" cy="29.5" r="28.5" fill="#FFF7FB" stroke="#FFFFFF" stroke-width="2"/>
+  <path d="M29.5 4.5l5.2 5.5 7.3-1.8 1.8 7.3 7 2.8-2.8 7 4.5 6-6 4.5.5 7.5-7.5.5-4 6.4-6.5-4-6.5 4-4-6.4-7.5-.5.5-7.5-6-4.5 4.5-6-2.8-7 7-2.8 1.8-7.3 7.3 1.8 5.2-5.5z" fill="#F49BD2" stroke="#2A2530" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M18 18l3.5-7 7 5 6-8 5 9 5-4-1.8 12H18.8L18 18z" fill="#FFD84D" stroke="#2A2530" stroke-width="1.4" stroke-linejoin="round"/>
+  <circle cx="21.5" cy="11" r="1.8" fill="#E83B54"/><circle cx="34.5" cy="7" r="1.8" fill="#E83B54"/><circle cx="44.5" cy="12.5" r="1.8" fill="#E83B54"/>
+  <text x="29.5" y="31" fill="#25372D" font-family="Arial" font-size="6" font-weight="700" text-anchor="middle">LEVEL</text>
+  <text x="29.5" y="42" fill="#25372D" font-family="Arial" font-size="13" font-weight="800" text-anchor="middle">6</text>
+</svg>
