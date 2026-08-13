@@ -54,11 +54,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const api = useMemo(() => createTastesApi(functions, {
     onUnauthenticated: clearLocalSession,
-    onError: (error, operation) => captureException(error, {
-      source: 'api',
-      operation,
-      code: error.code,
-    }),
+    onError: (error, operation) => {
+      // A conversation can disappear while a stale deep link or cached route is
+      // still open. The chat screen renders this as an ordinary empty/error
+      // state, so do not turn the expected 404 into a React Native redbox.
+      if (operation === 'getMessages' && error.code === 'not-found') return;
+      captureException(error, {
+        source: 'api',
+        operation,
+        code: error.code,
+      });
+    },
   }), [clearLocalSession]);
 
   const logout = useCallback(async () => {
