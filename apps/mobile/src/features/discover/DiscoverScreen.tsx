@@ -22,6 +22,8 @@ import MapView, { Marker, type Region } from 'react-native-maps';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
+import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import {
   type DiscoverVenueFilter,
   useDiscoverFeed,
@@ -219,7 +221,11 @@ export function DiscoverScreen({
         visible={saveTarget !== null}
       />
       <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={styles.aiFab}>
-        <Text style={styles.aiFabMark}>T</Text><Text style={styles.aiFabText}>Ask AI</Text>
+        <View style={styles.aiFabMark}>
+          <AiMouthPink height={10} style={styles.aiFabMarkPink} width={13} />
+          <AiMouthOutline height={13} style={styles.aiFabMarkOutline} width={18} />
+        </View>
+        <Text style={styles.aiFabText}>Ask AI</Text>
       </Pressable>
       <SeeAllPlacesModal onClose={() => setSeeAllPlaces(null)} onOpenPlace={onOpenPlace} onSave={setSaveTarget} savedVenueIds={savedVenueIds} venues={seeAllPlaces} />
     </View>
@@ -1069,9 +1075,11 @@ function ProfileSuggestion({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  aiFab: { position: 'absolute', right: 16, bottom: 18, height: 48, paddingHorizontal: 15, flexDirection: 'row', gap: 7, alignItems: 'center', borderRadius: 24, backgroundColor: colors.primary, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6 },
-  aiFabMark: { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', backgroundColor: '#FFFFFF', color: colors.primary, fontSize: 13, lineHeight: 24, fontWeight: '900', textAlign: 'center' },
-  aiFabText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  aiFab: { position: 'absolute', right: 16, bottom: 18, height: 48, paddingHorizontal: 15, flexDirection: 'row', gap: 7, alignItems: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },
+  aiFabMark: { width: 20, height: 18 },
+  aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
+  aiFabMarkOutline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
+  aiFabText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   header: { height: 106, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
   headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
   back: { color: colors.text, fontSize: 38, lineHeight: 40 },
