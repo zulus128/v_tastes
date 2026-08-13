@@ -54,7 +54,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
     }
 
     const photoRef = storageRef(storage, normalizedPath);
-    if (!photoRef.fullPath) {
+    if (!photoRef.fullPath.replace(/\//g, '')) {
       setState({ failed: true });
       return () => { active = false; };
     }
@@ -63,7 +63,8 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
     void getDownloadURL(photoRef).then((uri) => {
       if (active) setState({ uri, failed: false });
     }).catch((error) => {
-      captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });
+      if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
+        captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });
       if (active) setState({ failed: true });
     });
     return () => { active = false; };

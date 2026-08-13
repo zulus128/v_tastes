@@ -60,7 +60,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
     }
 
     const photoRef = ref(storage, normalizedPath);
-    if (!photoRef.fullPath) {
+    if (!photoRef.fullPath.replace(/\//g, '')) {
       setUri(undefined);
       return () => {
         active = false;
@@ -72,6 +72,10 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
         if (active) setUri(nextUri);
       })
       .catch((error) => {
+        if ((error as { code?: string }).code === 'storage/invalid-root-operation') {
+          if (active) setUri(undefined);
+          return;
+        }
         captureException(error, { operation: 'load-review-dish-photo', photoPath: normalizedPath });
         if (active) setUri(undefined);
       });
