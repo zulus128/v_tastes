@@ -59,7 +59,15 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
       };
     }
 
-    void getDownloadURL(ref(storage, normalizedPath))
+    const photoRef = ref(storage, normalizedPath);
+    if (!photoRef.fullPath) {
+      setUri(undefined);
+      return () => {
+        active = false;
+      };
+    }
+
+    void getDownloadURL(photoRef)
       .then((nextUri) => {
         if (active) setUri(nextUri);
       })

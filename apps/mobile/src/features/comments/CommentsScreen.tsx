@@ -53,8 +53,14 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
       return () => { active = false; };
     }
 
+    const photoRef = storageRef(storage, normalizedPath);
+    if (!photoRef.fullPath) {
+      setState({ failed: true });
+      return () => { active = false; };
+    }
+
     setState({ failed: false });
-    void getDownloadURL(storageRef(storage, normalizedPath)).then((uri) => {
+    void getDownloadURL(photoRef).then((uri) => {
       if (active) setState({ uri, failed: false });
     }).catch((error) => {
       captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });

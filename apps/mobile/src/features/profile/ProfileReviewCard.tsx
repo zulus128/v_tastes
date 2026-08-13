@@ -26,8 +26,14 @@ function DishPhoto({ path }: { path?: string }) {
       return () => { active = false; };
     }
 
+    const photoRef = storageRef(storage, normalizedPath);
+    if (!photoRef.fullPath) {
+      setState({ failed: true });
+      return () => { active = false; };
+    }
+
     setState({ failed: false });
-    void getDownloadURL(storageRef(storage, normalizedPath)).then((value) => {
+    void getDownloadURL(photoRef).then((value) => {
       if (active) setState({ uri: value, failed: false });
     }).catch((error) => { captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath }); if (active) setState({ failed: true }); });
     return () => { active = false; };
