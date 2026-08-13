@@ -29,7 +29,6 @@ import { DiscoverFiltersScreen } from '../features/discover/DiscoverFiltersScree
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { ProfileSettingsSheet } from '../features/profile/ProfileSettingsSheet';
-import { ProfileExtras, type ProfileExtra } from '../features/profile/ProfileExtras';
 import { HomeFeedScreen } from '../features/home/HomeFeedScreen';
 import { PaginatedLeaderboardScreen } from '../features/leaderboard/PaginatedLeaderboardScreen';
 import { ChatScreen } from '../features/messaging/ChatScreen';
@@ -160,7 +159,6 @@ function MainTabs({
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [profileExtra, setProfileExtra] = useState<ProfileExtra>(null);
 
   async function openConversation(targetUserId: string) {
     try {
@@ -277,15 +275,8 @@ function MainTabs({
         fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}
         onLogout={logout}
-        onNotifications={() => setProfileExtra('notifications')}
         userId={user.uid}
         visible={settingsVisible}
-      />
-      <ProfileExtras
-        onClose={() => setProfileExtra(null)}
-        screen={profileExtra}
-        targetUserId={user.uid}
-        visible={profileExtra !== null}
       />
     </>
   );

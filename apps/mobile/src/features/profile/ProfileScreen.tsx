@@ -27,7 +27,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { Screen } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useProfile, useProfileReviews } from './api';
-import { ProfileHeader } from './ProfileHeader';
+import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
 
@@ -206,16 +206,10 @@ export function ProfileScreen({
       followPending={followPending}
       following={following}
       onAvatarPress={() => void chooseProfilePhoto()}
-      onBack={onBack}
       onMessage={() => onMessage(targetUserId)}
       onFollowers={() => setExtra('followers')}
       onFollowing={() => setExtra('following')}
       onRewards={() => setExtra('rewards')}
-      onShare={() => void Share.share({
-        message: `See ${profile.displayName} on Tastes: https://tastes.app/profile/${targetUserId}`,
-        url: `https://tastes.app/profile/${targetUserId}`,
-      })}
-      onSettings={onSettings}
       onToggleFollow={() => void toggleFollow()}
       own={own}
       profile={profile}
@@ -257,14 +251,14 @@ export function ProfileScreen({
           onEndReached={() => void profileReviews.loadMore()}
           onEndReachedThreshold={0.5}
           windowSize={7}
-          renderItem={({ item: review }) => <ProfileReviewCard
-            item={review}
-            onComments={() => onOpenComments(review.id)}
-            onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
-            onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
-            onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
-            profile={profile}
-          />}
+          renderItem={({ item: review }) => <View style={styles.reviewItem}><ProfileReviewCard
+              item={review}
+              onComments={() => onOpenComments(review.id)}
+              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
+              onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
+              profile={profile}
+            /></View>}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -283,6 +277,16 @@ export function ProfileScreen({
           )}
         </ScrollView>
       )}
+      <ProfileTopBar
+        onBack={onBack}
+        onSettings={onSettings}
+        onShare={() => void Share.share({
+          message: `See ${profile.displayName} on Tastes: https://tastes.app/profile/${targetUserId}`,
+          url: `https://tastes.app/profile/${targetUserId}`,
+        })}
+        own={own}
+        profile={profile}
+      />
       <ProfileExtras onClose={() => setExtra(null)} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
       <Modal animationType="slide" onRequestClose={() => setFilterOpen(false)} transparent visible={filterOpen}>
         <Pressable onPress={() => setFilterOpen(false)} style={styles.filterBackdrop}><Pressable onPress={(event) => event.stopPropagation()} style={styles.filterSheet}><View style={styles.filterHandle} /><Text style={styles.filterTitle}>Filter reviews</Text>{([['all', 'All reviews'], ['highest', 'Highest rated'], ['recent', 'Most recent']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setFilter(value); setFilterOpen(false); }} style={styles.filterRow}><Text style={styles.filterLabel}>{label}</Text><Text style={styles.filterRadio}>{filter === value ? '●' : '○'}</Text></Pressable>)}</Pressable></Pressable>
@@ -312,7 +316,7 @@ export function ProfileScreen({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingBottom: 24 },
+  content: { paddingTop: 102, paddingBottom: 24 },
   controls: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, gap: 12 },
   switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 100, backgroundColor: 'rgba(223,223,233,0.12)' },
   switchOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 100 },
@@ -322,7 +326,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   searchBar: { height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.08)' },
   tuneGlyph: { color: colors.textMuted, fontSize: 18 },
   searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-  reviewList: { paddingHorizontal: 15, gap: 14 },
+  reviewList: { gap: 14 },
+  reviewItem: { paddingHorizontal: 15 },
   listLoader: { marginVertical: 36 },
   empty: { minHeight: 220, marginHorizontal: 16, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },

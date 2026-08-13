@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   Image,
   ImageBackground,
   Modal,
@@ -14,6 +16,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -48,14 +51,12 @@ export function ProfileSettingsSheet({
   fallbackName,
   onClose,
   onLogout,
-  onNotifications,
   userId,
   visible,
 }: {
   fallbackName: string;
   onClose: () => void;
   onLogout: () => Promise<void>;
-  onNotifications: () => void;
   userId: string;
   visible: boolean;
 }) {
@@ -74,9 +75,27 @@ export function ProfileSettingsSheet({
   const [searching, setSearching] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const notificationTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const notificationClosing = useRef(false);
+  const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
   const citySlide = useRef<SideSlideScreenHandle>(null);
+
+  useEffect(() => {
+    if (visible) return;
+    notificationClosing.current = false;
+    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
+    notificationCloseTimer.current = null;
+    setNotificationsOpen(false);
+    notificationTranslateX.setValue(Dimensions.get('window').width);
+  }, [notificationTranslateX, visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -196,18 +215,70 @@ export function ProfileSettingsSheet({
     ]);
   }
 
+  function openNotifications() {
+    notificationClosing.current = false;
+    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
+    notificationCloseTimer.current = null;
+    notificationTranslateX.stopAnimation();
+    setNotificationsOpen(true);
+    notificationTranslateX.setValue(Dimensions.get('window').width);
+    Animated.timing(notificationTranslateX, {
+      duration: 280,
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+    setNotificationsLoading(true);
+    void api.getProfileExtras({ targetUserId: userId })
+      .then((result) => {
+        const preferences = result.data.notificationPreferences;
+        setNotificationsEnabled(preferences.enabled);
+        setPushEnabled(preferences.push);
+        setEmailEnabled(preferences.email);
+        setSmsEnabled(preferences.sms);
+      })
+      .catch(() => Alert.alert('Could not load notification settings', 'Please try again.'))
+      .finally(() => setNotificationsLoading(false));
+  }
+
+  function closeNotifications() {
+    if (notificationClosing.current) return;
+    notificationClosing.current = true;
+    const finish = () => {
+      if (!notificationClosing.current) return;
+      notificationClosing.current = false;
+      if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
+      notificationCloseTimer.current = null;
+      setNotificationsOpen(false);
+    };
+    notificationCloseTimer.current = setTimeout(finish, 300);
+    Animated.timing(notificationTranslateX, {
+      duration: 240,
+      toValue: Dimensions.get('window').width,
+      useNativeDriver: true,
+    }).start(finish);
+  }
+
+  function saveNotifications(next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) {
+    setNotificationsEnabled(next.enabled);
+    setPushEnabled(next.push);
+    setEmailEnabled(next.email);
+    setSmsEnabled(next.sms);
+    void api.updateNotificationPreferences(next)
+      .catch(() => Alert.alert('Could not save notification settings', 'Please try again.'));
+  }
+
   const rows: Array<{ field?: EditableField; label: string; value?: string; valueFlag?: ReturnType<typeof cityFlag>; onPress?: () => void }> = profile ? [
     { field: 'displayName', label: 'Name', value: profile.displayName },
     { field: 'username', label: 'Username', value: profile.username ? `@${profile.username}` : 'Add username' },
     { field: 'favoriteDish', label: 'Favourite Dish', value: profile.favoriteDish ?? 'Select a dish' },
     { label: 'Favourite place', value: favoritePlace, onPress: () => setPlaceOpen(true) },
     { label: 'City', value: profile.city ?? 'Select a city', valueFlag: cityFlag(profile.city ?? ''), onPress: () => setCityOpen(true) },
-    { label: 'Notifications', onPress: onNotifications },
+    { label: 'Notifications', onPress: openNotifications },
   ] : [];
 
   return (
     <>
-    <SideSlideScreen onRequestClose={onClose} ref={settingsSlide} visible={visible}>
+    <SideSlideScreen onRequestClose={notificationsOpen ? closeNotifications : onClose} ref={settingsSlide} visible={visible}>
       <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={pattern} style={styles.screen}>
         <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View>
         <PatternBackgroundLift />
@@ -247,6 +318,27 @@ export function ProfileSettingsSheet({
             </Pressable>
           </View>
         </LinearGradient>
+        <Animated.View
+          pointerEvents={notificationsOpen ? 'auto' : 'none'}
+          style={[styles.notificationsScreen, { transform: [{ translateX: notificationTranslateX }] }]}
+        >
+          <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={pattern} style={styles.notificationBackground}>
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View>
+            <PatternBackgroundLift />
+            <View style={styles.header}>
+              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeNotifications} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+              <Text style={styles.title}>Notifications</Text>
+              <View style={styles.headerButton} />
+            </View>
+            {notificationsLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
+              <ScrollView contentContainerStyle={styles.notificationSettings}>
+                <NotificationSetting label="Enable notifications" onChange={(enabled) => saveNotifications({ enabled, push: pushEnabled, email: emailEnabled, sms: smsEnabled })} value={notificationsEnabled} />
+                <NotificationSetting disabled={!notificationsEnabled} label="Push notifications" onChange={(push) => saveNotifications({ enabled: notificationsEnabled, push, email: emailEnabled, sms: smsEnabled })} value={pushEnabled} />
+                <NotificationSetting disabled={!notificationsEnabled} label="SMS notifications" onChange={(sms) => saveNotifications({ enabled: notificationsEnabled, push: pushEnabled, email: emailEnabled, sms })} value={smsEnabled} />
+              </ScrollView>
+            )}
+          </ImageBackground>
+        </Animated.View>
       </ImageBackground>
     </SideSlideScreen>
 
@@ -286,6 +378,17 @@ export function ProfileSettingsSheet({
   );
 }
 
+function NotificationSetting({ disabled = false, label, onChange, value }: { disabled?: boolean; label: string; onChange: (value: boolean) => void; value: boolean }) {
+  return <View style={[notificationStyles.row, disabled && notificationStyles.disabled]}><Text style={notificationStyles.label}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} style={notificationStyles.switch} thumbColor="#FFFFFF" trackColor={{ false: '#5A5B60', true: '#C8322D' }} value={value} /></View>;
+}
+
+const notificationStyles = StyleSheet.create({
+  row: { height: 50, marginBottom: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 100, backgroundColor: '#080808' },
+  disabled: { opacity: 0.45 },
+  label: { flex: 1, color: '#FFFFFF', fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
+  switch: { marginRight: -4, transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }] },
+});
+
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#161616' },
@@ -308,6 +411,9 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     cityFlag: { width: 18, height: 18, marginLeft: 5 },
     chevron: { width: 8, marginLeft: 8, color: 'rgba(255,255,255,0.50)', fontSize: 27, lineHeight: 29 },
     actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingBottom: Math.max(24, safeBottom), alignItems: 'center', justifyContent: 'center' },
+    notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#161616' },
+    notificationBackground: { flex: 1, backgroundColor: '#161616' },
+    notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: safeBottom + 30 },
     inviteRing: { width: 330, height: 54, padding: 5, borderRadius: 36, backgroundColor: '#4C1816' },
     invite: { flex: 1, paddingHorizontal: 20, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#B82F29' },
     inviteText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },

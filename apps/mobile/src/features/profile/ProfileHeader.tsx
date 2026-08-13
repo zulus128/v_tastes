@@ -31,13 +31,10 @@ export function ProfileHeader({
   followPending,
   following,
   onAvatarPress,
-  onBack,
   onMessage,
   onFollowers,
   onFollowing,
   onRewards,
-  onShare,
-  onSettings,
   onToggleFollow,
   own,
   profile,
@@ -47,13 +44,10 @@ export function ProfileHeader({
   followPending: boolean;
   following: boolean;
   onAvatarPress: () => void;
-  onBack: () => void;
   onMessage: () => void;
   onFollowers: () => void;
   onFollowing: () => void;
   onRewards: () => void;
-  onShare: () => void;
-  onSettings: () => void;
   onToggleFollow: () => void;
   own: boolean;
   profile: ProfileData;
@@ -70,17 +64,6 @@ export function ProfileHeader({
 
   return (
     <View style={styles.hero}>
-      <View style={styles.topBar}>
-        <Pressable accessibilityLabel={own ? 'Open settings' : 'Back'} onPress={own ? onSettings : onBack} style={styles.topAction}>
-          {own ? <SettingsIcon width={20} height={20} /> : <BackIcon width={9} height={16} />}
-        </Pressable>
-        <Text numberOfLines={1} style={styles.username}>
-          {profile.username ? `@${profile.username}` : profile.displayName}
-        </Text>
-        <Pressable accessibilityLabel="Share profile" onPress={onShare} style={styles.topAction}>
-          <ShareIcon width={24} height={24} />
-        </Pressable>
-      </View>
       <Pressable disabled={!own || uploadingPhoto} onPress={onAvatarPress} style={styles.avatarWrap}>
         <Image source={profileAvatarSource(profile)} style={styles.avatar} />
         {uploadingPhoto ? (
@@ -135,9 +118,53 @@ export function ProfileHeader({
   );
 }
 
+export function ProfileTopBar({
+  onBack,
+  onSettings,
+  onShare,
+  own,
+  profile,
+}: {
+  onBack: () => void;
+  onSettings: () => void;
+  onShare: () => void;
+  own: boolean;
+  profile: ProfileData;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.topBar}>
+      <Pressable accessibilityLabel={own ? 'Open settings' : 'Back'} onPress={own ? onSettings : onBack} style={styles.topAction}>
+        {own ? <SettingsIcon width={20} height={20} /> : <BackIcon width={9} height={16} />}
+      </Pressable>
+      <Text numberOfLines={1} style={styles.username}>
+        {profile.username ? `@${profile.username}` : profile.displayName}
+      </Text>
+      <Pressable accessibilityLabel="Share profile" onPress={onShare} style={styles.topAction}>
+        <ShareIcon width={24} height={24} />
+      </Pressable>
+    </View>
+  );
+}
+
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  hero: { paddingBottom: 18, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
-  topBar: { height: 102, paddingTop: 48, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background },
+  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 18, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  topBar: {
+    position: 'absolute',
+    zIndex: 20,
+    top: 0,
+    right: 0,
+    left: 0,
+    height: 102,
+    paddingTop: 48,
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    backgroundColor: colors.background,
+  },
   topAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   username: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },
   avatarWrap: { width: 120, height: 120, marginTop: 18, alignSelf: 'center', borderRadius: 60 },
