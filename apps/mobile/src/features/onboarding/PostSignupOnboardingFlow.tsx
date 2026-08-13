@@ -206,8 +206,8 @@ function StepHeader({ step, title, subtitle }: { step: number; title: string; su
   </View>;
 }
 
-function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
-  icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
+function PermissionScreen({ icon, title, subtitle, button, alignSubtitleLeft = false, onBack, onSkip, onPress }: {
+  icon: ImageSourcePropType; title: string; subtitle: string; button: string; alignSubtitleLeft?: boolean; onBack: () => void; onSkip: () => void; onPress: () => void;
 }) {
   const styles = useOnboardingStyles();
   return <PatternScreen>
@@ -215,7 +215,7 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
     <View style={styles.permissionContent}>
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={styles.title}>{title}</Text>
-      <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
+      <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText, alignSubtitleLeft && styles.leftAlignedPermissionSubtitle]}>{subtitle}</Text>
     </View>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
   </PatternScreen>;
@@ -522,7 +522,7 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
-      <ScrollView contentContainerStyle={styles.pills}>
+      <ScrollView contentContainerStyle={styles.pills} showsVerticalScrollIndicator={false} style={styles.pillsScroll}>
         {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
       </ScrollView>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
@@ -680,7 +680,7 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
+  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" alignSubtitleLeft onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
     <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
@@ -707,6 +707,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionSubtitle: { marginTop: 8, maxWidth: 320 },
   permissionBodyText: { color: colors.textMuted },
+  leftAlignedPermissionSubtitle: { width: '100%', textAlign: 'left' },
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },
   profileScroll: { flex: 1 },
@@ -738,7 +739,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   cityFlag: { width: 20, height: 20, marginRight: 14 },
   cityName: { color: colors.text, fontSize: 15, flex: 1 },
   cityCountry: { color: colors.textMuted, fontSize: 13 },
-  pills: { paddingHorizontal: 20, paddingTop: 212, paddingBottom: 145, gap: 8 },
+  pillsScroll: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
+  pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
   pillText: { color: colors.textMuted, fontSize: 15, fontWeight: '400' },
