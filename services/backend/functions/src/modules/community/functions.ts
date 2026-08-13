@@ -148,10 +148,38 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
   const now = FieldValue.serverTimestamp();
   await ref.update({ status: input.response, respondedAt: now });
   if (input.response === 'accepted' && snap.get('kind') === 'group') {
-    await db
-      .collection('groups')
-      .doc(String(snap.get('targetId')))
-      .update({ memberIds: FieldValue.arrayUnion(uid), updatedAt: now });
+    const groupId = String(snap.get('targetId'));
+    const groupRef = db.collection('groups').doc(groupId);
+    const conversationRef = db.collection('conversations').doc(groupId);
+    await db.runTransaction(async (transaction) => {
+      const [group, conversation] = await Promise.all([
+        transaction.get(groupRef),
+        transaction.get(conversationRef),
+      ]);
+      if (!group.exists || !conversation.exists) return;
+      transaction.update(groupRef, {
+        memberIds: FieldValue.arrayUnion(uid),
+        invitedMemberIds: FieldValue.arrayRemove(uid),
+        updatedAt: now,
+      });
+      transaction.update(
+        conversationRef,
+        'participantIds', FieldValue.arrayUnion(uid),
+        new FieldPath('invitationStatuses', uid), 'accepted',
+        new FieldPath('unreadCounts', uid), 0,
+        'updatedAt', now,
+      );
+    });
+  } else if (input.response === 'declined' && snap.get('kind') === 'group') {
+    const groupId = String(snap.get('targetId'));
+    await Promise.all([
+      db.collection('groups').doc(groupId).set({ invitedMemberIds: FieldValue.arrayRemove(uid), updatedAt: now }, { merge: true }),
+      db.collection('conversations').doc(groupId).update(
+        new FieldPath('invitationStatuses', uid), 'declined',
+        'participantIds', FieldValue.arrayRemove(uid),
+        'updatedAt', now,
+      ),
+    ]);
   }
   if (snap.get('kind') === 'activity') {
     const activityId = String(snap.get('targetId'));
@@ -197,14 +225,53 @@ export const createGroup = onCall(callableOptions, async (request) => {
   const input = parseInput(createGroupInputSchema, request.data);
   const ref = db.collection('groups').doc();
   const memberIds = [...new Set([uid, ...input.memberIds])];
-  await ref.set({
+  const profiles = await db.getAll(...memberIds.map((id) => db.collection('users').doc(id)));
+  if (profiles.some((profile) => !profile.exists || profile.get('status') !== 'active')) {
+    throw new HttpsError('not-found', 'One of the selected group members was not found.');
+  }
+  const now = FieldValue.serverTimestamp();
+  const invitationStatuses = Object.fromEntries(memberIds.map((id) => [id, id === uid ? 'accepted' : 'pending']));
+  const batch = db.batch();
+  batch.create(ref, {
     name: input.name,
     adminId: uid,
-    memberIds,
+    memberIds: [uid],
+    invitedMemberIds: memberIds.filter((id) => id !== uid),
+    conversationId: ref.id,
     status: 'active',
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+    createdAt: now,
+    updatedAt: now,
   });
+  batch.create(db.collection('conversations').doc(ref.id), {
+    kind: 'group',
+    groupId: ref.id,
+    title: input.name,
+    organizerId: uid,
+    participantIds: [uid],
+    invitationStatuses,
+    unreadCounts: { [uid]: 0 },
+    lastReadAt: {},
+    lastReadMessageIds: {},
+    typing: {},
+    lastMessage: null,
+    messageCount: 0,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const memberId of memberIds.filter((id) => id !== uid)) {
+    batch.set(db.collection('users').doc(memberId).collection('requests').doc(`group-${ref.id}`), {
+      kind: 'group',
+      title: input.name,
+      body: `${String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Someone')} invited you to a group.`,
+      senderName: String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Tastes user'),
+      senderId: uid,
+      targetId: ref.id,
+      status: 'pending',
+      createdAt: now,
+    });
+  }
+  await batch.commit();
   return { id: ref.id };
 });
 
@@ -241,10 +308,40 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
   const group = await ref.get();
   if (!group.exists || group.get('adminId') !== uid)
     throw new HttpsError('permission-denied', 'Only the group admin can edit members.');
-  await ref.update({
-    memberIds: [...new Set([uid, ...input.memberIds])],
-    updatedAt: FieldValue.serverTimestamp(),
+  const previousIds = Array.isArray(group.get('memberIds')) ? group.get('memberIds') as string[] : [uid];
+  const selectedIds = [...new Set([uid, ...input.memberIds])];
+  const retainedIds = selectedIds.filter((id) => previousIds.includes(id));
+  const invitedIds = selectedIds.filter((id) => !previousIds.includes(id));
+  const profiles = invitedIds.length > 0
+    ? await db.getAll(...invitedIds.map((id) => db.collection('users').doc(id)))
+    : [];
+  if (profiles.some((profile) => !profile.exists || profile.get('status') !== 'active')) {
+    throw new HttpsError('not-found', 'One of the selected group members was not found.');
+  }
+  const owner = await db.collection('users').doc(uid).get();
+  const now = FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.update(ref, {
+    memberIds: retainedIds,
+    ...(invitedIds.length > 0 ? { invitedMemberIds: FieldValue.arrayUnion(...invitedIds) } : {}),
+    updatedAt: now,
   });
+  const conversationRef = db.collection('conversations').doc(ref.id);
+  batch.update(conversationRef, { participantIds: retainedIds, updatedAt: now });
+  for (const invitedId of invitedIds) {
+    batch.update(conversationRef, new FieldPath('invitationStatuses', invitedId), 'pending');
+    batch.set(db.collection('users').doc(invitedId).collection('requests').doc(`group-${ref.id}`), {
+      kind: 'group',
+      title: String(group.get('name') ?? 'Group'),
+      body: `${String(owner.get('displayName') ?? 'Someone')} invited you to a group.`,
+      senderName: String(owner.get('displayName') ?? 'Tastes user'),
+      senderId: uid,
+      targetId: ref.id,
+      status: 'pending',
+      createdAt: now,
+    });
+  }
+  await batch.commit();
   return { id: ref.id };
 });
 
@@ -255,15 +352,15 @@ export const leaveGroup = onCall(callableOptions, async (request) => {
   const group = await ref.get();
   if (!group.exists) throw new HttpsError('not-found', 'Group not found.');
   if (group.get('adminId') === uid)
-    await ref.update({
-      status: 'deleted',
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    await Promise.all([
+      ref.update({ status: 'deleted', updatedAt: FieldValue.serverTimestamp() }),
+      db.collection('conversations').doc(ref.id).update({ status: 'deleted', updatedAt: FieldValue.serverTimestamp() }),
+    ]);
   else
-    await ref.update({
-      memberIds: FieldValue.arrayRemove(uid),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    await Promise.all([
+      ref.update({ memberIds: FieldValue.arrayRemove(uid), updatedAt: FieldValue.serverTimestamp() }),
+      db.collection('conversations').doc(ref.id).update({ participantIds: FieldValue.arrayRemove(uid), updatedAt: FieldValue.serverTimestamp() }),
+    ]);
   return { id: ref.id };
 });
 

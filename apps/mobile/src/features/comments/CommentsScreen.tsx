@@ -82,6 +82,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
 function MainReview({ onReact, reacting, review }: { onReact: () => void; reacting: boolean; review: CommentReview }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [selectedDish, setSelectedDish] = useState<CommentReview['dishReviews'][number] | null>(null);
   return <View style={styles.mainReview}>
     <View style={styles.reviewAuthorRow}>
       {review.authorPhotoUrl ? <Image source={{ uri: review.authorPhotoUrl }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><Text style={styles.reviewAvatarInitial}>{review.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
@@ -90,10 +91,19 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     </View>
     <View style={styles.reviewBody}>
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(review.rating)))}<Text style={styles.reviewEmptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(review.rating)))}</Text></Text></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
-      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <View style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>} showsHorizontalScrollIndicator={false} /></View> : null}
+      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
       <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact}><Text style={[styles.reviewAction, review.reacted && styles.reviewActionActive]}>♥ {review.reactionCount}</Text></Pressable><Text style={styles.reviewAction}>◯ {review.commentCount}</Text><Pressable onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}><Text style={styles.reviewAction}>↗</Text></Pressable></View>
     </View>
+    <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
+      <View style={styles.dishModalScrim}>
+        <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
+        <View style={styles.dishModal}>
+          <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
+          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+        </View>
+      </View>
+    </Modal>
   </View>;
 }
 
@@ -277,6 +287,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dishShade: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.18)' },
   dishTitle: { position: 'absolute', top: 10, left: 10, right: 10, color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   dishRating: { position: 'absolute', left: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, borderTopRightRadius: 12, color: '#fff', fontSize: 13, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)' },
+  dishModalScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
+  dishModal: { minHeight: 550, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
+  dishModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center' },
+  dishModalTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' },
+  dishModalClose: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  dishModalCloseText: { color: colors.text, fontSize: 20, lineHeight: 21 },
+  dishModalImage: { width: '100%', aspectRatio: 1, maxHeight: 380, marginTop: 8, overflow: 'hidden', borderRadius: 16, backgroundColor: colors.surfaceRaised },
+  dishModalRating: { alignSelf: 'flex-start', marginTop: 16, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, overflow: 'hidden', color: '#FFFFFF', backgroundColor: colors.primary, fontSize: 15, fontWeight: '700' },
+  dishModalName: { marginTop: 10, color: colors.text, fontSize: 17, fontWeight: '700' },
   reviewText: { paddingHorizontal: 16, color: colors.text, fontSize: 14, lineHeight: 19 },
   reviewActions: { paddingHorizontal: 16, paddingBottom: 4, flexDirection: 'row', gap: 18 },
   reviewAction: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },

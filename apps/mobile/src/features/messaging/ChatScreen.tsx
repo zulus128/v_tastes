@@ -26,13 +26,14 @@ function messageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-function MessageBubble({ item, mine, styles }: { item: ChatMessage; mine: boolean; styles: ReturnType<typeof createStyles> }) {
+function MessageBubble({ item, mine, read, styles }: { item: ChatMessage; mine: boolean; read: boolean; styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={[styles.messageRow, mine ? styles.mineRow : styles.theirRow]}>
       <View style={[styles.bubble, mine ? styles.mineBubble : styles.theirBubble]}>
         <Text style={[styles.messageText, mine && styles.mineText]}>{item.text}</Text>
         <Text style={[styles.messageTime, mine && styles.mineTime]}>{messageTime(item.createdAt)}</Text>
       </View>
+      {read ? <Text style={styles.readReceipt}>Read</Text> : null}
     </View>
   );
 }
@@ -67,12 +68,18 @@ export function ChatScreen({
   }, [messageHistory.data?.pages, realtimeMessages.data]);
   const [participant, setParticipant] = useState<ConversationParticipant | null>(null);
   const [activity, setActivity] = useState<{ id: string; title: string } | null>(null);
+  const [groupTitle, setGroupTitle] = useState<string | null>(null);
+  const [lastMessageId, setLastMessageId] = useState<string | null>(null);
+  const [readByCount, setReadByCount] = useState(0);
+  const [someoneTyping, setSomeoneTyping] = useState(false);
   const [activityPreviewOpen, setActivityPreviewOpen] = useState(false);
   const [conversationError, setConversationError] = useState<Error | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('message'));
   const lastMarkedRead = useRef<string | null>(null);
+  const typingActive = useRef(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeActivityPreview = useCallback(() => setActivityPreviewOpen(false), []);
 
   useEffect(() => subscribeConversationDetails(
@@ -83,6 +90,10 @@ export function ChatScreen({
       setActivity(details.kind === 'activity' && details.activityId
         ? { id: details.activityId, title: details.title ?? 'Activity' }
         : null);
+      setGroupTitle(details.kind === 'group' ? details.title ?? 'Group' : null);
+      setLastMessageId(details.lastMessageId);
+      setReadByCount(details.readByCount);
+      setSomeoneTyping(details.someoneTyping);
       setConversationError(null);
       if (details.unreadCount > 0 && details.lastMessageId && lastMarkedRead.current !== details.lastMessageId) {
         lastMarkedRead.current = details.lastMessageId;
@@ -98,6 +109,28 @@ export function ChatScreen({
     setConversationError,
   ), [api, conversationId, userId]);
 
+  useEffect(() => () => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false });
+  }, [api, conversationId]);
+
+  function updateText(value: string) {
+    if (!text && value) setIdempotencyKey(createIdempotencyKey('message'));
+    setText(value);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    if (!value.trim()) {
+      if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false });
+      typingActive.current = false;
+      return;
+    }
+    if (!typingActive.current) void api.setTypingStatus({ conversationId, typing: true });
+    typingActive.current = true;
+    typingTimer.current = setTimeout(() => {
+      typingActive.current = false;
+      void api.setTypingStatus({ conversationId, typing: false });
+    }, 1_500);
+  }
+
   async function send() {
     const value = text.trim();
     if (!value || sending) return;
@@ -105,6 +138,9 @@ export function ChatScreen({
     try {
       await api.sendMessage({ conversationId, idempotencyKey, text: value });
       setText('');
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      typingActive.current = false;
+      void api.setTypingStatus({ conversationId, typing: false });
       setIdempotencyKey(createIdempotencyKey('message'));
     } catch (error) {
       Alert.alert('Could not send message', apiErrorMessage(error));
@@ -130,19 +166,17 @@ export function ChatScreen({
           onPress={() => activity && setActivityPreviewOpen(true)}
           style={styles.headerIdentity}
         >
+          <View style={styles.headerCopy}>
+            <Text numberOfLines={1} style={styles.headerName}>{activity?.title ?? groupTitle ?? participant?.displayName ?? 'Conversation'}</Text>
+            {someoneTyping ? <Text numberOfLines={1} style={styles.headerUsername}>Typing…</Text> : null}
+          </View>
           {participant?.photoUrl ? (
             <Image source={{ uri: participant.photoUrl }} style={styles.headerAvatar} />
           ) : (
             <View style={styles.headerAvatarFallback}>
-              <Text style={styles.headerInitial}>{activity ? '◷' : participant?.displayName.slice(0, 1).toUpperCase() ?? 'T'}</Text>
+              <Text style={styles.headerInitial}>{activity ? '◷' : groupTitle ? groupTitle.slice(0, 1).toUpperCase() : participant?.displayName.slice(0, 1).toUpperCase() ?? 'T'}</Text>
             </View>
           )}
-          <View style={styles.headerCopy}>
-            <Text numberOfLines={1} style={styles.headerName}>{activity?.title ?? participant?.displayName ?? 'Conversation'}</Text>
-            <Text numberOfLines={1} style={styles.headerUsername}>
-              {activity ? 'Activity · View details' : participant?.username ? `@${participant.username}` : 'Direct message'}
-            </Text>
-          </View>
         </Pressable>
       </View>
 
@@ -175,7 +209,7 @@ export function ChatScreen({
           }}
           onEndReachedThreshold={0.5}
           windowSize={9}
-          renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} styles={styles} />}
+          renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} read={item.senderId === userId && item.id === lastMessageId && readByCount > 0} styles={styles} />}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -186,10 +220,7 @@ export function ChatScreen({
           editable={!sending && !conversationError}
           maxLength={4_000}
           multiline
-          onChangeText={(value) => {
-            if (!text && value) setIdempotencyKey(createIdempotencyKey('message'));
-            setText(value);
-          }}
+          onChangeText={updateText}
           placeholder="Message"
           placeholderTextColor={colors.placeholder}
           style={styles.input}
@@ -221,12 +252,12 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
     backText: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300', marginTop: -3 },
     headerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-    headerAvatar: { width: 40, height: 40, marginLeft: 3, borderRadius: 20, backgroundColor: colors.skeleton },
-    headerAvatarFallback: { width: 40, height: 40, marginLeft: 3, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    headerAvatar: { width: 40, height: 40, marginRight: 2, borderRadius: 20, backgroundColor: colors.skeleton },
+    headerAvatarFallback: { width: 40, height: 40, marginRight: 2, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     headerInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },
-    headerCopy: { flex: 1, marginLeft: 10, marginRight: 10 },
-    headerName: { color: colors.text, fontSize: 16, fontWeight: '700' },
-    headerUsername: { color: colors.textMuted, marginTop: 1, fontSize: 12 },
+    headerCopy: { flex: 1, marginLeft: 4, marginRight: 8, alignItems: 'center' },
+    headerName: { color: colors.text, fontSize: 17, fontWeight: '500', textAlign: 'center' },
+    headerUsername: { color: colors.textMuted, marginTop: 1, fontSize: 11 },
     messagesContent: { paddingHorizontal: 14, paddingVertical: 12 },
     emptyMessages: { flexGrow: 1 },
     emptyState: { flex: 1, padding: 34, alignItems: 'center', justifyContent: 'center', transform: [{ scaleY: 1 }] },
@@ -240,6 +271,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     mineText: { color: colors.onPrimary },
     messageTime: { color: colors.textMuted, marginTop: 3, fontSize: 10, textAlign: 'right' },
     mineTime: { color: 'rgba(255,255,255,0.70)' },
+    readReceipt: { color: colors.textMuted, marginTop: 2, marginRight: 4, fontSize: 10 },
     composer: { minHeight: 62 + safeBottom, paddingTop: 8, paddingBottom: Math.max(8, safeBottom), paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, backgroundColor: colors.background },
     input: { flex: 1, minHeight: 44, maxHeight: 118, paddingHorizontal: 15, paddingTop: 11, paddingBottom: 10, borderRadius: 22, color: colors.text, backgroundColor: colors.surfaceRaised, fontSize: 16 },
     send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },

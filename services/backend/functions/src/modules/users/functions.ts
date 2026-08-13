@@ -6,6 +6,7 @@ import {
   type MonthlyRecapResult,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
@@ -149,6 +150,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createUserProfileInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
+  const authUser = await getAuth().getUser(uid);
   if (input.photoPath && !input.photoPath.startsWith(`profile-images/${uid}/`)) {
     throw new HttpsError('permission-denied', 'The profile image path is not owned by this user.');
   }
@@ -161,6 +163,8 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
       userRef,
       {
         uid,
+        email: authUser.email?.toLocaleLowerCase() ?? null,
+        phoneNumber: authUser.phoneNumber ?? null,
         displayName: input.displayName,
         username: input.username ?? existing.get('username') ?? null,
         city: input.city ?? existing.get('city') ?? null,

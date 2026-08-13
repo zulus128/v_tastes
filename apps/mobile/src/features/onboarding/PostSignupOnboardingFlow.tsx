@@ -111,6 +111,8 @@ interface ContactCandidate {
   handle: string;
   phoneNumber: string | null;
   invited: boolean;
+  userId?: string;
+  following?: boolean;
 }
 
 const cities = [
@@ -368,7 +370,7 @@ export function PostSignupOnboardingFlow({
   async function requestContacts() {
     const permission = await Contacts.requestPermissionsAsync();
     if (permission.status === 'granted') {
-      const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers] });
+      const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails] });
       const mapped = result.data.filter((item) => item.name).slice(0, 20).map((item) => ({
         id: item.id,
         name: item.name,
@@ -376,7 +378,29 @@ export function PostSignupOnboardingFlow({
         phoneNumber: item.phoneNumbers?.[0]?.number ?? null,
         invited: false,
       }));
-      setContacts(mapped);
+      const phoneNumbers = result.data.flatMap((item) => item.phoneNumbers ?? []).flatMap((phone) => {
+        const normalized = phone.number?.replace(/[\s()-]/g, '') ?? '';
+        return /^\+[1-9]\d{7,14}$/.test(normalized) ? [normalized] : [];
+      });
+      const emails = result.data.flatMap((item) => item.emails ?? []).flatMap((email) => email.email ? [email.email] : []);
+      let matches: ContactCandidate[] = [];
+      if (phoneNumbers.length || emails.length) {
+        try {
+          const response = await api.importContacts({ phoneNumbers, emails });
+          matches = response.data.matches.map((match) => ({
+            id: `tastes-${match.userId}`,
+            name: match.displayName,
+            handle: match.username ? `@${match.username}` : 'Already on Tastes',
+            phoneNumber: null,
+            invited: match.following,
+            userId: match.userId,
+            following: match.following,
+          }));
+        } catch (error) {
+          Alert.alert('Friend matching is unavailable', apiErrorMessage(error));
+        }
+      }
+      setContacts([...matches, ...mapped]);
       navigate('contacts');
       return;
     }
@@ -405,7 +429,8 @@ export function PostSignupOnboardingFlow({
 
   async function inviteContact(contact: ContactCandidate) {
     try {
-      if (contact.phoneNumber) await textInvite(contact.phoneNumber);
+      if (contact.userId) await api.followUser({ targetUserId: contact.userId });
+      else if (contact.phoneNumber) await textInvite(contact.phoneNumber);
       else await shareInvite();
       setContacts((items) => items.map((item) => item.id === contact.id ? { ...item, invited: true } : item));
     } catch (error) {
@@ -635,11 +660,11 @@ export function PostSignupOnboardingFlow({
   if (screen === 'contacts') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('invite')} />
-      <View style={styles.listPage}><Text style={styles.listTitle}>Invite from contacts</Text><Text style={styles.listSubtitle}>Tap Invite to bring friends to Tastes.</Text>
+      <View style={styles.listPage}><Text style={styles.listTitle}>Friends from contacts</Text><Text style={styles.listSubtitle}>Follow people already on Tastes or invite the rest.</Text>
         <ScrollView>{contacts.map((contact, index) => <View key={contact.id} style={styles.contactRow}>
           <View style={[styles.avatar, { backgroundColor: ['#263854', '#24504c', '#4b315d', '#5a4427', '#2f5438'][index % 5] }]}><Text style={styles.avatarText}>{initials(contact.name)}</Text></View>
           <View style={styles.contactCopy}><Text style={styles.contactName}>{contact.name}</Text><Text style={styles.contactHandle}>{contact.handle}</Text></View>
-          <Pressable onPress={() => inviteContact(contact)} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
+          <Pressable onPress={() => inviteContact(contact)} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.userId ? contact.invited ? 'Following' : 'Follow' : contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
         </View>)}</ScrollView>
       </View><PrimaryButton label="Done" onPress={() => navigate('invite')} style={styles.bottomButton} />
     </PatternScreen>;

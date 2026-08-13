@@ -41,8 +41,8 @@ function ConversationRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   const participant = conversation.otherParticipant;
-  const title = conversation.kind === 'activity'
-    ? conversation.title ?? 'Activity'
+  const title = conversation.kind === 'activity' || conversation.kind === 'group'
+    ? conversation.title ?? (conversation.kind === 'activity' ? 'Activity' : 'Group')
     : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
   return (
@@ -61,8 +61,8 @@ function ConversationRow({
         </View>
         <View style={styles.previewRow}>
           <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
-            {conversation.kind === 'activity' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
-            {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : 'Conversation started')}
+            {conversation.kind !== 'direct' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
+            {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : conversation.kind === 'group' ? 'Group created' : 'Conversation started')}
           </Text>
           {unread ? (
             <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(conversation.unreadCount, 99)}</Text></View>

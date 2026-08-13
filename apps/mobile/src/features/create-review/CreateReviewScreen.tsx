@@ -31,7 +31,8 @@ import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.s
 import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { useDiscoverVenues, usePlace } from '../discover/api';
+import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
+import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
 
 const ratingCircle = { centerX: 169, centerY: -36.8226, radius: 167.8226 };
@@ -359,19 +360,67 @@ function PlaceSelector({
   const styles = useMemo(() => createSelectorStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'Cafe' | 'Club' | 'Restaurant' | null>('Restaurant');
+  const [priceFilter, setPriceFilter] = useState(false);
+  const [trendingFilter, setTrendingFilter] = useState(false);
+  const [submittingVenueId, setSubmittingVenueId] = useState<string | null>(null);
+  const api = useTastesApi();
   const query = useDiscoverVenues(userId);
+  const searchQuery = useVenueSearch(search);
   const venues = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const filtered = venues.filter((venue) => {
+  const localFiltered = venues.filter((venue) => {
     const needle = search.trim().toLowerCase();
     return !needle || `${venue.name} ${venue.city} ${venue.category ?? ''}`.toLowerCase().includes(needle);
   });
+  const searchResults = search.trim().length >= 2
+    ? searchQuery.data?.items ?? localFiltered
+    : localFiltered;
+  const filtered = searchResults
+    .filter((venue) => !categoryFilter || venue.category?.toLowerCase().includes(categoryFilter.toLowerCase()))
+    .filter((venue) => !priceFilter || venue.priceLevel === 2)
+    .filter((venue) => !trendingFilter || venue.discoverTags?.includes('trending'));
+  const selectVenue = async (venue: Venue) => {
+    if (!venue.id.startsWith('google:')) {
+      onSelect(venue);
+      return;
+    }
+    setSubmittingVenueId(venue.id);
+    try {
+      await api.submitUserVenue({
+        name: venue.name,
+        city: venue.city === 'Unknown' ? 'Unknown city' : venue.city,
+        address: venue.address ?? venue.city,
+        category: venue.category ?? 'Restaurant',
+        latitude: venue.latitude,
+        longitude: venue.longitude,
+        googlePlaceId: venue.id.slice('google:'.length),
+      });
+      Alert.alert('Place submitted', 'We found it on Google Places and sent it for moderation. It will be available for reviews after approval.');
+    } catch (error) {
+      Alert.alert('Could not submit place', apiErrorMessage(error));
+    } finally {
+      setSubmittingVenueId(null);
+    }
+  };
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <Pressable onPress={onClose} style={styles.scrim} />
       <View style={[styles.sheet, { paddingBottom: Math.max(12, insets.bottom) }]}>
         <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Select Place</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
-        <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Search restaurants" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
-        {query.isPending ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError ? (
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
+          {search ? <Pressable onPress={() => setSearch('')}><Text style={styles.clear}>×</Text></Pressable> : null}
+        </View>
+        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false}>
+          {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
+            const active = categoryFilter === filter;
+            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
+          })}
+          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text style={styles.filterText}>$$⌄</Text></Pressable>
+          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text style={styles.filterText}>♨ Trending</Text></Pressable>
+        </ScrollView>
+        {query.isPending || (search.trim().length >= 2 && searchQuery.isPending) ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError || searchQuery.isError ? (
           <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
         ) : (
           <FlatList
@@ -388,14 +437,14 @@ function PlaceSelector({
             onEndReachedThreshold={0.5}
             windowSize={7}
             renderItem={({ item: venue }) => (
-              <Pressable onPress={() => onSelect(venue)} style={styles.row}>
+              <Pressable disabled={submittingVenueId === venue.id} onPress={() => void selectVenue(venue)} style={styles.row}>
                 <Image source={venueImage(venue.imageUrl)} style={styles.rowImage} />
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={styles.rowName}>{venue.name}</Text>
                   <Text numberOfLines={1} style={styles.rowAddress}>{venue.address ?? venue.city}</Text>
                   <View style={styles.meta}><Text style={styles.ratingPill}>★ {(venue.rating ?? 0).toFixed(1)}</Text><Text style={styles.metaText}>{venue.reviewCount ?? 0} reviews</Text></View>
                 </View>
-                <Text style={styles.add}>⊕</Text>
+                {submittingVenueId === venue.id ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.add}>{venue.id.startsWith('google:') ? 'Submit' : '⊕'}</Text>}
               </Pressable>
             )}
           />
@@ -555,7 +604,14 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '91%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
   sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   sheetTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
-  search: { height: 42, margin: 16, borderRadius: 22, paddingHorizontal: 15, color: colors.text, backgroundColor: colors.surfaceRaised, fontSize: 16 },
+  searchBox: { height: 42, marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
+  searchIcon: { color: colors.text, marginRight: 8, fontSize: 22 },
+  search: { flex: 1, height: 42, paddingVertical: 0, color: colors.text, fontSize: 16 },
+  clear: { color: colors.textSecondary, fontSize: 22 },
+  filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
+  filter: { height: 29, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
+  filterText: { color: colors.text, fontSize: 12 },
   loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' }, error: { color: colors.primary, textAlign: 'center' },
   row: { minHeight: 176, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowImage: { width: 122, height: 122, borderRadius: 14 }, rowCopy: { flex: 1, gap: 7 },

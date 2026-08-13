@@ -23,3 +23,10 @@ pnpm build
 pnpm test:rules
 pnpm test:auth
 ```
+
+## Places configuration
+
+`searchVenues` always searches active Firestore venues. To supplement those results with
+Google Places API (New), configure `GOOGLE_PLACES_API_KEY` in the Functions runtime environment
+and enable Places API (New) for the same Google Cloud project. When the key is absent or Google
+Places is temporarily unavailable, the callable returns the local matches instead of failing.

@@ -1,4 +1,5 @@
-import { followUserInputSchema } from '@tastes/contracts';
+import { followUserInputSchema, importContactsInputSchema, type ImportContactsResult } from '@tastes/contracts';
+import { getAuth, type UserIdentifier, type UserRecord } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
@@ -8,6 +9,52 @@ import { callableOptions } from '../../shared/options';
 import { parseInput } from '../../shared/validation';
 
 const MAX_FOLLOWING = 500;
+
+export const importContacts = onCall(callableOptions, async (request): Promise<ImportContactsResult> => {
+  const uid = requireUserId(request);
+  const input = parseInput(importContactsInputSchema, request.data);
+  const userRef = db.collection('users').doc(uid);
+  await db.runTransaction(async (transaction) => {
+    const profile = await transaction.get(userRef);
+    if (!profile.exists || profile.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    await enforceRateLimit(transaction, uid, 'import-contacts', 5, 60 * 60_000);
+    transaction.update(userRef, {
+      contactsImportedAt: FieldValue.serverTimestamp(),
+      contactsImportedCount: input.phoneNumbers.length + input.emails.length,
+    });
+  });
+
+  const identifiers: UserIdentifier[] = [
+    ...[...new Set(input.phoneNumbers)].map((phoneNumber) => ({ phoneNumber } as const)),
+    ...[...new Set(input.emails.map((email) => email.toLocaleLowerCase()))].map((email) => ({ email } as const)),
+  ];
+  const records: UserRecord[] = [];
+  for (let index = 0; index < identifiers.length; index += 100) {
+    const result = await getAuth().getUsers(identifiers.slice(index, index + 100));
+    records.push(...result.users);
+  }
+  const matchedIds = [...new Set(records.map((record) => record.uid).filter((id) => id !== uid))];
+  if (matchedIds.length === 0) {
+    return { matches: [], importedCount: identifiers.length };
+  }
+  const [profiles, following] = await Promise.all([
+    db.getAll(...matchedIds.map((id) => db.collection('users').doc(id))),
+    db.getAll(...matchedIds.map((id) => userRef.collection('following').doc(id))),
+  ]);
+  const followingIds = new Set(following.filter((document) => document.exists).map((document) => document.id));
+  return {
+    matches: profiles.filter((profile) => profile.exists && profile.get('status') === 'active').map((profile) => ({
+      userId: profile.id,
+      displayName: String(profile.get('displayName') ?? 'Tastes user'),
+      username: profile.get('username') ? String(profile.get('username')) : null,
+      photoUrl: profile.get('photoUrl') ? String(profile.get('photoUrl')) : null,
+      following: followingIds.has(profile.id),
+    })),
+    importedCount: identifiers.length,
+  };
+});
 
 export const followUser = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);

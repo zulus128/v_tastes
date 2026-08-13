@@ -433,7 +433,11 @@ export function ProductNavigator({ user }: { user: User }) {
         </RootStack.Screen>
         <RootStack.Screen name="GroupDetails">
           {({ navigation, route }) => (
-            <GroupDetailsScreen groupId={route.params.groupId} onBack={navigation.goBack} />
+            <GroupDetailsScreen
+              groupId={route.params.groupId}
+              onBack={navigation.goBack}
+              onOpenConversation={(conversationId) => navigation.navigate('Conversation', { conversationId })}
+            />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="DiscoverFilters">

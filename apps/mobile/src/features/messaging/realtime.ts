@@ -27,12 +27,14 @@ type RealtimeState<T> = {
 
 type ConversationDetails = {
   participant: ConversationParticipant | null;
-  kind: 'direct' | 'activity';
+  kind: 'direct' | 'activity' | 'group';
   activityId: string | null;
   title: string | null;
   imageUrl: string | null;
   lastMessageId: string | null;
   unreadCount: number;
+  readByCount: number;
+  someoneTyping: boolean;
 };
 
 function asError(value: unknown): Error {
@@ -82,12 +84,14 @@ function summaryFromDocument(
     : {};
   return {
     id: document.id,
-    kind: data.kind === 'activity' ? 'activity' : 'direct',
+    kind: data.kind === 'activity' || data.kind === 'group' ? data.kind : 'direct',
     participantIds,
     otherParticipant: participant,
     activityId: data.kind === 'activity' ? String(data.activityId ?? document.id) : null,
-    title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
-    imageUrl: data.kind === 'activity' && typeof data.imageUrl === 'string' ? data.imageUrl : null,
+    title: data.kind === 'activity' || data.kind === 'group'
+      ? String(data.title ?? (data.kind === 'activity' ? 'Activity' : 'Group'))
+      : null,
+    imageUrl: (data.kind === 'activity' || data.kind === 'group') && typeof data.imageUrl === 'string' ? data.imageUrl : null,
     organizerId: data.kind === 'activity' && typeof data.organizerId === 'string' ? data.organizerId : null,
     invitationStatus: data.kind === 'activity'
       ? data.invitationStatuses?.[userId] === 'pending'
@@ -128,7 +132,7 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
     );
     const unsubscribe = onSnapshot(inboxQuery, (snapshot) => {
       void Promise.all(snapshot.docs.map(async (conversation) => {
-        if (conversation.data().kind === 'activity') {
+        if (conversation.data().kind === 'activity' || conversation.data().kind === 'group') {
           return summaryFromDocument(conversation, userId, null);
         }
         const otherUserId = peerId(conversation, userId);
@@ -241,7 +245,9 @@ export function subscribeConversationDetails(
         return;
       }
       const data = snapshot.data();
-      const participantIds = Array.isArray(data.participantIds) ? data.participantIds : [];
+      const participantIds = Array.isArray(data.participantIds)
+        ? data.participantIds.filter((value): value is string => typeof value === 'string')
+        : [];
       const otherUserId = participantIds.find((value) => typeof value === 'string' && value !== userId);
       const lastMessage = data.lastMessage && typeof data.lastMessage === 'object'
         ? data.lastMessage as Record<string, unknown>
@@ -249,16 +255,32 @@ export function subscribeConversationDetails(
       const unreadCounts = data.unreadCounts && typeof data.unreadCounts === 'object'
         ? data.unreadCounts as Record<string, unknown>
         : {};
+      const readMessageIds = data.lastReadMessageIds && typeof data.lastReadMessageIds === 'object'
+        ? data.lastReadMessageIds as Record<string, unknown>
+        : {};
+      const typing = data.typing && typeof data.typing === 'object'
+        ? data.typing as Record<string, unknown>
+        : {};
+      const lastMessageId = lastMessage ? String(lastMessage.id ?? '') : null;
       const base = {
-        kind: data.kind === 'activity' ? 'activity' as const : 'direct' as const,
+        kind: data.kind === 'activity' || data.kind === 'group' ? data.kind as 'activity' | 'group' : 'direct' as const,
         activityId: data.kind === 'activity' ? String(data.activityId ?? conversationId) : null,
-        title: data.kind === 'activity' ? String(data.title ?? 'Activity') : null,
-        imageUrl: data.kind === 'activity' && typeof data.imageUrl === 'string' ? data.imageUrl : null,
-        lastMessageId: lastMessage ? String(lastMessage.id ?? '') : null,
+        title: data.kind === 'activity' || data.kind === 'group'
+          ? String(data.title ?? (data.kind === 'activity' ? 'Activity' : 'Group'))
+          : null,
+        imageUrl: (data.kind === 'activity' || data.kind === 'group') && typeof data.imageUrl === 'string' ? data.imageUrl : null,
+        lastMessageId,
         unreadCount: Math.max(0, Number(unreadCounts[userId] ?? 0)),
+        readByCount: lastMessageId
+          ? participantIds.filter((id) => id !== userId && readMessageIds[id] === lastMessageId).length
+          : 0,
+        someoneTyping: Object.entries(typing).some(([id, value]) => {
+          if (id === userId || !value || typeof value !== 'object' || !('toMillis' in value)) return false;
+          return (value as { toMillis: () => number }).toMillis() > Date.now() - 10_000;
+        }),
       };
       profileUnsubscribe?.();
-      if (base.kind === 'activity' || typeof otherUserId !== 'string' || otherUserId.length === 0) {
+      if (base.kind !== 'direct' || typeof otherUserId !== 'string' || otherUserId.length === 0) {
         listener({ ...base, participant: null });
         return;
       }

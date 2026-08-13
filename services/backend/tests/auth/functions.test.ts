@@ -57,7 +57,8 @@ async function postTelemetry(payload: unknown, token?: string): Promise<Response
 }
 
 async function authenticatedUser() {
-  const challenge = await requestOtp(uniquePhone());
+  const phoneNumber = uniquePhone();
+  const challenge = await requestOtp(phoneNumber);
   const verified = await callFunction<{ customToken: string }>('verifyPhoneOtp', {
     challengeId: challenge.challengeId,
     code: challenge.localCode,
@@ -71,7 +72,7 @@ async function authenticatedUser() {
     },
   );
   const result = (await response.json()) as { idToken: string; localId: string };
-  return { token: result.idToken, uid: result.localId };
+  return { token: result.idToken, uid: result.localId, phoneNumber };
 }
 
 async function expectReason(promise: Promise<unknown>, reason: string): Promise<CallableFailure> {
@@ -1019,6 +1020,104 @@ describe('messaging callables', () => {
     expect(answer.places.some((place) => place.id === 'far-sushi')).toBe(false);
     expect(answer.places[0]?.distanceKm).toBeTypeOf('number');
   }, 15_000);
+});
+
+describe('Milestone 2 completion callables', () => {
+  it('supports venue submission/search and review edit/delete/content actions', async () => {
+    const author = await authenticatedUser();
+    const reader = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', { displayName: 'M2 Author', username: 'm2.author', city: 'Istanbul' }, author.token);
+    await callFunction('createUserProfile', { displayName: 'M2 Reader', username: 'm2.reader', city: 'Istanbul' }, reader.token);
+    const authorProfile = (await db.collection('users').where('username', '==', 'm2.author').limit(1).get()).docs[0];
+    if (!authorProfile) throw new Error('Expected M2 author profile.');
+    await db.collection('venues').doc('m2-venue').set({
+      name: 'Milestone Bistro', city: 'Istanbul', address: 'M2 Street', category: 'Bistro',
+      status: 'active', rating: 0, reviewCount: 0,
+    });
+
+    const search = await callFunction<{ items: Array<{ id: string }> }>('searchVenues', { query: 'Milestone', limit: 10 }, author.token);
+    expect(search.items.map((venue) => venue.id)).toContain('m2-venue');
+    const submitted = await callFunction<{ id: string; status: string }>('submitUserVenue', {
+      name: 'Community Cafe', city: 'Istanbul', address: 'Community Street', category: 'Cafe',
+    }, author.token);
+    expect(submitted.status).toBe('pending');
+    expect((await db.collection('venues').doc(submitted.id).get()).data()).toMatchObject({
+      source: 'user', submittedBy: authorProfile.id, status: 'pending',
+    });
+
+    const review = await callFunction<{ id: string }>('createReview', {
+      idempotencyKey: 'm2-review-create-0001', venueId: 'm2-venue', rating: 3,
+      text: 'Initial review', tags: ['casual'], dishReviews: [],
+    }, author.token);
+    await callFunction('editReview', {
+      reviewId: review.id, rating: 4.5, text: 'Updated review', tags: ['date-night'], dishReviews: [],
+    }, author.token);
+    expect((await db.collection('reviews').doc(review.id).get()).data()).toMatchObject({
+      rating: 4.5, text: 'Updated review', tags: ['date-night'],
+    });
+    expect((await db.collection('venues').doc('m2-venue').get()).get('rating')).toBe(4.5);
+
+    expect(await callFunction('reactToContent', {
+      idempotencyKey: 'm2-content-react-001', targetType: 'review', reviewId: review.id, reaction: 'like',
+    }, reader.token)).toEqual({ active: true, reactionCount: 1 });
+    const report = await callFunction<{ id: string }>('reportContent', {
+      idempotencyKey: 'm2-content-report-001', targetType: 'review', reviewId: review.id, reason: 'Spam',
+    }, reader.token);
+    expect((await db.collection('reports').doc(report.id).get()).get('createdAt')).toBeTruthy();
+
+    await callFunction('deleteReview', { reviewId: review.id }, author.token);
+    expect((await db.collection('reviews').doc(review.id).get()).get('status')).toBe('deleted');
+    expect((await db.collection('venues').doc('m2-venue').get()).data()).toMatchObject({ rating: 0, reviewCount: 0 });
+  }, 15_000);
+
+  it('creates invite-based group chat, tracks typing/read state, and matches contacts', async () => {
+    const owner = await authenticatedUser();
+    const firstFriend = await authenticatedUser();
+    const secondFriend = await authenticatedUser();
+    const db = getFirestore();
+    await Promise.all([
+      callFunction('createUserProfile', { displayName: 'Group Owner', username: 'group.owner', city: 'Istanbul' }, owner.token),
+      callFunction('createUserProfile', { displayName: 'First Friend', username: 'group.first', city: 'Istanbul' }, firstFriend.token),
+      callFunction('createUserProfile', { displayName: 'Second Friend', username: 'group.second', city: 'Istanbul' }, secondFriend.token),
+    ]);
+    const [ownerProfile, firstProfile, secondProfile] = await Promise.all([
+      db.collection('users').where('username', '==', 'group.owner').limit(1).get(),
+      db.collection('users').where('username', '==', 'group.first').limit(1).get(),
+      db.collection('users').where('username', '==', 'group.second').limit(1).get(),
+    ]);
+    const ownerUid = ownerProfile.docs[0]?.id;
+    const firstUid = firstProfile.docs[0]?.id;
+    const secondUid = secondProfile.docs[0]?.id;
+    if (!ownerUid || !firstUid || !secondUid) throw new Error('Expected all group profiles.');
+
+    const imported = await callFunction<{ matches: Array<{ userId: string }> }>('importContacts', {
+      phoneNumbers: [firstFriend.phoneNumber], emails: [],
+    }, owner.token);
+    expect(imported.matches.map((match) => match.userId)).toContain(firstUid);
+
+    const group = await callFunction<{ id: string }>('createGroup', {
+      name: 'M2 Food Friends', memberIds: [firstUid, secondUid],
+    }, owner.token);
+    const requestId = `group-${group.id}`;
+    expect((await db.collection('users').doc(firstUid).collection('requests').doc(requestId).get()).exists).toBe(true);
+    await callFunction('respondToRequest', { requestId, response: 'accepted' }, firstFriend.token);
+
+    await callFunction('setTypingStatus', { conversationId: group.id, typing: true }, firstFriend.token);
+    expect((await db.collection('conversations').doc(group.id).get()).get(`typing.${firstUid}`)).toBeTruthy();
+    await callFunction('setTypingStatus', { conversationId: group.id, typing: false }, firstFriend.token);
+    expect((await db.collection('conversations').doc(group.id).get()).get(`typing.${firstUid}`)).toBeUndefined();
+
+    const message = await callFunction<{ id: string }>('sendMessage', {
+      conversationId: group.id, idempotencyKey: 'm2-group-message-001', text: 'Welcome to the group',
+    }, owner.token);
+    await callFunction('markConversationRead', { conversationId: group.id, throughMessageId: message.id }, firstFriend.token);
+    const conversation = await db.collection('conversations').doc(group.id).get();
+    expect(conversation.get('kind')).toBe('group');
+    expect(conversation.get(`lastReadMessageIds.${firstUid}`)).toBe(message.id);
+    expect((await callFunction<{ items: Array<{ id: string; kind: string }> }>('listConversations', { limit: 20 }, owner.token)).items)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: group.id, kind: 'group' })]));
+  }, 20_000);
 });
 
 describe('activity callables', () => {

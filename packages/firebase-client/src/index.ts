@@ -15,6 +15,7 @@ import type {
   CreateUserProfileInput,
   DeleteFolderInput,
   DeleteCommentInput,
+  DeleteReviewInput,
   DiscoverFeed,
   DiscoverPeopleResult,
   FeedItem,
@@ -29,6 +30,7 @@ import type {
   GetPlaceInput,
   GetPlaceReviewsInput,
   GetVenuesInput,
+  SearchVenuesInput,
   HealthCheckResult,
   ActivityCandidate,
   LeaderboardEntry,
@@ -37,14 +39,20 @@ import type {
   ListNotificationsInput,
   MarkConversationReadInput,
   MarkConversationReadResult,
+  SetTypingStatusInput,
   ReportReviewInput,
   ReportCommentInput,
+  EditReviewInput,
+  ImportContactsInput,
+  ImportContactsResult,
   PlaceDetails,
   PlaceReview,
   Page,
   ProfilePhotoResult,
   ReactToReviewInput,
   ReactToCommentInput,
+  ReactToContentInput,
+  ReportContentInput,
   RespondToActivityInvitationInput,
   RegisterPushTokenInput,
   RenameFolderInput,
@@ -60,6 +68,7 @@ import type {
   UnregisterPushTokenInput,
   UpdateProfilePhotoInput,
   Venue,
+  SubmitUserVenueInput,
   TastesAiAnswer,
   TastesGroup,
   GroupInput,
@@ -95,6 +104,7 @@ export const callableOperationNames = [
   'getMessages',
   'sendMessage',
   'markConversationRead',
+  'setTypingStatus',
   'registerPushToken',
   'unregisterPushToken',
   'getFavourites',
@@ -105,18 +115,27 @@ export const callableOperationNames = [
   'unsaveVenue',
   'getFeed',
   'createReview',
+  'editReview',
+  'deleteReview',
   'getComments',
   'addComment',
   'reactToComment',
   'deleteComment',
   'reactToReview',
+  'reactToContent',
+  'reportContent',
   'hideReview',
   'reportReview',
   'getLeaderboard',
   'getDiscoverFeed',
   'getDiscoverPeople',
+  'getFriendFeed',
+  'importContacts',
   'getVenues',
   'getPlace',
+  'getVenue',
+  'searchVenues',
+  'submitUserVenue',
   'getPlaceReviews',
   'askTastesAi',
   'listNotifications',
@@ -144,6 +163,8 @@ export const callableOperationNames = [
   'reinstateUser',
   'searchAdminVenues',
   'upsertVenue',
+  'createVenue',
+  'updateVenue',
   'setVenueStatus',
   'setVenueFlags',
   'mergeVenues',
@@ -277,6 +298,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<SendMessageInput, IdResult>('sendMessage', input),
     markConversationRead: (input: MarkConversationReadInput) =>
       invoke<MarkConversationReadInput, MarkConversationReadResult>('markConversationRead', input),
+    setTypingStatus: (input: SetTypingStatusInput) =>
+      invoke<SetTypingStatusInput, { conversationId: string; typing: boolean }>('setTypingStatus', input),
     registerPushToken: (input: RegisterPushTokenInput) =>
       invoke<RegisterPushTokenInput, PushTokenResult>('registerPushToken', input),
     unregisterPushToken: (input: UnregisterPushTokenInput) =>
@@ -297,6 +320,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<GetFeedInput, Page<FeedItem>>('getFeed', input),
     createReview: (input: CreateReviewInput) =>
       invoke<CreateReviewInput, IdResult>('createReview', input),
+    editReview: (input: EditReviewInput) =>
+      invoke<EditReviewInput, IdResult>('editReview', input),
+    deleteReview: (input: DeleteReviewInput) =>
+      invoke<DeleteReviewInput, IdResult>('deleteReview', input),
     getComments: (input: GetCommentsInput) =>
       invoke<GetCommentsInput, CommentsPage>('getComments', input),
     addComment: (input: AddCommentInput) =>
@@ -307,6 +334,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<DeleteCommentInput, IdResult>('deleteComment', input),
     reactToReview: (input: ReactToReviewInput) =>
       invoke<ReactToReviewInput, ReactionResult>('reactToReview', input),
+    reactToContent: (input: ReactToContentInput) =>
+      invoke<ReactToContentInput, ReactionResult>('reactToContent', input),
+    reportContent: (input: ReportContentInput) =>
+      invoke<ReportContentInput, IdResult>('reportContent', input),
     hideReview: (input: HideReviewInput) =>
       invoke<HideReviewInput, IdResult>('hideReview', input),
     reportReview: (input: ReportReviewInput) =>
@@ -317,10 +348,20 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<Record<string, never>, DiscoverFeed>('getDiscoverFeed', {}),
     getDiscoverPeople: () =>
       invoke<Record<string, never>, DiscoverPeopleResult>('getDiscoverPeople', {}),
+    getFriendFeed: (input: GetFeedInput) =>
+      invoke<GetFeedInput, Page<FeedItem>>('getFriendFeed', { ...input, scope: 'friends' }),
+    importContacts: (input: ImportContactsInput) =>
+      invoke<ImportContactsInput, ImportContactsResult>('importContacts', input),
     getVenues: (input: GetVenuesInput) =>
       invoke<GetVenuesInput, Page<Venue>>('getVenues', input),
     getPlace: (input: GetPlaceInput) =>
       invoke<GetPlaceInput, PlaceDetails>('getPlace', input),
+    getVenue: (input: GetPlaceInput) =>
+      invoke<GetPlaceInput, PlaceDetails>('getVenue', input),
+    searchVenues: (input: SearchVenuesInput) =>
+      invoke<SearchVenuesInput, { items: Venue[]; externalResultsAvailable: boolean }>('searchVenues', input),
+    submitUserVenue: (input: SubmitUserVenueInput) =>
+      invoke<SubmitUserVenueInput, { id: string; status: 'pending' }>('submitUserVenue', input),
     getPlaceReviews: (input: GetPlaceReviewsInput) =>
       invoke<GetPlaceReviewsInput, Page<PlaceReview>>('getPlaceReviews', input),
     askTastesAi: (input: AskTastesAiInput) =>

@@ -43,9 +43,20 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
     await api.respondToRequest({ requestId: item.id, response });
     setRequests((current) => current.filter((candidate) => candidate.id !== item.id));
   };
+  const deleteAll = async () => {
+    const pending = [...requests];
+    await Promise.all(pending.map((item) => api.respondToRequest({ requestId: item.id, response: 'declined' })));
+    setRequests([]);
+  };
   return (
     <View style={styles.screen}>
-      <Header onBack={onBack} styles={styles} title="Requests" />
+      <Header
+        action={requests.length ? 'Delete all' : undefined}
+        onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
+        onBack={onBack}
+        styles={styles}
+        title="Requests"
+      />
       {loading ? (
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : (
@@ -139,21 +150,16 @@ export function NewGroupScreen({
   return (
     <View style={styles.screen}>
       <Header
-        action={creating ? 'Creating…' : 'Create'}
-        actionDisabled={creating || !name.trim() || selected.size < 2}
-        onAction={() => void create()}
         onBack={onBack}
         styles={styles}
         title="New group"
       />
+      <Text style={styles.fieldLabel}>TITLE</Text>
       <View style={styles.groupHero}>
-        <View style={styles.groupAvatar}>
-          <Text style={styles.groupAvatarText}>+</Text>
-        </View>
         <TextInput
           maxLength={60}
           onChangeText={setName}
-          placeholder="Group name"
+          placeholder="Enter text"
           placeholderTextColor={colors.placeholder}
           style={styles.groupName}
           value={name}
@@ -169,7 +175,6 @@ export function NewGroupScreen({
           value={query}
         />
       </View>
-      <Text style={styles.section}>SELECT MEMBERS · {selected.size}</Text>
       {loading ? (
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : (
@@ -205,11 +210,20 @@ export function NewGroupScreen({
           }}
         />
       )}
+      <View style={[styles.createFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        <Pressable
+          disabled={creating || !name.trim() || selected.size < 2}
+          onPress={() => void create()}
+          style={[styles.createGroup, (creating || !name.trim() || selected.size < 2) && styles.disabled]}
+        >
+          {creating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createGroupText}>Create group</Text>}
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-export function GroupDetailsScreen({ groupId, onBack }: { groupId: string; onBack: () => void }) {
+export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { groupId: string; onBack: () => void; onOpenConversation: (conversationId: string) => void }) {
   const api = useTastesApi();
   const currentUserId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
@@ -261,6 +275,9 @@ export function GroupDetailsScreen({ groupId, onBack }: { groupId: string; onBac
         <Text style={styles.detailsSubtitle}>
           {group.members.length} members · Created {new Date(group.createdAt).toLocaleDateString()}
         </Text>
+        <Pressable onPress={() => onOpenConversation(groupId)} style={styles.primaryOutline}>
+          <Text style={styles.primaryOutlineText}>Open group chat</Text>
+        </Pressable>
         {admin ? (
           <Pressable onPress={() => setAdding((value) => !value)} style={styles.primaryOutline}>
             <Text style={styles.primaryOutlineText}>{adding ? 'Done' : '+ Add members'}</Text>
@@ -498,25 +515,16 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       lineHeight: 20,
       textAlign: 'center',
     },
-    groupHero: { padding: 20, alignItems: 'center', gap: 14 },
-    groupAvatar: {
-      width: 94,
-      height: 94,
-      borderRadius: 47,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surfaceRaised,
-    },
-    groupAvatarText: { color: colors.primary, fontSize: 34, fontWeight: '300' },
+    fieldLabel: { marginTop: 18, marginHorizontal: 16, marginBottom: 7, color: colors.textMuted, fontSize: 12 },
+    groupHero: { paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     groupName: {
       width: '100%',
       height: 46,
       paddingHorizontal: 14,
-      borderRadius: 23,
+      borderRadius: 12,
       color: colors.text,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.background,
       fontSize: 16,
-      textAlign: 'center',
     },
     search: {
       height: 40,
@@ -572,6 +580,9 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       backgroundColor: colors.primary,
     },
     checkText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    createFooter: { paddingTop: 12, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas },
+    createGroup: { height: 58, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     details: { paddingBottom: 40 },
     groupAvatarLarge: {
       width: 118,

@@ -5,6 +5,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 export const discoverFeedQueryKey = (userId: string) => ['discover', 'feed', userId] as const;
 export const discoverPeopleQueryKey = (userId: string) => ['discover', 'people', userId] as const;
 export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
+export const venueSearchQueryKey = (query: string) => ['venues', 'search', query] as const;
 export const placeReviewsQueryKey = (venueId: string, sort: string, scope = 'all') => ['place', venueId, 'reviews', sort, scope] as const;
 export type DiscoverVenueFilter = {
   category?: string;
@@ -44,6 +45,16 @@ export function useDiscoverVenues(userId: string, filter: DiscoverVenueFilter = 
       await api.getVenues({ ...filter, cursor: pageParam, limit: 20 })
     ).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+export function useVenueSearch(query: string) {
+  const api = useTastesApi();
+  const normalized = query.trim();
+  return useQuery({
+    queryKey: venueSearchQueryKey(normalized),
+    queryFn: async () => (await api.searchVenues({ query: normalized, limit: 20 })).data,
+    enabled: normalized.length >= 2,
   });
 }
 

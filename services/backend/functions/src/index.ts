@@ -3,7 +3,7 @@ export { ingestMobileTelemetry } from './modules/observability/functions';
 export { askTastesAi } from './modules/ai/functions';
 export { clearNotifications, createGroup, getGroup, getProfileExtras, leaveGroup, listNotifications, listRequests, markNotificationRead, reportComment, respondToRequest, updateGroupMembers, updateNotificationPreferences } from './modules/community/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
-export { followUser, unfollowUser } from './modules/social/functions';
+export { followUser, importContacts, unfollowUser } from './modules/social/functions';
 export {
   createActivity,
   listActivityCandidates,
@@ -17,6 +17,7 @@ export {
   pushMessageNotification,
   registerPushToken,
   sendMessage,
+  setTypingStatus,
   unregisterPushToken,
 } from './modules/messaging/functions';
 export {
@@ -32,9 +33,11 @@ export {
   getDiscoverFeed,
   getDiscoverPeople,
   getPlace,
+  getPlace as getVenue,
   getPlaceReviews,
   getVenues,
 } from './modules/discover/functions';
+export { searchVenues, submitUserVenue } from './modules/venues/functions';
 export {
   completeOnboarding,
   getMonthlyRecap,
@@ -47,12 +50,17 @@ export {
   addComment,
   deleteComment,
   createReview,
+  deleteReview,
+  editReview,
   getComments,
   getFeed,
+  getFeed as getFriendFeed,
   hideReview,
   reportReview,
   reactToReview,
   reactToComment,
+  reactToContent,
+  reportContent,
 } from './modules/reviews/functions';
 export {
   banUser,
@@ -70,4 +78,6 @@ export {
   suspendUser,
   unbanUser,
   upsertVenue,
+  createVenue,
+  updateVenue,
 } from './modules/admin/functions';

@@ -6,6 +6,7 @@ import {
   markConversationReadInputSchema,
   registerPushTokenInputSchema,
   sendMessageInputSchema,
+  setTypingStatusInputSchema,
   unregisterPushTokenInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -132,6 +133,8 @@ export const createConversation = onCall(callableOptions, async (request) => {
       participantIds,
       unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
       lastReadAt: {},
+      lastReadMessageIds: {},
+      typing: {},
       lastMessage: null,
       messageCount: 0,
       status: 'active',
@@ -162,7 +165,8 @@ export const listConversations = onCall(callableOptions, async (request) => {
   const pageDocuments = snapshot.docs.slice(0, input.limit);
   const rows = pageDocuments.map((document) => {
     const participantIds = requireParticipant(document, uid);
-    const kind = document.get('kind') === 'activity' ? 'activity' : 'direct';
+    const rawKind = document.get('kind');
+    const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
     const otherUserId = kind === 'direct'
       ? participantIds.find((participantId) => participantId !== uid) ?? null
       : null;
@@ -192,8 +196,10 @@ export const listConversations = onCall(callableOptions, async (request) => {
           photoUrl: profile?.get('photoUrl') ? String(profile.get('photoUrl')) : null,
         } : null,
         activityId: kind === 'activity' ? String(document.get('activityId') ?? document.id) : null,
-        title: kind === 'activity' ? String(document.get('title') ?? 'Activity') : null,
-        imageUrl: kind === 'activity' && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
+        title: kind === 'activity' || kind === 'group'
+          ? String(document.get('title') ?? (kind === 'activity' ? 'Activity' : 'Group'))
+          : null,
+        imageUrl: (kind === 'activity' || kind === 'group') && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
         organizerId: kind === 'activity' ? String(document.get('organizerId') ?? '') : null,
         invitationStatus: kind === 'activity' ? invitationStatus(document, uid) : null,
         lastMessage: lastMessage(document),
@@ -260,9 +266,10 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     }
     const recipientIds = participantIds.filter((participantId) => participantId !== uid);
     if (recipientIds.length === 0) throw new HttpsError('internal', 'The conversation participants are invalid.');
-    const kind = conversation.get('kind') === 'activity' ? 'activity' : 'direct';
-    if (kind === 'activity' && invitationStatus(conversation, uid) !== 'accepted') {
-      throw new HttpsError('failed-precondition', 'Accept the activity invitation before sending messages.');
+    const rawKind = conversation.get('kind');
+    const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
+    if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
+      throw new HttpsError('failed-precondition', 'Accept the invitation before sending messages.');
     }
     const userRef = db.collection('users').doc(uid);
     const recipientRefs = recipientIds.map((recipientId) => db.collection('users').doc(recipientId));
@@ -319,6 +326,7 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       },
       'messageCount', FieldValue.increment(1),
       'updatedAt', now,
+      new FieldPath('typing', uid), FieldValue.delete(),
     );
     for (const recipientId of recipientIds) {
       const notificationRef = db.collection('notifications').doc(
@@ -361,10 +369,28 @@ export const markConversationRead = onCall(callableOptions, async (request) => {
       conversationRef,
       new FieldPath('unreadCounts', uid), 0,
       new FieldPath('lastReadAt', uid), now,
+      new FieldPath('lastReadMessageIds', uid), input.throughMessageId,
     );
   });
 
   return { conversationId: input.conversationId, unreadCount: 0 as const };
+});
+
+export const setTypingStatus = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(setTypingStatusInputSchema, request.data);
+  const conversationRef = db.collection('conversations').doc(input.conversationId);
+  const conversation = await conversationRef.get();
+  requireParticipant(conversation, uid);
+  const kind = conversation.get('kind');
+  if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
+    throw new HttpsError('failed-precondition', 'Accept the invitation before updating typing status.');
+  }
+  await conversationRef.update(
+    new FieldPath('typing', uid),
+    input.typing ? Timestamp.now() : FieldValue.delete(),
+  );
+  return { conversationId: input.conversationId, typing: input.typing };
 });
 
 export const registerPushToken = onCall(callableOptions, async (request) => {

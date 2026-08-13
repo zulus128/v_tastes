@@ -1,12 +1,16 @@
 import {
   addCommentInputSchema,
   createReviewInputSchema,
+  deleteReviewInputSchema,
   deleteCommentInputSchema,
+  editReviewInputSchema,
   getCommentsInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
   reactToReviewInputSchema,
   reactToCommentInputSchema,
+  reactToContentInputSchema,
+  reportContentInputSchema,
   reportReviewInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -253,6 +257,171 @@ export const createReview = onCall(callableOptions, async (request) => {
   });
 
   return { id: reviewRef.id };
+});
+
+export const editReview = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(editReviewInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(`review-images/${uid}/`))) {
+    throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user.');
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const review = await transaction.get(reviewRef);
+    if (!review.exists || review.get('status') !== 'published') {
+      throw new HttpsError('not-found', 'The review was not found.');
+    }
+    if (review.get('authorId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the review author can edit this review.');
+    }
+    const venueRef = db.collection('venues').doc(String(review.get('venueId')));
+    const venue = await transaction.get(venueRef);
+    if (!venue.exists) throw new HttpsError('not-found', 'The venue was not found.');
+
+    const count = Math.max(1, Number(venue.get('reviewCount') ?? 1));
+    const average = Math.max(0, Number(venue.get('rating') ?? 0));
+    const oldRating = Number(review.get('rating') ?? 0);
+    const now = FieldValue.serverTimestamp();
+    transaction.update(reviewRef, {
+      rating: input.rating,
+      text: input.text,
+      tags: input.tags,
+      tag: input.tags[0] ?? null,
+      dishReviews: input.dishReviews,
+      dishNames: input.dishReviews.map((dish) => dish.title),
+      updatedAt: now,
+    });
+    transaction.update(venueRef, {
+      rating: Math.max(0, Math.min(5, ((average * count) - oldRating + input.rating) / count)),
+      updatedAt: now,
+    });
+  });
+  return { id: input.reviewId };
+});
+
+export const deleteReview = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(deleteReviewInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const userRef = db.collection('users').doc(uid);
+
+  await db.runTransaction(async (transaction) => {
+    const [review, user] = await Promise.all([
+      transaction.get(reviewRef),
+      transaction.get(userRef),
+    ]);
+    if (!review.exists || review.get('status') === 'deleted') return;
+    if (review.get('authorId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the review author can delete this review.');
+    }
+    const venueRef = db.collection('venues').doc(String(review.get('venueId')));
+    const venue = await transaction.get(venueRef);
+    const now = FieldValue.serverTimestamp();
+    transaction.update(reviewRef, { status: 'deleted', deletedAt: now, updatedAt: now });
+    if (venue.exists) {
+      const count = Math.max(0, Number(venue.get('reviewCount') ?? 0));
+      const nextCount = Math.max(0, count - 1);
+      const average = Math.max(0, Number(venue.get('rating') ?? 0));
+      const rating = Number(review.get('rating') ?? 0);
+      transaction.update(venueRef, {
+        reviewCount: nextCount,
+        rating: nextCount === 0 ? 0 : Math.max(0, Math.min(5, ((average * count) - rating) / nextCount)),
+        updatedAt: now,
+      });
+    }
+    if (user.exists) {
+      addXp(transaction, userRef, -50, {
+        xp: Number(user.get('xp') ?? 0),
+        monthlyXp: Number(user.get('monthlyXp') ?? 0),
+      });
+      transaction.update(userRef, {
+        reviewCount: Math.max(0, Number(user.get('reviewCount') ?? 0) - 1),
+        updatedAt: now,
+      });
+    }
+  });
+  return { id: input.reviewId };
+});
+
+export const reactToContent = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(reactToContentInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const contentRef = input.targetType === 'review'
+    ? reviewRef
+    : reviewRef.collection('comments').doc(input.commentId!);
+  const reactionRef = contentRef.collection('reactions').doc(uid);
+  const idempotencyRef = db.collection('_idempotency').doc(
+    idempotentDocumentId(uid, `${input.targetType}-reaction:${contentRef.id}`, input.idempotencyKey),
+  );
+  return db.runTransaction(async (transaction) => {
+    const [profile, review, content, reaction, idempotency] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)),
+      transaction.get(reviewRef),
+      input.targetType === 'review' ? transaction.get(reviewRef) : transaction.get(contentRef),
+      transaction.get(reactionRef),
+      transaction.get(idempotencyRef),
+    ]);
+    if (!profile.exists || profile.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    if (idempotency.exists) {
+      return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount') ?? 0) };
+    }
+    if (!review.exists || review.get('status') !== 'published' || !content.exists || content.get('status') !== 'published') {
+      throw new HttpsError('not-found', 'The content was not found.');
+    }
+    if (content.get('authorId') === uid) {
+      throw new HttpsError('failed-precondition', 'You cannot react to your own content.');
+    }
+    await enforceRateLimit(transaction, uid, 'react-content', 120, 60_000);
+    const currentCount = Math.max(0, Number(content.get('reactionCount') ?? 0));
+    const active = !reaction.exists;
+    const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
+    if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
+    else transaction.delete(reactionRef);
+    transaction.update(contentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    transaction.create(idempotencyRef, {
+      active,
+      reactionCount,
+      expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000),
+    });
+    return { active, reactionCount };
+  });
+});
+
+export const reportContent = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(reportContentInputSchema, request.data);
+  const profileRef = db.collection('users').doc(uid);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const contentRef = input.targetType === 'review'
+    ? reviewRef
+    : reviewRef.collection('comments').doc(input.commentId!);
+  const [profile, review, content] = await Promise.all([profileRef.get(), reviewRef.get(), contentRef.get()]);
+  if (!profile.exists || profile.get('status') !== 'active') {
+    throw new HttpsError('failed-precondition', 'An active user profile is required.');
+  }
+  if (!review.exists || review.get('status') !== 'published' || !content.exists || content.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The content was not found.');
+  }
+  const reportRef = db.collection('reports').doc(
+    idempotentDocumentId(uid, `report-${input.targetType}:${contentRef.id}`, input.idempotencyKey),
+  );
+  await reportRef.set({
+    reporterId: uid,
+    reporterName: String(profile.get('displayName') ?? 'Tastes user'),
+    contentType: input.targetType,
+    contentId: contentRef.id,
+    reviewId: input.reviewId,
+    reason: input.reason,
+    details: input.details ?? null,
+    status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: false });
+  return { id: reportRef.id };
 });
 
 export const addComment = onCall(callableOptions, async (request) => {

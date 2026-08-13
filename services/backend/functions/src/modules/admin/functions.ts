@@ -54,6 +54,8 @@ const venueInputSchema = z.object({
   category: z.string().trim().min(2).max(80),
   status: venueStatusSchema.default('active'),
 });
+const createVenueInputSchema = venueInputSchema.omit({ venueId: true });
+const updateVenueInputSchema = venueInputSchema.extend({ venueId: idSchema });
 const venueStatusInputSchema = z.object({ venueId: idSchema, status: venueStatusSchema });
 const venueFlagsInputSchema = z.object({
   venueId: idSchema,
@@ -327,6 +329,42 @@ export const upsertVenue = onCall(callableOptions, async (request) => {
     ...(input.venueId ? {} : { createdAt: FieldValue.serverTimestamp(), reviewCount: 0 }),
   }, { merge: true });
   await audit(actorId, input.venueId ? 'update-venue' : 'create-venue', reference.id);
+  return { id: reference.id };
+});
+
+export const createVenue = onCall(callableOptions, async (request) => {
+  const actorId = requireAdmin(request);
+  const input = parseInput(createVenueInputSchema, request.data);
+  const reference = db.collection('venues').doc();
+  await reference.create({
+    ...input,
+    source: 'admin',
+    rating: 0,
+    reviewCount: 0,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: actorId,
+  });
+  await audit(actorId, 'create-venue', reference.id);
+  return { id: reference.id };
+});
+
+export const updateVenue = onCall(callableOptions, async (request) => {
+  const actorId = requireAdmin(request);
+  const input = parseInput(updateVenueInputSchema, request.data);
+  const reference = db.collection('venues').doc(input.venueId);
+  const venue = await reference.get();
+  if (!venue.exists) throw new HttpsError('not-found', 'The venue was not found.');
+  await reference.update({
+    name: input.name,
+    city: input.city,
+    address: input.address,
+    category: input.category,
+    status: input.status,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: actorId,
+  });
+  await audit(actorId, 'update-venue', reference.id);
   return { id: reference.id };
 });
 

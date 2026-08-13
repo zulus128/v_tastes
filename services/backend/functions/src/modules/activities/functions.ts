@@ -91,6 +91,8 @@ export const createActivity = onCall(callableOptions, async (request) => {
           ])),
           unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
           lastReadAt: {},
+          lastReadMessageIds: {},
+          typing: {},
           lastMessage: null,
           messageCount: 0,
           status: 'active',
@@ -152,6 +154,8 @@ export const createActivity = onCall(callableOptions, async (request) => {
       },
       unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
       lastReadAt: {},
+      lastReadMessageIds: {},
+      typing: {},
       lastMessage: null,
       messageCount: 0,
       status: 'active',
@@ -203,6 +207,8 @@ export const respondToActivityInvitation = onCall(callableOptions, async (reques
         'participantIds', FieldValue.arrayRemove(uid),
         new FieldPath('unreadCounts', uid), FieldValue.delete(),
         new FieldPath('lastReadAt', uid), FieldValue.delete(),
+        new FieldPath('lastReadMessageIds', uid), FieldValue.delete(),
+        new FieldPath('typing', uid), FieldValue.delete(),
         'updatedAt', now,
       );
     } else {

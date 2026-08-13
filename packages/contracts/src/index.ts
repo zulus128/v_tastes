@@ -91,6 +91,13 @@ export const createReviewInputSchema = z.object({
   dishReviews: z.array(dishReviewInputSchema).max(5).default([]),
 });
 
+export const editReviewInputSchema = createReviewInputSchema.omit({
+  idempotencyKey: true,
+  venueId: true,
+}).extend({ reviewId: z.string().min(1).max(128) });
+
+export const deleteReviewInputSchema = z.object({ reviewId: z.string().min(1).max(128) });
+
 export const addCommentInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   reviewId: z.string().min(1),
@@ -141,6 +148,27 @@ export const reportReviewInputSchema = z.object({
   details: z.string().trim().max(300).optional(),
 });
 
+export const reactToContentInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  targetType: z.enum(['review', 'comment']),
+  reviewId: z.string().min(1).max(128),
+  commentId: z.string().min(1).max(128).optional(),
+  reaction: z.enum(['like']),
+}).refine((input) => input.targetType === 'review' || Boolean(input.commentId), {
+  message: 'A comment id is required for comment reactions.',
+});
+
+export const reportContentInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  targetType: z.enum(['review', 'comment']),
+  reviewId: z.string().min(1).max(128),
+  commentId: z.string().min(1).max(128).optional(),
+  reason: reportReasonSchema,
+  details: z.string().trim().max(300).optional(),
+}).refine((input) => input.targetType === 'review' || Boolean(input.commentId), {
+  message: 'A comment id is required for comment reports.',
+});
+
 export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
@@ -177,6 +205,8 @@ export const conversationInputSchema = z.object({
 export const markConversationReadInputSchema = conversationInputSchema.extend({
   throughMessageId: z.string().min(1).max(128),
 });
+
+export const setTypingStatusInputSchema = conversationInputSchema.extend({ typing: z.boolean() });
 
 export const expoPushTokenSchema = z.string().trim().min(20).max(512).regex(
   /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9._~+/=-]+\]$/,
@@ -258,6 +288,29 @@ export const getPlaceInputSchema = z.object({
   venueId: z.string().trim().min(1).max(128),
 });
 
+export const searchVenuesInputSchema = z.object({
+  query: z.string().trim().min(2).max(160),
+  limit: z.number().int().min(1).max(20).default(10),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
+  message: 'Latitude and longitude must be provided together.',
+});
+
+export const venueMutationInputSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  city: z.string().trim().min(2).max(120),
+  address: z.string().trim().min(2).max(300),
+  category: z.string().trim().min(2).max(80),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  googlePlaceId: z.string().trim().min(1).max(256).optional(),
+}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
+  message: 'Latitude and longitude must be provided together.',
+});
+
+export const submitUserVenueInputSchema = venueMutationInputSchema;
+
 export const placeReviewSortSchema = z.enum(['highest', 'lowest', 'popular', 'recent', 'oldest']);
 
 export const getPlaceReviewsInputSchema = getPlaceInputSchema.merge(pageInputSchema).extend({
@@ -306,6 +359,13 @@ export const phoneNumberSchema = z.string().trim().regex(
   'The phone number must use E.164 format, for example +905551234567.',
 );
 
+export const importContactsInputSchema = z.object({
+  phoneNumbers: z.array(phoneNumberSchema).max(500).default([]),
+  emails: z.array(z.string().trim().toLowerCase().email().max(254)).max(500).default([]),
+}).refine((input) => input.phoneNumbers.length + input.emails.length > 0, {
+  message: 'Provide at least one contact.',
+});
+
 export const requestPhoneOtpInputSchema = z.object({
   phoneNumber: phoneNumberSchema,
 });
@@ -328,12 +388,17 @@ export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
 export type GetVenuesInput = z.infer<typeof getVenuesInputSchema>;
 export type GetPlaceInput = z.infer<typeof getPlaceInputSchema>;
+export type SearchVenuesInput = z.infer<typeof searchVenuesInputSchema>;
+export type VenueMutationInput = z.infer<typeof venueMutationInputSchema>;
+export type SubmitUserVenueInput = z.infer<typeof submitUserVenueInputSchema>;
 export type GetPlaceReviewsInput = z.infer<typeof getPlaceReviewsInputSchema>;
 export type PlaceReviewSort = z.infer<typeof placeReviewSortSchema>;
 export type Review = z.infer<typeof reviewSchema>;
 export type ReviewTag = z.infer<typeof reviewTagSchema>;
 export type DishReviewInput = z.infer<typeof dishReviewInputSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
+export type EditReviewInput = z.infer<typeof editReviewInputSchema>;
+export type DeleteReviewInput = z.infer<typeof deleteReviewInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToCommentInput = z.infer<typeof reactToCommentInputSchema>;
 export type DeleteCommentInput = z.infer<typeof deleteCommentInputSchema>;
@@ -341,6 +406,8 @@ export type ReactToReviewInput = z.infer<typeof reactToReviewInputSchema>;
 export type HideReviewInput = z.infer<typeof hideReviewInputSchema>;
 export type ReportReason = z.infer<typeof reportReasonSchema>;
 export type ReportReviewInput = z.infer<typeof reportReviewInputSchema>;
+export type ReactToContentInput = z.infer<typeof reactToContentInputSchema>;
+export type ReportContentInput = z.infer<typeof reportContentInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
 export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
@@ -348,6 +415,7 @@ export type RespondToActivityInvitationInput = z.infer<typeof respondToActivityI
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
+export type SetTypingStatusInput = z.infer<typeof setTypingStatusInputSchema>;
 export type RegisterPushTokenInput = z.infer<typeof registerPushTokenInputSchema>;
 export type UnregisterPushTokenInput = z.infer<typeof unregisterPushTokenInputSchema>;
 export type CreateFolderInput = z.infer<typeof createFolderInputSchema>;
@@ -376,6 +444,7 @@ export type ProfileExtrasInput = z.infer<typeof profileExtrasInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
 export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
+export type ImportContactsInput = z.infer<typeof importContactsInputSchema>;
 
 export interface RequestPhoneOtpResult {
   challengeId: string;
@@ -492,7 +561,7 @@ export interface ConversationParticipant {
 
 export interface ConversationSummary {
   id: string;
-  kind: 'direct' | 'activity';
+  kind: 'direct' | 'activity' | 'group';
   participantIds: string[];
   otherParticipant: ConversationParticipant | null;
   activityId: string | null;
@@ -524,6 +593,19 @@ export interface ChatMessage {
 export interface MarkConversationReadResult {
   conversationId: string;
   unreadCount: 0;
+}
+
+export interface ImportedContact {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
+  following: boolean;
+}
+
+export interface ImportContactsResult {
+  matches: ImportedContact[];
+  importedCount: number;
 }
 
 export interface PushTokenResult {
