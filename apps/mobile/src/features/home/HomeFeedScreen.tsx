@@ -59,16 +59,10 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
       };
     }
 
-    const photoRef = ref(storage, normalizedPath);
-    if (!photoRef.fullPath.replace(/\//g, '')) {
-      setUri(undefined);
-      return () => {
-        active = false;
-      };
-    }
-
     let download: Promise<string>;
     try {
+      const photoRef = ref(storage, normalizedPath);
+      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
       download = getDownloadURL(photoRef);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')

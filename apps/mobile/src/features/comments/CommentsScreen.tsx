@@ -53,14 +53,10 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
       return () => { active = false; };
     }
 
-    const photoRef = storageRef(storage, normalizedPath);
-    if (!photoRef.fullPath.replace(/\//g, '')) {
-      setState({ failed: true });
-      return () => { active = false; };
-    }
-
     let download: Promise<string>;
     try {
+      const photoRef = storageRef(storage, normalizedPath);
+      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
       download = getDownloadURL(photoRef);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
