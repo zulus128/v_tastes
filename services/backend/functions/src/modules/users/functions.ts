@@ -3,6 +3,7 @@ import {
   createUserProfileInputSchema,
   getLeaderboardInputSchema,
   updateProfilePhotoInputSchema,
+  updateProfileSettingsInputSchema,
   type MonthlyRecapResult,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
@@ -221,4 +222,29 @@ export const updateProfilePhoto = onCall(callableOptions, async (request) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
   return { photoPath: input.photoPath, photoUrl };
+});
+
+export const updateProfileSettings = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(updateProfileSettingsInputSchema, request.data);
+  const userRef = db.collection('users').doc(uid);
+  const [user, venue] = await Promise.all([
+    userRef.get(),
+    input.favoriteVenueId ? db.collection('venues').doc(input.favoriteVenueId).get() : Promise.resolve(null),
+  ]);
+  if (!user.exists || user.get('status') !== 'active') {
+    throw new HttpsError('failed-precondition', 'An active user profile is required.');
+  }
+  if (venue && (!venue.exists || venue.get('status') !== 'active')) {
+    throw new HttpsError('not-found', 'The selected favourite place was not found.');
+  }
+  await userRef.update({
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.username ? { username: input.username } : {}),
+    ...(input.city ? { city: input.city } : {}),
+    ...(input.favoriteDish ? { 'tastePreferences.favoriteDish': input.favoriteDish } : {}),
+    ...(input.favoriteVenueId ? { 'tastePreferences.favoriteVenueId': input.favoriteVenueId } : {}),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { id: uid };
 });

@@ -274,13 +274,11 @@ function MainTabs({
         </Tabs.Screen>
       </Tabs.Navigator>
       <ProfileSettingsSheet
+        fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}
-        onFollowers={() => setProfileExtra('followers')}
-        onLeaderboard={() => rootNavigation.navigate('Leaderboard')}
         onLogout={logout}
         onNotifications={() => setProfileExtra('notifications')}
-        onRecap={() => rootNavigation.navigate('Recap', { mode: 'ready' })}
-        onRewards={() => setProfileExtra('rewards')}
+        userId={user.uid}
         visible={settingsVisible}
       />
       <ProfileExtras

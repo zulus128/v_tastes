@@ -16,17 +16,17 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const [enabled, setEnabled] = useState(true);
   const [push, setPush] = useState(true);
-  const [comments, setComments] = useState(true);
-  const [followers, setFollowers] = useState(true);
-  const [activities, setActivities] = useState(true);
+  const [email, setEmail] = useState(true);
+  const [sms, setSms] = useState(false);
   const [detail, setDetail] = useState<'rewardDetails' | 'achievement' | null>(null);
   const [data, setData] = useState<ProfileExtrasResult | null>(null);
   const [detailReward, setDetailReward] = useState<RewardProgress | null>(null);
   const activeScreen = detail ?? screen;
   const handleBack = () => detail ? setDetail(null) : onClose();
-  useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras(targetUserId ? { targetUserId } : {}).then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setPush(p.push); setComments(p.comments); setFollowers(p.followers); setActivities(p.activities); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, targetUserId, visible]);
-  const savePreferences = (next: { push: boolean; comments: boolean; followers: boolean; activities: boolean }) => { setPush(next.push); setComments(next.comments); setFollowers(next.followers); setActivities(next.activities); void api.updateNotificationPreferences(next); };
+  useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras(targetUserId ? { targetUserId } : {}).then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setEnabled(p.enabled); setPush(p.push); setEmail(p.email); setSms(p.sms); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, targetUserId, visible]);
+  const savePreferences = (next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) => { setEnabled(next.enabled); setPush(next.push); setEmail(next.email); setSms(next.sms); void api.updateNotificationPreferences(next).catch(() => Alert.alert('Could not save notification settings', 'Please try again.')); };
 
   const title = activeScreen === 'followers' ? 'Followers'
     : activeScreen === 'following' ? 'Following'
@@ -46,12 +46,11 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
           </ScrollView>
         ) : activeScreen === 'notifications' ? (
           <ScrollView contentContainerStyle={styles.settings}>
-            <Text style={styles.section}>PUSH NOTIFICATIONS</Text>
-            <Setting label="Allow push notifications" onChange={(value) => savePreferences({ push: value, comments, followers, activities })} styles={styles} value={push} />
-            <Text style={styles.section}>ACTIVITY</Text>
-            <Setting label="Comments and reactions" onChange={(value) => savePreferences({ push, comments: value, followers, activities })} styles={styles} value={comments} />
-            <Setting label="New followers" onChange={(value) => savePreferences({ push, comments, followers: value, activities })} styles={styles} value={followers} />
-            <Setting label="Invitations and reminders" onChange={(value) => savePreferences({ push, comments, followers, activities: value })} styles={styles} value={activities} />
+            <Setting label="Enable notifications" onChange={(value) => savePreferences({ enabled: value, push, email, sms })} styles={styles} value={enabled} />
+            <View style={styles.notificationGap} />
+            <Setting disabled={!enabled} label="Push notifications" onChange={(value) => savePreferences({ enabled, push: value, email, sms })} styles={styles} value={push} />
+            <Setting disabled={!enabled} label="Email notifications" onChange={(value) => savePreferences({ enabled, push, email: value, sms })} styles={styles} value={email} />
+            <Setting disabled={!enabled} label="SMS notifications" onChange={(value) => savePreferences({ enabled, push, email, sms: value })} styles={styles} value={sms} />
           </ScrollView>
         ) : activeScreen === 'rewardDetails' || activeScreen === 'achievement' ? (
           <View style={styles.rewardDetail}><Image source={activeScreen === 'achievement' ? cityBadge : burgerBadge} style={styles.heroBadge} /><Text style={styles.rewardTitle}>{detailReward?.name ?? (activeScreen === 'achievement' ? 'City Explorer' : 'Burger Lover')}</Text><Text style={styles.rewardBody}>{detailReward?.description ?? 'Keep exploring places to complete this achievement.'}</Text><View style={styles.bigProgress}><View style={[styles.bigProgressFill, { width: `${(detailReward?.progress ?? 1) * 100}%` }]} /></View><Text style={styles.progressLabel}>{detailReward?.completed ? `Completed · ${detailReward.xp} XP earned` : `${Math.round((detailReward?.progress ?? 0) * 100)}% complete`}</Text></View>
@@ -67,8 +66,8 @@ export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onCl
   );
 }
 
-function Setting({ label, onChange, styles, value }: { label: string; onChange: (value: boolean) => void; styles: ReturnType<typeof createStyles>; value: boolean }) {
-  return <View style={styles.setting}><Text style={styles.settingLabel}>{label}</Text><Switch onValueChange={onChange} thumbColor="#FFFFFF" trackColor={{ false: '#353535', true: '#B82F29' }} value={value} /></View>;
+function Setting({ disabled = false, label, onChange, styles, value }: { disabled?: boolean; label: string; onChange: (value: boolean) => void; styles: ReturnType<typeof createStyles>; value: boolean }) {
+  return <View style={[styles.setting, disabled && styles.disabledSetting]}><Text style={styles.settingLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} thumbColor="#FFFFFF" trackColor={{ false: '#353535', true: '#B82F29' }} value={value} /></View>;
 }
 
 function createStyles(colors: ThemeColors, safeTop: number) {
@@ -90,7 +89,9 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     following: { borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
     followText: { color: colors.text, fontSize: 12, fontWeight: '600' },
     settings: { paddingHorizontal: 16, paddingBottom: 30 },
+    notificationGap: { height: 14 },
     setting: { height: 60, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
+    disabledSetting: { opacity: 0.45 },
     settingLabel: { flex: 1, color: colors.text, fontSize: 15 },
     rewards: { padding: 16, paddingBottom: 40 },
     levelCard: { padding: 20, borderRadius: 20, backgroundColor: colors.surface },

@@ -67,6 +67,8 @@ import type {
   UnsaveVenueInput,
   UnregisterPushTokenInput,
   UpdateProfilePhotoInput,
+  UpdateProfileSettingsInput,
+  SetReviewPinnedInput,
   Venue,
   SubmitUserVenueInput,
   TastesAiAnswer,
@@ -93,6 +95,7 @@ export const callableOperationNames = [
   'getSessionStatus',
   'completeOnboarding',
   'createUserProfile',
+  'updateProfileSettings',
   'updateProfilePhoto',
   'followUser',
   'unfollowUser',
@@ -117,6 +120,7 @@ export const callableOperationNames = [
   'createReview',
   'editReview',
   'deleteReview',
+  'setReviewPinned',
   'getComments',
   'addComment',
   'reactToComment',
@@ -276,6 +280,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
     createUserProfile: (input: CreateUserProfileInput) =>
       invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
+    updateProfileSettings: (input: UpdateProfileSettingsInput) =>
+      invoke<UpdateProfileSettingsInput, IdResult>('updateProfileSettings', input),
     updateProfilePhoto: (input: UpdateProfilePhotoInput) =>
       invoke<UpdateProfilePhotoInput, ProfilePhotoResult>('updateProfilePhoto', input),
     followUser: (input: FollowUserInput) =>
@@ -324,6 +330,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<EditReviewInput, IdResult>('editReview', input),
     deleteReview: (input: DeleteReviewInput) =>
       invoke<DeleteReviewInput, IdResult>('deleteReview', input),
+    setReviewPinned: (input: SetReviewPinnedInput) =>
+      invoke<SetReviewPinnedInput, IdResult>('setReviewPinned', input),
     getComments: (input: GetCommentsInput) =>
       invoke<GetCommentsInput, CommentsPage>('getComments', input),
     addComment: (input: AddCommentInput) =>

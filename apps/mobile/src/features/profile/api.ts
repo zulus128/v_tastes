@@ -22,6 +22,8 @@ export type ProfileData = {
   city: string | null;
   displayName: string;
   favoriteCuisines: string[];
+  favoriteDish: string | null;
+  favoriteVenueId: string | null;
   followerCount: number;
   followingCount: number;
   photoUrl: string | null;
@@ -40,6 +42,8 @@ function profileFromDocument(data: DocumentData | undefined, fallbackName: strin
     city: typeof data?.city === 'string' ? data.city : null,
     displayName: typeof data?.displayName === 'string' ? data.displayName : fallbackName,
     favoriteCuisines: cuisines,
+    favoriteDish: typeof data?.tastePreferences?.favoriteDish === 'string' ? data.tastePreferences.favoriteDish : null,
+    favoriteVenueId: typeof data?.tastePreferences?.favoriteVenueId === 'string' ? data.tastePreferences.favoriteVenueId : null,
     followerCount: Number(data?.followerCount ?? 0),
     followingCount: Number(data?.followingCount ?? 0),
     photoUrl: typeof data?.photoUrl === 'string' ? data.photoUrl : null,
@@ -66,6 +70,7 @@ function reviewFromDocument(document: QueryDocumentSnapshot<DocumentData>): Feed
     status: 'published',
     commentCount: Number(data.commentCount ?? 0),
     reactionCount: Number(data.reactionCount ?? 0),
+    pinned: data.pinned === true,
     createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : new Date().toISOString(),
   };
 }

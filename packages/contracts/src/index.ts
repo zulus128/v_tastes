@@ -27,6 +27,15 @@ export const updateProfilePhotoInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512),
 });
 
+export const updateProfileSettingsInputSchema = z.object({
+  displayName: z.string().trim().min(2).max(80),
+  username: z.string().trim().min(2).max(40)
+    .regex(/^[a-zA-Z0-9._]+$/, 'The username can only use Latin letters, numbers, dots, and underscores.'),
+  city: z.string().trim().min(2).max(120),
+  favoriteDish: z.string().trim().min(1).max(80),
+  favoriteVenueId: z.string().trim().min(1).max(128),
+}).partial().refine((input) => Object.keys(input).length > 0, 'Provide at least one profile field.');
+
 export const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
 
 export const venueSchema = z.object({
@@ -97,6 +106,10 @@ export const editReviewInputSchema = createReviewInputSchema.omit({
 }).extend({ reviewId: z.string().min(1).max(128) });
 
 export const deleteReviewInputSchema = z.object({ reviewId: z.string().min(1).max(128) });
+export const setReviewPinnedInputSchema = z.object({
+  reviewId: z.string().min(1).max(128),
+  pinned: z.boolean(),
+});
 
 export const addCommentInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
@@ -344,7 +357,7 @@ export const createGroupInputSchema = z.object({
 export const groupInputSchema = z.object({ groupId: z.string().min(1).max(128) });
 export const updateGroupMembersInputSchema = groupInputSchema.extend({ memberIds: z.array(z.string().min(1).max(128)).max(50) });
 export const updateNotificationPreferencesInputSchema = z.object({
-  push: z.boolean(), comments: z.boolean(), followers: z.boolean(), activities: z.boolean(),
+  enabled: z.boolean(), push: z.boolean(), email: z.boolean(), sms: z.boolean(),
 });
 export const reportCommentInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
@@ -384,6 +397,7 @@ export const healthCheckResultSchema = z.object({
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
 export type UpdateProfilePhotoInput = z.infer<typeof updateProfilePhotoInputSchema>;
+export type UpdateProfileSettingsInput = z.infer<typeof updateProfileSettingsInputSchema>;
 export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
 export type GetVenuesInput = z.infer<typeof getVenuesInputSchema>;
@@ -399,6 +413,7 @@ export type DishReviewInput = z.infer<typeof dishReviewInputSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type EditReviewInput = z.infer<typeof editReviewInputSchema>;
 export type DeleteReviewInput = z.infer<typeof deleteReviewInputSchema>;
+export type SetReviewPinnedInput = z.infer<typeof setReviewPinnedInputSchema>;
 export type AddCommentInput = z.infer<typeof addCommentInputSchema>;
 export type ReactToCommentInput = z.infer<typeof reactToCommentInputSchema>;
 export type DeleteCommentInput = z.infer<typeof deleteCommentInputSchema>;
@@ -496,7 +511,7 @@ export interface MonthlyRecapResult {
 }
 export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
 export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; createdAt: string; }
-export interface NotificationPreferences { push: boolean; comments: boolean; followers: boolean; activities: boolean; }
+export interface NotificationPreferences { enabled: boolean; push: boolean; email: boolean; sms: boolean; }
 export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
 export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
 export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
@@ -508,6 +523,7 @@ export interface Page<T> {
 
 export interface FeedItem extends Review {
   createdAt: string;
+  pinned?: boolean;
 }
 
 export interface Comment {

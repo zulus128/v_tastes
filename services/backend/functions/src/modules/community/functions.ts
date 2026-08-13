@@ -24,10 +24,10 @@ import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
 const defaultPreferences = {
+  enabled: true,
   push: true,
-  comments: true,
-  followers: true,
-  activities: true,
+  email: true,
+  sms: false,
 };
 
 function progress(value: number, target: number): number {

@@ -45,6 +45,7 @@ export {
   getLeaderboard,
   getSessionStatus,
   updateProfilePhoto,
+  updateProfileSettings,
 } from './modules/users/functions';
 export {
   addComment,
@@ -52,6 +53,7 @@ export {
   createReview,
   deleteReview,
   editReview,
+  setReviewPinned,
   getComments,
   getFeed,
   getFeed as getFriendFeed,

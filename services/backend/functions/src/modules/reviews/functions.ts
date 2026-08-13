@@ -4,6 +4,7 @@ import {
   deleteReviewInputSchema,
   deleteCommentInputSchema,
   editReviewInputSchema,
+  setReviewPinnedInputSchema,
   getCommentsInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
@@ -340,6 +341,24 @@ export const deleteReview = onCall(callableOptions, async (request) => {
         updatedAt: now,
       });
     }
+  });
+  return { id: input.reviewId };
+});
+
+export const setReviewPinned = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(setReviewPinnedInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const review = await reviewRef.get();
+  if (!review.exists || review.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The review was not found.');
+  }
+  if (review.get('authorId') !== uid) {
+    throw new HttpsError('permission-denied', 'Only the review author can change its pinned state.');
+  }
+  await reviewRef.update({
+    pinned: input.pinned,
+    updatedAt: FieldValue.serverTimestamp(),
   });
   return { id: input.reviewId };
 });

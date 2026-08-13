@@ -1,5 +1,5 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import type { Venue } from '@tastes/contracts';
+import type { FeedItem, Venue } from '@tastes/contracts';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
@@ -71,6 +71,10 @@ export function ProfileScreen({
   const [mapVenues, setMapVenues] = useState<Venue[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReload, setMapReload] = useState(0);
+  const [selectedReview, setSelectedReview] = useState<FeedItem | null>(null);
+  const [editingReview, setEditingReview] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [reviewActionPending, setReviewActionPending] = useState(false);
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
   useEffect(() => { if (activeTab !== 'map') return; let active = true; setMapError(null); void api.getVenues({ limit: 50 }).then((response) => { if (active) setMapVenues(response.data.items); }).catch((error) => { if (active) setMapError(apiErrorMessage(error)); }); return () => { active = false; }; }, [activeTab, api, mapReload]);
@@ -131,6 +135,54 @@ export function ProfileScreen({
     }
   }
 
+  async function saveReviewEdit() {
+    if (!selectedReview || !editText.trim() || reviewActionPending) return;
+    setReviewActionPending(true);
+    try {
+      await api.editReview({
+        reviewId: selectedReview.id,
+        rating: selectedReview.rating,
+        text: editText.trim(),
+        tags: selectedReview.tags,
+        dishReviews: selectedReview.dishReviews,
+      });
+      setEditingReview(false);
+      setSelectedReview(null);
+    } catch (error) {
+      Alert.alert('Could not edit review', apiErrorMessage(error));
+    } finally {
+      setReviewActionPending(false);
+    }
+  }
+
+  async function unpinReview() {
+    if (!selectedReview || reviewActionPending) return;
+    setReviewActionPending(true);
+    try {
+      await api.setReviewPinned({ reviewId: selectedReview.id, pinned: false });
+      setSelectedReview(null);
+    } catch (error) {
+      Alert.alert('Could not unpin review', apiErrorMessage(error));
+    } finally {
+      setReviewActionPending(false);
+    }
+  }
+
+  function confirmDeleteReview() {
+    if (!selectedReview || reviewActionPending) return;
+    const review = selectedReview;
+    Alert.alert('Delete review?', 'This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        setReviewActionPending(true);
+        void api.deleteReview({ reviewId: review.id })
+          .then(() => setSelectedReview(null))
+          .catch((error) => Alert.alert('Could not delete review', apiErrorMessage(error)))
+          .finally(() => setReviewActionPending(false));
+      } },
+    ]);
+  }
+
   if (loading || !profile) {
     return (
       <View style={[styles.loading, { backgroundColor: colors.canvas }]}>
@@ -148,7 +200,7 @@ export function ProfileScreen({
     ? right.rating - left.rating
     : filter === 'recent'
       ? new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
-      : 0);
+      : Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)));
   const profileHeader = (
     <ProfileHeader
       followPending={followPending}
@@ -208,11 +260,7 @@ export function ProfileScreen({
           renderItem={({ item: review }) => <ProfileReviewCard
             item={review}
             onComments={() => onOpenComments(review.id)}
-            onMore={() => Alert.alert(review.venueName, 'Review actions', [
-              { text: 'Open comments', onPress: () => onOpenComments(review.id) },
-              { text: 'Share', onPress: () => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` }) },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
+            onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
             onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
             onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
             profile={profile}
@@ -238,6 +286,25 @@ export function ProfileScreen({
       <ProfileExtras onClose={() => setExtra(null)} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
       <Modal animationType="slide" onRequestClose={() => setFilterOpen(false)} transparent visible={filterOpen}>
         <Pressable onPress={() => setFilterOpen(false)} style={styles.filterBackdrop}><Pressable onPress={(event) => event.stopPropagation()} style={styles.filterSheet}><View style={styles.filterHandle} /><Text style={styles.filterTitle}>Filter reviews</Text>{([['all', 'All reviews'], ['highest', 'Highest rated'], ['recent', 'Most recent']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setFilter(value); setFilterOpen(false); }} style={styles.filterRow}><Text style={styles.filterLabel}>{label}</Text><Text style={styles.filterRadio}>{filter === value ? '●' : '○'}</Text></Pressable>)}</Pressable></Pressable>
+      </Modal>
+      <Modal animationType="fade" onRequestClose={() => setSelectedReview(null)} transparent visible={selectedReview !== null && !editingReview}>
+        <Pressable onPress={() => setSelectedReview(null)} style={styles.actionBackdrop}>
+          <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>
+            <Pressable onPress={() => { setEditText(selectedReview?.text ?? ''); setEditingReview(true); }} style={styles.actionRow}><Text style={styles.actionText}>Edit</Text></Pressable>
+            <Pressable disabled={reviewActionPending} onPress={() => void unpinReview()} style={styles.actionRow}><Text style={styles.actionText}>Unpin</Text></Pressable>
+            <Pressable disabled={reviewActionPending} onPress={confirmDeleteReview} style={styles.actionRow}><Text style={styles.deleteActionText}>Delete</Text></Pressable>
+            <Pressable onPress={() => setSelectedReview(null)} style={[styles.actionRow, styles.cancelAction]}><Text style={styles.actionText}>Cancel</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal animationType="fade" onRequestClose={() => setEditingReview(false)} transparent visible={editingReview}>
+        <Pressable onPress={() => setEditingReview(false)} style={styles.actionBackdrop}>
+          <Pressable onPress={(event) => event.stopPropagation()} style={styles.editSheet}>
+            <Text style={styles.editTitle}>Edit review</Text>
+            <TextInput autoFocus multiline onChangeText={setEditText} style={styles.editInput} value={editText} />
+            <Pressable disabled={reviewActionPending} onPress={() => void saveReviewEdit()} style={styles.editSave}>{reviewActionPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.editSaveText}>Save</Text>}</Pressable>
+          </Pressable>
+        </Pressable>
       </Modal>
     </Screen>
   );
@@ -267,6 +334,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   mapEmpty: { position: 'absolute', left: 24, right: 24, bottom: 24, padding: 18, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(8,8,8,0.82)' },
   retryButton: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 18, backgroundColor: colors.primary },
   retryText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
+  actionBackdrop: { flex: 1, padding: 16, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
+  actionSheet: { padding: 8, paddingBottom: 12, borderRadius: 24, backgroundColor: colors.surface },
+  actionRow: { height: 54, paddingHorizontal: 18, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  actionText: { color: colors.text, fontSize: 17, textAlign: 'center' },
+  deleteActionText: { color: colors.danger, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  cancelAction: { marginTop: 8, borderBottomWidth: 0, borderRadius: 18, backgroundColor: colors.surfaceRaised },
+  editSheet: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
+  editTitle: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  editInput: { minHeight: 120, marginTop: 16, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 16, color: colors.text, backgroundColor: colors.canvas, textAlignVertical: 'top' },
+  editSave: { height: 50, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 25, backgroundColor: colors.primary },
+  editSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   wishlistPane: { height: 720, marginTop: -8 },
   filterBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   filterSheet: { paddingHorizontal: 18, paddingBottom: 34, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
