@@ -46,23 +46,31 @@ const tagLabels: Record<string, string> = {
 
 const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 'Hate', 'Safety risk', 'Something else'] as const;
 
-function DishPhoto({ photoPath }: { photoPath: string }) {
+function DishPhoto({ photoPath }: { photoPath?: string }) {
   const [uri, setUri] = useState<string>();
+  const normalizedPath = photoPath?.trim();
 
   useEffect(() => {
     let active = true;
-    void getDownloadURL(ref(storage, photoPath))
+    if (!normalizedPath) {
+      setUri(undefined);
+      return () => {
+        active = false;
+      };
+    }
+
+    void getDownloadURL(ref(storage, normalizedPath))
       .then((nextUri) => {
         if (active) setUri(nextUri);
       })
       .catch((error) => {
-        captureException(error, { operation: 'load-review-dish-photo', photoPath });
+        captureException(error, { operation: 'load-review-dish-photo', photoPath: normalizedPath });
         if (active) setUri(undefined);
       });
     return () => {
       active = false;
     };
-  }, [photoPath]);
+  }, [normalizedPath]);
 
   return uri ? <Image source={{ uri }} style={stylesStatic.dishPhoto} /> : <View style={stylesStatic.dishPhotoPlaceholder} />;
 }
