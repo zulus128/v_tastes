@@ -1,7 +1,7 @@
 import type { FeedItem } from '@tastes/contracts';
 import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -15,14 +15,15 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
-function DishPhoto({ path }: { path?: string }) {
+function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string; large?: boolean; path?: string }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
+  const imageStyle = large ? staticStyles.dishImageLarge : staticStyles.dishImage;
 
   useEffect(() => {
     let active = true;
     if (!normalizedPath) {
-      setState({ failed: true });
+      setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
       return () => { active = false; };
     }
 
@@ -34,7 +35,7 @@ function DishPhoto({ path }: { path?: string }) {
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath });
-      setState({ failed: true });
+      setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
       return () => { active = false; };
     }
 
@@ -44,17 +45,18 @@ function DishPhoto({ path }: { path?: string }) {
     }).catch((error) => {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath });
-      if (active) setState({ failed: true });
+      if (active) setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
     });
     return () => { active = false; };
-  }, [normalizedPath]);
+  }, [fallbackUri, normalizedPath]);
 
   return state.uri
-    ? <Image source={{ uri: state.uri }} style={staticStyles.dishImage} />
-    : <View style={staticStyles.dishImagePlaceholder}>{state.failed ? <Text style={staticStyles.dishImageError}>Photo unavailable</Text> : null}</View>;
+    ? <Image onError={() => setState({ failed: true })} source={{ uri: state.uri }} style={imageStyle} />
+    : <View style={[imageStyle, staticStyles.dishImagePlaceholder]}>{state.failed ? <Text style={staticStyles.dishImageError}>Photo unavailable</Text> : null}</View>;
 }
 
 export function ProfileReviewCard({
+  fallbackImageUrl,
   item,
   onComments,
   onMore,
@@ -62,6 +64,7 @@ export function ProfileReviewCard({
   onShare,
   profile,
 }: {
+  fallbackImageUrl?: string;
   item: FeedItem;
   onComments: () => void;
   onMore: () => void;
@@ -73,6 +76,7 @@ export function ProfileReviewCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const dishes = item.dishReviews ?? [];
   const tags = item.tags ?? [];
+  const [selectedDish, setSelectedDish] = useState<(typeof dishes)[number] | null>(null);
 
   return (
     <View style={styles.reviewCard}>
@@ -99,11 +103,11 @@ export function ProfileReviewCard({
         {dishes.length > 0 ? (
           <ScrollView contentContainerStyle={styles.dishRow} horizontal showsHorizontalScrollIndicator={false}>
             {dishes.map((dish) => (
-              <View key={dish.id} style={styles.dishCard}>
-                <DishPhoto path={dish.photoPath} />
+              <Pressable accessibilityLabel={`Open photo of ${dish.title}`} key={dish.id} onPress={() => setSelectedDish(dish)} style={styles.dishCard}>
+                <DishPhoto fallbackUri={fallbackImageUrl} path={dish.photoPath} />
                 <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
                 <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
-              </View>
+              </Pressable>
             ))}
           </ScrollView>
         ) : null}
@@ -114,6 +118,19 @@ export function ProfileReviewCard({
           <Pressable onPress={onShare}><Text style={styles.metric}>↗</Text></Pressable>
         </View>
       </View>
+      <Modal animationType="fade" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
+        <View style={styles.photoModalScrim}>
+          <Pressable accessibilityLabel="Close photo" onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
+          <View style={styles.photoModal}>
+            <View style={styles.photoModalHeader}>
+              <Text numberOfLines={1} style={styles.photoModalTitle}>{selectedDish?.title}</Text>
+              <Pressable accessibilityLabel="Close photo" hitSlop={8} onPress={() => setSelectedDish(null)}><Text style={styles.photoModalClose}>×</Text></Pressable>
+            </View>
+            {selectedDish ? <DishPhoto fallbackUri={fallbackImageUrl} large path={selectedDish.photoPath} /> : null}
+            {selectedDish ? <Text style={styles.photoModalRating}>★ {selectedDish.rating.toFixed(1)}</Text> : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -141,10 +158,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   reviewText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   metrics: { paddingTop: 2, flexDirection: 'row', gap: 20 },
   metric: { color: colors.text, fontSize: 14 },
+  photoModalScrim: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.84)' },
+  photoModal: { width: '100%', maxWidth: 430, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
+  photoModalHeader: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+  photoModalTitle: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600' },
+  photoModalClose: { color: colors.text, fontSize: 30, lineHeight: 32 },
+  photoModalRating: { padding: 16, color: '#D33B35', fontSize: 18, fontWeight: '700' },
 });
 
 const staticStyles = StyleSheet.create({
   dishImage: { width: 150, height: 150 },
-  dishImagePlaceholder: { width: 150, height: 150, backgroundColor: '#222222' },
+  dishImageLarge: { width: '100%', aspectRatio: 1 },
+  dishImagePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#222222' },
   dishImageError: { margin: 'auto', color: '#AEB4C0', fontSize: 11, textAlign: 'center' },
 });

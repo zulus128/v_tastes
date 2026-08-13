@@ -11,6 +11,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
 
@@ -28,6 +29,7 @@ function Stat({ label, onPress, value }: { label: string; onPress?: () => void; 
 }
 
 export function ProfileHeader({
+  favoritePlaceName,
   followPending,
   following,
   onAvatarPress,
@@ -41,6 +43,7 @@ export function ProfileHeader({
   reviewCount,
   uploadingPhoto,
 }: {
+  favoritePlaceName: string | null;
   followPending: boolean;
   following: boolean;
   onAvatarPress: () => void;
@@ -56,11 +59,11 @@ export function ProfileHeader({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const chips = [
-    profile.city ? `${profile.city} 📍` : null,
-    profile.favoriteCuisines[0] ? `${profile.favoriteCuisines[0]} ❤️` : null,
-    profile.favoriteCuisines[1] ? `${profile.favoriteCuisines[1]} 🍽️` : null,
-  ].filter((value): value is string => Boolean(value));
+  const favoriteDishIcon = profile.favoriteDish?.toLocaleLowerCase().includes('sushi') ? '🍣' : '🍽️';
+  const chips: Array<{ flag?: ReturnType<typeof cityFlag>; icon?: string; label: string }> = [];
+  if (profile.city) chips.push({ flag: cityFlag(profile.city), label: profile.city });
+  if (favoritePlaceName) chips.push({ icon: '❤️', label: favoritePlaceName });
+  if (profile.favoriteDish) chips.push({ icon: favoriteDishIcon, label: profile.favoriteDish });
 
   return (
     <View style={styles.hero}>
@@ -103,7 +106,7 @@ export function ProfileHeader({
       ) : null}
       {chips.length > 0 ? (
         <ScrollView contentContainerStyle={styles.chips} horizontal showsHorizontalScrollIndicator={false}>
-          {chips.map((chip) => <Text key={chip} style={styles.chip}>{chip}</Text>)}
+          {chips.map((chip) => <View key={chip.label} style={styles.chip}><Text style={styles.chipText}>{chip.label}</Text>{chip.flag ? <Image source={chip.flag} style={styles.cityFlag} /> : null}{chip.icon ? <Text style={styles.chipIcon}>{chip.icon}</Text> : null}</View>)}
         </ScrollView>
       ) : null}
       <Pressable accessibilityLabel="Open rewards" onPress={onRewards} style={styles.badges}>
@@ -114,6 +117,7 @@ export function ProfileHeader({
           </View>
         ))}
       </Pressable>
+      <View pointerEvents="none" style={styles.heroDivider} />
     </View>
   );
 }
@@ -149,7 +153,8 @@ export function ProfileTopBar({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 18, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 26, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  heroDivider: { position: 'absolute', right: 0, bottom: 0, left: 0, height: 24, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#45474B', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   topBar: {
     position: 'absolute',
     zIndex: 20,
@@ -184,7 +189,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616' },
   messageActionText: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
   chips: { minWidth: '100%', paddingHorizontal: 10, paddingTop: 14, gap: 6, justifyContent: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 39, overflow: 'hidden', backgroundColor: '#161616', color: colors.text, fontSize: 14 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 39, overflow: 'hidden', backgroundColor: '#161616' },
+  chipText: { color: colors.text, fontSize: 14 },
+  chipIcon: { fontSize: 14, lineHeight: 18 },
+  cityFlag: { width: 16, height: 16, transform: [{ translateY: -1 }] },
   badges: { height: 82, marginTop: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   badge: { width: 68, alignItems: 'center' },
   badgeLabel: { width: 72, marginTop: 4, color: colors.text, fontSize: 10, lineHeight: 10, fontWeight: '400', letterSpacing: -0.12, textAlign: 'center' },

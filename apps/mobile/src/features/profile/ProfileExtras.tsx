@@ -1,84 +1,273 @@
 import type { ProfileExtrasResult, RewardProgress } from '@tastes/contracts';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageBackground,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import burgerBadge from '../../../assets/profile/burger-lover.png';
-import cityBadge from '../../../assets/profile/city-explorer.png';
-import matchaBadge from '../../../assets/profile/matcha-hunter.png';
-import tiramisuBadge from '../../../assets/profile/tiramisu.png';
-import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import birthdayLocked from '../../../assets/rewards/birthday-keeper-locked.png';
+import cityLocked from '../../../assets/rewards/city-hopper-locked.png';
+import reviewLocked from '../../../assets/rewards/review-rookie-locked.png';
+import reviewUnlocked from '../../../assets/rewards/review-rookie.png';
+import socialLocked from '../../../assets/rewards/social-starter-locked.png';
+import spreadDetail from '../../../assets/rewards/spread-word-detail.png';
+import spreadLocked from '../../../assets/rewards/spread-word-locked.png';
+import closeIcon from '../../../assets/favourites/close-folder.png';
+import BackIcon from '../../../assets/leaderboard/back.svg';
+import rewardPattern from '../../../assets/onboarding/pattern.png';
 import { useTastesApi } from '../../session/SessionProvider';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 
 export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
 
-export function ProfileExtras({ onClose, screen, targetUserId, visible }: { onClose: () => void; screen: ProfileExtra; targetUserId?: string; visible: boolean }) {
+type RewardView = RewardProgress & {
+  lockedImage: ImageSourcePropType;
+  detailImage: ImageSourcePropType;
+  current: number;
+  target: number;
+};
+
+const REWARD_COPY = 'One answer is that Truth pertains to the possibility that an event will occur. If true – it must occur and if false, it cannot occur.';
+const REWARD_PRESENTATION = [
+  { name: 'Review Rookie', lockedImage: reviewLocked, detailImage: reviewUnlocked, current: 10, target: 10 },
+  { name: 'Social Starter', lockedImage: socialLocked, detailImage: socialLocked, current: 4, target: 10 },
+  { name: 'Birthday Keeper', lockedImage: birthdayLocked, detailImage: birthdayLocked, current: 3, target: 10 },
+  { name: 'Spread the Word', lockedImage: spreadLocked, detailImage: spreadDetail, current: 7, target: 10 },
+  { name: 'City Hopper', lockedImage: cityLocked, detailImage: cityLocked, current: 5, target: 10 },
+] as const;
+
+function rewardViews(data: ProfileExtrasResult | null): RewardView[] {
+  return REWARD_PRESENTATION.map((item, index) => {
+    const apiReward = data?.rewards[index];
+    const progress = apiReward?.progress ?? item.current / item.target;
+    return {
+      id: apiReward?.id ?? `reward-${index}`,
+      name: apiReward?.name || item.name,
+      description: apiReward?.description || REWARD_COPY,
+      progress,
+      completed: apiReward?.completed ?? progress >= 1,
+      xp: apiReward?.xp ?? 0,
+      lockedImage: item.lockedImage,
+      detailImage: item.detailImage,
+      current: apiReward ? Math.min(item.target, Math.round(progress * item.target)) : item.current,
+      target: item.target,
+    };
+  });
+}
+
+export function ProfileExtras({
+  onClose,
+  screen,
+  targetUserId,
+  visible,
+}: {
+  onClose: () => void;
+  screen: ProfileExtra;
+  targetUserId?: string;
+  visible: boolean;
+}) {
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
   const [enabled, setEnabled] = useState(true);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
   const [sms, setSms] = useState(false);
-  const [detail, setDetail] = useState<'rewardDetails' | 'achievement' | null>(null);
   const [data, setData] = useState<ProfileExtrasResult | null>(null);
-  const [detailReward, setDetailReward] = useState<RewardProgress | null>(null);
+  const [detailReward, setDetailReward] = useState<RewardView | null>(null);
+  const [achievementReward, setAchievementReward] = useState<RewardView | null>(null);
   const slide = useRef<SideSlideScreenHandle>(null);
-  const activeScreen = detail ?? screen;
-  const handleBack = () => detail ? setDetail(null) : slide.current?.close();
-  useEffect(() => { if (!visible) return; let active = true; void api.getProfileExtras(targetUserId ? { targetUserId } : {}).then((result) => { if (!active) return; setData(result.data); const p = result.data.notificationPreferences; setEnabled(p.enabled); setPush(p.push); setEmail(p.email); setSms(p.sms); }).catch(() => Alert.alert('Could not load profile details', 'Please try again.')); return () => { active = false; }; }, [api, targetUserId, visible]);
-  const savePreferences = (next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) => { setEnabled(next.enabled); setPush(next.push); setEmail(next.email); setSms(next.sms); void api.updateNotificationPreferences(next).catch(() => Alert.alert('Could not save notification settings', 'Please try again.')); };
 
-  const title = activeScreen === 'followers' ? 'Followers'
-    : activeScreen === 'following' ? 'Following'
-    : activeScreen === 'notifications' ? 'Notifications'
-      : activeScreen === 'rewardDetails' ? 'Reward details'
-        : activeScreen === 'achievement' ? 'Achievement'
-          : 'Rewards';
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    void api.getProfileExtras(targetUserId ? { targetUserId } : {})
+      .then((result) => {
+        if (!active) return;
+        setData(result.data);
+        const preferences = result.data.notificationPreferences;
+        setEnabled(preferences.enabled);
+        setPush(preferences.push);
+        setEmail(preferences.email);
+        setSms(preferences.sms);
+      })
+      .catch(() => Alert.alert('Could not load profile details', 'Please try again.'));
+    return () => { active = false; };
+  }, [api, targetUserId, visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setDetailReward(null);
+      setAchievementReward(null);
+    }
+  }, [visible]);
+
+  const savePreferences = (next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) => {
+    setEnabled(next.enabled);
+    setPush(next.push);
+    setEmail(next.email);
+    setSms(next.sms);
+    void api.updateNotificationPreferences(next)
+      .catch(() => Alert.alert('Could not save notification settings', 'Please try again.'));
+  };
+
+  const title = screen === 'followers' ? 'Followers'
+    : screen === 'following' ? 'Following'
+      : screen === 'notifications' ? 'Notifications'
+        : 'Rewards';
 
   return (
     <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
-        <View style={styles.header}><Pressable onPress={handleBack} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.title}>{title}</Text><View style={styles.headerButton} /></View>
-        {activeScreen === 'followers' || activeScreen === 'following' ? (
+        <View style={styles.header}>
+          <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
+            <BackIcon height={16} width={9} />
+          </Pressable>
+          <Text style={styles.title}>{title}</Text>
+          <View style={styles.headerButton} />
+        </View>
+
+        {screen === 'followers' || screen === 'following' ? (
           <ScrollView contentContainerStyle={styles.peopleList}>
-            <Text style={styles.section}>{activeScreen.toUpperCase()} ({data?.[activeScreen].length ?? 0})</Text>
-            {!data ? <ActivityIndicator color={colors.primary} /> : data[activeScreen].map((person) => <View key={person.userId} style={styles.person}><View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View><View style={styles.personCopy}><Text style={styles.personName}>{person.displayName}</Text><Text style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View><Pressable onPress={() => void (person.following ? api.unfollowUser({ targetUserId: person.userId }) : api.followUser({ targetUserId: person.userId })).then(() => setData((current) => current ? { ...current, [activeScreen]: current[activeScreen].map((candidate) => candidate.userId === person.userId ? { ...candidate, following: !candidate.following } : candidate) } : current))} style={[styles.follow, person.following && styles.following]}><Text style={styles.followText}>{person.following ? 'Following' : 'Follow'}</Text></Pressable></View>)}
+            <Text style={styles.sectionLabel}>{screen.toUpperCase()} ({data?.[screen].length ?? 0})</Text>
+            {!data ? <ActivityIndicator color={colors.primary} /> : data[screen].map((person) => (
+              <View key={person.userId} style={styles.person}>
+                <View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
+                <View style={styles.personCopy}><Text style={styles.personName}>{person.displayName}</Text><Text style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View>
+                <Pressable onPress={() => void (person.following ? api.unfollowUser({ targetUserId: person.userId }) : api.followUser({ targetUserId: person.userId })).then(() => setData((current) => current ? { ...current, [screen]: current[screen].map((candidate) => candidate.userId === person.userId ? { ...candidate, following: !candidate.following } : candidate) } : current))} style={[styles.follow, person.following && styles.following]}>
+                  <Text style={styles.followText}>{person.following ? 'Following' : 'Follow'}</Text>
+                </Pressable>
+              </View>
+            ))}
           </ScrollView>
-        ) : activeScreen === 'notifications' ? (
+        ) : screen === 'notifications' ? (
           <ScrollView contentContainerStyle={styles.settings}>
             <Setting label="Enable notifications" onChange={(value) => savePreferences({ enabled: value, push, email, sms })} styles={styles} value={enabled} />
             <View style={styles.notificationGap} />
             <Setting disabled={!enabled} label="Push notifications" onChange={(value) => savePreferences({ enabled, push: value, email, sms })} styles={styles} value={push} />
             <Setting disabled={!enabled} label="SMS notifications" onChange={(value) => savePreferences({ enabled, push, email, sms: value })} styles={styles} value={sms} />
           </ScrollView>
-        ) : activeScreen === 'rewardDetails' || activeScreen === 'achievement' ? (
-          <View style={styles.rewardDetail}><Image source={activeScreen === 'achievement' ? cityBadge : burgerBadge} style={styles.heroBadge} /><Text style={styles.rewardTitle}>{detailReward?.name ?? (activeScreen === 'achievement' ? 'City Explorer' : 'Burger Lover')}</Text><Text style={styles.rewardBody}>{detailReward?.description ?? 'Keep exploring places to complete this achievement.'}</Text><View style={styles.bigProgress}><View style={[styles.bigProgressFill, { width: `${(detailReward?.progress ?? 1) * 100}%` }]} /></View><Text style={styles.progressLabel}>{detailReward?.completed ? `Completed · ${detailReward.xp} XP earned` : `${Math.round((detailReward?.progress ?? 0) * 100)}% complete`}</Text></View>
         ) : (
-          <ScrollView contentContainerStyle={styles.rewards}>
-            <View style={styles.levelCard}><Text style={styles.levelEyebrow}>YOUR LEVEL</Text><Text style={styles.levelTitle}>Taste Explorer · Level {data?.level ?? '–'}</Text><Text style={styles.levelCopy}>{data?.xp ?? 0} XP</Text><View style={styles.progress}><View style={[styles.progressFill, { width: `${((data?.xp ?? 0) % 250) / 2.5}%` }]} /></View></View>
-            <Text style={styles.section}>BADGES</Text>
-            {(data?.rewards ?? []).map((reward, index) => <Pressable key={reward.id} onPress={() => { setDetailReward(reward); setDetail(reward.completed ? 'achievement' : 'rewardDetails'); }} style={styles.rewardRow}><Image source={[burgerBadge, tiramisuBadge, matchaBadge, cityBadge][index % 4]} style={styles.rewardImage} /><View style={styles.rewardCopy}><Text style={styles.rewardName}>{reward.name}</Text><Text style={styles.rewardDescription}>{reward.description}</Text><View style={styles.progress}><View style={[styles.progressFill, { width: `${reward.progress * 100}%` }]} /></View></View><Text style={styles.rewardPercent}>{Math.round(reward.progress * 100)}%</Text></Pressable>)}
-          </ScrollView>
+          <RewardsList
+            data={data}
+            onPress={(reward) => reward.completed ? setAchievementReward(reward) : setDetailReward(reward)}
+            styles={styles}
+          />
         )}
+
+        <RewardDetailsModal onClose={() => setDetailReward(null)} reward={detailReward} styles={styles} />
+        <AchievementModal
+          onClose={() => setAchievementReward(null)}
+          onViewAll={() => setAchievementReward(null)}
+          reward={achievementReward}
+          styles={styles}
+        />
       </View>
     </SideSlideScreen>
   );
+}
+
+function RewardsList({ data, onPress, styles }: { data: ProfileExtrasResult | null; onPress: (reward: RewardView) => void; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <ScrollView contentContainerStyle={styles.rewards} showsVerticalScrollIndicator={false}>
+      <View style={styles.levelTag}>
+        <Text style={styles.levelPrefix}>Current level:</Text>
+        <Text style={styles.levelName}>{(data?.level ?? 1) <= 1 ? 'Newbie' : `Level ${data?.level}`}</Text>
+      </View>
+      <View style={styles.rewardList}>
+        {rewardViews(data).map((reward) => (
+          <Pressable key={reward.id} onPress={() => onPress(reward)} style={({ pressed }) => [styles.rewardRow, pressed && styles.pressed]}>
+            <Image source={reward.lockedImage} style={styles.rewardImage} />
+            <View style={styles.rewardCopy}>
+              <Text style={styles.rewardName}>{reward.name}</Text>
+              <Text numberOfLines={2} style={styles.rewardDescription}>{reward.description}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function RewardDetailsModal({ onClose, reward, styles }: { onClose: () => void; reward: RewardView | null; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={reward !== null}>
+      <View style={styles.modalRoot}>
+        <Pressable onPress={onClose} style={styles.scrim} />
+        <View style={styles.detailSheet}>
+          <SheetHeader onClose={onClose} styles={styles}>Reward details</SheetHeader>
+          <View style={styles.detailContent}>
+            <Image source={reward?.detailImage} style={styles.detailImage} />
+            <ProgressCount current={reward?.current ?? 0} styles={styles} target={reward?.target ?? 10} />
+            <Text style={styles.detailName}>{reward?.name}</Text>
+            <Text style={styles.detailCopy}>{reward?.description}</Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function AchievementModal({ onClose, onViewAll, reward, styles }: { onClose: () => void; onViewAll: () => void; reward: RewardView | null; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={reward !== null}>
+      <View style={styles.modalRoot}>
+        <Pressable onPress={onClose} style={styles.scrim} />
+        <ImageBackground imageStyle={styles.achievementPatternImage} source={rewardPattern} style={styles.achievementSheet}>
+          <SheetHeader onClose={onClose} styles={styles}>Achievement unlocked !</SheetHeader>
+          <View style={styles.achievementBody}>
+            <View style={styles.achievementCard}>
+              <Image source={reward?.name === 'Review Rookie' ? reviewUnlocked : reward?.detailImage} style={styles.achievementImage} />
+              <View style={styles.achievementCopy}>
+                <ProgressCount current={reward?.target ?? 10} styles={styles} target={reward?.target ?? 10} />
+                <Text style={styles.rewardName}>{reward?.name}</Text>
+                <Text numberOfLines={2} style={styles.rewardDescription}>{reward?.description}</Text>
+              </View>
+            </View>
+            <Pressable onPress={onViewAll} style={styles.viewAllButton}><Text style={styles.viewAllText}>View all rewards</Text></Pressable>
+          </View>
+        </ImageBackground>
+      </View>
+    </Modal>
+  );
+}
+
+function SheetHeader({ children, onClose, styles }: { children: ReactNode; onClose: () => void; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <View style={styles.sheetHeader}>
+      <Text style={styles.sheetTitle}>{children}</Text>
+      <Pressable accessibilityLabel="Close" onPress={onClose}><Image source={closeIcon} style={styles.closeIcon} /></Pressable>
+    </View>
+  );
+}
+
+function ProgressCount({ current, styles, target }: { current: number; styles: ReturnType<typeof createStyles>; target: number }) {
+  return <Text style={styles.progressCount}><Text style={styles.progressCurrent}>{current}</Text> / {target}</Text>;
 }
 
 function Setting({ disabled = false, label, onChange, styles, value }: { disabled?: boolean; label: string; onChange: (value: boolean) => void; styles: ReturnType<typeof createStyles>; value: boolean }) {
   return <View style={[styles.setting, disabled && styles.disabledSetting]}><Text style={styles.settingLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} thumbColor="#FFFFFF" trackColor={{ false: '#353535', true: '#B82F29' }} value={value} /></View>;
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
+function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.canvas },
-    header: { height: safeTop + 60, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background },
+    screen: { flex: 1, backgroundColor: '#161616' },
+    header: { height: safeTop + 60, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
     headerButton: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
-    back: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300' },
-    title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
-    section: { marginTop: 18, marginBottom: 8, color: colors.textMuted, fontSize: 12 },
+    title: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
+    sectionLabel: { marginTop: 18, marginBottom: 8, color: colors.textMuted, fontSize: 12 },
     peopleList: { paddingHorizontal: 16, paddingBottom: 30 },
     person: { height: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
@@ -94,25 +283,36 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     setting: { height: 60, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
     disabledSetting: { opacity: 0.45 },
     settingLabel: { flex: 1, color: colors.text, fontSize: 15 },
-    rewards: { padding: 16, paddingBottom: 40 },
-    levelCard: { padding: 20, borderRadius: 20, backgroundColor: colors.surface },
-    levelEyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800' },
-    levelTitle: { marginTop: 8, color: colors.text, fontSize: 21, fontWeight: '800' },
-    levelCopy: { marginTop: 6, color: colors.textSecondary, fontSize: 13 },
-    progress: { height: 5, marginTop: 10, overflow: 'hidden', borderRadius: 3, backgroundColor: colors.surfaceRaised },
-    progressFill: { height: 5, borderRadius: 3, backgroundColor: colors.primary },
-    rewardRow: { minHeight: 106, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    rewardImage: { width: 66, height: 82, resizeMode: 'contain' },
-    rewardCopy: { flex: 1, marginLeft: 8 },
-    rewardName: { color: colors.text, fontSize: 15, fontWeight: '700' },
-    rewardDescription: { marginTop: 4, color: colors.textSecondary, fontSize: 12 },
-    rewardPercent: { marginLeft: 9, color: colors.textMuted, fontSize: 11 },
-    rewardDetail: { flex: 1, paddingHorizontal: 36, alignItems: 'center', justifyContent: 'center' },
-    heroBadge: { width: 180, height: 210, resizeMode: 'contain' },
-    rewardTitle: { marginTop: 10, color: colors.text, fontSize: 26, fontWeight: '800' },
-    rewardBody: { marginTop: 12, color: colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-    bigProgress: { width: '100%', height: 8, marginTop: 30, overflow: 'hidden', borderRadius: 4, backgroundColor: colors.surfaceRaised },
-    bigProgressFill: { height: 8, borderRadius: 4, backgroundColor: colors.primary },
-    progressLabel: { marginTop: 10, color: colors.textMuted, fontSize: 13 },
+    rewards: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(30, safeBottom) },
+    levelTag: { height: 38, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 100, backgroundColor: 'rgba(184,47,41,0.10)' },
+    levelPrefix: { color: '#FFFFFF', opacity: 0.5, fontSize: 14, letterSpacing: -0.41 },
+    levelName: { color: '#B82F29', fontSize: 16, fontWeight: '600', letterSpacing: -0.23 },
+    rewardList: { marginTop: 16, gap: 12 },
+    rewardRow: { height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16 },
+    rewardImage: { width: 84, height: 84, resizeMode: 'contain' },
+    rewardCopy: { flex: 1, gap: 7 },
+    rewardName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
+    rewardDescription: { color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
+    pressed: { opacity: 0.7 },
+    modalRoot: { flex: 1, justifyContent: 'flex-end' },
+    scrim: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
+    detailSheet: { height: 450 + safeBottom, paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#161616', overflow: 'hidden' },
+    sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sheetTitle: { color: '#FFFFFF', fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
+    closeIcon: { width: 30, height: 30 },
+    detailContent: { paddingHorizontal: 16, gap: 16, alignItems: 'center' },
+    detailImage: { width: 120, height: 120, resizeMode: 'contain' },
+    progressCount: { color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.41 },
+    progressCurrent: { color: '#B82F29' },
+    detailName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
+    detailCopy: { maxWidth: 370, color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+    achievementSheet: { paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+    achievementPatternImage: { opacity: 0.18, resizeMode: 'repeat' },
+    achievementBody: { paddingHorizontal: 16, gap: 24, alignItems: 'center' },
+    achievementCard: { width: '100%', height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16, backgroundColor: '#080808' },
+    achievementImage: { width: 84, height: 84, resizeMode: 'contain' },
+    achievementCopy: { flex: 1, gap: 6 },
+    viewAllButton: { width: 330, height: 54, alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#4C1816', borderRadius: 36, backgroundColor: '#B82F29' },
+    viewAllText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   });
 }

@@ -251,6 +251,7 @@ function MainTabs({
             const targetUserId = route.params?.userId ?? user.uid;
             return (
               <ProfileScreen
+                appliedFilters={discoverFilters}
                 currentUserId={user.uid}
                 fallbackName={user.displayName ?? 'Your profile'}
                 initialFollowing={route.params?.initialFollowing}
@@ -263,6 +264,7 @@ function MainTabs({
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
                 onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
+                onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
                 onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}

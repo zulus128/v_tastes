@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
-import { useSavedVenue, useSaveVenue, useUnsaveVenue } from '../favourites/api';
+import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
+import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -38,14 +39,14 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const [reactingId, setReactingId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<'hours' | 'photos' | 'sort' | null>(null);
   const [toast, setToast] = useState(false);
+  const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
   const details = usePlace(venueId);
   const reviews = usePlaceReviews(venueId, sort, reviewScope);
   const savedVenue = useSavedVenue(userId, venueId);
-  const save = useSaveVenue(userId);
   const unsave = useUnsaveVenue(userId);
   const saved = savedVenue.saved;
-  const busy = save.isPending || unsave.isPending;
+  const busy = unsave.isPending;
   async function reactToReview(reviewId: string) {
     if (reactingId) return;
     setReactingId(reviewId);
@@ -61,7 +62,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     if (saved) {
       unsave.mutate(venueId);
     } else {
-      save.mutate({ venueId, folderIds: [] }, { onSuccess: () => { setToast(true); setTimeout(() => setToast(false), 2200); } });
+      setSaveTarget({ venueId, name: details.data?.venue.name ?? '' });
     }
   };
 
@@ -115,6 +116,13 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
       <Hours visible={sheet === 'hours'} close={() => setSheet(null)} hours={place.openingHours} styles={styles} />
       <Gallery visible={sheet === 'photos'} close={() => setSheet(null)} photos={photos} styles={styles} />
       <Sort visible={sheet === 'sort'} close={() => setSheet(null)} selected={sort} select={setSort} styles={styles} />
+      <SaveToFolderSheet
+        onClose={() => setSaveTarget(null)}
+        onSaved={() => { setToast(true); setTimeout(() => setToast(false), 2200); }}
+        place={saveTarget}
+        userId={userId}
+        visible={saveTarget !== null}
+      />
     </View>
   );
 }

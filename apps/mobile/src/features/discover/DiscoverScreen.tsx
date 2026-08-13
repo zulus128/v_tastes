@@ -40,6 +40,7 @@ import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { matchesPlaceFilters } from './placeFilters';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
@@ -201,7 +202,7 @@ export function DiscoverScreen({
           />
         )
       ) : null}
-      {tab === 'places' && favouritesOpen ? <FavouritesPane onOpenPlace={onOpenPlace} userId={userId} /> : null}
+      {tab === 'places' && favouritesOpen ? <FavouritesPane appliedFilters={appliedFilters} onOpenFilters={onOpenFilters} onOpenPlace={onOpenPlace} userId={userId} /> : null}
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
@@ -506,18 +507,7 @@ function PlacesMap({
   const filtered = venues.filter((venue) => {
     const query = search.trim().toLowerCase();
     if (query && !venue.name.toLowerCase().includes(query)) return false;
-    const cuisines = appliedFilters.filter((value) => /🇮🇹|🇯🇵|🇬🇪|🇹🇭|🇺🇸|🇮🇳|🇲🇽|🇨🇳/.test(value)).map((value) => value.split(' ')[0]?.toLowerCase());
-    if (cuisines.length > 0 && !cuisines.some((value) => value && venue.category?.toLowerCase().includes(value))) return false;
-    const prices = appliedFilters.filter((value) => /^\${1,4}$/.test(value));
-    if (prices.length > 0 && !prices.includes('$'.repeat(venue.priceLevel ?? 1))) return false;
-    if (appliedFilters.includes('Vegetarian 🥦') && !['cafe', 'italian', 'japanese'].includes(venue.category?.toLowerCase() ?? '')) return false;
-    if (appliedFilters.includes('Vegan 🌱') && !['cafe', 'mexican'].includes(venue.category?.toLowerCase() ?? '')) return false;
-    if (appliedFilters.includes('Gluten free') && !['japanese', 'mexican'].includes(venue.category?.toLowerCase() ?? '')) return false;
-    if (appliedFilters.includes('Date night') && (venue.priceLevel ?? 1) < 2) return false;
-    if (appliedFilters.includes('With friends') && (venue.reviewCount ?? 0) < 200) return false;
-    if (appliedFilters.includes('Quick bite') && (venue.priceLevel ?? 1) > 2) return false;
-    if (appliedFilters.includes('Open late') && venue.category?.toLowerCase() === 'cafe') return false;
-    return true;
+    return matchesPlaceFilters(venue, appliedFilters);
   }).sort((left, right) => sort === 'top' ? (right.rating ?? 0) - (left.rating ?? 0) : sort === 'nearest' ? (left.distanceKm ?? 999) - (right.distanceKm ?? 999) : sort === 'reviewed' ? (right.reviewCount ?? 0) - (left.reviewCount ?? 0) : sort === 'newest' ? Number(right.discoverTags?.includes('new')) - Number(left.discoverTags?.includes('new')) : ((right.rating ?? 0) * 10 + (right.reviewCount ?? 0) / 100) - ((left.rating ?? 0) * 10 + (left.reviewCount ?? 0) / 100));
 
   async function toggleLocation() { if (locationEnabled) { setLocationEnabled(false); return; } const permission = await Location.requestForegroundPermissionsAsync(); if (permission.status === 'granted') { const position = await Location.getCurrentPositionAsync(); const next = { latitude: position.coords.latitude, longitude: position.coords.longitude, latitudeDelta: 0.045, longitudeDelta: 0.045 }; setRegion(next); mapRef.current?.animateToRegion(next, 450); setLocationEnabled(true); } else Alert.alert('Location is off', 'Enable location in Settings or keep browsing the selected city.'); }

@@ -367,10 +367,8 @@ export function TastesAIScreen({
         visible={historyOpen}
       />
       <SaveToFolderSheet
-        onClose={() => {
-          setSavedPlace(null);
-          showToast('Saved to favourites');
-        }}
+        onClose={() => setSavedPlace(null)}
+        onSaved={() => showToast('Saved to favourites')}
         place={savedPlace}
         userId={userId}
         visible={savedPlace !== null}
