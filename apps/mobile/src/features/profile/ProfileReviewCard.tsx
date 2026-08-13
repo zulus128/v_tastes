@@ -17,7 +17,7 @@ const tagLabels: Record<string, string> = {
 
 function DishPhoto({ path }: { path?: string }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
-  const normalizedPath = path?.trim();
+  const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
 
   useEffect(() => {
     let active = true;

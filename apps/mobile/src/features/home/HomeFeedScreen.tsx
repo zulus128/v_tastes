@@ -48,7 +48,7 @@ const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 
 
 function DishPhoto({ photoPath }: { photoPath?: string }) {
   const [uri, setUri] = useState<string>();
-  const normalizedPath = photoPath?.trim();
+  const normalizedPath = photoPath?.trim().replace(/^\/+|\/+$/g, '');
 
   useEffect(() => {
     let active = true;
