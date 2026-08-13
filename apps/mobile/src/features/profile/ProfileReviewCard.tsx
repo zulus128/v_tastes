@@ -15,16 +15,23 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
-function DishPhoto({ path }: { path: string }) {
+function DishPhoto({ path }: { path?: string }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+  const normalizedPath = path?.trim();
 
   useEffect(() => {
     let active = true;
-    void getDownloadURL(storageRef(storage, path)).then((value) => {
+    if (!normalizedPath) {
+      setState({ failed: true });
+      return () => { active = false; };
+    }
+
+    setState({ failed: false });
+    void getDownloadURL(storageRef(storage, normalizedPath)).then((value) => {
       if (active) setState({ uri: value, failed: false });
-    }).catch((error) => { captureException(error, { operation: 'load-profile-review-photo', path }); if (active) setState({ failed: true }); });
+    }).catch((error) => { captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath }); if (active) setState({ failed: true }); });
     return () => { active = false; };
-  }, [path]);
+  }, [normalizedPath]);
 
   return state.uri
     ? <Image source={{ uri: state.uri }} style={staticStyles.dishImage} />

@@ -43,19 +43,25 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
-function DishPhoto({ path, styles }: { path: string; styles: ReturnType<typeof createStyles> }) {
+function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof createStyles> }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+  const normalizedPath = path?.trim();
   useEffect(() => {
     let active = true;
+    if (!normalizedPath) {
+      setState({ failed: true });
+      return () => { active = false; };
+    }
+
     setState({ failed: false });
-    void getDownloadURL(storageRef(storage, path)).then((uri) => {
+    void getDownloadURL(storageRef(storage, normalizedPath)).then((uri) => {
       if (active) setState({ uri, failed: false });
     }).catch((error) => {
-      captureException(error, { operation: 'load-comments-review-photo', path });
+      captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });
       if (active) setState({ failed: true });
     });
     return () => { active = false; };
-  }, [path]);
+  }, [normalizedPath]);
   if (state.uri) return <Image source={{ uri: state.uri }} style={styles.dishImage} />;
   return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
 }
