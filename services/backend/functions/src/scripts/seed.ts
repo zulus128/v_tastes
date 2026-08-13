@@ -21,6 +21,7 @@ if (seedRemote) {
   delete process.env.FIRESTORE_EMULATOR_HOST;
 } else {
   process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8180';
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST ??= '127.0.0.1:9199';
   process.env.GCLOUD_PROJECT ??= 'demo-tastes';
 }
 
