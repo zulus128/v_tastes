@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -163,29 +162,29 @@ export function FavouritesPane({ onOpenPlace, userId }: { onOpenPlace: (venueId:
               <Text style={styles.sortChevron}>▾</Text>
             </Pressable>
           </View>
-          <FlatList
+          <ScrollView
             contentContainerStyle={styles.placeList}
-            data={[...places].sort((left, right) => sort === 'top' ? right.rating - left.rating : sort === 'nearest' ? left.distanceKm - right.distanceKm : right.savedAt.localeCompare(left.savedAt))}
-            initialNumToRender={8}
-            keyExtractor={(place) => place.venueId}
-            maxToRenderPerBatch={8}
-            ListFooterComponent={favourites.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
-            onEndReached={() => {
-              if (favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
+            nestedScrollEnabled
+            onScroll={({ nativeEvent }) => {
+              const nearEnd = nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y
+                >= nativeEvent.contentSize.height - 120;
+              if (nearEnd && favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
             }}
-            onEndReachedThreshold={0.5}
-            windowSize={7}
-            renderItem={({ item: place, index }) => (
+            scrollEventThrottle={120}
+            showsVerticalScrollIndicator={false}
+          >
+            {[...places].sort((left, right) => sort === 'top' ? right.rating - left.rating : sort === 'nearest' ? left.distanceKm - right.distanceKm : right.savedAt.localeCompare(left.savedAt)).map((place, index) => (
               <FavouriteCard
                 index={index}
+                key={place.venueId}
                 onOpen={() => onOpenPlace(place.venueId)}
                 onUnsave={() => unsaveVenue.mutate(place.venueId)}
                 place={place}
                 styles={styles}
               />
-            )}
-            showsVerticalScrollIndicator={false}
-          />
+            ))}
+            {favourites.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
+          </ScrollView>
         </>
       ) : null}
 
