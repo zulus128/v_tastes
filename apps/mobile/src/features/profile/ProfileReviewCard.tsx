@@ -32,8 +32,18 @@ function DishPhoto({ path }: { path?: string }) {
       return () => { active = false; };
     }
 
+    let download: Promise<string>;
+    try {
+      download = getDownloadURL(photoRef);
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
+        captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath });
+      setState({ failed: true });
+      return () => { active = false; };
+    }
+
     setState({ failed: false });
-    void getDownloadURL(photoRef).then((value) => {
+    void download.then((value) => {
       if (active) setState({ uri: value, failed: false });
     }).catch((error) => {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')

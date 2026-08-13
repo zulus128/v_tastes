@@ -67,7 +67,19 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
       };
     }
 
-    void getDownloadURL(photoRef)
+    let download: Promise<string>;
+    try {
+      download = getDownloadURL(photoRef);
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
+        captureException(error, { operation: 'load-review-dish-photo', photoPath: normalizedPath });
+      setUri(undefined);
+      return () => {
+        active = false;
+      };
+    }
+
+    void download
       .then((nextUri) => {
         if (active) setUri(nextUri);
       })
