@@ -18,10 +18,14 @@ import {
   Modal,
   type ImageSourcePropType,
 } from 'react-native';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import SearchIcon from '../../../assets/favourites/search.svg';
+import VoiceIcon from '../../../assets/profile/followers-voice.svg';
+import MapLayersIcon from '../../../assets/discover/map-layers.svg';
+import MapTuneIcon from '../../../assets/discover/map-tune.svg';
 import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import {
@@ -44,6 +48,21 @@ import { matchesPlaceFilters } from './placeFilters';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
+
+const DARK_MAP_STYLE: MapStyleElement[] = [
+  { elementType: 'geometry', stylers: [{ color: '#212121' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8F96A4' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#3A3A3A' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#252525' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#173B22' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2C2C2C' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#171717' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3A3022' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2B2B2B' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#102D43' }] },
+];
 
 type Place = {
   venueId: string;
@@ -481,67 +500,122 @@ function PlacesMap({
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(true);
-  const [layer, setLayer] = useState<'default' | 'transit' | 'satellite'>('default');
   const [layersOpen, setLayersOpen] = useState(false);
+  const [mapLayers, setMapLayers] = useState({ friends: true, saved: true, openNow: false });
   const mapRef = useRef<MapView | null>(null);
   const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
-  const [sort, setSort] = useState<'best' | 'top' | 'nearest' | 'reviewed' | 'newest'>('best');
-  const [sortOpen, setSortOpen] = useState(false);
-  const catalogueQuery = useDiscoverVenues(userId);
   const venuesQuery = useDiscoverVenues(userId, activeFilter ?? {});
-  const catalogueVenues = catalogueQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
-  const categories = useMemo(
-    () => [...new Set(catalogueVenues.map((venue) => venue.category).filter((value): value is string => Boolean(value)))],
-    [catalogueVenues],
-  );
-  const filters = useMemo<MapFilter[]>(
-    () => [
-      { key: 'trending', label: '🔥 Trending', tag: 'trending' },
-      ...categories.map((category) => ({ key: `category:${category}`, label: category, category })),
-    ],
-    [categories],
-  );
+  const filters: MapFilter[] = [
+    { key: 'trending', label: '🔥 Trending', tag: 'trending' },
+    { key: 'restaurant', label: 'Restaurant', category: 'Restaurant' },
+    { key: 'cafe', label: '☕ Cafe', category: 'Cafe' },
+    { key: 'bar', label: 'Bar', category: 'Bar' },
+  ];
 
   const filtered = venues.filter((venue) => {
     const query = search.trim().toLowerCase();
-    if (query && !venue.name.toLowerCase().includes(query)) return false;
+    const searchable = [venue.name, venue.address, venue.city, venue.category]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (query && !searchable.includes(query)) return false;
     return matchesPlaceFilters(venue, appliedFilters);
-  }).sort((left, right) => sort === 'top' ? (right.rating ?? 0) - (left.rating ?? 0) : sort === 'nearest' ? (left.distanceKm ?? 999) - (right.distanceKm ?? 999) : sort === 'reviewed' ? (right.reviewCount ?? 0) - (left.reviewCount ?? 0) : sort === 'newest' ? Number(right.discoverTags?.includes('new')) - Number(left.discoverTags?.includes('new')) : ((right.rating ?? 0) * 10 + (right.reviewCount ?? 0) / 100) - ((left.rating ?? 0) * 10 + (left.reviewCount ?? 0) / 100));
+  });
 
   async function toggleLocation() { if (locationEnabled) { setLocationEnabled(false); return; } const permission = await Location.requestForegroundPermissionsAsync(); if (permission.status === 'granted') { const position = await Location.getCurrentPositionAsync(); const next = { latitude: position.coords.latitude, longitude: position.coords.longitude, latitudeDelta: 0.045, longitudeDelta: 0.045 }; setRegion(next); mapRef.current?.animateToRegion(next, 450); setLocationEnabled(true); } else Alert.alert('Location is off', 'Enable location in Settings or keep browsing the selected city.'); }
-  function zoom(multiplier: number) { const next = { ...region, latitudeDelta: Math.min(0.8, Math.max(0.008, region.latitudeDelta * multiplier)), longitudeDelta: Math.min(0.8, Math.max(0.008, region.longitudeDelta * multiplier)) }; setRegion(next); mapRef.current?.animateToRegion(next, 240); }
+
+  function focusFirstSearchResult() {
+    const venue = filtered.find((item) => item.latitude != null && item.longitude != null);
+    if (!venue) return;
+    mapRef.current?.animateToRegion({
+      latitude: venue.latitude!,
+      longitude: venue.longitude!,
+      latitudeDelta: 0.035,
+      longitudeDelta: 0.035,
+    }, 350);
+  }
+
+  function toggleMapLayer(key: keyof typeof mapLayers) {
+    setMapLayers((current) => ({ ...current, [key]: !current[key] }));
+  }
 
   return (
     <View style={styles.mapScreen}>
-      <MapView ref={mapRef} initialRegion={region} mapType={layer === 'satellite' ? 'hybrid' : 'standard'} onRegionChangeComplete={setRegion} showsCompass={false} showsMyLocationButton={false} showsTraffic={layer === 'transit'} showsUserLocation={locationEnabled} style={styles.mapNative}>{filtered.filter((venue) => venue.latitude != null && venue.longitude != null).map((venue) => <Marker coordinate={{ latitude: venue.latitude!, longitude: venue.longitude! }} key={venue.id} onPress={() => onOpenPlace(venue.id)}><View style={styles.mapPin}><Text style={styles.mapPinText}>{(venue.rating ?? 0).toFixed(1)}</Text><View style={styles.mapPinTip} /></View></Marker>)}</MapView>
+      <MapView
+        customMapStyle={DARK_MAP_STYLE}
+        initialRegion={region}
+        mapType="standard"
+        onRegionChangeComplete={setRegion}
+        ref={mapRef}
+        showsCompass={false}
+        showsMyLocationButton={false}
+        showsPointsOfInterests={false}
+        showsUserLocation={locationEnabled}
+        style={styles.mapNative}
+        toolbarEnabled={false}
+        userInterfaceStyle="dark"
+      >
+        {filtered.filter((venue) => venue.latitude != null && venue.longitude != null).map((venue) => (
+          <Marker
+            anchor={{ x: 0.16, y: 1 }}
+            coordinate={{ latitude: venue.latitude!, longitude: venue.longitude! }}
+            key={venue.id}
+            onPress={() => onOpenPlace(venue.id)}
+          >
+            <View style={styles.mapMarker}>
+              <View style={[styles.mapMarkerImageWrap, savedVenueIds.has(venue.id) && styles.mapMarkerSaved]}>
+                <Image source={venueImage(venue.imageUrl)} style={styles.mapMarkerImage} />
+                <View style={styles.mapMarkerDot} />
+              </View>
+              <View style={styles.mapMarkerCopy}>
+                <Text numberOfLines={1} style={styles.mapMarkerName}>{venue.name}</Text>
+                <Text numberOfLines={1} style={styles.mapMarkerCategory}>{venue.category ?? 'Place'}</Text>
+              </View>
+            </View>
+          </Marker>
+        ))}
+      </MapView>
       {!locationEnabled ? <Pressable onPress={() => void toggleLocation()} style={styles.locationBanner}><Text style={styles.locationBannerTitle}>Location is off</Text><Text style={styles.locationBannerCopy}>Turn on location to discover places and friends near you.</Text></Pressable> : null}
-      {layer !== 'default' ? <View style={styles.layerBadge}><Text style={styles.layerBadgeText}>{layer === 'transit' ? 'Transit' : 'Satellite'} map</Text></View> : null}
-      <View style={styles.mapControls}>
-        <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.65)}><Text style={styles.mapControl}>+</Text></Pressable>
-        <Pressable accessibilityLabel="Zoom out" onPress={() => zoom(1.5)}><Text style={styles.mapControl}>−</Text></Pressable>
-        <Pressable accessibilityLabel={locationEnabled ? 'Disable location' : 'Enable location'} onPress={() => void toggleLocation()}><Text style={[styles.mapControl, !locationEnabled && styles.mapControlActive]}>⌖</Text></Pressable>
-        <Pressable accessibilityLabel="Map layers" onPress={() => setLayersOpen((value) => !value)}><Text style={[styles.mapControl, layersOpen && styles.mapControlActive]}>▱</Text></Pressable>
-      </View>
-      {layersOpen ? <View style={styles.layersMenu}>{(['default', 'transit', 'satellite'] as const).map((value) => <Pressable key={value} onPress={() => { setLayer(value); setLayersOpen(false); }} style={[styles.layerOption, layer === value && styles.layerOptionActive]}><Text style={styles.layerOptionText}>{value[0].toUpperCase() + value.slice(1)}</Text></Pressable>)}</View> : null}
+      <Pressable
+        accessibilityLabel="Show on map"
+        accessibilityState={{ expanded: layersOpen }}
+        onPress={() => setLayersOpen((value) => !value)}
+        style={[styles.mapLayersButton, layersOpen && styles.mapLayersButtonActive]}
+      >
+        <MapLayersIcon height={15} width={22} />
+      </Pressable>
+      {layersOpen ? (
+        <View style={styles.layersMenu}>
+          <Text style={styles.layersTitle}>Show on map</Text>
+          <MapLayerToggle active={mapLayers.friends} label="Friends" onPress={() => toggleMapLayer('friends')} styles={styles} />
+          <MapLayerToggle active={mapLayers.saved} label="Saved" onPress={() => toggleMapLayer('saved')} styles={styles} />
+          <MapLayerToggle active={mapLayers.openNow} label="Open now" onPress={() => toggleMapLayer('openNow')} styles={styles} />
+        </View>
+      ) : null}
       <View style={styles.mapSheet}>
         <View style={styles.sheetHandle} />
         <View style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
-            <Text style={styles.searchGlyph}>⌕</Text>
+            <SearchIcon height={24} width={24} />
             <TextInput
+              autoCorrect={false}
               onChangeText={setSearch}
+              onSubmitEditing={focusFirstSearchResult}
               placeholder="Search"
               placeholderTextColor={colors.placeholder}
+              returnKeyType="search"
               style={styles.mapSearchInput}
               value={search}
             />
-            <Text style={styles.voiceGlyph}>●</Text>
+            <VoiceIcon height={24} width={24} />
           </View>
-          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><Text style={styles.filterGlyph}>☷</Text></Pressable>
-          <Pressable accessibilityLabel="Open favourites" hitSlop={10} onPress={onOpenFavourites}>
-            <Text style={[styles.filterGlyph, styles.favouritesGlyph]}>♥</Text>
+          <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapHeaderIcon}>
+            <MapTuneIcon height={22} width={18} />
+          </Pressable>
+          <Pressable accessibilityLabel="Open favourites" hitSlop={8} onPress={onOpenFavourites} style={styles.mapHeaderIcon}>
+            <BookmarkIcon height={20} width={18} />
           </Pressable>
         </View>
         <ScrollView
@@ -563,7 +637,6 @@ function PlacesMap({
             );
           })}
         </ScrollView>
-        <Pressable onPress={() => setSortOpen(true)} style={styles.mapSort}><Text style={styles.mapSortText}>Sort by: {sort === 'best' ? 'Best match' : sort === 'top' ? 'Top rated' : sort === 'nearest' ? 'Nearest first' : sort === 'reviewed' ? 'Most reviewed' : 'Newest'} ▾</Text></Pressable>
         {venuesQuery.isPending ? (
           <View style={styles.placesStatus}><ActivityIndicator color={colors.primary} /></View>
         ) : venuesQuery.isError ? (
@@ -602,8 +675,34 @@ function PlacesMap({
           </ScrollView>
         )}
       </View>
-      <Modal animationType="fade" transparent visible={sortOpen} onRequestClose={() => setSortOpen(false)}><Pressable onPress={() => setSortOpen(false)} style={styles.sortScrim}><View style={styles.sortMenu}><Text style={styles.sortTitle}>Sort by</Text>{([['best', 'Best match'], ['top', 'Top rated'], ['nearest', 'Nearest first'], ['reviewed', 'Most reviewed'], ['newest', 'Newest']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setSort(value); setSortOpen(false); }} style={styles.sortOption}><Text style={styles.sortOptionText}>{label}</Text><Text style={styles.sortOptionText}>{sort === value ? '●' : '○'}</Text></Pressable>)}</View></Pressable></Modal>
     </View>
+  );
+}
+
+function MapLayerToggle({
+  active,
+  label,
+  onPress,
+  styles,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: active }}
+      onPress={onPress}
+      style={styles.layerRow}
+    >
+      <Text style={styles.layerOptionText}>{label}</Text>
+      <View style={[styles.layerSwitch, active && styles.layerSwitchActive]}>
+        <View style={[styles.layerSwitchThumb, active && styles.layerSwitchThumbActive]} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -1192,37 +1291,34 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   gemMeta: { color: colors.textSecondary, fontSize: 11 },
   mapScreen: { flex: 1, backgroundColor: '#161616', overflow: 'hidden' },
   mapNative: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  mapPin: { width: 42, height: 42, marginBottom: 8, borderRadius: 21, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center', shadowColor: '#FF4757', shadowOpacity: 0.65, shadowRadius: 10 },
-  mapPinText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  mapPinTip: { position: 'absolute', bottom: -4, width: 10, height: 10, backgroundColor: '#FF4757', transform: [{ rotate: '45deg' }] },
-  mapControls: { position: 'absolute', top: 94, right: 16, gap: 8 },
-  mapControl: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(22,22,22,0.9)', color: '#FFFFFF', fontSize: 22, lineHeight: 40, textAlign: 'center', overflow: 'hidden' },
-  mapControlActive: { backgroundColor: colors.primary },
-  locationBanner: { position: 'absolute', top: 94, left: 16, right: 72, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, backgroundColor: 'rgba(22,22,22,0.94)' },
+  mapMarker: { width: 126, minHeight: 52, flexDirection: 'row', gap: 4, alignItems: 'flex-start' },
+  mapMarkerImageWrap: { width: 36, height: 36, marginTop: 2, borderRadius: 18, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#161616', alignItems: 'center', justifyContent: 'center' },
+  mapMarkerSaved: { borderColor: colors.primary },
+  mapMarkerImage: { width: 32, height: 32, borderRadius: 16, resizeMode: 'cover' },
+  mapMarkerDot: { position: 'absolute', left: 16, bottom: -12, width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
+  mapMarkerCopy: { width: 82, paddingTop: 4 },
+  mapMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  mapMarkerCategory: { marginTop: 1, color: '#D9D9D9', fontSize: 11 },
+  locationBanner: { position: 'absolute', top: 10, left: 16, right: 68, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, backgroundColor: 'rgba(22,22,22,0.94)' },
   locationBannerTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   locationBannerCopy: { marginTop: 3, color: '#C9C9C9', fontSize: 11, lineHeight: 15 },
-  layerBadge: { position: 'absolute', top: 52, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 15, backgroundColor: 'rgba(22,22,22,0.86)' },
-  layerBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  layersMenu: { position: 'absolute', top: 94, right: 66, width: 130, padding: 6, gap: 4, borderRadius: 14, backgroundColor: 'rgba(22,22,22,0.96)' },
-  layerOption: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
-  layerOptionActive: { backgroundColor: colors.primary },
-  layerOptionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 330, paddingTop: 8, paddingHorizontal: 16, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: colors.canvas },
+  mapLayersButton: { position: 'absolute', top: 10, right: 16, width: 36, height: 36, borderWidth: 3, borderColor: '#080808', borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF2525', shadowOpacity: 0.25, shadowRadius: 15 },
+  mapLayersButtonActive: { borderColor: '#FFFFFF' },
+  layersMenu: { position: 'absolute', zIndex: 3, top: 54, right: 16, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 16, backgroundColor: '#1C1C1F', shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  layersTitle: { marginBottom: 4, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
+  layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  layerOptionText: { color: '#FFFFFF', fontSize: 15 },
+  layerSwitch: { width: 38, height: 22, padding: 2, justifyContent: 'center', borderRadius: 11, backgroundColor: '#5A5B60' },
+  layerSwitchActive: { backgroundColor: colors.primary },
+  layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
+  layerSwitchThumbActive: { alignSelf: 'flex-end' },
+  mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%', minHeight: 330, paddingTop: 8, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
   sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  mapSearchRow: { height: 49, marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mapSort: { alignSelf: 'flex-end', marginTop: 3, marginBottom: 3, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 13, backgroundColor: colors.surfaceRaised },
-  mapSortText: { color: colors.textSecondary, fontSize: 11 },
-  sortScrim: { flex: 1, justifyContent: 'flex-end', padding: 16, backgroundColor: 'rgba(0,0,0,0.65)' },
-  sortMenu: { padding: 18, borderRadius: 22, backgroundColor: colors.surface },
-  sortTitle: { marginBottom: 8, color: colors.text, fontSize: 18, fontWeight: '700' },
-  sortOption: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  sortOptionText: { color: colors.text, fontSize: 15 },
+  mapSearchRow: { height: 51, marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 12 },
   mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
   searchGlyph: { color: colors.textSecondary, fontSize: 21 },
   mapSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-  voiceGlyph: { color: colors.textSecondary, fontSize: 12 },
-  filterGlyph: { color: colors.text, fontSize: 22 },
-  favouritesGlyph: { color: colors.primary },
+  mapHeaderIcon: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center' },
   filterContent: { height: 38, alignItems: 'center', gap: 6 },
   filterChip: { height: 28, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   filterChipActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.12)' },
@@ -1232,7 +1328,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   placesStatusText: { color: colors.textSecondary, fontSize: 13 },
   inlineRetry: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceRaised },
   inlineRetryText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  placesList: { maxHeight: 170, marginTop: 8 },
+  placesList: { flex: 1, marginTop: 4 },
   placesListContent: { gap: 10, paddingBottom: 16 },
   loadMore: { height: 38, marginTop: 2, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
   loadMoreText: { color: colors.primary, fontSize: 13, fontWeight: '700' },

@@ -1,5 +1,7 @@
 type FilterablePlace = {
   category?: string | null;
+  distanceKm?: number | null;
+  isOpen?: boolean | null;
   priceLevel?: number | null;
   rating?: number | null;
 };
@@ -34,5 +36,12 @@ export function matchesPlaceFilters(place: FilterablePlace, filters: string[]) {
     || (value === 'Coffee ☕' && (category.includes('coffee') || category.includes('cafe')))
     || (value === 'Vegan coffee 🥛' && (category.includes('vegan') || category.includes('cafe')))
   ))) return false;
+
+  if (filters.includes('Vegetarian 🥦') && !/vegetarian|vegan/.test(category)) return false;
+
+  const maximumDistance = Number.parseFloat(valueFor(filters, 'Distance') ?? '');
+  if (Number.isFinite(maximumDistance) && place.distanceKm != null && place.distanceKm > maximumDistance) return false;
+
+  if (valueFor(filters, 'OpenNow') === 'true' && place.isOpen === false) return false;
   return true;
 }
