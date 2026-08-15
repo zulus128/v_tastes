@@ -1108,6 +1108,15 @@ describe('Milestone 2 completion callables', () => {
     const group = await callFunction<{ id: string }>('createGroup', {
       name: 'M2 Food Friends', memberIds: [firstUid, secondUid],
     }, owner.token);
+    expect((await callFunction<{
+      items: Array<{ id: string; kind: string; lastMessage: { text: string } | null }>;
+    }>('listConversations', { limit: 20 }, owner.token)).items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: group.id,
+        kind: 'group',
+        lastMessage: expect.objectContaining({ text: 'Group created' }),
+      }),
+    ]));
     const requestId = `group-${group.id}`;
     expect((await db.collection('users').doc(firstUid).collection('requests').doc(requestId).get()).exists).toBe(true);
     await callFunction('respondToRequest', { requestId, response: 'accepted' }, firstFriend.token);
@@ -1206,10 +1215,17 @@ describe('activity callables', () => {
       organizerId: organizerUid,
       participantIds: [organizerUid, friendUid],
       title: 'Activity Restaurant',
+      lastMessage: expect.objectContaining({ text: 'Activity created' }),
       status: 'active',
     });
     const friendInbox = await callFunction<{
-      items: Array<{ id: string; kind: string; title: string; activityId: string }>;
+      items: Array<{
+        id: string;
+        kind: string;
+        title: string;
+        activityId: string;
+        lastMessage: { text: string } | null;
+      }>;
     }>('listConversations', { limit: 20 }, friend.token);
     expect(friendInbox.items).toEqual(
       expect.arrayContaining([
@@ -1218,6 +1234,7 @@ describe('activity callables', () => {
           kind: 'activity',
           activityId: created.id,
           title: 'Activity Restaurant',
+          lastMessage: expect.objectContaining({ text: 'Activity created' }),
         }),
       ]),
     );

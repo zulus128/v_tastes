@@ -253,7 +253,12 @@ export const createGroup = onCall(callableOptions, async (request) => {
     lastReadAt: {},
     lastReadMessageIds: {},
     typing: {},
-    lastMessage: null,
+    lastMessage: {
+      id: `${ref.id}-created`,
+      senderId: uid,
+      text: 'Group created',
+      createdAt: now,
+    },
     messageCount: 0,
     status: 'active',
     createdAt: now,
