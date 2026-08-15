@@ -171,7 +171,7 @@ export function ProfileExtras({
         <View style={[styles.header, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
           <View style={styles.headerTitleRow}>
             <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
-              <BackIcon height={16} width={9} />
+              <BackIcon color={colors.text} height={16} width={9} />
             </Pressable>
             <Text style={styles.title}>{title}</Text>
             <View style={styles.headerButton} />

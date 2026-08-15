@@ -207,6 +207,7 @@ export function ChatScreen({
       </View>
 
       <ImageBackground
+        imageStyle={{ opacity: isDark ? 1 : 0.08 }}
         resizeMode="stretch"
         source={isDark ? dialogPattern : lightDialogPattern}
         style={[styles.patternBody, { backgroundColor: colors.canvas }]}

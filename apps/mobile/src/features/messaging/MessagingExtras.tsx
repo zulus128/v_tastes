@@ -63,6 +63,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
         title="Requests"
       />
       <ImageBackground
+        imageStyle={{ opacity: isDark ? 1 : 0.08 }}
         resizeMode="stretch"
         source={isDark ? dialogPattern : lightDialogPattern}
         style={[styles.patternBody, { backgroundColor: colors.canvas }]}
@@ -481,7 +482,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       flexDirection: 'row',
       alignItems: 'center',
       borderBottomWidth: 1,
-      borderBottomColor: '#45474B',
+      borderBottomColor: colors.border,
     },
     requestIcon: {
       width: 52,

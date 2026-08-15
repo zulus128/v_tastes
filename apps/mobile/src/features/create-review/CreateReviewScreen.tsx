@@ -23,17 +23,21 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { ClipPath, Defs, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Line, Path, Rect } from 'react-native-svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import pattern from '../../../assets/onboarding/pattern-screen.png';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
 import DeleteDishIcon from '../../../assets/create-review/delete-dish.svg';
+import PhotoAddLightIcon from '../../../assets/create-review/photo-add-light.svg';
 import RatingPin from '../../../assets/create-review/rating-pin.svg';
 import RatingScale from '../../../assets/create-review/rating-scale.svg';
+import RatingScaleLight from '../../../assets/create-review/rating-scale-light.svg';
 import SaveCheck from '../../../assets/create-review/save-check.svg';
 import SelectPlaceCircle from '../../../assets/create-review/select-place-circle.svg';
 import SelectPlacePlus from '../../../assets/create-review/select-place-plus.svg';
+import TagBirthdayIcon from '../../../assets/create-review/tag-birthday.svg';
+import TagChildrenIcon from '../../../assets/create-review/tag-children.svg';
+import TagNightIcon from '../../../assets/create-review/tag-night.svg';
 import successGlow from '../../../assets/create-review/success-glow.png';
 import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
@@ -72,9 +76,9 @@ const dishRatingMarkers = [
 ] as const;
 const tagOptions: Array<{ label: string; value: ReviewTag }> = [
   { label: 'Casual', value: 'casual' },
-  { label: '☾ Date night', value: 'date-night' },
-  { label: '♨ Birthday', value: 'birthday' },
-  { label: '☺ Children', value: 'children' },
+  { label: 'Date night', value: 'date-night' },
+  { label: 'Birthday', value: 'birthday' },
+  { label: 'Children', value: 'children' },
 ];
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
@@ -103,8 +107,8 @@ export function CreateReviewScreen({
   onPublished: () => void;
   userId: string;
 }) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
@@ -241,7 +245,7 @@ export function CreateReviewScreen({
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
-      <ImageBackground imageStyle={styles.patternImage} source={pattern} style={styles.screen}>
+      <ImageBackground imageStyle={styles.patternImage} source={successPattern} style={styles.screen}>
         <PatternBackgroundLift />
         <ScrollView
           automaticallyAdjustKeyboardInsets
@@ -252,7 +256,7 @@ export function CreateReviewScreen({
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={['#080808', '#080808', '#190404']}
+            colors={isDark ? ['#080808', '#080808', '#190404'] : ['#FFFFFF', '#FFFFFF', '#F8EBEA']}
             locations={[0, 0.65982, 1]}
             style={[styles.hero, { paddingTop: insets.top + 8 }]}
           >
@@ -270,18 +274,18 @@ export function CreateReviewScreen({
                     <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
                   </View>
                   <View style={styles.edit}>
-                    <PenIcon height={20} width={20} />
+                    <PenIcon color={colors.text} height={20} width={20} />
                   </View>
                 </Pressable>
                 <RatingCurve onChange={setRating} value={rating} />
               </>
             ) : (
               <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.selectPlace}>
-                {place.isPending && venueId ? <ActivityIndicator color="#fff" /> : (
+                {place.isPending && venueId ? <ActivityIndicator color={colors.text} /> : (
                   <View style={styles.selectPlaceContent}>
                     <View style={styles.selectPlaceIcon}>
-                      <SelectPlaceCircle height={21.5} style={styles.selectPlaceCircle} width={21.5} />
-                      <SelectPlacePlus height={7.5} style={styles.selectPlacePlus} width={7.5} />
+                      <SelectPlaceCircle color={colors.text} height={21.5} style={styles.selectPlaceCircle} width={21.5} />
+                      <SelectPlacePlus color={colors.text} height={7.5} style={styles.selectPlacePlus} width={7.5} />
                     </View>
                     <Text style={styles.selectPlaceText}>Select Place</Text>
                   </View>
@@ -305,10 +309,6 @@ export function CreateReviewScreen({
             textAlignVertical="top"
             value={text}
           />
-          <View style={styles.feedbackMeta}>
-            <Text style={styles.feedbackHint}>Tell others what stood out about your visit.</Text>
-            <Text style={styles.feedbackCount}>{text.length}/2,000</Text>
-          </View>
           {submitError ? (
             <View accessibilityRole="alert" style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{submitError === 'offline'
@@ -339,7 +339,7 @@ export function CreateReviewScreen({
               onPress={() => setDishEditor({ id: createIdempotencyKey('dish'), photoUri: '', rating: 1, title: '' })}
               style={styles.addDish}
             >
-              <AddDishIcon height={18.0656} width={20} />
+              <AddDishIcon color={colors.text} height={18.0654} width={20} />
               <Text style={styles.addDishText}>Add Dish</Text>
             </Pressable>
           ) : null}
@@ -353,17 +353,23 @@ export function CreateReviewScreen({
                   key={tag.value}
                   onPress={() => setTags((items) => selected ? items.filter((item) => item !== tag.value) : [...items, tag.value])}
                   style={[styles.tag, selected && styles.tagSelected]}
-                ><Text style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text></Pressable>
+                >
+                  <TagGlyph color={selected ? colors.onPrimary : colors.text} value={tag.value} />
+                  <Text style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text>
+                </Pressable>
               );
             })}
           </ScrollView>
         </ScrollView>
 
-        {!keyboardVisible ? <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        {!keyboardVisible ? <LinearGradient
+          colors={isDark ? ['rgba(8,8,8,0)', colors.background] : ['rgba(255,255,255,0)', '#FFFFFF']}
+          style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}
+        >
           <Pressable disabled={!valid || createReview.isPending} onPress={submit} style={[styles.post, (!valid || createReview.isPending) && styles.postDisabled]}>
             {createReview.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.postText}>Post Review</Text>}
           </Pressable>
-        </View> : null}
+        </LinearGradient> : null}
 
         <PlaceSelector
           onClose={() => setPlaceSelectorOpen(false)}
@@ -428,6 +434,13 @@ function SectionLabel({ label }: { label: string }) {
   return <Text style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
 }
 
+function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
+  if (value === 'date-night') return <TagNightIcon color={color} height={12} width={12} />;
+  if (value === 'birthday') return <TagBirthdayIcon color={color} height={12} width={12} />;
+  if (value === 'children') return <TagChildrenIcon color={color} height={12} width={12} />;
+  return null;
+}
+
 function RatingCurve({
   linear = false,
   onChange,
@@ -437,7 +450,10 @@ function RatingCurve({
   onChange: (value: number) => void;
   value: number;
 }) {
+  const { isDark } = useAppTheme();
   const accent = '#B82F29';
+  const curveBase = isDark ? '#3D1A1C' : '#FFCBCE';
+  const curvePoint = isDark ? '#120606' : '#FFFFFF';
   const selectedMarker = reviewRatingMarkers.find((marker) => marker.value === value);
   return (
     <View style={ratingStyles.wrap}>
@@ -469,7 +485,44 @@ function RatingCurve({
       </View>
       {linear ? (
         <View style={ratingStyles.scale}>
-          <RatingScale height={15.1808} width={359.903} />
+          {isDark
+            ? <RatingScale height={15.1808} width={359.903} />
+            : <RatingScaleLight height={15.1808} width={359.903} />}
+          {!isDark && value >= 1 ? (
+            <Svg height={15.1808} pointerEvents="none" style={ratingStyles.linearProgress} width={359.903}>
+              <Line
+                stroke={accent}
+                strokeLinecap="round"
+                strokeWidth={4}
+                x1={4}
+                x2={dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4}
+                y1={8}
+                y2={8}
+              />
+              {dishRatingMarkers.filter((marker) => marker.value <= value).map((marker) => Number.isInteger(marker.value) ? (
+                <Circle
+                  cx={marker.x}
+                  cy={7.59038}
+                  fill="#FFFFFF"
+                  key={marker.value}
+                  r={6.09038}
+                  stroke={accent}
+                  strokeWidth={3}
+                />
+              ) : (
+                <Line
+                  key={marker.value}
+                  stroke={accent}
+                  strokeLinecap="round"
+                  strokeWidth={2}
+                  x1={marker.x}
+                  x2={marker.x}
+                  y1={2}
+                  y2={13.3857}
+                />
+              ))}
+            </Svg>
+          ) : null}
           {dishRatingMarkers.map((marker) => (
             <Pressable
               accessibilityLabel={`${marker.value} stars`}
@@ -490,8 +543,8 @@ function RatingCurve({
                 <Rect height={139} width={selectedMarker?.x ?? 0} x={0} y={0} />
               </ClipPath>
             </Defs>
-            <Path d="M7 7 A167.8226 167.8226 0 0 0 169 131" fill="none" stroke="#3D1A1C" strokeLinecap="round" strokeWidth={4} />
-            <Path d="M169 131 A167.8226 167.8226 0 0 0 331 7" fill="none" stroke="#3D1A1C" strokeLinecap="round" strokeWidth={4} />
+            <Path d="M7 7 A167.8226 167.8226 0 0 0 169 131" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
+            <Path d="M169 131 A167.8226 167.8226 0 0 0 331 7" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
             {selectedMarker ? (
               <Path
                 clipPath="url(#review-rating-progress)"
@@ -517,12 +570,12 @@ function RatingCurve({
                 {selected ? (
                   <RatingPin color={accent} height={38} width={38} />
                 ) : marker.kind === 'dot' ? (
-                  <View style={[ratingStyles.point, active && ratingStyles.pointActive]} />
+                  <View style={[ratingStyles.point, { backgroundColor: curvePoint, borderColor: active ? accent : curveBase }]} />
                 ) : (
                   <View
                     style={[
                       ratingStyles.tick,
-                      active && ratingStyles.tickActive,
+                      { backgroundColor: active ? accent : curveBase },
                       { transform: [{ rotate: `${marker.rotation}deg` }] },
                     ]}
                   />
@@ -665,8 +718,8 @@ function DishEditor({
   value: DishReviewDraft | null;
   visible: boolean;
 }) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createDishStyles(colors), [colors]);
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createDishStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<DishReviewDraft | null>(value);
 
@@ -712,7 +765,11 @@ function DishEditor({
           style={styles.scroll}
         >
           <Pressable onPress={pickSource} style={styles.photo}>
-            {draft.photoUri ? <Image source={{ uri: draft.photoUri }} style={styles.photoImage} /> : <Text style={styles.photoAdd}>⊕</Text>}
+            {draft.photoUri
+              ? <Image source={{ uri: draft.photoUri }} style={styles.photoImage} />
+              : isDark
+                ? <Text style={styles.photoAdd}>⊕</Text>
+                : <PhotoAddLightIcon color={colors.text} height={23.3333} width={23.3333} />}
           </Pressable>
           <RatingCurve linear onChange={(rating) => setDraft({ ...draft, rating })} value={draft.rating} />
           <SectionLabel label="Title" />
@@ -782,19 +839,21 @@ function ReviewConfirmationSheet({
 }
 
 function ReviewAdded({ onDone }: { onDone: () => void }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createSuccessStyles(colors, isDark), [colors, isDark]);
   return (
-    <View style={successStyles.screen}>
-      <Image source={successPattern} style={successStyles.pattern} />
-      <Image source={successGlow} style={successStyles.glow} />
-      <View style={successStyles.center}>
-        <View style={successStyles.logo}>
-          <SuccessMouthPink height={61} style={successStyles.logoPink} width={77} />
-          <SuccessMouthOutline height={76} style={successStyles.logoOutline} width={105} />
+    <View style={styles.screen}>
+      <Image source={successPattern} style={styles.pattern} />
+      {isDark ? <Image source={successGlow} style={styles.glow} /> : null}
+      <View style={styles.center}>
+        <View style={styles.logo}>
+          <SuccessMouthPink height={61} style={styles.logoPink} width={77} />
+          <SuccessMouthOutline height={76} style={styles.logoOutline} width={105} />
         </View>
-        <Text style={successStyles.copy}>Your review has been added</Text>
+        <Text style={styles.copy}>Your review has been added</Text>
       </View>
-      <Pressable accessibilityRole="button" onPress={onDone} style={successStyles.done}>
-        <Text style={successStyles.doneText}>Back to Home</Text>
+      <Pressable accessibilityRole="button" onPress={onDone} style={styles.done}>
+        <Text style={styles.doneText}>Back to Home</Text>
       </Pressable>
     </View>
   );
@@ -803,53 +862,49 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
 const sectionStyles = StyleSheet.create({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
 const ratingStyles = StyleSheet.create({
   wrap: { height: 198, position: 'relative', alignItems: 'center' },
-  value: { position: 'absolute', top: 18, zIndex: 3, color: '#D33B35', fontSize: 34, lineHeight: 40, fontWeight: '500' },
-  stars: { position: 'absolute', top: 61, zIndex: 4, flexDirection: 'row', gap: 1 },
-  starButton: { width: 30, height: 38, alignItems: 'center', justifyContent: 'center' },
+  value: { position: 'absolute', top: 18, zIndex: 3, color: '#B82F29', fontSize: 34, lineHeight: 40, fontWeight: '500' },
+  stars: { position: 'absolute', top: 61, zIndex: 4, flexDirection: 'row', gap: 4 },
+  starButton: { width: 26, height: 38, alignItems: 'center', justifyContent: 'center' },
   starGlyph: { width: 26, height: 30 },
-  starOutline: { position: 'absolute', color: '#D33B35', fontSize: 29, lineHeight: 30 },
+  starOutline: { position: 'absolute', color: '#B82F29', opacity: 0.3, fontSize: 29, lineHeight: 30 },
   starFillClip: { position: 'absolute', height: 30, overflow: 'hidden' },
-  starFill: { width: 26, color: '#D33B35', fontSize: 27, lineHeight: 30 },
+  starFill: { width: 26, color: '#B82F29', fontSize: 27, lineHeight: 30 },
   curve: { position: 'absolute', top: 36, width: 338, height: 139 },
   scale: { position: 'absolute', top: 116, width: 360, height: 44, justifyContent: 'center' },
+  linearProgress: { position: 'absolute', left: 0, top: 14.4096 },
   pointHit: { position: 'absolute', zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   linearPointHit: { position: 'absolute', top: 0, zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  point: { width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: '#3D1A1C', backgroundColor: '#120606' },
-  pointActive: { borderColor: '#B82F29', backgroundColor: '#fff' },
-  tick: { width: 12, height: 2, borderRadius: 1, backgroundColor: '#3D1A1C' },
-  tickActive: { backgroundColor: '#B82F29' },
+  point: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
+  tick: { width: 12, height: 2, borderRadius: 1 },
 });
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.canvas },
-  patternImage: { opacity: colors.background === '#080808' ? 0.16 : 0.05, resizeMode: 'repeat' },
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: isDark ? colors.background : colors.canvas },
+  patternImage: { opacity: isDark ? 1 : 0.06, resizeMode: 'repeat', tintColor: '#161616' },
   content: { flexGrow: 1 },
   hero: { minHeight: 438, paddingHorizontal: 16, borderBottomLeftRadius: 210, borderBottomRightRadius: 210, overflow: 'hidden' },
-  heroBorder: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderBottomLeftRadius: 210, borderBottomRightRadius: 210 },
+  heroBorder: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.18)' : colors.border, borderBottomLeftRadius: 210, borderBottomRightRadius: 210 },
   navigation: { height: 54, flexDirection: 'row', alignItems: 'center' },
-  back: { color: '#fff', fontSize: 36, lineHeight: 38 },
-  title: { flex: 1, color: '#fff', fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  back: { color: colors.text, fontSize: 36, lineHeight: 38 },
+  title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },
   navigationSpacer: { width: 22 },
   selectPlace: { flex: 1, minHeight: 250, alignItems: 'center', justifyContent: 'center' },
   selectPlaceContent: { height: 44, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
   selectPlaceIcon: { width: 24, height: 24 },
   selectPlaceCircle: { position: 'absolute', top: 1.25, left: 1.25 },
   selectPlacePlus: { position: 'absolute', top: 8.25, left: 8.25 },
-  selectPlaceText: { color: '#fff', fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
+  selectPlaceText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
   venueCard: { minHeight: 142, flexDirection: 'row', alignItems: 'center' },
   venueImage: { width: 122, height: 122, borderRadius: 14 },
   venueCopy: { flex: 1, gap: 7, paddingLeft: 16 },
-  venueName: { color: '#fff', fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  venueAddress: { color: '#AAB2C5', fontSize: 15, lineHeight: 18 },
+  venueName: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  venueAddress: { color: colors.textSecondary, fontSize: 15, lineHeight: 18 },
   edit: { width: 44, height: 44, marginRight: -12, alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center' },
-  feedback: { minHeight: 50, marginHorizontal: 16, borderRadius: 12, padding: 12, color: colors.text, backgroundColor: colors.background, fontSize: 15, lineHeight: 20 },
-  feedbackMeta: { minHeight: 22, marginTop: 5, marginHorizontal: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  feedbackHint: { flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 16 },
-  feedbackCount: { color: colors.textMuted, fontSize: 12, lineHeight: 16 },
+  feedback: { minHeight: 50, marginHorizontal: 16, borderRadius: 12, padding: 12, color: colors.text, backgroundColor: colors.surface, fontSize: 16, lineHeight: 22 },
   errorBanner: { minHeight: 52, marginTop: 10, marginHorizontal: 16, borderWidth: 1, borderColor: '#D94D45', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 8, justifyContent: 'center', backgroundColor: 'rgba(217,77,69,0.12)' },
   errorBannerText: { color: '#D94D45', fontSize: 13, lineHeight: 16 },
   dishList: { gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
-  dishCard: { width: 174, padding: 12, borderRadius: 16, backgroundColor: colors.background },
+  dishCard: { width: 174, padding: 12, borderRadius: 16, backgroundColor: colors.surface },
   dishImage: { width: 150, height: 150, borderRadius: 14 },
   deleteDish: { position: 'absolute', right: 17, top: 17, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,22,22,0.2)' },
   dishRating: { position: 'absolute', top: 136, left: 12, color: '#fff', fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 9, paddingVertical: 4, borderBottomLeftRadius: 14, borderTopRightRadius: 10 },
@@ -857,12 +912,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   addDish: { height: 44, marginHorizontal: 16, flexDirection: 'row', gap: 8, borderRadius: 36, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(173,51,36,0.1)' },
   addDishText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
   tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18 },
-  tag: { height: 34, paddingHorizontal: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  tag: { minHeight: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   tagSelected: { borderColor: colors.primary, backgroundColor: '#D33B35' },
-  tagText: { color: colors.textMuted, fontSize: 13 },
+  tagText: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.23 },
   tagTextSelected: { color: '#fff' },
-  footer: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 14, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas },
-  post: { height: 58, borderWidth: 5, borderColor: '#4C1816', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' },
+  footer: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingHorizontal: 36 },
+  post: { height: 58, borderWidth: 5, borderColor: isDark ? '#4C1816' : '#FFFFFF', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' },
   postDisabled: { opacity: 0.45 },
   postText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });
@@ -890,18 +945,18 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
   more: { height: 54, alignItems: 'center', justifyContent: 'center' }, moreText: { color: colors.primary, fontWeight: '600' },
 });
 
-const createDishStyles = (colors: ThemeColors) => StyleSheet.create({
+const createDishStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
-  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
-  header: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
+  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? colors.border : '#45474B', backgroundColor: isDark ? colors.canvas : colors.surface },
+  header: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 }, close: { color: colors.text, fontSize: 27 },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 16, paddingBottom: 16 },
-  photo: { width: '100%', aspectRatio: 1, maxHeight: 370, borderWidth: 1, borderColor: colors.border, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.background },
+  photo: { width: '100%', aspectRatio: 1, maxHeight: 370, borderWidth: 1, borderColor: colors.border, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surfaceRaised },
   photoImage: { width: '100%', height: '100%', resizeMode: 'cover' }, photoAdd: { color: colors.textMuted, fontSize: 32 },
-  input: { height: 50, borderRadius: 12, paddingHorizontal: 12, color: colors.text, backgroundColor: colors.background, fontSize: 16 },
-  actions: { paddingTop: 14, paddingHorizontal: 16, flexDirection: 'row', gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas }, cancel: { flex: 1, height: 52, borderWidth: 1, borderColor: colors.primary, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontSize: 15 },
-  save: { flex: 1, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' }, saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 }, saveIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontSize: 15, fontWeight: '600' }, disabled: { opacity: 0.45 },
+  input: { height: 50, borderRadius: 12, paddingHorizontal: 12, color: colors.text, backgroundColor: colors.surfaceRaised, fontSize: 16 },
+  actions: { paddingTop: 16, paddingHorizontal: 16, flexDirection: 'row', gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: isDark ? colors.canvas : colors.surface }, cancel: { flex: 1, height: isDark ? 52 : 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'transparent' : colors.surface }, cancelText: { color: colors.text, fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
+  save: { flex: 1, height: isDark ? 52 : 40, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' }, saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 }, saveIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 }, disabled: { opacity: 0.5 },
 });
 
 const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
@@ -918,15 +973,15 @@ const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
   dangerText: { color: '#D94D45', fontSize: 16, fontWeight: '500' },
 });
 
-const successStyles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#161616' },
-  pattern: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', resizeMode: 'cover' },
+const createSuccessStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: isDark ? '#161616' : colors.canvas },
+  pattern: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', opacity: isDark ? 1 : 0.06, resizeMode: 'cover', tintColor: isDark ? undefined : '#161616' },
   glow: { position: 'absolute', left: '50%', top: '50%', width: 553, height: 552, marginLeft: -276.5, marginTop: -283 },
   center: { zIndex: 1, alignItems: 'center', gap: 29 },
   logo: { position: 'relative', width: 233, height: 95 },
   logoPink: { position: 'absolute', top: 22, left: 78 },
   logoOutline: { position: 'absolute', top: 9, left: 64, transform: [{ scaleY: -1 }] },
-  copy: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  done: { position: 'absolute', right: 36, bottom: 28, left: 36, height: 54, zIndex: 2, borderWidth: 5, borderColor: '#4C1816', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  copy: { color: colors.text, fontSize: 17, fontWeight: '600' },
+  done: { position: 'absolute', right: 36, bottom: 28, left: 36, height: 54, zIndex: 2, borderWidth: 5, borderColor: isDark ? '#4C1816' : '#FFFFFF', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
   doneText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });

@@ -148,13 +148,13 @@ export function ProfileTopBar({
   return (
     <View style={styles.topBar}>
       <Pressable accessibilityLabel={own ? 'Open settings' : 'Back'} onPress={own ? onSettings : onBack} style={styles.topAction}>
-        {own ? <SettingsIcon width={20} height={20} /> : <BackIcon width={9} height={16} />}
+        {own ? <SettingsIcon color={colors.text} width={16.9641} height={17.9167} /> : <BackIcon color={colors.text} width={9} height={16} />}
       </Pressable>
       <Text numberOfLines={1} style={styles.username}>
         {profile.username ? `@${profile.username}` : profile.displayName}
       </Text>
       <Pressable accessibilityLabel="Share profile" onPress={onShare} style={styles.topAction}>
-        <ShareIcon width={24} height={24} />
+          <ShareIcon color={colors.text} width={18.1673} height={18.1667} />
       </Pressable>
     </View>
   );

@@ -131,7 +131,7 @@ export function NewActivityScreen({
               <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
             </View>
             <Pressable accessibilityLabel="Change place" onPress={() => setPlaceOpen(true)} style={styles.edit}>
-              <PenIcon height={18} width={18} />
+              <PenIcon color={colors.text} height={18} width={18} />
             </Pressable>
           </View>
         ) : (

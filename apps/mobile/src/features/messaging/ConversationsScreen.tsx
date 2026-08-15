@@ -200,6 +200,7 @@ export function ConversationsScreen({
         </View>
       </View>
       <ImageBackground
+        imageStyle={{ opacity: isDark ? 1 : 0.08 }}
         resizeMode="stretch"
         source={isDark ? dialogPattern : lightDialogPattern}
         style={[styles.patternBody, { backgroundColor: colors.canvas }]}
@@ -281,7 +282,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       minHeight: 82,
       overflow: 'hidden',
       borderBottomWidth: 1,
-      borderBottomColor: '#45474B',
+      borderBottomColor: colors.border,
     },
     swipeContent: {},
     deleteAction: { position: 'absolute', top: 0, right: -82, bottom: 0, width: 82, backgroundColor: colors.danger },
