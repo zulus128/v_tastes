@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const PROJECT_ID = process.env.TEST_PROJECT_ID ?? 'demo-tastes';
@@ -880,6 +880,9 @@ describe('messaging callables', () => {
       idempotencyKey: 'message-command-0001',
       text: 'Hello from the real backend',
     };
+    await db.collection('conversations').doc(conversation.id).update({
+      typing: FieldValue.delete(),
+    });
     const firstMessage = await callFunction<{ id: string }>('sendMessage', command, first.token);
     const replayedMessage = await callFunction<{ id: string }>('sendMessage', command, first.token);
     expect(replayedMessage.id).toBe(firstMessage.id);

@@ -58,7 +58,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // A conversation can disappear while a stale deep link or cached route is
       // still open. The chat screen renders this as an ordinary empty/error
       // state, so do not turn the expected 404 into a React Native redbox.
-      if (operation === 'getMessages' && error.code === 'not-found') return;
+      if (
+        error.code === 'not-found'
+        && (operation === 'getMessages' || operation === 'setTypingStatus')
+      ) return;
       captureException(error, {
         source: 'api',
         operation,

@@ -115,8 +115,8 @@ function FeedCard({
   onShare: () => void;
   onLongPress: () => void;
 }) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   // Persisted query caches and reviews created before Increment 2 do not have
   // the new arrays. Keep those records renderable while the cache refreshes.
   const dishReviews = item.dishReviews ?? [];
@@ -275,8 +275,8 @@ export function HomeFeedScreen({
   onOpenPlace: (venueId: string) => void;
 }) {
   const userId = useAuthenticatedUserId();
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
@@ -510,15 +510,15 @@ export function HomeFeedScreen({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   header: { height: 157, paddingTop: 54, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
   headerTop: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  switcher: { height: 40, marginTop: 7, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised },
+  switcher: { height: 40, marginTop: 7, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: isDark ? colors.surfaceRaised : '#F3F0EB' },
   switch: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.pill },
-  switchActive: { backgroundColor: '#D9DDE5' },
-  switchText: { color: colors.textSecondary, opacity: 0.5, fontSize: 13 },
-  switchTextActive: { color: '#161616', opacity: 1, fontWeight: '700' },
+  switchActive: { backgroundColor: isDark ? '#D9DDE5' : '#262626' },
+  switchText: { color: isDark ? colors.textSecondary : '#858585', opacity: isDark ? 0.5 : 1, fontSize: 13 },
+  switchTextActive: { color: isDark ? '#161616' : '#FFFFFF', opacity: 1, fontWeight: '700' },
   newPostsBanner: { position: 'absolute', top: 152, left: 16, right: 16, zIndex: 3, alignSelf: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#161616CC' },
   newPostsText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { TastesAiAnswer, TastesAiPlace } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -68,7 +69,7 @@ export function TastesAIScreen({
   userId: string;
 }) {
   const api = useTastesApi();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(
     () => createStyles(colors, insets.top, insets.bottom),
@@ -170,9 +171,11 @@ export function TastesAIScreen({
 
   return (
     <LinearGradient
-      colors={['#560E0B', '#080808']}
+      colors={isDark ? ['#560E0B', '#080808'] : ['#B82F29', '#F2EFEA']}
+      locations={isDark ? [0, 1] : [0, 0.42449]}
       style={styles.screen}
     >
+      <StatusBar style="light" />
       <View pointerEvents="none" style={styles.backgroundDim} />
       <View pointerEvents="none" style={styles.bottomGlow}>
         <Image source={bottomGlow} style={styles.bottomGlowImage} />
@@ -576,6 +579,7 @@ function HistoryModal({
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
+  const isDark = colors.background === '#080808';
   return StyleSheet.create({
     screen: { flex: 1 },
     backgroundDim: {
@@ -584,7 +588,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       right: 0,
       bottom: 0,
       left: 0,
-      backgroundColor: 'rgba(0,0,0,0.2)',
+      backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'transparent',
     },
     bottomGlow: {
       position: 'absolute',
@@ -594,7 +598,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       bottom: -155.7,
       transform: [{ translateX: -227.2 }],
     },
-    bottomGlowImage: { width: '100%', height: '100%' },
+    bottomGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
     header: {
       height: safeTop + 66,
       paddingTop: safeTop + 6,
@@ -609,7 +613,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       justifyContent: 'center',
     },
     back: {
-      color: colors.text,
+      color: '#FFFFFF',
       fontSize: 38,
       lineHeight: 40,
       fontWeight: '300',
@@ -621,30 +625,30 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       justifyContent: 'center',
       gap: 8,
     },
-    title: { color: colors.text, fontSize: 17, fontWeight: '600' },
-    historyLink: { color: colors.textSecondary, fontSize: 13 },
+    title: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+    historyLink: { color: '#FFFFFF', opacity: 0.72, fontSize: 13 },
     empty: { flex: 1, paddingHorizontal: 16, alignItems: 'center' },
     heroTitle: {
       marginTop: 6,
-      color: colors.text,
+      color: '#FFFFFF',
       fontSize: 24,
       fontWeight: '800',
       textAlign: 'center',
       letterSpacing: 0.4,
     },
     assistantCrop: {
-      width: 380,
-      height: 300,
-      marginTop: 30,
-      marginBottom: 25,
+      width: isDark ? 380 : 257,
+      height: isDark ? 300 : 226,
+      marginTop: isDark ? 30 : 36,
+      marginBottom: isDark ? 25 : 39,
       overflow: 'hidden',
     },
-    assistant: { position: 'absolute', top: -20, left: 0, width: 380, height: 380 },
+    assistant: { position: 'absolute', top: isDark ? -20 : -43, left: isDark ? 0 : -29, width: isDark ? 380 : 319, height: isDark ? 380 : 319 },
     heroCopy: {
       maxWidth: 365,
       color: colors.textSecondary,
-      fontSize: 19,
-      lineHeight: 25,
+      fontSize: isDark ? 19 : 22,
+      lineHeight: isDark ? 25 : 26,
       textAlign: 'center',
     },
     accent: { color: colors.primary, fontWeight: '700' },
@@ -665,10 +669,10 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     quickPrompts: { width: '100%', marginTop: 'auto', paddingBottom: 20 },
     quickPromptsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     quickPromptsDivider: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-    quickPromptsTitle: { color: colors.textMuted, fontSize: 12, letterSpacing: 0.6 },
-    quickPromptsGrid: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 6, rowGap: 8 },
-    quickPrompt: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.08)' },
-    quickPromptText: { color: colors.text, fontSize: 12 },
+    quickPromptsTitle: { color: colors.textMuted, fontSize: 13, letterSpacing: 0.6 },
+    quickPromptsGrid: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 8, rowGap: 8 },
+    quickPrompt: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 39, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF' },
+    quickPromptText: { color: isDark ? colors.text : '#000000', fontSize: 14 },
     chatContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 18 },
     userBubble: {
       maxWidth: '82%',
@@ -795,7 +799,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       textAlign: 'center',
     },
     composer: {
-      minHeight: 64 + safeBottom,
+      minHeight: (isDark ? 64 : 55) + safeBottom,
       paddingHorizontal: 16,
       paddingTop: 10,
       paddingBottom: Math.max(10, safeBottom),
@@ -804,7 +808,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       gap: 8,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      backgroundColor: 'rgba(8,8,8,0.24)',
+      backgroundColor: isDark ? 'rgba(8,8,8,0.24)' : 'transparent',
     },
     input: {
       flex: 1,
@@ -812,8 +816,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       paddingHorizontal: 14,
       paddingVertical: 8,
       borderRadius: 20,
-      color: colors.text,
-      backgroundColor: 'rgba(255,255,255,0.08)',
+      color: isDark ? colors.text : '#000000',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
       fontSize: 16,
     },
     send: {
@@ -824,7 +828,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       justifyContent: 'center',
       backgroundColor: colors.primary,
     },
-    sendDisabled: { backgroundColor: '#8E2926' },
+    sendDisabled: { backgroundColor: isDark ? '#8E2926' : colors.primary },
     sendText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
     toast: {
       position: 'absolute',

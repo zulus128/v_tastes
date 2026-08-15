@@ -1,0 +1,11 @@
+Welcome to Tastes, a social discovery app for sharing real restaurant experiences.
+
+The home feed combines friends' reviews, ratings, dishes, photos, reactions and comments. Discover makes it easy to move between trending reviews, places and people, search the community and follow new tastemakers.
+
+Every place has ratings, reviews, contact information and a photo gallery. Creating a review starts with selecting a venue, then adding feedback, dishes, photos and tags before publishing.
+
+The social layer also includes profiles, favourites, followers, notifications and an experience-based leaderboard. Users can create activities, choose a date and time, invite friends, and respond to restaurant invitations.
+
+Messaging is connected to the remote Firebase test project. Here, one user types and sends a message. Firestore synchronizes the conversation, allowing the other participant to receive it and reply in real time.
+
+Monthly recap turns recent dining activity into a visual story with personal stats and highlights. The product also includes Tastes AI recommendations, group conversations, message requests, onboarding, deep links and an administration workspace.

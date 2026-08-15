@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,14 +15,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { Screen } from '../../ui/components';
+import { PatternBackgroundLift, Screen } from '../../ui/components';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
   const api = useTastesApi();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
@@ -59,44 +62,51 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
         styles={styles}
         title="Requests"
       />
-      {loading ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.list}
-          data={requests}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <Empty
-              copy="New message and activity requests will appear here."
-              styles={styles}
-              title="No requests"
-            />
-          }
-          renderItem={({ item }) => (
-            <View style={styles.request}>
-              <View style={styles.requestIcon}>
-                <Text style={styles.requestIconText}>{item.kind === 'group' ? 'G' : '◷'}</Text>
+      <ImageBackground
+        resizeMode="stretch"
+        source={isDark ? dialogPattern : lightDialogPattern}
+        style={[styles.patternBody, { backgroundColor: colors.canvas }]}
+      >
+        <PatternBackgroundLift />
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={styles.loader} />
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.list}
+            data={requests}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              <Empty
+                copy="New message and activity requests will appear here."
+                styles={styles}
+                title="No requests"
+              />
+            }
+            renderItem={({ item }) => (
+              <View style={styles.request}>
+                <View style={styles.requestIcon}>
+                  <Text style={styles.requestIconText}>{item.kind === 'group' ? 'G' : '◷'}</Text>
+                </View>
+                <View style={styles.requestCopy}>
+                  <Text style={styles.requestName}>{item.title}</Text>
+                  <Text style={styles.requestBody}>{item.body}</Text>
+                  <Text style={styles.requestType}>
+                    {item.senderName} · {item.kind}
+                  </Text>
+                </View>
+                <View style={styles.requestActions}>
+                  <Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}>
+                    <Text style={styles.actionText}>Accept</Text>
+                  </Pressable>
+                  <Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}>
+                    <Text style={styles.declineText}>×</Text>
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.requestCopy}>
-                <Text style={styles.requestName}>{item.title}</Text>
-                <Text style={styles.requestBody}>{item.body}</Text>
-                <Text style={styles.requestType}>
-                  {item.senderName} · {item.kind}
-                </Text>
-              </View>
-              <View style={styles.requestActions}>
-                <Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}>
-                  <Text style={styles.actionText}>Accept</Text>
-                </Pressable>
-                <Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}>
-                  <Text style={styles.declineText}>×</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-        />
-      )}
+            )}
+          />
+        )}
+      </ImageBackground>
     </Screen>
   );
 }
@@ -434,6 +444,7 @@ function Empty({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
+    patternBody: { flex: 1 },
     header: {
       height: safeTop + 62,
       paddingTop: safeTop,
@@ -469,8 +480,8 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       padding: 16,
       flexDirection: 'row',
       alignItems: 'center',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: '#45474B',
     },
     requestIcon: {
       width: 52,

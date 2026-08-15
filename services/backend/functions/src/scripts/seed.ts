@@ -1035,6 +1035,8 @@ async function main() {
         participantIds,
         unreadCounts: { [profileId]: conversation.unread, [conversation.peerId]: 0 },
         lastReadAt: {},
+        typing: {},
+        hiddenFor: [],
         lastMessage: { id: lastMessage.id, senderId: lastMessage.senderId, text: lastMessage.text, createdAt: lastMessage.createdAt },
         messageCount: messages.length,
         status: 'active',

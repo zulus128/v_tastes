@@ -1,0 +1,21 @@
+# Tastes complete demo — English voice-over
+
+## 00:00 — Authentication and profile photo
+
+Welcome to Tastes, a social discovery app built around food, places, and people. The opening journey starts with the branded splash and sign-in options for phone, Google, and Apple. Here, phone authentication is demonstrated step by step: entering a number, requesting the one-time code, and confirming the OTP. A new user then creates a profile with a display name, username, city, and profile picture. The complete photo flow is visible, including permission, library selection, cropping, and the finished avatar.
+
+## 00:59 — Personalized onboarding
+
+Onboarding turns a new account into a genuinely personalized experience. The user chooses favourite dishes, enables location, selects a favourite place, and picks an appearance. The flow then helps them find friends, review contact access, configure notifications, and reach the ready state. The screens remain visible long enough to understand each choice, while taps and scrolling keep the walkthrough moving. These preferences feed directly into recommendations and can be changed later from profile and settings.
+
+## 01:52 — Core product walkthrough
+
+The main product experience connects discovery, planning, and social activity. The home feed presents reviews, ratings, photos, tags, likes, comments, sharing, and saved collections. Discover brings together trending content, nearby places, people, map browsing, search, and useful filters. Place pages provide venue details and community reviews. Users can also create a review, choose a venue, publish food experiences, follow other people, and browse profiles, favourites, and settings. Activities add the planning layer: select a place, date, time, and members, then review the invitation and activity details. Rewards, experience points, and the leaderboard make continued participation visible.
+
+## 02:37 — Your Month in Tastes
+
+Your Month in Tastes turns recent activity into a personal visual recap. After the short loading animation, the completed story shows the places explored, food photos, and individual ratings, with a direct link to the full statistics.
+
+## 03:00 — Two-user conversation
+
+Finally, messaging is shown as a natural two-person conversation. The first user types a brunch suggestion and it appears on the other phone. The second user writes a reply, and that answer arrives back in the same conversation. Both sides stay visible together, making the rapid back-and-forth easy to follow without extra send or receive labels.

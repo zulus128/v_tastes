@@ -38,17 +38,18 @@ export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetail
 type RewardView = RewardProgress & {
   lockedImage: ImageSourcePropType;
   detailImage: ImageSourcePropType;
+  imageFrame: { height: number; left: number; top: number; width: number };
   current: number;
   target: number;
 };
 
 const REWARD_COPY = 'One answer is that Truth pertains to the possibility that an event will occur. If true – it must occur and if false, it cannot occur.';
 const REWARD_PRESENTATION = [
-  { name: 'Review Rookie', lockedImage: reviewLocked, detailImage: reviewUnlocked, current: 10, target: 10 },
-  { name: 'Social Starter', lockedImage: socialLocked, detailImage: socialLocked, current: 4, target: 10 },
-  { name: 'Birthday Keeper', lockedImage: birthdayLocked, detailImage: birthdayLocked, current: 3, target: 10 },
-  { name: 'Spread the Word', lockedImage: spreadLocked, detailImage: spreadDetail, current: 7, target: 10 },
-  { name: 'City Hopper', lockedImage: cityLocked, detailImage: cityLocked, current: 5, target: 10 },
+  { name: 'Review Rookie', lockedImage: reviewLocked, detailImage: reviewUnlocked, imageFrame: { width: 92, height: 84, left: -3, top: -3 }, current: 10, target: 10 },
+  { name: 'Social Starter', lockedImage: socialLocked, detailImage: socialLocked, imageFrame: { width: 84, height: 80, left: 0, top: 2 }, current: 4, target: 10 },
+  { name: 'Birthday Keeper', lockedImage: birthdayLocked, detailImage: birthdayLocked, imageFrame: { width: 91, height: 83, left: -3, top: -4 }, current: 3, target: 10 },
+  { name: 'Spread the Word', lockedImage: spreadLocked, detailImage: spreadDetail, imageFrame: { width: 87, height: 80, left: -1, top: 2 }, current: 7, target: 10 },
+  { name: 'City Hopper', lockedImage: cityLocked, detailImage: cityLocked, imageFrame: { width: 81, height: 97, left: 3, top: -13 }, current: 5, target: 10 },
 ] as const;
 
 function rewardViews(data: ProfileExtrasResult | null): RewardView[] {
@@ -64,6 +65,7 @@ function rewardViews(data: ProfileExtrasResult | null): RewardView[] {
       xp: apiReward?.xp ?? 0,
       lockedImage: item.lockedImage,
       detailImage: item.detailImage,
+      imageFrame: item.imageFrame,
       current: apiReward ? Math.min(item.target, Math.round(progress * item.target)) : item.current,
       target: item.target,
     };
@@ -252,7 +254,9 @@ function RewardsList({ data, onPress, styles }: { data: ProfileExtrasResult | nu
       <View style={styles.rewardList}>
         {rewardViews(data).map((reward) => (
           <Pressable key={reward.id} onPress={() => onPress(reward)} style={({ pressed }) => [styles.rewardRow, pressed && styles.pressed]}>
-            <Image source={reward.lockedImage} style={styles.rewardImage} />
+            <View style={styles.rewardImageFrame}>
+              <Image source={reward.lockedImage} style={[styles.rewardImage, reward.imageFrame]} />
+            </View>
             <View style={styles.rewardCopy}>
               <Text style={styles.rewardName}>{reward.name}</Text>
               <Text numberOfLines={2} style={styles.rewardDescription}>{reward.description}</Text>
@@ -356,7 +360,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     levelName: { color: '#B82F29', fontSize: 16, fontWeight: '600', letterSpacing: -0.23 },
     rewardList: { marginTop: 16, gap: 12 },
     rewardRow: { height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16 },
-    rewardImage: { width: 84, height: 84, resizeMode: 'contain' },
+    rewardImageFrame: { width: 84, height: 84, overflow: 'visible' },
+    rewardImage: { position: 'absolute', resizeMode: 'stretch' },
     rewardCopy: { flex: 1, gap: 7 },
     rewardName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
     rewardDescription: { color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
@@ -368,7 +373,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     sheetTitle: { color: '#FFFFFF', fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
     closeIcon: { width: 30, height: 30 },
     detailContent: { paddingHorizontal: 16, gap: 16, alignItems: 'center' },
-    detailImage: { width: 120, height: 120, resizeMode: 'contain' },
+    detailImage: { width: 120, height: 120, resizeMode: 'stretch' },
     progressCount: { color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.41 },
     progressCurrent: { color: '#B82F29' },
     detailName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
@@ -377,7 +382,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     achievementPatternImage: { opacity: 0.18, resizeMode: 'repeat' },
     achievementBody: { paddingHorizontal: 16, gap: 24, alignItems: 'center' },
     achievementCard: { width: '100%', height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16, backgroundColor: '#080808' },
-    achievementImage: { width: 84, height: 84, resizeMode: 'contain' },
+    achievementImage: { width: 84, height: 84, resizeMode: 'stretch' },
     achievementCopy: { flex: 1, gap: 6 },
     viewAllButton: { width: 330, height: 54, alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#4C1816', borderRadius: 36, backgroundColor: '#B82F29' },
     viewAllText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },

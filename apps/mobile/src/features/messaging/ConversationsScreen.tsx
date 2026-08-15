@@ -7,6 +7,7 @@ import {
   Animated,
   FlatList,
   Image,
+  ImageBackground,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -15,9 +16,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { Screen } from '../../ui/components';
+import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -125,7 +128,7 @@ export function ConversationsScreen({
   userId: string;
 }) {
   const api = useTastesApi();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [search, setSearch] = useState('');
@@ -196,43 +199,50 @@ export function ConversationsScreen({
           <Pressable onPress={onOpenRequests}><Text style={styles.requests}>Requests {requestCount > 0 ? <Text style={styles.requestsCount}>({requestCount})</Text> : null}</Text></Pressable>
         </View>
       </View>
-      {inbox.loading && conversationHistory.isPending ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-      ) : (inbox.error ?? conversationHistory.error) && inboxItems.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.stateTitle}>Could not load messages</Text>
-          <Text style={styles.stateCopy}>{(inbox.error ?? conversationHistory.error)?.message}</Text>
-        </View>
-      ) : (
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={[styles.listContent, conversations.length === 0 && styles.emptyContent]}
-          data={conversations}
-          initialNumToRender={10}
-          keyExtractor={(item) => item.id}
-          maxToRenderPerBatch={10}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={(
-            <View style={styles.empty}>
-              <View style={styles.emptyGlyph}><Text style={styles.emptyGlyphText}>···</Text></View>
-              <Text style={styles.stateTitle}>{search ? 'No conversations found' : 'No messages yet'}</Text>
-              <Text style={styles.stateCopy}>
-                {search ? 'Try another name or username.' : 'Conversations with mutual followers will appear here.'}
-              </Text>
-            </View>
-          )}
-          ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
-          onEndReached={() => {
-            if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
-          windowSize={7}
-          renderItem={({ item }) => (
-            <ConversationRow conversation={item} deleting={deletingId === item.id} onDelete={() => void deleteConversation(item.id)} onOpen={() => onOpenConversation(item.id)} styles={styles} />
-          )}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <ImageBackground
+        resizeMode="stretch"
+        source={isDark ? dialogPattern : lightDialogPattern}
+        style={[styles.patternBody, { backgroundColor: colors.canvas }]}
+      >
+        <PatternBackgroundLift />
+        {inbox.loading && conversationHistory.isPending ? (
+          <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        ) : (inbox.error ?? conversationHistory.error) && inboxItems.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.stateTitle}>Could not load messages</Text>
+            <Text style={styles.stateCopy}>{(inbox.error ?? conversationHistory.error)?.message}</Text>
+          </View>
+        ) : (
+          <FlatList
+            style={styles.list}
+            contentContainerStyle={[styles.listContent, conversations.length === 0 && styles.emptyContent]}
+            data={conversations}
+            initialNumToRender={10}
+            keyExtractor={(item) => item.id}
+            maxToRenderPerBatch={10}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={(
+              <View style={styles.empty}>
+                <View style={styles.emptyGlyph}><Text style={styles.emptyGlyphText}>···</Text></View>
+                <Text style={styles.stateTitle}>{search ? 'No conversations found' : 'No messages yet'}</Text>
+                <Text style={styles.stateCopy}>
+                  {search ? 'Try another name or username.' : 'Conversations with mutual followers will appear here.'}
+                </Text>
+              </View>
+            )}
+            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
+            onEndReached={() => {
+              if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            windowSize={7}
+            renderItem={({ item }) => (
+              <ConversationRow conversation={item} deleting={deletingId === item.id} onDelete={() => void deleteConversation(item.id)} onOpen={() => onOpenConversation(item.id)} styles={styles} />
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </ImageBackground>
       <NewDialogSheet
         onClose={() => setNewDialogOpen(false)}
         onNewActivity={onNewActivity}
@@ -253,7 +263,8 @@ export function ConversationsScreen({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
-    header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
+    patternBody: { flex: 1 },
+    header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -269,8 +280,8 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     swipeRow: {
       minHeight: 82,
       overflow: 'hidden',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: '#45474B',
     },
     swipeContent: {},
     deleteAction: { position: 'absolute', top: 0, right: -82, bottom: 0, width: 82, backgroundColor: colors.danger },

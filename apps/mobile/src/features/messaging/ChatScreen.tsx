@@ -7,6 +7,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,11 +18,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SendIcon from '../../../assets/ai/send.svg';
+import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { Screen } from '../../ui/components';
+import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
 
 function messageTime(iso: string): string {
@@ -49,7 +52,7 @@ export function ChatScreen({
   onBack: () => void;
   userId: string;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
   const api = useTastesApi();
@@ -81,6 +84,7 @@ export function ChatScreen({
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('message'));
   const lastMarkedRead = useRef<string | null>(null);
   const typingActive = useRef(false);
+  const typingStatusAvailable = useRef(true);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeActivityPreview = useCallback(() => setActivityPreviewOpen(false), []);
 
@@ -111,19 +115,26 @@ export function ChatScreen({
     setConversationError,
   ), [api, conversationId, userId]);
 
-  useEffect(() => () => {
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    // Typing presence is best-effort. The conversation may be deleted while
-    // this screen is closing, so never let cleanup create an unhandled promise.
-    if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false }).catch(() => undefined);
+  useEffect(() => {
+    typingStatusAvailable.current = true;
+    return () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      // Typing presence is best-effort. The conversation may be deleted while
+      // this screen is closing, so never let cleanup create an unhandled promise.
+      if (typingActive.current) void api.setTypingStatus({ conversationId, typing: false }).catch(() => undefined);
+    };
   }, [api, conversationId]);
 
   function updateTypingStatus(typing: boolean) {
+    if (!typingStatusAvailable.current) return;
     void api.setTypingStatus({ conversationId, typing }).catch((error) => {
       // A stale/deleted conversation is already handled by the screen's
       // realtime and history subscriptions. Typing status must not show a
       // React Native error overlay for this non-critical race.
-      if ((error as { code?: string }).code === 'not-found') return;
+      if ((error as { code?: string }).code === 'not-found') {
+        typingStatusAvailable.current = false;
+        return;
+      }
       setConversationError(error instanceof Error ? error : new Error('Could not update typing status.'));
     });
   }
@@ -195,40 +206,47 @@ export function ChatScreen({
         </Pressable>
       </View>
 
-      {realtimeMessages.loading && messageHistory.isPending ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-      ) : error && messageItems.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.stateTitle}>Could not load conversation</Text>
-          <Text style={styles.stateCopy}>{error.message}</Text>
-        </View>
-      ) : (
-        <FlatList
-          style={styles.messages}
-          contentContainerStyle={[styles.messagesContent, messageItems.length === 0 && styles.emptyMessages]}
-          data={messageItems}
-          initialNumToRender={16}
-          inverted={messageItems.length > 0}
-          keyExtractor={(item) => item.id}
-          maxToRenderPerBatch={12}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={(
-            <View style={styles.emptyState}>
-              <Text style={styles.stateTitle}>Start the conversation</Text>
-              <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
-            </View>
-          )}
-          ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} /> : null}
-          onEndReached={() => {
-            if (messageHistory.hasNextPage && !messageHistory.isFetchingNextPage) void messageHistory.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
-          windowSize={9}
-          renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} read={item.senderId === userId && item.id === lastMessageId && readByCount > 0} styles={styles} />}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <ImageBackground
+        resizeMode="stretch"
+        source={isDark ? dialogPattern : lightDialogPattern}
+        style={[styles.patternBody, { backgroundColor: colors.canvas }]}
+      >
+        <PatternBackgroundLift />
+        {realtimeMessages.loading && messageHistory.isPending ? (
+          <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        ) : error && messageItems.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.stateTitle}>Could not load conversation</Text>
+            <Text style={styles.stateCopy}>{error.message}</Text>
+          </View>
+        ) : (
+          <FlatList
+            style={styles.messages}
+            contentContainerStyle={[styles.messagesContent, messageItems.length === 0 && styles.emptyMessages]}
+            data={messageItems}
+            initialNumToRender={16}
+            inverted={messageItems.length > 0}
+            keyExtractor={(item) => item.id}
+            maxToRenderPerBatch={12}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={(
+              <View style={styles.emptyState}>
+                <Text style={styles.stateTitle}>Start the conversation</Text>
+                <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
+              </View>
+            )}
+            ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} /> : null}
+            onEndReached={() => {
+              if (messageHistory.hasNextPage && !messageHistory.isFetchingNextPage) void messageHistory.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            windowSize={9}
+            renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} read={item.senderId === userId && item.id === lastMessageId && readByCount > 0} styles={styles} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </ImageBackground>
 
       <View style={styles.composer}>
         <TextInput
@@ -265,7 +283,8 @@ export function ChatScreen({
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
-    header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background },
+    patternBody: { flex: 1 },
+    header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
     backText: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300', marginTop: -3 },
     headerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center' },

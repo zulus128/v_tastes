@@ -1,4 +1,4 @@
-import type { DiscoverTag } from '@tastes/contracts';
+import type { DiscoverTag, PlaceReview } from '@tastes/contracts';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
 
@@ -19,6 +19,21 @@ export const discoverVenuesQueryKey = (userId: string, filter: DiscoverVenueFilt
   filter.category ?? null,
   filter.tag ?? null,
 ] as const;
+
+function isPlaceReview(value: unknown): value is PlaceReview {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { id?: unknown }).id === 'string';
+}
+
+function normalizePlaceReviewPage(page: unknown): PlaceReview[] {
+  const items = Array.isArray(page)
+    ? page
+    : typeof page === 'object' && page !== null
+      ? (page as { items?: unknown }).items
+      : [];
+  return Array.isArray(items) ? items.filter(isPlaceReview) : [];
+}
 
 export function useDiscoverFeed(userId: string) {
   const api = useTastesApi();
@@ -76,7 +91,7 @@ export function usePlaceReviews(venueId: string, sort: 'highest' | 'lowest' | 'p
       await api.getPlaceReviews({ venueId, sort, scope, cursor: pageParam, limit: 20 })
     ).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    select: (data) => data.pages.flatMap((page) => page.items),
+    select: (data) => data.pages.flatMap(normalizePlaceReviewPage),
   });
 }
 

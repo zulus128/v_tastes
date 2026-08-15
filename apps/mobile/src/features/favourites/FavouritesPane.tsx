@@ -22,8 +22,8 @@ import EmptyIcon from '../../../assets/favourites/empty.svg';
 import FolderActiveIcon from '../../../assets/favourites/folder-active.svg';
 import FolderIcon from '../../../assets/favourites/folder.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
+import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import tuneIcon from '../../../assets/profile/map-tune.png';
 import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
@@ -101,7 +101,7 @@ export function FavouritesPane({
     <View style={styles.pane}>
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <SearchIcon color={colors.textMuted} height={22} width={22} />
+          <SearchIcon color={colors.textMuted} height={24} width={24} />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search"
@@ -110,7 +110,7 @@ export function FavouritesPane({
             value={query}
           />
           <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters}>
-            <Image source={tuneIcon} style={styles.tuneIcon} />
+            <SearchTuneIcon color={colors.textMuted} height={24} width={24} />
           </Pressable>
         </View>
       </View>
@@ -119,6 +119,7 @@ export function FavouritesPane({
         contentContainerStyle={styles.folderChips}
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.folderChipsScroll}
       >
         <FolderChip
           active={selectedFolderId === null}
@@ -282,7 +283,7 @@ export function SaveToFolderSheet({
           <View style={styles.addSearch}>
             <SearchIcon color={colors.textMuted} height={22} width={22} />
             <TextInput onChangeText={setQuery} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={query} />
-            <Image source={tuneIcon} style={styles.tuneIcon} />
+            <SearchTuneIcon color={colors.textMuted} height={24} width={24} />
           </View>
         </View>
         <ScrollView contentContainerStyle={styles.selectionList} keyboardShouldPersistTaps="handled">
@@ -571,33 +572,34 @@ function FolderActionSheet({
 }
 
 function createStyles(colors: ThemeColors) {
+  const isDark = colors.background === '#080808';
   return StyleSheet.create({
     pane: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
     searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
-    searchBox: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 22, backgroundColor: colors.surfaceRaised, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-    tuneIcon: { width: 24, height: 24, opacity: 0.55 },
+    folderChipsScroll: { flexGrow: 0, flexShrink: 0, height: 48 },
     folderChips: { gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-    folderChip: { height: 28, paddingHorizontal: 9, borderRadius: 14, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surface },
+    folderChip: { height: 28, paddingHorizontal: 9, borderRadius: 14, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.10)', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isDark ? colors.surface : '#FFFFFF' },
     folderChipActive: { backgroundColor: colors.primary, borderColor: 'rgba(255,255,255,0.1)' },
-    folderChipText: { color: colors.textMuted, fontSize: 12 },
+    folderChipText: { color: isDark ? colors.textMuted : '#677083', fontSize: 12 },
     folderChipTextActive: { color: '#FFFFFF' },
     placeList: { paddingBottom: 32 },
     pageLoader: { paddingVertical: 20 },
-    placeCard: { minHeight: 142, padding: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-    cardImageWrap: { width: 96, height: 96, borderRadius: 12, overflow: 'hidden' },
+    placeCard: { minHeight: 188, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+    cardImageWrap: { width: 122, height: 122, borderRadius: 12, overflow: 'hidden' },
     cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    popularTag: { position: 'absolute', left: 3, top: 3, color: '#FFFFFF', backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, fontSize: 11 },
+    popularTag: { position: 'absolute', left: 4, top: 4, height: 18, color: '#FFFFFF', backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 8, fontSize: 12, lineHeight: 18 },
     cardBody: { flex: 1, minWidth: 0, gap: 6 },
     cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
-    cardAddress: { color: colors.textSecondary, fontSize: 12, lineHeight: 15 },
+    cardAddress: { color: colors.textSecondary, fontSize: 13, lineHeight: 16 },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    ratingPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: colors.primary },
-    ratingText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-    reviewCount: { color: colors.textMuted, fontSize: 12 },
+    ratingPill: { height: 28, paddingHorizontal: 12, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    ratingText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+    reviewCount: { color: isDark ? colors.textMuted : 'rgba(56,64,80,0.40)', fontSize: 14 },
     cardBookmark: { position: 'absolute', right: 16, top: 16 },
-    metaRow: { position: 'absolute', left: 16, bottom: 10, flexDirection: 'row', gap: 6 },
-    metaPill: { color: colors.text, fontSize: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#080808', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 5 },
+    metaRow: { position: 'absolute', left: 16, bottom: 12, flexDirection: 'row', gap: 7 },
+    metaPill: { height: 33, color: colors.text, fontSize: 15, lineHeight: 20, borderWidth: isDark ? 1 : 0, borderColor: colors.border, backgroundColor: isDark ? '#080808' : '#F6F6F6', borderRadius: 40, paddingHorizontal: 12, paddingVertical: 6 },
     centerState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
     emptyState: { flex: 1, minHeight: 360, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
     stateTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },

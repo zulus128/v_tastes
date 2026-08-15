@@ -70,6 +70,15 @@ function invitationStatus(document: DocumentSnapshot, uid: string) {
   return status === 'pending' || status === 'declined' ? status : 'accepted';
 }
 
+function hasTypingStatus(document: DocumentSnapshot, uid: string): boolean {
+  const typing = document.get('typing');
+  return Boolean(
+    typing
+    && typeof typing === 'object'
+    && Object.prototype.hasOwnProperty.call(typing, uid),
+  );
+}
+
 async function requireActiveProfile(uid: string) {
   const profile = await db.collection('users').doc(uid).get();
   if (!profile.exists || profile.get('status') !== 'active') {
@@ -331,8 +340,10 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       'messageCount', FieldValue.increment(1),
       'updatedAt', now,
       'hiddenFor', FieldValue.arrayRemove(...participantIds),
-      new FieldPath('typing', uid), FieldValue.delete(),
     );
+    if (hasTypingStatus(conversation, uid)) {
+      transaction.update(conversationRef, new FieldPath('typing', uid), FieldValue.delete());
+    }
     for (const recipientId of recipientIds) {
       const notificationRef = db.collection('notifications').doc(
         idempotentDocumentId(recipientId, 'message-notification', messageRef.id),
@@ -367,8 +378,10 @@ export const hideConversation = onCall(callableOptions, async (request) => {
       conversationRef,
       'hiddenFor', FieldValue.arrayUnion(uid),
       new FieldPath('unreadCounts', uid), 0,
-      new FieldPath('typing', uid), FieldValue.delete(),
     );
+    if (hasTypingStatus(conversation, uid)) {
+      transaction.update(conversationRef, new FieldPath('typing', uid), FieldValue.delete());
+    }
   });
 
   return { id: conversationRef.id };
@@ -410,10 +423,11 @@ export const setTypingStatus = onCall(callableOptions, async (request) => {
   if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
     throw new HttpsError('failed-precondition', 'Accept the invitation before updating typing status.');
   }
-  await conversationRef.update(
-    new FieldPath('typing', uid),
-    input.typing ? Timestamp.now() : FieldValue.delete(),
-  );
+  if (input.typing) {
+    await conversationRef.set({ typing: { [uid]: Timestamp.now() } }, { merge: true });
+  } else if (hasTypingStatus(conversation, uid)) {
+    await conversationRef.update(new FieldPath('typing', uid), FieldValue.delete());
+  }
   return { conversationId: input.conversationId, typing: input.typing };
 });
 

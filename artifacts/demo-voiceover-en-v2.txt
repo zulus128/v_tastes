@@ -1,0 +1,17 @@
+Welcome to Tastes, a social discovery app built around real recommendations from people you trust.
+
+The experience starts with a fast phone sign-in and one-time passcode. New members can create a profile, choose and crop a photo, set their name, username and location, then personalize the app with favourite dishes, places and appearance.
+
+Permissions are requested in context, including location, contacts and notifications. The final onboarding step takes the member directly into the product.
+
+The home feed brings together friends' reviews, photos, ratings and recommendations. Members can open a post, scroll through the full review, react, comment, share it, or save it into a personal folder for later.
+
+Discover supports visual browsing, search and filters. Places can be explored as a list or on the map, with useful details such as category, rating, price and distance.
+
+Activities turn recommendations into plans. A member can create an activity, invite friends, review the details and track responses after publishing.
+
+Social profiles show posts, followers, favourites and saved collections. Settings include profile editing, preferences, appearance, notifications and account controls. Rewards make progress visible and encourage continued participation.
+
+Messaging is connected to the same live test Firebase environment. Here, two independent phones are in the same conversation. A message sent from one person appears on the other phone immediately, and the reply arrives back in real time.
+
+Together, these flows demonstrate the complete product loop: join, personalize, discover, save, share, plan and stay connected.

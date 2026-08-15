@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import lightPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import darkPattern from '../../../assets/onboarding/pattern-screen.png';
 import BurgerBadge from '../../../assets/profile/reward-burger.svg';
 import CityBadge from '../../../assets/profile/reward-city.svg';
 import followIcon from '../../../assets/profile/follow.png';
@@ -11,6 +13,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
@@ -57,7 +60,7 @@ export function ProfileHeader({
   reviewCount: number;
   uploadingPhoto: boolean;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const favoriteDishIcon = profile.favoriteDish?.toLocaleLowerCase().includes('sushi') ? '🍣' : '🍽️';
   const chips: Array<{ flag?: ReturnType<typeof cityFlag>; icon?: string; label: string }> = [];
@@ -66,7 +69,13 @@ export function ProfileHeader({
   if (profile.favoriteDish) chips.push({ icon: favoriteDishIcon, label: profile.favoriteDish });
 
   return (
-    <View style={styles.hero}>
+    <ImageBackground
+      imageStyle={[styles.heroPattern, { opacity: isDark ? 1 : 0.06 }]}
+      resizeMode="cover"
+      source={isDark ? darkPattern : lightPattern}
+      style={[styles.hero, { backgroundColor: colors.canvas }]}
+    >
+      <PatternBackgroundLift />
       <Pressable disabled={!own || uploadingPhoto} onPress={onAvatarPress} style={styles.avatarWrap}>
         <Image source={profileAvatarSource(profile)} style={styles.avatar} />
         {uploadingPhoto ? (
@@ -117,8 +126,7 @@ export function ProfileHeader({
           </View>
         ))}
       </Pressable>
-      <View pointerEvents="none" style={styles.heroDivider} />
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -153,8 +161,8 @@ export function ProfileTopBar({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 26, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
-  heroDivider: { position: 'absolute', right: 0, bottom: 0, left: 0, height: 24, borderRightWidth: 1, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#45474B', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  heroPattern: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   topBar: {
     position: 'absolute',
     zIndex: 20,
@@ -189,7 +197,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616' },
   messageActionText: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
   chips: { minWidth: '100%', paddingHorizontal: 10, paddingTop: 14, gap: 6, justifyContent: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 39, overflow: 'hidden', backgroundColor: '#161616' },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 39, overflow: 'hidden', backgroundColor: colors.surface },
   chipText: { color: colors.text, fontSize: 14 },
   chipIcon: { fontSize: 14, lineHeight: 18 },
   cityFlag: { width: 16, height: 16, transform: [{ translateY: -1 }] },
