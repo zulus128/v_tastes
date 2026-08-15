@@ -177,8 +177,8 @@ function StepHeader({ step, title, subtitle }: { step: number; title: string; su
   </View>;
 }
 
-function PermissionScreen({ icon, title, subtitle, button, alignSubtitleLeft = false, onBack, onSkip, onPress }: {
-  icon: ImageSourcePropType; title: string; subtitle: string; button: string; alignSubtitleLeft?: boolean; onBack: () => void; onSkip: () => void; onPress: () => void;
+function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
+  icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
 }) {
   const styles = useOnboardingStyles();
   return <PatternScreen>
@@ -186,7 +186,7 @@ function PermissionScreen({ icon, title, subtitle, button, alignSubtitleLeft = f
     <View style={styles.permissionContent}>
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={styles.title}>{title}</Text>
-      <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText, alignSubtitleLeft && styles.leftAlignedPermissionSubtitle]}>{subtitle}</Text>
+      <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
     </View>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
   </PatternScreen>;
@@ -483,9 +483,9 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
-      <ScrollView contentContainerStyle={styles.pills} showsVerticalScrollIndicator={false} style={styles.pillsScroll}>
+      <View style={[styles.pillsPanel, styles.pills]}>
         {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
-      </ScrollView>
+      </View>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
     </PatternScreen>;
@@ -641,7 +641,7 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" alignSubtitleLeft onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
+  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
     <View style={styles.readyContent}>
@@ -668,9 +668,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionContent: { position: 'absolute', top: 132, left: 26, right: 26, alignItems: 'center' },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
-  permissionSubtitle: { marginTop: 8, maxWidth: 320 },
+  permissionSubtitle: { width: 282, marginTop: 8, textAlign: 'center' },
   permissionBodyText: { color: colors.textMuted },
-  leftAlignedPermissionSubtitle: { width: '100%', textAlign: 'left' },
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },
   profileScroll: { flex: 1 },
@@ -702,7 +701,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   cityFlag: { width: 20, height: 20, marginRight: 14 },
   cityName: { color: colors.text, fontSize: 15, flex: 1 },
   cityCountry: { color: colors.textMuted, fontSize: 13 },
-  pillsScroll: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
+  pillsPanel: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
   pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
@@ -794,9 +793,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   actionText: { color: colors.text, fontSize: 13, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
-  readyContent: { position: 'absolute', top: 170, left: 16, right: 16, alignItems: 'center' },
-  reviewCollage: { width: 402, height: 287.378 },
-  readyCopy: { width: '100%', height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24 },
+  readyContent: { position: 'absolute', top: 170, left: 0, right: 0, alignItems: 'center' },
+  reviewCollage: { width: '100%', maxWidth: 402, aspectRatio: 402 / 288 },
+  readyCopy: { width: '100%', maxWidth: 370, height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24, paddingHorizontal: 16 },
   readyTitle: { width: '100%', color: '#FFFFFF', fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   readySubtitle: { width: '100%', color: '#AAB2C5', fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
   readyButton: { width: 330, marginTop: 24 },

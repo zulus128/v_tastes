@@ -35,7 +35,8 @@ import {
 } from './HomeFeedStates';
 import avatar from '../../../assets/home/avatar.png';
 import { useDiscoverFeed } from '../discover/api';
-import { useAuthenticatedUserId } from '../../session/SessionProvider';
+import { useAuthenticatedUserId, useSession } from '../../session/SessionProvider';
+import { useProfile } from '../profile/api';
 
 const tagLabels: Record<string, string> = {
   casual: 'Casual',
@@ -274,7 +275,9 @@ export function HomeFeedScreen({
   onOpenNotifications?: () => void;
   onOpenPlace: (venueId: string) => void;
 }) {
+  const { state } = useSession();
   const userId = useAuthenticatedUserId();
+  const { profile } = useProfile(userId, state.user?.displayName ?? 'Tastes member');
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
@@ -425,7 +428,7 @@ export function HomeFeedScreen({
           <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
         )
       ) : items.length === 0 ? (
-        <HomeFeedEmptyState onAction={onExplore} scope={scope} />
+        <HomeFeedEmptyState city={profile?.city} onAction={onExplore} scope={scope} />
       ) : (
         <FlatList
           contentContainerStyle={styles.content}

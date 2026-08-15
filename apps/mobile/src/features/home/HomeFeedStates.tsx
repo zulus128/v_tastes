@@ -13,9 +13,11 @@ function useStyles() {
 }
 
 export function HomeFeedEmptyState({
+  city,
   onAction,
   scope,
 }: {
+  city?: string | null;
   onAction: () => void;
   scope: FeedScope;
 }) {
@@ -34,7 +36,7 @@ export function HomeFeedEmptyState({
         <Text style={styles.body}>
           {friends
             ? 'Follow friends to see their reviews and recommendations here.'
-            : 'Be the first to review a place in Monaco —\nyour post starts the feed.'}
+            : `Be the first to review a place in ${city?.trim() || 'your city'} —\nyour post starts the feed.`}
         </Text>
         <Pressable
           accessibilityRole="button"
