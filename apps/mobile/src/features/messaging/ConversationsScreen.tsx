@@ -48,9 +48,11 @@ function ConversationRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   const participant = conversation.otherParticipant;
-  const title = conversation.kind === 'activity' || conversation.kind === 'group'
-    ? conversation.title ?? (conversation.kind === 'activity' ? 'Activity' : 'Group')
-    : participant?.displayName ?? 'Tastes user';
+  const title = conversation.kind === 'activity'
+    ? participant?.displayName ?? 'Activity'
+    : conversation.kind === 'group'
+      ? conversation.title ?? 'Group'
+      : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
   const translateX = useMemo(() => new Animated.Value(0), []);
   const panResponder = useMemo(() => PanResponder.create({

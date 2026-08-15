@@ -358,7 +358,7 @@ export const notificationInputSchema = z.object({ notificationId: z.string().min
 export const requestInputSchema = z.object({ requestId: z.string().min(1).max(128), response: z.enum(['accepted', 'declined']) });
 export const createGroupInputSchema = z.object({
   name: z.string().trim().min(2).max(60),
-  memberIds: z.array(z.string().min(1).max(128)).min(2).max(50),
+  memberIds: z.array(z.string().min(1).max(128)).min(1).max(50),
 });
 export const groupInputSchema = z.object({ groupId: z.string().min(1).max(128) });
 export const updateGroupMembersInputSchema = groupInputSchema.extend({ memberIds: z.array(z.string().min(1).max(128)).max(50) });

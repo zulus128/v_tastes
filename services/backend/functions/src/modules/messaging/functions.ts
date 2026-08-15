@@ -171,13 +171,13 @@ export const listConversations = onCall(callableOptions, async (request) => {
     const participantIds = requireParticipant(document, uid);
     const rawKind = document.get('kind');
     const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
-    const otherUserId = kind === 'direct'
+    const otherUserId = kind === 'direct' || kind === 'activity'
       ? participantIds.find((participantId) => participantId !== uid) ?? null
       : null;
     return { document, participantIds, kind, otherUserId };
   });
   const profileIds = [...new Set(rows
-    .filter((row) => row.kind === 'direct' && Boolean(row.otherUserId))
+    .filter((row) => row.kind !== 'group' && Boolean(row.otherUserId))
     .map((row) => row.otherUserId as string))];
   const profileSnapshots = profileIds.length > 0
     ? await db.getAll(...profileIds.map((userId) => db.collection('users').doc(userId)))
@@ -193,7 +193,7 @@ export const listConversations = onCall(callableOptions, async (request) => {
         id: document.id,
         kind,
         participantIds,
-        otherParticipant: kind === 'direct' ? {
+        otherParticipant: kind !== 'group' && otherUserId ? {
           userId: otherUserId ?? '',
           displayName: String(profile?.get('displayName') ?? ''),
           username: profile?.get('username') ? String(profile.get('username')) : null,

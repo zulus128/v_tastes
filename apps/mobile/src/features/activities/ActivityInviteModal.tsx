@@ -223,7 +223,7 @@ export function ActivityInviteModal({
                     <Text numberOfLines={2} style={styles.address}>{details.venue.address}</Text>
                     <View style={styles.ratingRow}>
                       <Text style={styles.rating}>★ {details.venue.rating.toFixed(1)}</Text>
-                      <Text style={styles.reviews}>{details.venue.reviewCount} reviews</Text>
+                      <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={styles.reviews}>{details.venue.reviewCount} reviews</Text>
                     </View>
                   </View>
                 </View>
@@ -284,15 +284,15 @@ const styles = StyleSheet.create({
   dateRow: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 4 },
   date: { color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 20, fontWeight: '500' },
   placeCard: { width: '100%', marginTop: 15, padding: 12, borderRadius: 16, backgroundColor: '#161616' },
-  placeTop: { flexDirection: 'row', gap: 16 },
-  venueImage: { width: 122, height: 122, borderRadius: 12 },
+  placeTop: { flexDirection: 'row', gap: 12 },
+  venueImage: { width: 110, height: 110, borderRadius: 12 },
   popular: { position: 'absolute', top: 4, left: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden', color: '#FFFFFF', fontSize: 12, backgroundColor: '#B82F29' },
-  placeCopy: { flex: 1, paddingTop: 6 },
+  placeCopy: { flex: 1, minWidth: 0, paddingTop: 6 },
   placeName: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   address: { minHeight: 36, marginTop: 6, color: '#AAB2C5', fontSize: 13, lineHeight: 16 },
   ratingRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   rating: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, overflow: 'hidden', color: '#FFFFFF', fontSize: 14, fontWeight: '600', backgroundColor: '#B82F29' },
-  reviews: { flex: 1, color: 'rgba(216,221,232,0.4)', fontSize: 14 },
+  reviews: { flexShrink: 1, color: 'rgba(216,221,232,0.4)', fontSize: 14 },
   tags: { marginTop: 9, flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 18, overflow: 'hidden', color: '#FFFFFF', fontSize: 15, backgroundColor: '#080808' },
   peopleRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },

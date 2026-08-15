@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { Screen } from '../../ui/components';
@@ -166,15 +167,25 @@ export function NewGroupScreen({
           value={name}
         />
       </View>
-      <View style={styles.search}>
-        <Text style={styles.searchGlyph}>⌕</Text>
-        <TextInput
-          onChangeText={setQuery}
-          placeholder="Search people"
-          placeholderTextColor={colors.placeholder}
-          style={styles.searchInput}
-          value={query}
-        />
+      <View style={styles.searchRow}>
+        <View style={styles.search}>
+          <Text style={styles.searchGlyph}>⌕</Text>
+          <TextInput
+            onChangeText={setQuery}
+            placeholder="Search people"
+            placeholderTextColor={colors.placeholder}
+            style={styles.searchInput}
+            value={query}
+          />
+        </View>
+        <Pressable
+          accessibilityLabel="Show contacts"
+          accessibilityRole="button"
+          onPress={() => setQuery('')}
+          style={styles.contactsButton}
+        >
+          <InviteUsersIcon height={20} width={22} />
+        </Pressable>
       </View>
       {loading ? (
         <ActivityIndicator color={colors.primary} style={styles.loader} />
@@ -213,9 +224,9 @@ export function NewGroupScreen({
       )}
       <View style={[styles.createFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
         <Pressable
-          disabled={creating || !name.trim() || selected.size < 2}
+          disabled={creating || name.trim().length < 2 || selected.size < 1}
           onPress={() => void create()}
-          style={[styles.createGroup, (creating || !name.trim() || selected.size < 2) && styles.disabled]}
+          style={[styles.createGroup, (creating || name.trim().length < 2 || selected.size < 1) && styles.disabled]}
         >
           {creating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createGroupText}>Create group</Text>}
         </Pressable>
@@ -517,7 +528,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       textAlign: 'center',
     },
     fieldLabel: { marginTop: 18, marginHorizontal: 16, marginBottom: 7, color: colors.textMuted, fontSize: 12 },
-    groupHero: { paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    groupHero: { paddingHorizontal: 16, paddingBottom: 16 },
     groupName: {
       width: '100%',
       height: 46,
@@ -527,9 +538,16 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       backgroundColor: colors.background,
       fontSize: 16,
     },
-    search: {
-      height: 40,
+    searchRow: {
+      marginTop: 10,
       marginHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    search: {
+      flex: 1,
+      height: 40,
       paddingHorizontal: 11,
       flexDirection: 'row',
       alignItems: 'center',
@@ -538,6 +556,16 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     },
     searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 21 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16 },
+    contactsButton: {
+      width: 40,
+      height: 40,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
     section: {
       marginHorizontal: 16,
       marginTop: 18,

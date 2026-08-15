@@ -137,7 +137,7 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
     );
     const unsubscribe = onSnapshot(inboxQuery, (snapshot) => {
       void Promise.all(snapshot.docs.filter((conversation) => isVisibleInInbox(conversation, userId)).map(async (conversation) => {
-        if (conversation.data().kind === 'activity' || conversation.data().kind === 'group') {
+        if (conversation.data().kind === 'group') {
           return summaryFromDocument(conversation, userId, null);
         }
         const otherUserId = peerId(conversation, userId);

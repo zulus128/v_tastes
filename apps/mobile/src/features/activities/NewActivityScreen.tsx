@@ -16,11 +16,15 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PenIcon from '../../../assets/create-review/pen.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
+import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import SearchTuneIcon from '../../../assets/onboarding/place-tuning.svg';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useDiscoverVenues } from '../discover/api';
+import { useFavourites } from '../favourites/api';
 
 const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -117,7 +121,7 @@ export function NewActivityScreen({
         <Text style={styles.navTitle}>New activity</Text>
         <View style={styles.navButton} />
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 18) + 100 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 14) + 78 }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>PLACE</Text>
         {venue ? (
           <View style={styles.venueCard}>
@@ -126,7 +130,9 @@ export function NewActivityScreen({
               <Text numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
               <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
             </View>
-            <Pressable accessibilityLabel="Change place" onPress={() => setPlaceOpen(true)}><Text style={styles.edit}>✎</Text></Pressable>
+            <Pressable accessibilityLabel="Change place" onPress={() => setPlaceOpen(true)} style={styles.edit}>
+              <PenIcon height={18} width={18} />
+            </Pressable>
           </View>
         ) : (
           <Pressable onPress={() => setPlaceOpen(true)} style={styles.outlineButton}>
@@ -206,21 +212,61 @@ function SheetHeader({ onClose, styles, title }: { onClose: () => void; styles: 
 
 function PlaceSelector({ onClose, onSelect, styles, userId, visible }: { onClose: () => void; onSelect: (venue: Venue) => void; styles: ReturnType<typeof createStyles>; userId: string; visible: boolean }) {
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'Cafe' | 'Club' | 'Restaurant' | null>('Restaurant');
+  const [priceFilter, setPriceFilter] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [trendingFilter, setTrendingFilter] = useState(false);
   const venues = useDiscoverVenues(userId);
+  const favourites = useFavourites(userId);
+  const savedVenueIds = new Set(favourites.data?.places.map((place) => place.venueId) ?? []);
   const items = venues.data?.pages.flatMap((page) => page.items) ?? [];
   const query = search.trim().toLowerCase();
-  const filtered = items.filter((venue) => !query || venue.name.toLowerCase().includes(query) || venue.city.toLowerCase().includes(query));
+  const filtered = items
+    .filter((venue) => !query || `${venue.name} ${venue.city} ${venue.category ?? ''}`.toLowerCase().includes(query))
+    .filter((venue) => {
+      if (!categoryFilter) return true;
+      const category = venue.category?.toLowerCase() ?? '';
+      if (categoryFilter === 'Restaurant') {
+        return !['cafe', 'club', 'bar'].some((value) => category.includes(value));
+      }
+      return category.includes(categoryFilter.toLowerCase());
+    })
+    .filter((venue) => !priceFilter || venue.priceLevel === 2)
+    .filter((venue) => !savedOnly || savedVenueIds.has(venue.id))
+    .filter((venue) => !trendingFilter || venue.discoverTags?.includes('trending'));
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.modalBackdrop}><View style={styles.sheet}>
         <SheetHeader onClose={onClose} styles={styles} title="Select Place" />
-        <View style={styles.sheetSearch}><Text style={styles.searchGlyph}>⌕</Text><TextInput onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} /></View>
+        <View style={styles.sheetSearch}>
+          <Text style={styles.searchGlyph}>⌕</Text>
+          <TextInput onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} />
+          {search ? <Pressable accessibilityLabel="Clear search" onPress={() => setSearch('')}><Text style={styles.searchClear}>×</Text></Pressable> : null}
+          <Pressable accessibilityLabel="Place filters" onPress={() => setCategoryFilter((value) => value ? null : 'Restaurant')} style={styles.searchAction}>
+            <SearchTuneIcon color={styles.searchPlaceholder.color} height={24} width={24} />
+          </Pressable>
+          <Pressable accessibilityLabel="Saved places" onPress={() => setSavedOnly((active) => !active)} style={[styles.searchAction, savedOnly && styles.searchActionActive]}>
+            <BookmarkIcon height={18} width={16} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false}>
+          {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
+            const active = categoryFilter === filter;
+            return (
+              <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}>
+                <Text style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text>
+              </Pressable>
+            );
+          })}
+          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text style={styles.filterText}>$$⌄</Text></Pressable>
+          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text style={styles.filterText}>♨ Trending</Text></Pressable>
+        </ScrollView>
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={venues.isLoading ? <ActivityIndicator style={styles.loader} /> : <Text style={styles.emptyText}>No places found</Text>}
           onEndReached={() => { if (venues.hasNextPage && !venues.isFetchingNextPage) void venues.fetchNextPage(); }}
-          renderItem={({ item }) => <Pressable onPress={() => onSelect(item)} style={styles.placeRow}><Image source={venueImage(item.imageUrl)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
+          renderItem={({ item }) => <Pressable onPress={() => onSelect(item)} style={styles.placeRow}><Image source={venueImage(item.imageUrl)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text numberOfLines={1} style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
         />
       </View></View>
     </Modal>
@@ -259,25 +305,25 @@ function createStyles(colors: ThemeColors) {
     navButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     back: { color: colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
     navTitle: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 44, fontWeight: '600', textAlign: 'center' },
-    content: { paddingTop: 16 },
+    content: { paddingTop: 12 },
     sectionLabel: { color: colors.textMuted, marginHorizontal: 16, marginBottom: 8, fontSize: 12 },
     outlineButton: { height: 45, marginHorizontal: 16, borderWidth: 1, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
     outlineButtonText: { color: colors.text, fontSize: 15 },
-    divider: { height: StyleSheet.hairlineWidth, marginVertical: 16, backgroundColor: colors.border },
+    divider: { height: StyleSheet.hairlineWidth, marginVertical: 12, backgroundColor: colors.border },
     venueCard: { minHeight: 112, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
     venueImage: { width: 104, height: 104, borderRadius: 10 },
-    venueCopy: { flex: 1, marginLeft: 14 }, venueName: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '600' }, venueAddress: { color: colors.textSecondary, marginTop: 6, fontSize: 13, lineHeight: 18 }, edit: { color: colors.text, fontSize: 24, padding: 10 },
-    calendar: { marginHorizontal: 16, padding: 16, borderRadius: 13, backgroundColor: colors.background },
+    venueCopy: { flex: 1, marginLeft: 14 }, venueName: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '600' }, venueAddress: { color: colors.textSecondary, marginTop: 6, fontSize: 13, lineHeight: 18 }, edit: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+    calendar: { marginHorizontal: 16, padding: 12, borderRadius: 13, backgroundColor: colors.background },
     calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, month: { color: colors.text, fontSize: 17, fontWeight: '700' }, monthActions: { flexDirection: 'row', gap: 25 }, monthArrow: { color: colors.primary, fontSize: 32, lineHeight: 34 },
     weekRow: { marginTop: 5, flexDirection: 'row' }, weekday: { width: '14.2857%', color: colors.textMuted, fontSize: 11, textAlign: 'center' },
-    days: { marginTop: 5, flexDirection: 'row', flexWrap: 'wrap' }, dayCell: { width: '14.2857%', height: 46, alignItems: 'center', justifyContent: 'center' }, dayCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, daySelected: { backgroundColor: colors.primaryBorder }, dayText: { color: colors.text, fontSize: 17 }, dayPast: { color: colors.textMuted, opacity: 0.35 }, daySelectedText: { color: colors.primary, fontWeight: '700' },
+    days: { marginTop: 4, flexDirection: 'row', flexWrap: 'wrap' }, dayCell: { width: '14.2857%', height: 35, alignItems: 'center', justifyContent: 'center' }, dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, daySelected: { backgroundColor: colors.primaryBorder }, dayText: { color: colors.text, fontSize: 15 }, dayPast: { color: colors.textMuted, opacity: 0.35 }, daySelectedText: { color: colors.primary, fontWeight: '700' },
     timeRow: { marginTop: 5, paddingTop: 13, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, timeLabel: { color: colors.text, fontSize: 16 }, timePill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised }, timeValue: { color: colors.text, fontSize: 16 },
     memberRow: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.skeleton }, avatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' }, memberCopy: { flex: 1, marginLeft: 10 }, memberName: { color: colors.text, fontSize: 15, fontWeight: '600' }, memberHandle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 }, remove: { color: colors.text, fontSize: 25, padding: 10 },
     addMember: { width: 44, height: 44, marginLeft: 16, marginTop: 5, borderWidth: 1, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, addMemberText: { color: colors.text, fontSize: 28, fontWeight: '300' },
-    footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 12, paddingHorizontal: 31, backgroundColor: colors.canvas }, createButton: { height: 62, borderWidth: 5, borderColor: colors.primaryBorder, borderRadius: 31, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, createText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 }, disabled: { opacity: 0.45 },
+    footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 31, backgroundColor: colors.canvas }, createButton: { height: 54, borderWidth: 5, borderColor: colors.primaryBorder, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, createText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 }, disabled: { opacity: 0.45 },
     modalBackdrop: { flex: 1, paddingTop: 86, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' }, sheet: { maxHeight: '91%', minHeight: '72%', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, closeCircle: { width: 30, height: 30, borderWidth: 2, borderColor: colors.text, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
-    sheetSearch: { height: 40, margin: 16, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, fontSize: 21, marginRight: 8 }, sheetSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 }, searchPlaceholder: { color: colors.placeholder }, loader: { marginTop: 40 }, emptyText: { color: colors.textMuted, margin: 32, textAlign: 'center' },
-    placeRow: { minHeight: 165, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'flex-start' }, placeImage: { width: 122, height: 122, borderRadius: 10 }, placeCopy: { flex: 1, marginLeft: 15, paddingTop: 18 }, placeName: { color: colors.text, fontSize: 15, fontWeight: '700' }, placeAddress: { color: colors.textSecondary, marginTop: 5, fontSize: 13 }, placeMeta: { marginTop: 13, flexDirection: 'row', alignItems: 'center' }, rating: { color: '#FFFFFF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.primary, fontWeight: '700' }, reviews: { color: colors.textMuted, marginLeft: 8, fontSize: 13 }, rowPlus: { color: colors.text, fontSize: 23 },
+    sheetSearch: { height: 42, marginHorizontal: 16, marginTop: 16, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, fontSize: 21, marginRight: 8 }, sheetSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 }, searchPlaceholder: { color: colors.placeholder }, searchClear: { color: colors.textSecondary, fontSize: 22 }, searchAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45474B' }, searchActionActive: { backgroundColor: colors.primary }, filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 }, filter: { height: 29, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }, filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised }, filterText: { color: colors.text, fontSize: 12 }, loader: { marginTop: 40 }, emptyText: { color: colors.textMuted, margin: 32, textAlign: 'center' },
+    placeRow: { minHeight: 165, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'flex-start' }, placeImage: { width: 122, height: 122, borderRadius: 10 }, placeCopy: { flex: 1, minWidth: 0, marginLeft: 15, paddingTop: 18 }, placeName: { color: colors.text, fontSize: 15, fontWeight: '700' }, placeAddress: { color: colors.textSecondary, marginTop: 5, fontSize: 13 }, placeMeta: { marginTop: 13, flexDirection: 'row', alignItems: 'center' }, rating: { color: '#FFFFFF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.primary, fontWeight: '700' }, reviews: { flexShrink: 1, color: colors.textMuted, marginLeft: 8, fontSize: 13 }, rowPlus: { color: colors.text, fontSize: 23 },
     candidateRow: { minHeight: 76, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' }, radio: { width: 23, height: 23, borderWidth: 1.5, borderColor: colors.text, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, radioChecked: { borderColor: colors.primary, backgroundColor: colors.primary }, check: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     sheetFooter: { padding: 16, flexDirection: 'row', gap: 10, backgroundColor: colors.background }, cancelButton: { flex: 1, height: 45, borderWidth: 1, borderColor: colors.primary, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontWeight: '600' }, confirmButton: { flex: 1, minHeight: 45, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, confirmText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     centerBackdrop: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' }, timeSheet: { paddingBottom: 20, borderRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, pickerLabel: { color: colors.textMuted, margin: 16, marginBottom: 8, fontSize: 12 }, timeOption: { width: 50, height: 45, marginLeft: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised }, timeOptionSelected: { backgroundColor: colors.primary }, timeOptionText: { color: colors.text, fontSize: 16, fontWeight: '600' }, minuteRow: { marginBottom: 20, paddingRight: 8, flexDirection: 'row' },
