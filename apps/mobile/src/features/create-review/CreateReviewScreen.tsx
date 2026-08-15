@@ -1,14 +1,16 @@
 import type { ReviewTag, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -74,6 +76,18 @@ const tagOptions: Array<{ label: string; value: ReviewTag }> = [
   { label: '♨ Birthday', value: 'birthday' },
   { label: '☺ Children', value: 'children' },
 ];
+const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
+
+interface StoredReviewDraft {
+  dishes: DishReviewDraft[];
+  idempotencyKey: string;
+  rating: number;
+  selectedVenue: Venue | null;
+  tags: ReviewTag[];
+  text: string;
+  venueId: string;
+}
+
 function venueImage(url: string | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
 }
@@ -92,6 +106,7 @@ export function CreateReviewScreen({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
@@ -101,12 +116,54 @@ export function CreateReviewScreen({
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
   const [placeSelectorOpen, setPlaceSelectorOpen] = useState(false);
   const [dishEditor, setDishEditor] = useState<DishReviewDraft | null>(null);
+  const [dishToRemove, setDishToRemove] = useState<DishReviewDraft | null>(null);
+  const [exitPromptOpen, setExitPromptOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [submitError, setSubmitError] = useState<'failed' | 'offline' | null>(null);
   const [success, setSuccess] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('review'));
   const place = usePlace(venueId);
   const createReview = useCreateReview(userId);
   const venue = selectedVenue ?? place.data?.venue ?? null;
   const valid = Boolean(venueId && text.trim() && rating >= 1 && dishes.every((dish) => dish.photoUri && dish.title.trim() && dish.rating >= 1));
+  const hasDraftChanges = Boolean(
+    venueId !== (initialVenueId ?? '') || rating > 0 || text.trim() || tags.length > 0 || dishes.length > 0,
+  );
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (initialVenueId) return;
+    let active = true;
+    void AsyncStorage.getItem(reviewDraftKey(userId)).then((stored) => {
+      if (!active || !stored) return;
+      try {
+        const draft = JSON.parse(stored) as Partial<StoredReviewDraft>;
+        if (typeof draft.venueId !== 'string' || typeof draft.text !== 'string' || typeof draft.rating !== 'number') return;
+        setVenueId(draft.venueId);
+        setSelectedVenue(draft.selectedVenue ?? null);
+        setRating(draft.rating);
+        setText(draft.text);
+        setTags(Array.isArray(draft.tags) ? draft.tags : []);
+        setDishes(Array.isArray(draft.dishes) ? draft.dishes : []);
+        if (typeof draft.idempotencyKey === 'string') setIdempotencyKey(draft.idempotencyKey);
+      } catch {
+        void AsyncStorage.removeItem(reviewDraftKey(userId));
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [initialVenueId, userId]);
 
   useEffect(() => {
     if (!initialVenueId || selectedVenue) return;
@@ -124,6 +181,34 @@ export function CreateReviewScreen({
     setDishes([]);
     setIdempotencyKey(createIdempotencyKey('review'));
     setSuccess(false);
+    setSubmitError(null);
+    void AsyncStorage.removeItem(reviewDraftKey(userId));
+  }
+
+  async function persistDraft() {
+    const draft: StoredReviewDraft = {
+      dishes,
+      idempotencyKey,
+      rating,
+      selectedVenue: venue,
+      tags,
+      text,
+      venueId,
+    };
+    try {
+      await AsyncStorage.setItem(reviewDraftKey(userId), JSON.stringify(draft));
+    } catch {
+      // Leaving the form should not be blocked if local storage is unavailable.
+    }
+  }
+
+  function requestClose() {
+    Keyboard.dismiss();
+    if (hasDraftChanges) {
+      setExitPromptOpen(true);
+      return;
+    }
+    onClose();
   }
 
   function finish() {
@@ -133,6 +218,8 @@ export function CreateReviewScreen({
 
   function submit() {
     if (!valid || createReview.isPending) return;
+    Keyboard.dismiss();
+    setSubmitError(null);
     createReview.mutate({
       dishReviews: dishes,
       idempotencyKey,
@@ -141,7 +228,11 @@ export function CreateReviewScreen({
       text,
       venueId,
     }, {
-      onError: (error) => Alert.alert('Could not post review', apiErrorMessage(error)),
+      onError: (error) => {
+        const message = apiErrorMessage(error);
+        setSubmitError(/network|offline|unavailable|deadline/i.test(message) ? 'offline' : 'failed');
+        void persistDraft();
+      },
       onSuccess: () => setSuccess(true),
     });
   }
@@ -149,12 +240,15 @@ export function CreateReviewScreen({
   if (success) return <ReviewAdded onDone={finish} />;
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
       <ImageBackground imageStyle={styles.patternImage} source={pattern} style={styles.screen}>
         <PatternBackgroundLift />
         <ScrollView
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={[styles.content, { paddingBottom: 112 + insets.bottom }]}
+          keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
@@ -163,7 +257,7 @@ export function CreateReviewScreen({
             style={[styles.hero, { paddingTop: insets.top + 8 }]}
           >
             <View style={styles.navigation}>
-              <Pressable accessibilityLabel="Close review" hitSlop={14} onPress={onClose}><Text style={styles.back}>‹</Text></Pressable>
+              <Pressable accessibilityLabel="Close review" hitSlop={14} onPress={requestClose}><Text style={styles.back}>‹</Text></Pressable>
               <Text style={styles.title}>Write a Review</Text>
               <View style={styles.navigationSpacer} />
             </View>
@@ -203,6 +297,7 @@ export function CreateReviewScreen({
             multiline
             onChangeText={setText}
             onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(140, Math.max(50, nativeEvent.contentSize.height)))}
+            onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollTo({ animated: true, y: 360 }))}
             placeholder="Enter text"
             placeholderTextColor={colors.placeholder}
             scrollEnabled={feedbackHeight >= 140}
@@ -210,6 +305,17 @@ export function CreateReviewScreen({
             textAlignVertical="top"
             value={text}
           />
+          <View style={styles.feedbackMeta}>
+            <Text style={styles.feedbackHint}>Tell others what stood out about your visit.</Text>
+            <Text style={styles.feedbackCount}>{text.length}/2,000</Text>
+          </View>
+          {submitError ? (
+            <View accessibilityRole="alert" style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{submitError === 'offline'
+                ? "You're offline. Your review is kept as a draft until you're back."
+                : "Couldn't post your review.\nCheck your connection and try again."}</Text>
+            </View>
+          ) : null}
 
           <SectionLabel label="Dish reviews" />
           {dishes.length > 0 ? (
@@ -219,7 +325,7 @@ export function CreateReviewScreen({
                   <Image source={{ uri: dish.photoUri }} style={styles.dishImage} />
                   <Pressable
                     accessibilityLabel={`Remove ${dish.title}`}
-                    onPress={() => setDishes((items) => items.filter((item) => item.id !== dish.id))}
+                    onPress={() => setDishToRemove(dish)}
                     style={styles.deleteDish}
                   ><DeleteDishIcon height={17} width={16} /></Pressable>
                   <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
@@ -253,11 +359,11 @@ export function CreateReviewScreen({
           </ScrollView>
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
+        {!keyboardVisible ? <View style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}>
           <Pressable disabled={!valid || createReview.isPending} onPress={submit} style={[styles.post, (!valid || createReview.isPending) && styles.postDisabled]}>
             {createReview.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.postText}>Post Review</Text>}
           </Pressable>
-        </View>
+        </View> : null}
 
         <PlaceSelector
           onClose={() => setPlaceSelectorOpen(false)}
@@ -279,6 +385,38 @@ export function CreateReviewScreen({
           }}
           value={dishEditor}
           visible={dishEditor !== null}
+        />
+        <ReviewConfirmationSheet
+          body="The photo, rating and title will be deleted from your review."
+          dangerLabel="Remove"
+          onClose={() => setDishToRemove(null)}
+          onDanger={() => {
+            if (dishToRemove) setDishes((items) => items.filter((item) => item.id !== dishToRemove.id));
+            setDishToRemove(null);
+          }}
+          primaryLabel="Keep dish"
+          title="Remove this dish?"
+          visible={dishToRemove !== null}
+        />
+        <ReviewConfirmationSheet
+          body="Your review will be saved as a draft, so you can finish it later."
+          dangerLabel="Discard review"
+          onClose={() => setExitPromptOpen(false)}
+          onDanger={() => {
+            reset();
+            setExitPromptOpen(false);
+            onClose();
+          }}
+          onPrimary={() => {
+            void persistDraft().finally(() => {
+              setExitPromptOpen(false);
+              onClose();
+            });
+          }}
+          primaryLabel="Save draft & exit"
+          secondaryLabel="Keep writing"
+          title="Leave without posting?"
+          visible={exitPromptOpen}
         />
       </ImageBackground>
     </KeyboardAvoidingView>
@@ -464,8 +602,9 @@ function PlaceSelector({
   };
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <Pressable onPress={onClose} style={styles.scrim} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(12, insets.bottom) }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
+        <Pressable onPress={onClose} style={styles.scrim} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(12, insets.bottom) }]}>
         <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Select Place</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>⌕</Text>
@@ -509,7 +648,8 @@ function PlaceSelector({
             )}
           />
         )}
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -559,11 +699,14 @@ function DishEditor({
   const valid = Boolean(draft.photoUri && draft.title.trim() && draft.rating >= 1);
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <Pressable onPress={onClose} style={styles.scrim} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom) }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
+        <Pressable onPress={onClose} style={styles.scrim} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom) }]}>
         <View style={styles.header}><Text style={styles.title}>Add Dish</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
         <ScrollView
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={styles.body}
+          keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           style={styles.scroll}
@@ -582,6 +725,55 @@ function DishEditor({
               <View style={styles.saveIcon}><SaveCheck height={14.2724} width={19.9891} /></View>
               <Text style={styles.saveText}>Save</Text>
             </View>
+          </Pressable>
+        </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ReviewConfirmationSheet({
+  body,
+  dangerLabel,
+  onClose,
+  onDanger,
+  onPrimary = onClose,
+  primaryLabel,
+  secondaryLabel,
+  title,
+  visible,
+}: {
+  body: string;
+  dangerLabel: string;
+  onClose: () => void;
+  onDanger: () => void;
+  onPrimary?: () => void;
+  primaryLabel: string;
+  secondaryLabel?: string;
+  title: string;
+  visible: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createConfirmationStyles(colors), [colors]);
+  return (
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+      <View style={styles.backdrop}>
+        <Pressable accessibilityLabel="Close confirmation" onPress={onClose} style={StyleSheet.absoluteFill} />
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.body}>{body}</Text>
+          <Pressable accessibilityRole="button" onPress={onPrimary} style={styles.primary}>
+            <Text style={styles.primaryText}>{primaryLabel}</Text>
+          </Pressable>
+          {secondaryLabel ? (
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondary}>
+              <Text style={styles.secondaryText}>{secondaryLabel}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable accessibilityRole="button" onPress={onDanger} style={styles.danger}>
+            <Text style={styles.dangerText}>{dangerLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -651,6 +843,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   venueAddress: { color: '#AAB2C5', fontSize: 15, lineHeight: 18 },
   edit: { width: 44, height: 44, marginRight: -12, alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center' },
   feedback: { minHeight: 50, marginHorizontal: 16, borderRadius: 12, padding: 12, color: colors.text, backgroundColor: colors.background, fontSize: 15, lineHeight: 20 },
+  feedbackMeta: { minHeight: 22, marginTop: 5, marginHorizontal: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  feedbackHint: { flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 16 },
+  feedbackCount: { color: colors.textMuted, fontSize: 12, lineHeight: 16 },
+  errorBanner: { minHeight: 52, marginTop: 10, marginHorizontal: 16, borderWidth: 1, borderColor: '#D94D45', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 8, justifyContent: 'center', backgroundColor: 'rgba(217,77,69,0.12)' },
+  errorBannerText: { color: '#D94D45', fontSize: 13, lineHeight: 16 },
   dishList: { gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
   dishCard: { width: 174, padding: 12, borderRadius: 16, backgroundColor: colors.background },
   dishImage: { width: 150, height: 150, borderRadius: 14 },
@@ -671,6 +868,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 });
 
 const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
+  modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '91%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
   sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
@@ -693,6 +891,7 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
 });
 
 const createDishStyles = (colors: ThemeColors) => StyleSheet.create({
+  modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
   header: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
@@ -703,6 +902,20 @@ const createDishStyles = (colors: ThemeColors) => StyleSheet.create({
   input: { height: 50, borderRadius: 12, paddingHorizontal: 12, color: colors.text, backgroundColor: colors.background, fontSize: 16 },
   actions: { paddingTop: 14, paddingHorizontal: 16, flexDirection: 'row', gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas }, cancel: { flex: 1, height: 52, borderWidth: 1, borderColor: colors.primary, borderRadius: 26, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontSize: 15 },
   save: { flex: 1, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' }, saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 }, saveIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontSize: 15, fontWeight: '600' }, disabled: { opacity: 0.45 },
+});
+
+const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
+  sheet: { paddingTop: 32, paddingHorizontal: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, alignItems: 'center', backgroundColor: colors.surfaceRaised },
+  handle: { position: 'absolute', top: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
+  title: { color: colors.text, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  body: { maxWidth: 310, marginTop: 9, color: colors.textMuted, fontSize: 14, lineHeight: 18, textAlign: 'center' },
+  primary: { width: '100%', height: 50, marginTop: 24, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
+  primaryText: { color: '#fff', fontSize: 16, fontWeight: '500' },
+  secondary: { width: '100%', minHeight: 22, marginTop: 19, alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { color: colors.text, fontSize: 16, fontWeight: '500' },
+  danger: { width: '100%', minHeight: 22, marginTop: 19, alignItems: 'center', justifyContent: 'center' },
+  dangerText: { color: '#D94D45', fontSize: 16, fontWeight: '500' },
 });
 
 const successStyles = StyleSheet.create({
