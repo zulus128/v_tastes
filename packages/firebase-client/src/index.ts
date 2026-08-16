@@ -161,6 +161,7 @@ export const callableOperationNames = [
   'reportComment',
   'getAdminOverview',
   'getReportedContent',
+  'getUserHistory',
   'dismissReport',
   'deleteContent',
   'editContent',

@@ -5,6 +5,7 @@ import * as backendExports from '../../services/backend/functions/src';
 const nonCallableExports = new Set([
   'ingestMobileTelemetry',
   'pushMessageNotification',
+  'reinstateExpiredSuspensions',
   'resetMonthlyXp',
 ]);
 

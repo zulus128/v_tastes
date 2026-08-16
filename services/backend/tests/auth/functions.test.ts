@@ -525,8 +525,10 @@ describe('authenticated session and paginated reads', () => {
     expect(reportDocument.data()).toMatchObject({
       reporterId: reader.id,
       reporterName: 'Reader',
-      contentType: 'comment',
-      contentId: firstComment.id,
+      targetType: 'comment',
+      targetId: firstComment.id,
+      parentId: firstReview.id,
+      contentPreview: 'Exactly once too',
       status: 'pending',
     });
 
@@ -1073,7 +1075,9 @@ describe('Milestone 2 completion callables', () => {
     const report = await callFunction<{ id: string }>('reportContent', {
       idempotencyKey: 'm2-content-report-001', targetType: 'review', reviewId: review.id, reason: 'Spam',
     }, reader.token);
-    expect((await db.collection('reports').doc(report.id).get()).get('createdAt')).toBeTruthy();
+    expect((await db.collection('reports').doc(report.id).get()).data()).toMatchObject({
+      targetType: 'review', targetId: review.id, contentPreview: 'Updated review', status: 'pending',
+    });
 
     await callFunction('deleteReview', { reviewId: review.id }, author.token);
     expect((await db.collection('reviews').doc(review.id).get()).get('status')).toBe('deleted');

@@ -9,13 +9,13 @@ type StaffRole = 'admin' | 'moderator';
 
 interface Overview {
   totalUsers: number;
-  publishedReviews: number;
+  totalReviews: number;
   pendingReports: number;
   activeVenues: number;
   newUsers: { last24Hours: number; last7Days: number; last30Days: number };
   analytics: { connected: boolean; propertyId: string; dau: number; mau: number; error: string | null };
   reviewCities: Array<{ city: string; count: number }>;
-  adsense: { connected: boolean; estimatedEarnings: number; impressions: number; clicks: number; error: string | null };
+  adsense: { connected: boolean; estimatedEarnings: number; impressions: number; clicks: number; currencyCode: string | null; error: string | null };
 }
 
 interface ReportItem {
@@ -37,7 +37,7 @@ interface AdminVenue {
   city: string;
   address: string;
   category: string;
-  status: 'active' | 'hidden' | 'pending' | 'merged';
+  status: 'active' | 'hidden' | 'pending' | 'merged' | 'removed';
   featured: boolean;
   hotSpot: boolean;
   reviewCount: number;
@@ -53,15 +53,25 @@ interface AdminUser {
   createdAt: string;
 }
 
+interface UserHistory {
+  user: AdminUser & { moderationReason: string | null; suspendedUntil: string | null };
+  reviews: Array<{ id: string; text: string; status: string; venueName: string; createdAt: string }>;
+  reports: Array<{ id: string; reason: string; status: string; createdAt: string }>;
+  actions: Array<{ id: string; action: string; details: Record<string, unknown>; createdAt: string }>;
+}
+
+type RunAdmin = (name: string, input: unknown) => Promise<boolean>;
+type AccountActionName = 'suspendUser' | 'banUser' | 'unbanUser' | 'reinstateUser';
+
 const emptyOverview: Overview = {
   totalUsers: 0,
-  publishedReviews: 0,
+  totalReviews: 0,
   pendingReports: 0,
   activeVenues: 0,
   newUsers: { last24Hours: 0, last7Days: 0, last30Days: 0 },
   analytics: { connected: false, propertyId: '', dau: 0, mau: 0, error: null },
   reviewCities: [],
-  adsense: { connected: false, estimatedEarnings: 0, impressions: 0, clicks: 0, error: null },
+  adsense: { connected: false, estimatedEarnings: 0, impressions: 0, clicks: 0, currencyCode: null, error: null },
 };
 
 function Icon({ name }: { name: View | 'logout' | 'search' | 'plus' }) {
@@ -85,6 +95,15 @@ function formatDate(value: string) {
 function errorMessage(error: unknown) {
   const message = (error as { message?: unknown })?.message;
   return typeof message === 'string' ? message.replace(/^Firebase:\s*/, '') : 'Something went wrong.';
+}
+
+function ModalShell({ title, eyebrow, close, children }: { title: string; eyebrow: string; close: () => void; children: ReactNode }) {
+  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+    <section className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><button type="button" className="close" onClick={close}>×</button></div>
+      {children}
+    </section>
+  </div>;
 }
 
 function Login() {
@@ -137,7 +156,7 @@ function OverviewView({ data }: { data: Overview }) {
   return <>
     <div className="metrics">
       <Metric label="Total users" value={data.totalUsers} note="Registered profiles" />
-      <Metric label="Published reviews" value={data.publishedReviews} note="Visible content" />
+      <Metric label="Total reviews" value={data.totalReviews} note="All review records" />
       <Metric label="Pending reports" value={data.pendingReports} note="Needs attention" tone="red" />
       <Metric label="Active venues" value={data.activeVenues} note="Available in discovery" />
     </div>
@@ -145,7 +164,7 @@ function OverviewView({ data }: { data: Overview }) {
       <Metric label="DAU" value={data.analytics.dau} note={data.analytics.connected ? 'Google Analytics · yesterday' : 'Analytics permission needed'} />
       <Metric label="MAU" value={data.analytics.mau} note={data.analytics.connected ? 'Google Analytics · 30 days' : `Property ${data.analytics.propertyId || 'not found'}`} />
       <Metric label="Ad impressions" value={data.adsense.impressions} note={data.adsense.connected ? 'AdSense · 30 days' : 'AdSense OAuth not connected'} />
-      <Metric label="Ad clicks" value={data.adsense.clicks} note={data.adsense.connected ? `$${data.adsense.estimatedEarnings.toFixed(2)} estimated` : 'Publisher account required'} />
+      <Metric label="Ad clicks" value={data.adsense.clicks} note={data.adsense.connected ? `${data.adsense.estimatedEarnings.toFixed(2)} ${data.adsense.currencyCode ?? ''} estimated` : 'Optional · publisher account required'} />
     </div>
     <div className="split-grid">
       <section className="panel">
@@ -167,21 +186,44 @@ function OverviewView({ data }: { data: Overview }) {
   </>;
 }
 
-function ReportsView({ reports, run }: { reports: ReportItem[]; run: (name: string, input: unknown) => Promise<void> }) {
+function ReportsView({ reports, run }: { reports: ReportItem[]; run: RunAdmin }) {
+  const [selected, setSelected] = useState<{ report: ReportItem; action: 'edit' | 'delete' } | null>(null);
+  const [text, setText] = useState('');
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    const target = {
+      reportId: selected.report.id,
+      targetType: selected.report.targetType,
+      targetId: selected.report.targetId,
+      ...(selected.report.parentId ? { parentId: selected.report.parentId } : {}),
+    };
+    const saved = selected.action === 'edit'
+      ? await run('editContent', { ...target, text })
+      : await run('deleteContent', target);
+    if (!saved) return;
+    setSelected(null);
+  }
   if (!reports.length) return <Empty title="No pending reports" text="New content reports will appear here." />;
-  return <div className="report-grid">{reports.map((report) => <article className="report-card" key={report.id}>
+  return <><div className="report-grid">{reports.map((report) => <article className="report-card" key={report.id}>
     <div className="report-top"><span className="status-pill warning">{report.reason}</span><time>{formatDate(report.createdAt)}</time></div>
     <p className="content-preview">“{report.contentPreview || report.details || 'No preview available'}”</p>
     <dl><div><dt>Reporter</dt><dd>{report.reporterName}</dd></div><div><dt>Content</dt><dd>{report.targetType} · {report.targetId.slice(0, 10)}</dd></div></dl>
     <div className="actions">
       <button className="button ghost" onClick={() => run('dismissReport', { reportId: report.id })}>Dismiss</button>
-      <button className="button ghost" onClick={() => {
-        const text = window.prompt('Replace content text:', report.contentPreview);
-        if (text) void run('editContent', { reportId: report.id, targetType: report.targetType, targetId: report.targetId, ...(report.parentId ? { parentId: report.parentId } : {}), text });
-      }}>Edit</button>
-      <button className="button danger" onClick={() => run('deleteContent', { reportId: report.id, targetType: report.targetType, targetId: report.targetId, ...(report.parentId ? { parentId: report.parentId } : {}) })}>Remove</button>
+      <button className="button ghost" onClick={() => { setText(report.contentPreview); setSelected({ report, action: 'edit' }); }}>Edit</button>
+      <button className="button danger" onClick={() => setSelected({ report, action: 'delete' })}>Remove</button>
     </div>
-  </article>)}</div>;
+  </article>)}</div>
+    {selected && <ModalShell eyebrow="MODERATION" title={selected.action === 'edit' ? 'Edit reported content' : 'Remove reported content'} close={() => setSelected(null)}>
+      <form onSubmit={submit}>
+        {selected.action === 'edit'
+          ? <label>Content<textarea required maxLength={2000} rows={7} value={text} onChange={(event) => setText(event.target.value)} /></label>
+          : <p className="modal-copy">This hides the content from the product and resolves the report. The action is recorded in the audit log.</p>}
+        <div className="actions end"><button type="button" className="button ghost" onClick={() => setSelected(null)}>Cancel</button><button className={selected.action === 'delete' ? 'button danger' : 'button primary'}>{selected.action === 'delete' ? 'Remove content' : 'Save changes'}</button></div>
+      </form>
+    </ModalShell>}
+  </>;
 }
 
 function VenueForm({ venue, close, saved }: { venue?: AdminVenue; close: () => void; saved: () => Promise<void> }) {
@@ -193,34 +235,73 @@ function VenueForm({ venue, close, saved }: { venue?: AdminVenue; close: () => v
   }
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="modal" onSubmit={submit}>
     <div className="panel-heading"><div><p className="eyebrow">VENUE</p><h2>{venue ? 'Edit venue' : 'Add venue'}</h2></div><button type="button" className="close" onClick={close}>×</button></div>
-    <div className="form-grid"><label>Name<input required value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })}/></label><label>Category<input required value={values.category} onChange={(e) => setValues({ ...values, category: e.target.value })}/></label><label>City<input required value={values.city} onChange={(e) => setValues({ ...values, city: e.target.value })}/></label><label>Status<select value={values.status} onChange={(e) => setValues({ ...values, status: e.target.value as typeof values.status })}><option value="active">Active</option><option value="pending">Pending</option><option value="hidden">Hidden</option></select></label><label className="wide">Address<input required value={values.address} onChange={(e) => setValues({ ...values, address: e.target.value })}/></label></div>
+    <div className="form-grid"><label>Name<input required value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })}/></label><label>Category<input required value={values.category} onChange={(e) => setValues({ ...values, category: e.target.value })}/></label><label>City<input required value={values.city} onChange={(e) => setValues({ ...values, city: e.target.value })}/></label><label>Status<select value={values.status} onChange={(e) => setValues({ ...values, status: e.target.value as typeof values.status })}><option value="active">Active</option><option value="pending">Pending</option><option value="hidden">Hidden</option><option value="removed">Removed</option></select></label><label className="wide">Address<input required value={values.address} onChange={(e) => setValues({ ...values, address: e.target.value })}/></label></div>
     <div className="actions end"><button type="button" className="button ghost" onClick={close}>Cancel</button><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save venue'}</button></div>
   </form></div>;
 }
 
-function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; isAdmin: boolean; refresh: () => Promise<void>; run: (name: string, input: unknown) => Promise<void> }) {
+function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; isAdmin: boolean; refresh: () => Promise<void>; run: RunAdmin }) {
   const [editing, setEditing] = useState<AdminVenue | 'new' | null>(null);
-  async function merge(venue: AdminVenue) {
-    const targetVenueId = window.prompt(`Merge “${venue.name}” into venue ID:`);
-    if (!targetVenueId) return;
-    await run('mergeVenues', { sourceVenueId: venue.id, targetVenueId });
+  const [merging, setMerging] = useState<AdminVenue | null>(null);
+  const [targetVenueId, setTargetVenueId] = useState('');
+  const [statusAction, setStatusAction] = useState<{ venue: AdminVenue; status: 'active' | 'hidden' | 'removed' } | null>(null);
+  async function merge(event: FormEvent) {
+    event.preventDefault();
+    if (!merging || !targetVenueId) return;
+    if (!await run('mergeVenues', { sourceVenueId: merging.id, targetVenueId })) return;
+    setMerging(null); setTargetVenueId('');
+  }
+  async function changeStatus() {
+    if (!statusAction) return;
+    if (!await run('setVenueStatus', { venueId: statusAction.venue.id, status: statusAction.status })) return;
+    setStatusAction(null);
   }
   return <>
     {isAdmin && <div className="toolbar-right"><button className="button primary" onClick={() => setEditing('new')}><Icon name="plus"/> Add venue</button></div>}
-    <div className="table-wrap"><table><thead><tr><th>Venue</th><th>Location</th><th>Status</th><th>Flags</th><th>Reviews</th><th /></tr></thead><tbody>{venues.map((venue) => <tr key={venue.id}><td><strong>{venue.name}</strong><small>{venue.category}</small></td><td>{venue.city}<small>{venue.address}</small></td><td><span className={`status-pill ${venue.status}`}>{venue.status}</span></td><td><div className="flag-list"><button disabled={!isAdmin} className={venue.featured ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: !venue.featured, hotSpot: venue.hotSpot })}>Featured</button><button disabled={!isAdmin} className={venue.hotSpot ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: venue.featured, hotSpot: !venue.hotSpot })}>Hot spot</button></div></td><td>{venue.reviewCount}</td><td>{isAdmin && <div className="row-menu"><button className="text-button" onClick={() => setEditing(venue)}>Edit</button><button className="text-button" onClick={() => merge(venue)}>Merge</button></div>}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Venue</th><th>Location</th><th>Status</th><th>Flags</th><th>Reviews</th><th /></tr></thead><tbody>{venues.map((venue) => <tr key={venue.id}><td><strong>{venue.name}</strong><small>{venue.category}</small></td><td>{venue.city}<small>{venue.address}</small></td><td><span className={`status-pill ${venue.status}`}>{venue.status}</span></td><td><div className="flag-list"><button disabled={!isAdmin} className={venue.featured ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: !venue.featured, hotSpot: venue.hotSpot })}>Featured</button><button disabled={!isAdmin} className={venue.hotSpot ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: venue.featured, hotSpot: !venue.hotSpot })}>Hot spot</button></div></td><td>{venue.reviewCount}</td><td>{isAdmin && <div className="row-menu"><button className="text-button" onClick={() => setEditing(venue)}>Edit</button>{venue.status === 'active' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'hidden' })}>Hide</button> : venue.status === 'hidden' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'active' })}>Restore</button> : null}<button className="text-button" onClick={() => { setMerging(venue); setTargetVenueId(''); }}>Merge</button>{venue.status !== 'removed' && <button className="text-button red" onClick={() => setStatusAction({ venue, status: 'removed' })}>Remove</button>}</div>}</td></tr>)}</tbody></table></div>
     {editing && (editing === 'new'
       ? <VenueForm close={() => setEditing(null)} saved={refresh}/>
       : <VenueForm venue={editing} close={() => setEditing(null)} saved={refresh}/>)} 
+    {merging && <ModalShell eyebrow="VENUE MERGE" title={`Merge ${merging.name}`} close={() => setMerging(null)}><form onSubmit={merge}><p className="modal-copy">All reviews will move to the selected venue. The source venue will remain as a merged record.</p><label>Destination venue<select required value={targetVenueId} onChange={(event) => setTargetVenueId(event.target.value)}><option value="">Select a venue…</option>{venues.filter((venue) => venue.id !== merging.id && venue.status !== 'merged' && venue.status !== 'removed').map((venue) => <option key={venue.id} value={venue.id}>{venue.name} · {venue.city}</option>)}</select></label><div className="actions end"><button type="button" className="button ghost" onClick={() => setMerging(null)}>Cancel</button><button className="button danger" disabled={!targetVenueId}>Merge venues</button></div></form></ModalShell>}
+    {statusAction && <ModalShell eyebrow="VENUE STATUS" title={`${statusAction.status === 'active' ? 'Restore' : statusAction.status === 'hidden' ? 'Hide' : 'Remove'} ${statusAction.venue.name}`} close={() => setStatusAction(null)}><p className="modal-copy">{statusAction.status === 'removed' ? 'The venue will disappear from discovery but remain in the database and audit log.' : `The venue status will change to ${statusAction.status}.`}</p><div className="actions end"><button className="button ghost" onClick={() => setStatusAction(null)}>Cancel</button><button className={statusAction.status === 'removed' ? 'button danger' : 'button primary'} onClick={() => void changeStatus()}>Confirm</button></div></ModalShell>}
   </>;
 }
 
-function UsersView({ users, run }: { users: AdminUser[]; run: (name: string, input: unknown) => Promise<void> }) {
-  async function action(name: string, user: AdminUser) {
-    const reason = window.prompt(`Reason for this account action on ${user.displayName}:`);
-    if (!reason) return;
-    await run(name, { userId: user.id, reason });
+function UsersView({ users, run }: { users: AdminUser[]; run: RunAdmin }) {
+  const [selectedAction, setSelectedAction] = useState<{ name: AccountActionName; user: AdminUser } | null>(null);
+  const [reason, setReason] = useState('');
+  const [suspendedUntil, setSuspendedUntil] = useState('');
+  const [history, setHistory] = useState<UserHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  async function action(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedAction) return;
+    const saved = await run(selectedAction.name, {
+      userId: selectedAction.user.id,
+      reason,
+      ...(selectedAction.name === 'suspendUser' ? { suspendedUntil: new Date(`${suspendedUntil}T23:59:59.000Z`).toISOString() } : {}),
+    });
+    if (!saved) return;
+    setSelectedAction(null); setReason(''); setSuspendedUntil('');
   }
-  return <div className="table-wrap"><table><thead><tr><th>User</th><th>Contact</th><th>Joined</th><th>Status</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.displayName}</strong><small>@{user.username ?? user.id.slice(0, 8)}</small></td><td>{user.email ?? user.phoneNumber ?? '—'}</td><td>{formatDate(user.createdAt)}</td><td><span className={`status-pill ${user.status}`}>{user.status}</span></td><td><div className="row-menu">{user.status === 'active' ? <><button className="text-button" onClick={() => action('suspendUser', user)}>Suspend</button><button className="text-button red" onClick={() => action('banUser', user)}>Ban</button></> : <button className="text-button" onClick={() => action(user.status === 'banned' ? 'unbanUser' : 'reinstateUser', user)}>Reinstate</button>}</div></td></tr>)}</tbody></table></div>;
+  function chooseAction(name: AccountActionName, user: AdminUser) {
+    setReason(''); setSuspendedUntil(''); setSelectedAction({ name, user });
+  }
+  async function showHistory(user: AdminUser) {
+    setHistoryLoading(true); setHistoryError('');
+    try { setHistory(await callAdmin<{ userId: string }, UserHistory>('getUserHistory', { userId: user.id })); }
+    catch (error) { setHistoryError(errorMessage(error)); }
+    finally { setHistoryLoading(false); }
+  }
+  return <>{historyError && <button className="notice" onClick={() => setHistoryError('')}>{historyError}<span>×</span></button>}<div className="table-wrap"><table><thead><tr><th>User</th><th>Contact</th><th>Joined</th><th>Status</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><strong>{user.displayName}</strong><small>@{user.username ?? user.id.slice(0, 8)}</small></td><td>{user.email ?? user.phoneNumber ?? '—'}</td><td>{formatDate(user.createdAt)}</td><td><span className={`status-pill ${user.status}`}>{user.status}</span></td><td><div className="row-menu"><button className="text-button" disabled={historyLoading} onClick={() => void showHistory(user)}>History</button>{user.status === 'active' ? <><button className="text-button" onClick={() => chooseAction('suspendUser', user)}>Suspend</button><button className="text-button red" onClick={() => chooseAction('banUser', user)}>Ban</button></> : <button className="text-button" onClick={() => chooseAction(user.status === 'banned' ? 'unbanUser' : 'reinstateUser', user)}>{user.status === 'banned' ? 'Unban' : 'Reinstate'}</button>}</div></td></tr>)}</tbody></table></div>
+    {selectedAction && <ModalShell eyebrow="ACCOUNT ACTION" title={`${selectedAction.name === 'suspendUser' ? 'Temporarily suspend' : selectedAction.name === 'banUser' ? 'Permanently ban' : selectedAction.name === 'unbanUser' ? 'Unban' : 'Reinstate'} ${selectedAction.user.displayName}`} close={() => setSelectedAction(null)}><form onSubmit={action}><label>Reason<textarea required maxLength={500} rows={4} value={reason} onChange={(event) => setReason(event.target.value)} /></label>{selectedAction.name === 'suspendUser' && <label>Suspended until<input type="date" required min={new Date().toISOString().slice(0, 10)} value={suspendedUntil} onChange={(event) => setSuspendedUntil(event.target.value)} /></label>}<div className="actions end"><button type="button" className="button ghost" onClick={() => setSelectedAction(null)}>Cancel</button><button className={selectedAction.name === 'banUser' ? 'button danger' : 'button primary'}>{selectedAction.name === 'banUser' ? 'Permanently ban' : 'Confirm action'}</button></div></form></ModalShell>}
+    {history && <ModalShell eyebrow="USER HISTORY" title={history.user.displayName} close={() => setHistory(null)}><div className="history-summary"><div><span>Status</span><strong className={`status-pill ${history.user.status}`}>{history.user.status}</strong></div><div><span>Joined</span><strong>{formatDate(history.user.createdAt)}</strong></div>{history.user.suspendedUntil && <div><span>Suspended until</span><strong>{formatDate(history.user.suspendedUntil)}</strong></div>}{history.user.moderationReason && <div className="wide"><span>Latest moderation reason</span><strong>{history.user.moderationReason}</strong></div>}</div><div className="history-grid"><HistoryList title="Reviews" empty="No reviews" items={history.reviews.map((item) => ({ id: item.id, title: item.venueName, text: item.text || item.status, date: item.createdAt }))} /><HistoryList title="Reports filed" empty="No reports" items={history.reports.map((item) => ({ id: item.id, title: item.reason, text: item.status, date: item.createdAt }))} /><HistoryList title="Account actions" empty="No account actions" items={history.actions.map((item) => ({ id: item.id, title: item.action.replaceAll('-', ' '), text: String(item.details.reason ?? ''), date: item.createdAt }))} /></div></ModalShell>}
+  </>;
+}
+
+function HistoryList({ title, empty, items }: { title: string; empty: string; items: Array<{ id: string; title: string; text: string; date: string }> }) {
+  return <section className="history-list"><h3>{title}</h3>{items.length ? items.map((item) => <article key={item.id}><div><strong>{item.title}</strong><time>{formatDate(item.date)}</time></div>{item.text && <p>{item.text}</p>}</article>) : <p className="muted">{empty}</p>}</section>;
 }
 
 function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><span>✓</span><h2>{title}</h2><p>{text}</p></div>; }
@@ -261,8 +342,8 @@ export function AdminApp() {
 
   async function run(name: string, input: unknown) {
     setBusy(true); setNotice('');
-    try { await callAdmin(name, input); setNotice('Changes saved.'); await refresh(); }
-    catch (error) { setNotice(errorMessage(error)); setBusy(false); }
+    try { await callAdmin(name, input); setNotice('Changes saved.'); await refresh(); return true; }
+    catch (error) { setNotice(errorMessage(error)); setBusy(false); return false; }
   }
 
   const titles = useMemo(() => ({ overview: ['Overview', 'A quick view of platform health.'], reports: ['Moderation', 'Review and resolve reported content.'], venues: ['Venues', 'Maintain place data and discovery flags.'], users: ['Users', 'Search accounts and manage access.'] }), []);

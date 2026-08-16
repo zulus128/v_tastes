@@ -32,4 +32,17 @@ Connect `admin.tastes.com` to the `tastes-admin` Hosting site in Firebase Consol
 The dashboard reads DAU/MAU from GA4 property `546866444` through the Google Analytics Data API. Grant the Functions runtime service account
 `254210443804-compute@developer.gserviceaccount.com` Viewer access to that property in Google Analytics Admin.
 
-AdSense reporting requires a project-owned OAuth desktop client and an AdSense publisher account. Do not use the default `gcloud` OAuth client for this integration: Google blocks its sensitive Analytics/AdSense scopes. Store the OAuth client and refresh token in Secret Manager before enabling revenue metrics.
+AdSense is optional and is only useful when the product runs Google ads. Without it, the rest of the dashboard works normally and the ad cards show a disconnected state.
+
+To enable 30-day impressions, clicks, and estimated earnings, enable AdSense Management API v2 and provide these runtime environment variables to the Functions deployment:
+
+```bash
+ADSENSE_ACCOUNT_ID=pub-1234567890123456
+ADSENSE_OAUTH_CLIENT_ID=...
+ADSENSE_OAUTH_CLIENT_SECRET=...
+ADSENSE_OAUTH_REFRESH_TOKEN=...
+```
+
+The refresh token must include the `https://www.googleapis.com/auth/adsense.readonly` scope. Use a project-owned OAuth client and keep all three OAuth values out of source control.
+
+Temporary suspensions are automatically reinstated by the `reinstateExpiredSuspensions` scheduled function every 30 minutes. Scheduled functions require billing to be enabled in the Firebase project.
