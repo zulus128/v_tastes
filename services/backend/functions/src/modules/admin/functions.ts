@@ -117,7 +117,7 @@ interface AnalyticsBatchResponse {
 }
 
 async function getAnalyticsMetrics() {
-  const propertyId = process.env.GA4_PROPERTY_ID ?? '546866444';
+  const propertyId = process.env.GA4_PROPERTY_ID ?? '550185288';
   try {
     const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/analytics.readonly'] });
     const token = await auth.getAccessToken();

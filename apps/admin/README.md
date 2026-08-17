@@ -29,7 +29,7 @@ Connect `admin.tastes.com` to the `tastes-admin` Hosting site in Firebase Consol
 
 ## Analytics metrics
 
-The dashboard reads DAU/MAU from GA4 property `546866444` through the Google Analytics Data API. Grant the Functions runtime service account
+The dashboard reads DAU/MAU from GA4 property `550185288` through the Google Analytics Data API. Grant the Functions runtime service account
 `254210443804-compute@developer.gserviceaccount.com` Viewer access to that property in Google Analytics Admin.
 
 Temporary suspensions are automatically reinstated by the `reinstateExpiredSuspensions` scheduled function every 30 minutes. Scheduled functions require billing to be enabled in the Firebase project.
