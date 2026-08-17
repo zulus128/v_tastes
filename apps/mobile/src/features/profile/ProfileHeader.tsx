@@ -105,10 +105,13 @@ export function ProfileHeader({
               </View>
             )}
           </Pressable>
-          <Pressable onPress={onMessage} style={styles.messageAction}>
+          <Pressable
+            onPress={onMessage}
+            style={[styles.messageAction, { backgroundColor: isDark ? '#161616' : colors.canvas }]}
+          >
             <View style={styles.actionLabel}>
               <Image source={messageIcon} style={styles.messageIcon} />
-              <Text style={styles.messageActionText}>Message</Text>
+              <Text style={[styles.messageActionText, { color: isDark ? '#FFFFFF' : colors.text }]}>Message</Text>
             </View>
           </Pressable>
         </View>
@@ -194,8 +197,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   followIcon: { width: 24, height: 24 },
   messageIcon: { width: 20, height: 20 },
   followActionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.7 },
-  messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616' },
-  messageActionText: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
+  messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  messageActionText: { fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
   chips: { minWidth: '100%', paddingHorizontal: 10, paddingTop: 14, gap: 6, justifyContent: 'center' },
   chip: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 39, overflow: 'hidden', backgroundColor: colors.surface },
   chipText: { color: colors.text, fontSize: 14 },

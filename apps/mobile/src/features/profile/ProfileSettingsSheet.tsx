@@ -366,12 +366,17 @@ export function ProfileSettingsSheet({
           </ScrollView>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
-          <View style={styles.inviteRing}>
+          <LinearGradient
+            colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
+            end={{ x: 0.5, y: 1 }}
+            start={{ x: 0.5, y: 0 }}
+            style={styles.inviteRing}
+          >
             <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastes.app' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
               <InviteUsersIcon height={24} width={24} />
               <Text style={styles.inviteText}>Invite a Friend</Text>
             </Pressable>
-          </View>
+          </LinearGradient>
         </LinearGradient>
         <Animated.View
           pointerEvents={notificationsOpen ? 'auto' : 'none'}
@@ -519,7 +524,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     selectionCircle: { width: 20, height: 20, marginLeft: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.textMuted, borderRadius: 10 },
     selectionCircleSelected: { borderColor: colors.primary },
     selectionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-    inviteRing: { width: 330, height: 54, padding: 5, borderRadius: 36, backgroundColor: '#4C1816' },
+    inviteRing: { width: 330, height: 54, padding: 5, borderRadius: 36 },
     invite: { flex: 1, paddingHorizontal: 20, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#B82F29' },
     inviteText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
     pressed: { opacity: 0.72 },

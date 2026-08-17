@@ -178,19 +178,19 @@ export function ProfileExtras({
           </View>
           {screen === 'followers' || screen === 'following' ? (
             <View style={styles.searchField}>
-              <SearchIcon height={24} width={24} />
+              <SearchIcon color={colors.text} height={24} width={24} />
               <TextInput
                 accessibilityLabel={`Search ${title.toLocaleLowerCase()}`}
                 autoCapitalize="none"
                 autoCorrect={false}
                 onChangeText={setPeopleSearch}
                 placeholder="Search"
-                placeholderTextColor="rgba(217,221,229,0.4)"
+                placeholderTextColor={colors.placeholder}
                 style={styles.searchInput}
                 value={peopleSearch}
               />
               <Pressable accessibilityLabel="Voice search" hitSlop={8} style={styles.voiceButton}>
-                <VoiceIcon height={24} width={24} />
+                <VoiceIcon color={colors.text} height={24} width={24} />
               </Pressable>
             </View>
           ) : null}
@@ -211,7 +211,7 @@ export function ProfileExtras({
                     onPress={() => confirmRemoveFollower(person.userId, person.displayName)}
                     style={styles.removeFollower}
                   >
-                    {removingFollowerId === person.userId ? <ActivityIndicator color="#FFFFFF" size="small" /> : <TrashIcon height={25} width={24} />}
+                    {removingFollowerId === person.userId ? <ActivityIndicator color={colors.text} size="small" /> : <TrashIcon color={colors.text} height={25} width={24} />}
                   </Pressable>
                 ) : null}
               </View>
@@ -330,24 +330,24 @@ function Setting({ disabled = false, label, onChange, styles, value }: { disable
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: '#161616' },
-    header: { height: safeTop + 60, paddingTop: safeTop, backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+    screen: { flex: 1, backgroundColor: colors.canvas },
+    header: { height: safeTop + 60, paddingTop: safeTop, backgroundColor: colors.background, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
     peopleHeader: { height: safeTop + 106 },
     headerTitleRow: { height: 60, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center' },
     headerButton: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
-    title: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
-    searchField: { height: 39, marginHorizontal: 16, marginBottom: 12, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: 'rgba(255,255,255,0.08)' },
-    searchInput: { flex: 1, height: 39, padding: 0, color: '#D9DDE5', fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
+    title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
+    searchField: { height: 39, marginHorizontal: 16, marginBottom: 12, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: colors.surfaceRaised },
+    searchInput: { flex: 1, height: 39, padding: 0, color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
     voiceButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
     peopleList: { paddingBottom: Math.max(30, safeBottom) },
     peopleLoading: { marginTop: 32 },
-    person: { height: 76, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#45474B' },
+    person: { height: 76, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
     avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-    avatarImage: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#262626' },
+    avatarImage: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceRaised },
     avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
     personCopy: { flex: 1, height: 38, justifyContent: 'center', gap: 4 },
-    personName: { color: '#FFFFFF', fontSize: 15, lineHeight: 18, fontWeight: '600', letterSpacing: -0.41 },
-    handle: { color: '#D9D9D9', fontSize: 13, lineHeight: 16, letterSpacing: -0.24 },
+    personName: { color: colors.text, fontSize: 15, lineHeight: 18, fontWeight: '600', letterSpacing: -0.41 },
+    handle: { color: colors.textSecondary, fontSize: 13, lineHeight: 16, letterSpacing: -0.24 },
     removeFollower: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     settings: { paddingHorizontal: 16, paddingBottom: 30 },
     notificationGap: { height: 14 },
@@ -356,32 +356,32 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     settingLabel: { flex: 1, color: colors.text, fontSize: 15 },
     rewards: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(30, safeBottom) },
     levelTag: { height: 38, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 100, backgroundColor: 'rgba(184,47,41,0.10)' },
-    levelPrefix: { color: '#FFFFFF', opacity: 0.5, fontSize: 14, letterSpacing: -0.41 },
+    levelPrefix: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.41 },
     levelName: { color: '#B82F29', fontSize: 16, fontWeight: '600', letterSpacing: -0.23 },
     rewardList: { marginTop: 16, gap: 12 },
-    rewardRow: { height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16 },
+    rewardRow: { height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
     rewardImageFrame: { width: 84, height: 84, overflow: 'visible' },
     rewardImage: { position: 'absolute', resizeMode: 'stretch' },
     rewardCopy: { flex: 1, gap: 7 },
-    rewardName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
-    rewardDescription: { color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
+    rewardName: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
+    rewardDescription: { color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
     pressed: { opacity: 0.7 },
     modalRoot: { flex: 1, justifyContent: 'flex-end' },
     scrim: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
-    detailSheet: { height: 450 + safeBottom, paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#161616', overflow: 'hidden' },
+    detailSheet: { height: 450 + safeBottom, paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
     sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    sheetTitle: { color: '#FFFFFF', fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
+    sheetTitle: { color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
     closeIcon: { width: 30, height: 30 },
     detailContent: { paddingHorizontal: 16, gap: 16, alignItems: 'center' },
     detailImage: { width: 120, height: 120, resizeMode: 'stretch' },
-    progressCount: { color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.41 },
+    progressCount: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.41 },
     progressCurrent: { color: '#B82F29' },
-    detailName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
-    detailCopy: { maxWidth: 370, color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
-    achievementSheet: { paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+    detailName: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
+    detailCopy: { maxWidth: 370, color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+    achievementSheet: { paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.surface },
     achievementPatternImage: { opacity: 0.18, resizeMode: 'repeat' },
     achievementBody: { paddingHorizontal: 16, gap: 24, alignItems: 'center' },
-    achievementCard: { width: '100%', height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: '#45474B', borderRadius: 16, backgroundColor: '#080808' },
+    achievementCard: { width: '100%', height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.background },
     achievementImage: { width: 84, height: 84, resizeMode: 'stretch' },
     achievementCopy: { flex: 1, gap: 6 },
     viewAllButton: { width: 330, height: 54, alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#4C1816', borderRadius: 36, backgroundColor: '#B82F29' },

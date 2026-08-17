@@ -20,6 +20,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -197,7 +198,13 @@ export function PostSignupOnboardingFlow({
   onComplete,
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const styles = useOnboardingStyles();
+  const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
+  const dishGap = usesCompactDishLayout ? 5 : 8;
+  const dishPanelHeight = viewportHeight - (usesCompactDishLayout ? 205 : 212) - (usesCompactDishLayout ? 105 : 110);
+  const dishPillHeight = Math.max(30, Math.min(45, Math.floor((dishPanelHeight - 8 - dishGap * (dishes.length - 1)) / dishes.length)));
+  const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useMemo(() => createTastesApi(functions), []);
   const [screen, setScreen] = useState<Screen>('profile');
   const [history, setHistory] = useState<Screen[]>([]);
@@ -483,8 +490,15 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
-      <View style={[styles.pillsPanel, styles.pills]}>
-        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
+      <View
+        style={[
+          styles.pillsPanel,
+          usesCompactDishLayout && styles.pillsPanelCompact,
+          styles.pills,
+          { gap: dishGap },
+        ]}
+      >
+        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, { height: dishPillHeight }, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
       </View>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
@@ -509,7 +523,7 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('style')} />
       <StepHeader step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
-      <View style={styles.placesCard}>
+      <View style={[styles.placesCard, usesNarrowPlaceLayout && styles.placesCardNarrow]}>
         <View style={styles.placeHeader}>
           <View style={styles.placeSearchRow}>
             <View style={styles.placeSearch}>
@@ -539,13 +553,15 @@ export function PostSignupOnboardingFlow({
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
             {[1, 2, 3].map((item) => (
               <View key={item} style={styles.venue}>
-                <View style={styles.skeletonImage} />
-                <View style={styles.venueCopy}>
-                  <View style={styles.skeletonTitle} />
-                  <View style={styles.skeletonLine} />
-                  <View style={styles.skeletonShort} />
-                  <View style={styles.skeletonTags} />
+                <View style={styles.venueMainRow}>
+                  <View style={styles.skeletonImage} />
+                  <View style={styles.skeletonCopy}>
+                    <View style={styles.skeletonTitle} />
+                    <View style={styles.skeletonLine} />
+                    <View style={styles.skeletonShort} />
+                  </View>
                 </View>
+                <View style={styles.skeletonTags} />
               </View>
             ))}
           </ScrollView>
@@ -560,18 +576,20 @@ export function PostSignupOnboardingFlow({
               return (
                 <Pressable key={item.id} onPress={() => setPlace(item.id)} style={[styles.venue, selected && styles.venueSelected]}>
                   <Image source={selected ? placeSelected : placeUnselected} style={styles.venueSelection} />
-                  <View style={styles.venueImageWrap}>
-                    <Image source={item.image} resizeMode="cover" style={styles.venueImage} />
-                    {item.popular ? <View style={styles.popularBadge}><Text style={styles.popularText}>Popular</Text></View> : null}
-                  </View>
-                  <View style={styles.venueCopy}>
-                    <View style={styles.venueDetails}>
-                      <Text numberOfLines={1} style={styles.venueTitle}>{item.name}</Text>
-                      <Text numberOfLines={2} style={styles.venueAddress}>{item.address}</Text>
-                      <View style={styles.ratingRow}><View style={styles.ratingTag}><Image source={ratingStar} style={styles.ratingStar} /><Text style={styles.ratingValue}>{item.rating}</Text></View><Text style={styles.reviews}>{item.reviews}</Text></View>
+                  <View style={styles.venueMainRow}>
+                    <View style={styles.venueImageWrap}>
+                      <Image source={item.image} resizeMode="cover" style={styles.venueImage} />
+                      {item.popular ? <View style={styles.popularBadge}><Text style={styles.popularText}>Popular</Text></View> : null}
                     </View>
-                    <View style={styles.venueTagsRow}><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.category}</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.price}</Text></View><View style={styles.venueTag}><Text style={styles.venueTagText}>{item.distance}</Text></View></View>
+                    <View style={styles.venueCopy}>
+                      <View style={styles.venueDetails}>
+                        <Text numberOfLines={1} style={styles.venueTitle}>{item.name}</Text>
+                        <Text numberOfLines={2} style={styles.venueAddress}>{item.address}</Text>
+                        <View style={styles.ratingRow}><View style={styles.ratingTag}><Image source={ratingStar} style={styles.ratingStar} /><Text style={styles.ratingValue}>{item.rating}</Text></View><Text numberOfLines={1} style={styles.reviews}>{item.reviews}</Text></View>
+                      </View>
+                    </View>
                   </View>
+                  <View style={styles.venueTagsRow}><View style={styles.venueTag}><Text numberOfLines={1} style={styles.venueTagText}>{item.category}</Text></View><View style={styles.venueTag}><Text numberOfLines={1} style={styles.venueTagText}>{item.price}</Text></View><View style={styles.venueTag}><Text numberOfLines={1} style={styles.venueTagText}>{item.distance}</Text></View></View>
                 </Pressable>
               );
             })}
@@ -703,6 +721,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   cityName: { color: colors.text, fontSize: 15, flex: 1 },
   cityCountry: { color: colors.textMuted, fontSize: 13 },
   pillsPanel: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
+  pillsPanelCompact: { top: 205, bottom: 105 },
   pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
@@ -713,6 +732,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   dishIconDimmed: { opacity: 0.5 },
   helper: { position: 'absolute', bottom: 90, alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
   placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  placesCardNarrow: { top: 241 },
   placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.canvas },
   placeSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeSearch: { flex: 1, height: 39, borderRadius: 22, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
@@ -730,14 +750,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   filterDimmed: { opacity: 0.5 },
   placeList: { flex: 1 },
   placeListContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110, gap: 12 },
-  venue: { minHeight: 167, padding: 12, gap: 12, borderWidth: 1, borderColor: isDark ? '#2A2A2A' : colors.border, borderRadius: 16, backgroundColor: isDark ? '#1A1A1A' : colors.surface, flexDirection: 'row', alignItems: 'flex-start' },
+  venue: { minHeight: 167, padding: 12, gap: 12, borderWidth: 1, borderColor: isDark ? '#2A2A2A' : colors.border, borderRadius: 16, backgroundColor: isDark ? '#1A1A1A' : colors.surface },
   venueSelected: { borderColor: isDark ? '#2A2A2A' : colors.border, backgroundColor: isDark ? '#222222' : colors.surfaceRaised },
   venueSelection: { position: 'absolute', zIndex: 2, top: 9, right: 9, width: 22, height: 22 },
+  venueMainRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   venueImageWrap: { position: 'relative', width: 86, height: 86, borderRadius: 12, overflow: 'hidden' },
   venueImage: { width: 86, height: 86, borderRadius: 12 },
   popularBadge: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 8, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   popularText: { color: colors.onPrimary, fontSize: 12, letterSpacing: -0.24 },
-  venueCopy: { flex: 1, minWidth: 0, gap: 12 },
+  venueCopy: { flex: 1, minWidth: 0 },
   venueDetails: { gap: 6, paddingRight: 24 },
   venueTitle: { color: colors.text, fontSize: 14, fontWeight: '600', letterSpacing: -0.41 },
   venueAddress: { minHeight: 30, color: colors.textMuted, fontSize: 13, lineHeight: 15, letterSpacing: -0.24 },
@@ -752,6 +773,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   venueTagText: { color: colors.text, fontSize: 15, lineHeight: 20, letterSpacing: -0.24 },
   venueFlag: { width: 14, height: 14, transform: [{ translateY: -1 }] },
   skeletonImage: { width: 86, height: 86, borderRadius: 12, backgroundColor: colors.skeletonMuted },
+  skeletonCopy: { flex: 1, minWidth: 0, gap: 12 },
   skeletonTitle: { width: '72%', height: 14, backgroundColor: colors.skeleton, borderRadius: 4 },
   skeletonLine: { width: '94%', height: 24, backgroundColor: colors.skeletonMuted, borderRadius: 4 },
   skeletonShort: { width: '52%', height: 28, backgroundColor: colors.skeletonMuted, borderRadius: 14 },

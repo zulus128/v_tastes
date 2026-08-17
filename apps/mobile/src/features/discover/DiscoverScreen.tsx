@@ -30,6 +30,7 @@ import MapLayersControlIcon from '../../../assets/discover/map-layers-control.sv
 import MapLocateIcon from '../../../assets/discover/map-locate.svg';
 import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
+import PeopleSearchIcon from '../../../assets/discover/search.svg';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
@@ -770,7 +771,7 @@ function PlacesMap({
               style={styles.mapSearchInput}
               value={search}
             />
-            <VoiceIcon height={24} width={24} />
+            <VoiceIcon color={colors.text} height={24} width={24} />
           </View>
           <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapHeaderIcon}>
             <MapTuneIcon height={22} width={18} />
@@ -953,7 +954,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
   return (
     <ScrollView contentContainerStyle={styles.peopleContent} showsVerticalScrollIndicator={false}>
       <View style={styles.peopleSearch}>
-        <Text style={styles.searchGlyph}>⌕</Text>
+        <PeopleSearchIcon color={colors.textSecondary} height={24} width={24} />
         <TextInput
           onChangeText={setQuery}
           placeholder="Search people, cuisines, cities"
@@ -1082,7 +1083,7 @@ function SectionLabel({ onSeeAll, subtitle, title }: { onSeeAll?: () => void; su
 function SeeAllPlacesModal({ onClose, onOpenPlace, onSave, savedVenueIds, venues }: { onClose: () => void; onOpenPlace: (id: string) => void; onSave: (place: SaveablePlace) => void; savedVenueIds: Set<string>; venues: Venue[] | null }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]); const [query, setQuery] = useState('');
   const visible = (venues ?? []).filter((venue) => venue.name.toLowerCase().includes(query.toLowerCase()));
-  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: 16 }]}><Text style={styles.searchGlyph}>⌕</Text><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 10 }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
+  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: 16 }]}><PeopleSearchIcon color={colors.textSecondary} height={24} width={24} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 10 }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
 }
 
 function RatingPill({ value }: { value: string }) {
@@ -1564,7 +1565,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
   mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
-  searchGlyph: { color: colors.textSecondary, fontSize: 21 },
   mapSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
   mapHeaderIcon: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center' },
   filterList: { flexGrow: 0, height: 38 },

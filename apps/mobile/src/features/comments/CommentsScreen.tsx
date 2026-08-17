@@ -8,7 +8,9 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   Share,
@@ -197,59 +199,64 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
-        <Text style={styles.title}>Comments</Text>
-        <View style={styles.back} />
-      </View>
-      {query.isPending ? <LoadingState label="Loading comments…" /> : query.isError && items.length === 0 ? (
-        <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.content}
-          data={rootItems}
-          initialNumToRender={10}
-          keyExtractor={(item) => item.id}
-          maxToRenderPerBatch={10}
-          ListHeaderComponent={review ? <View><MainReview onReact={() => void reactToMainReview()} reacting={reviewReacting} review={review} /><Text style={styles.commentsHeading}>Comments</Text></View> : null}
-          ListEmptyComponent={<Text style={styles.empty}>No comments yet. Be the first.</Text>}
-          ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
-          windowSize={7}
-          refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
-          renderItem={({ item }) => {
-            const replies = repliesByParent.get(item.id) ?? [];
-            const hidden = hiddenReplies.has(item.id);
-            const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
-            return <View><CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} />
-              {replies.length > 0 ? <Pressable onPress={() => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} style={styles.repliesToggle}><Text style={styles.repliesToggleText}>{hidden ? `Show ${replies.length} replies` : 'Hide replies'}</Text></Pressable> : null}
-              {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} />) : null}
-            </View>;
-          }}
-        />
-      )}
-      <View style={styles.composer}>
-        {replyTarget ? <View style={styles.replyBanner}><Text numberOfLines={1} style={styles.replyBannerText}>Replying to {replyTarget.authorDisplayName}</Text><Pressable onPress={() => setReplyTarget(null)}><Text style={styles.replyClose}>×</Text></Pressable></View> : null}
-        <TextInput
-          editable={!mutation.isPending}
-          maxLength={1_000}
-          onChangeText={(value) => {
-            if (!text && value) setIdempotencyKey(createIdempotencyKey('comment'));
-            setText(value);
-          }}
-          onSubmitEditing={() => void submit()}
-          placeholder={replyTarget ? `Reply to ${replyTarget.authorDisplayName}` : 'Add comment'}
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-          value={text}
-        />
-        <Pressable disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
-          <Text style={styles.sendText}>↑</Text>
-        </Pressable>
-      </View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoiding}>
+        <View style={styles.header}>
+          <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
+          <Text style={styles.title}>Comments</Text>
+          <View style={styles.back} />
+        </View>
+        {query.isPending ? <LoadingState label="Loading comments…" /> : query.isError && items.length === 0 ? (
+          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.content}
+            data={rootItems}
+            initialNumToRender={10}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            keyExtractor={(item) => item.id}
+            maxToRenderPerBatch={10}
+            ListHeaderComponent={review ? <View><MainReview onReact={() => void reactToMainReview()} reacting={reviewReacting} review={review} /><Text style={styles.commentsHeading}>Comments</Text></View> : null}
+            ListEmptyComponent={<Text style={styles.empty}>No comments yet. Be the first.</Text>}
+            ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
+            onEndReached={() => {
+              if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            style={styles.list}
+            windowSize={7}
+            refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
+            renderItem={({ item }) => {
+              const replies = repliesByParent.get(item.id) ?? [];
+              const hidden = hiddenReplies.has(item.id);
+              const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
+              return <View><CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} />
+                {replies.length > 0 ? <Pressable onPress={() => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} style={styles.repliesToggle}><Text style={styles.repliesToggleText}>{hidden ? `Show ${replies.length} replies` : 'Hide replies'}</Text></Pressable> : null}
+                {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} />) : null}
+              </View>;
+            }}
+          />
+        )}
+        <View style={styles.composer}>
+          {replyTarget ? <View style={styles.replyBanner}><Text numberOfLines={1} style={styles.replyBannerText}>Replying to {replyTarget.authorDisplayName}</Text><Pressable onPress={() => setReplyTarget(null)}><Text style={styles.replyClose}>×</Text></Pressable></View> : null}
+          <TextInput
+            editable={!mutation.isPending}
+            maxLength={1_000}
+            onChangeText={(value) => {
+              if (!text && value) setIdempotencyKey(createIdempotencyKey('comment'));
+              setText(value);
+            }}
+            onSubmitEditing={() => void submit()}
+            placeholder={replyTarget ? `Reply to ${replyTarget.authorDisplayName}` : 'Add comment'}
+            placeholderTextColor={colors.textMuted}
+            style={styles.input}
+            value={text}
+          />
+          <Pressable disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
+            <Text style={styles.sendText}>↑</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
       <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={styles.reportSheet}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></View></View></Modal>
       <Modal animationType="fade" onRequestClose={() => setReportSent(false)} visible={reportSent}><View style={styles.sent}><View style={styles.sentIcon}><Text style={styles.sentCheck}>✓</Text></View><Text style={styles.sentTitle}>Report sent</Text><Text style={styles.sentCopy}>Thanks for helping keep Tastes safe. Our team will review this shortly.</Text><Pressable onPress={() => setReportSent(false)} style={styles.sentDone}><Text style={styles.sentDoneText}>Done</Text></Pressable></View></Modal>
     </Screen>
@@ -257,11 +264,13 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  keyboardAvoiding: { flex: 1 },
   header: { height: 102, paddingTop: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background },
   back: { width: 52, height: 48, alignItems: 'center', justifyContent: 'center' },
   backText: { color: colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
   title: { color: colors.text, fontSize: 17, fontWeight: '700' },
-  content: { paddingBottom: 88 },
+  list: { flex: 1 },
+  content: { paddingBottom: 16 },
   empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
   mainReview: { marginBottom: 16, backgroundColor: colors.background },
   reviewAuthorRow: { minHeight: 72, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
@@ -315,7 +324,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   actionActive: { color: colors.primary },
   repliesToggle: { marginLeft: 62, paddingVertical: 8 },
   repliesToggleText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  composer: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 70, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background },
+  composer: { minHeight: 70, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background },
   replyBanner: { position: 'absolute', left: 16, right: 16, top: -30, height: 30, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
   replyBannerText: { flex: 1, color: colors.textMuted, fontSize: 12 },
   replyClose: { color: colors.text, fontSize: 20 },

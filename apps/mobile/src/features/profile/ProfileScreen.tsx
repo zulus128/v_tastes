@@ -361,7 +361,7 @@ export function ProfileScreen({
       </View>
       {activeTab === 'reviews' ? (
         <View style={styles.searchBar}>
-          <SearchIcon width={24} height={24} />
+          <SearchIcon color={colors.textMuted} width={24} height={24} />
           <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
           <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={24} width={24} /></Pressable>
         </View>
@@ -438,7 +438,7 @@ export function ProfileScreen({
               {mapError ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{mapError}</Text><Pressable onPress={() => setMapReload((value) => value + 1)} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable></View> : mapPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyCopy}>Try another search or filter.</Text></View> : mappedPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Locations unavailable</Text><Text style={styles.emptyCopy}>These places do not have map coordinates yet.</Text></View> : null}
               <View style={styles.mapSearchPanel}>
                 <View style={styles.searchBar}>
-                  <SearchIcon width={24} height={24} />
+                  <SearchIcon color={colors.textMuted} width={24} height={24} />
                   <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
                   <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={24} width={24} /></Pressable>
                 </View>
