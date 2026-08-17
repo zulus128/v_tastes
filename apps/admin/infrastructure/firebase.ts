@@ -3,6 +3,7 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getStorage } from 'firebase/storage';
 
 function getFirebaseApp() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'tastes-934e6';
@@ -18,6 +19,10 @@ function getFirebaseApp() {
 
 export function getFirebaseAuth() {
   return getAuth(getFirebaseApp());
+}
+
+export function getFirebaseStorage() {
+  return getStorage(getFirebaseApp());
 }
 
 export async function callAdmin<Input, Output>(name: string, input: Input): Promise<Output> {

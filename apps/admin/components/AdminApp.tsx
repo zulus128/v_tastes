@@ -1,11 +1,16 @@
 'use client';
 
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { callAdmin, getFirebaseAuth } from '../infrastructure/firebase';
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { callAdmin, getFirebaseAuth, getFirebaseStorage } from '../infrastructure/firebase';
 
 type View = 'overview' | 'reports' | 'venues' | 'users';
 type StaffRole = 'admin' | 'moderator';
+type DiscoverTag = 'trending' | 'most-reviewed' | 'new' | 'for-you' | 'hidden-gem';
+
+interface OpeningHour { day: string; hours: string }
+interface PopularDish { name: string; rating: number }
 
 interface Overview {
   totalUsers: number;
@@ -15,8 +20,9 @@ interface Overview {
   newUsers: { last24Hours: number; last7Days: number; last30Days: number };
   analytics: { connected: boolean; propertyId: string; dau: number; mau: number; error: string | null };
   reviewCities: Array<{ city: string; count: number }>;
-  adsense: { connected: boolean; estimatedEarnings: number; impressions: number; clicks: number; currencyCode: string | null; error: string | null };
 }
+
+type SignupPeriod = '24h' | '7d' | '30d';
 
 interface ReportItem {
   id: string;
@@ -41,6 +47,18 @@ interface AdminVenue {
   featured: boolean;
   hotSpot: boolean;
   reviewCount: number;
+  imageUrl: string | null;
+  photoUrls: string[];
+  priceLevel: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  googlePlaceId: string | null;
+  discoverTags: DiscoverTag[];
+  phone: string | null;
+  website: string | null;
+  openingHours: OpeningHour[];
+  placeTags: string[];
+  popularDishes: PopularDish[];
 }
 
 interface AdminUser {
@@ -71,7 +89,6 @@ const emptyOverview: Overview = {
   newUsers: { last24Hours: 0, last7Days: 0, last30Days: 0 },
   analytics: { connected: false, propertyId: '', dau: 0, mau: 0, error: null },
   reviewCities: [],
-  adsense: { connected: false, estimatedEarnings: 0, impressions: 0, clicks: 0, currencyCode: null, error: null },
 };
 
 function Icon({ name }: { name: View | 'logout' | 'search' | 'plus' }) {
@@ -147,12 +164,14 @@ function Metric({ label, value, note, tone = 'neutral' }: { label: string; value
 }
 
 function OverviewView({ data }: { data: Overview }) {
+  const [signupPeriod, setSignupPeriod] = useState<SignupPeriod>('24h');
   const max = Math.max(data.newUsers.last24Hours, data.newUsers.last7Days, data.newUsers.last30Days, 1);
-  const bars = [
-    ['24 hours', data.newUsers.last24Hours],
-    ['7 days', data.newUsers.last7Days],
-    ['30 days', data.newUsers.last30Days],
+  const periods = [
+    { key: '24h', label: '24h', description: 'last 24 hours', value: data.newUsers.last24Hours },
+    { key: '7d', label: '7d', description: 'last 7 days', value: data.newUsers.last7Days },
+    { key: '30d', label: '30d', description: 'last 30 days', value: data.newUsers.last30Days },
   ] as const;
+  const selectedPeriod = periods.find((period) => period.key === signupPeriod) ?? periods[0];
   return <>
     <div className="metrics">
       <Metric label="Total users" value={data.totalUsers} note="Registered profiles" />
@@ -160,17 +179,30 @@ function OverviewView({ data }: { data: Overview }) {
       <Metric label="Pending reports" value={data.pendingReports} note="Needs attention" tone="red" />
       <Metric label="Active venues" value={data.activeVenues} note="Available in discovery" />
     </div>
-    <div className="metrics compact-metrics">
+    <div className="metrics compact-metrics analytics-metrics">
       <Metric label="DAU" value={data.analytics.dau} note={data.analytics.connected ? 'Google Analytics · yesterday' : 'Analytics permission needed'} />
       <Metric label="MAU" value={data.analytics.mau} note={data.analytics.connected ? 'Google Analytics · 30 days' : `Property ${data.analytics.propertyId || 'not found'}`} />
-      <Metric label="Ad impressions" value={data.adsense.impressions} note={data.adsense.connected ? 'AdSense · 30 days' : 'AdSense OAuth not connected'} />
-      <Metric label="Ad clicks" value={data.adsense.clicks} note={data.adsense.connected ? `${data.adsense.estimatedEarnings.toFixed(2)} ${data.adsense.currencyCode ?? ''} estimated` : 'Optional · publisher account required'} />
     </div>
     <div className="split-grid">
       <section className="panel">
-        <div className="panel-heading"><div><p className="eyebrow">GROWTH</p><h2>New signups</h2></div><span className="status-pill good">Live</span></div>
-        <div className="bar-chart">
-          {bars.map(([label, value]) => <div className="bar-row" key={label}><span>{label}</span><div className="bar-track"><i style={{ width: `${Math.max(4, value / max * 100)}%` }} /></div><strong>{value}</strong></div>)}
+        <div className="panel-heading">
+          <div><p className="eyebrow">GROWTH</p><h2>New signups</h2></div>
+          <div className="period-switcher" role="group" aria-label="New signups period">
+            {periods.map((period) => <button
+              key={period.key}
+              type="button"
+              aria-pressed={signupPeriod === period.key}
+              className={signupPeriod === period.key ? 'active' : ''}
+              onClick={() => setSignupPeriod(period.key)}
+            >{period.label}</button>)}
+          </div>
+        </div>
+        <div className="signup-period-value" aria-live="polite">
+          <strong>{selectedPeriod.value.toLocaleString()}</strong>
+          <span>new users in the {selectedPeriod.description}</span>
+        </div>
+        <div className="signup-period-bar" aria-hidden="true">
+          <div className="bar-track"><i style={{ width: `${selectedPeriod.value === 0 ? 0 : Math.max(4, selectedPeriod.value / max * 100)}%` }} /></div>
         </div>
       </section>
       <section className="panel focus-panel">
@@ -226,17 +258,199 @@ function ReportsView({ reports, run }: { reports: ReportItem[]; run: RunAdmin })
   </>;
 }
 
+const discoverTagOptions: Array<{ value: DiscoverTag; label: string }> = [
+  { value: 'trending', label: 'Trending' },
+  { value: 'most-reviewed', label: 'Most reviewed' },
+  { value: 'new', label: 'New' },
+  { value: 'for-you', label: 'For you' },
+  { value: 'hidden-gem', label: 'Hidden gem' },
+];
+
+function uniqueVenueImages(venue?: AdminVenue) {
+  return [...new Set([venue?.imageUrl, ...(venue?.photoUrls ?? [])].filter((value): value is string => Boolean(value)))];
+}
+
+function optionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function commaSeparated(value: string) {
+  return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))];
+}
+
 function VenueForm({ venue, close, saved }: { venue?: AdminVenue; close: () => void; saved: () => Promise<void> }) {
-  const [values, setValues] = useState({ name: venue?.name ?? '', city: venue?.city ?? '', address: venue?.address ?? '', category: venue?.category ?? '', status: venue?.status ?? 'active' });
+  const [venueId] = useState(() => venue?.id ?? crypto.randomUUID());
+  const initialImages = useMemo(() => uniqueVenueImages(venue), [venue]);
+  const [values, setValues] = useState({
+    name: venue?.name ?? '',
+    city: venue?.city ?? '',
+    address: venue?.address ?? '',
+    category: venue?.category ?? '',
+    status: venue?.status ?? 'active',
+    priceLevel: venue?.priceLevel?.toString() ?? '',
+    latitude: venue?.latitude?.toString() ?? '',
+    longitude: venue?.longitude?.toString() ?? '',
+    googlePlaceId: venue?.googlePlaceId ?? '',
+    phone: venue?.phone ?? '',
+    website: venue?.website ?? '',
+    placeTags: venue?.placeTags.join(', ') ?? '',
+    featured: venue?.featured ?? false,
+    hotSpot: venue?.hotSpot ?? false,
+  });
+  const [discoverTags, setDiscoverTags] = useState<DiscoverTag[]>(venue?.discoverTags ?? []);
+  const [openingHours, setOpeningHours] = useState<OpeningHour[]>(venue?.openingHours ?? []);
+  const [popularDishes, setPopularDishes] = useState<PopularDish[]>(venue?.popularDishes ?? []);
+  const [images, setImages] = useState<string[]>(initialImages);
+  const [newUploads, setNewUploads] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true);
-    try { await callAdmin('upsertVenue', { ...(venue ? { venueId: venue.id } : {}), ...values }); await saved(); close(); } finally { setBusy(false); }
+  const [uploading, setUploading] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  function toggleDiscoverTag(tag: DiscoverTag) {
+    setDiscoverTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
   }
-  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && close()}><form className="modal" onSubmit={submit}>
-    <div className="panel-heading"><div><p className="eyebrow">VENUE</p><h2>{venue ? 'Edit venue' : 'Add venue'}</h2></div><button type="button" className="close" onClick={close}>×</button></div>
-    <div className="form-grid"><label>Name<input required value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })}/></label><label>Category<input required value={values.category} onChange={(e) => setValues({ ...values, category: e.target.value })}/></label><label>City<input required value={values.city} onChange={(e) => setValues({ ...values, city: e.target.value })}/></label><label>Status<select value={values.status} onChange={(e) => setValues({ ...values, status: e.target.value as typeof values.status })}><option value="active">Active</option><option value="pending">Pending</option><option value="hidden">Hidden</option><option value="removed">Removed</option></select></label><label className="wide">Address<input required value={values.address} onChange={(e) => setValues({ ...values, address: e.target.value })}/></label></div>
-    <div className="actions end"><button type="button" className="button ghost" onClick={close}>Cancel</button><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save venue'}</button></div>
+
+  function moveImage(index: number, direction: -1 | 1) {
+    setImages((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
+  }
+
+  function managedImageReference(url: string) {
+    try {
+      const reference = storageRef(getFirebaseStorage(), url);
+      return reference.fullPath.startsWith(`venue-images/${venueId}/`) ? reference : null;
+    } catch { return null; }
+  }
+
+  async function deleteManagedImage(url: string) {
+    const reference = managedImageReference(url);
+    if (reference) await deleteObject(reference);
+  }
+
+  async function removeImage(url: string) {
+    setImages((current) => current.filter((item) => item !== url));
+    if (!newUploads.includes(url)) return;
+    setNewUploads((current) => current.filter((item) => item !== url));
+    try { await deleteManagedImage(url); } catch { /* A failed cleanup must not block editing. */ }
+  }
+
+  async function uploadImages(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = '';
+    if (!files.length) return;
+    if (images.length + files.length > 12) { setFormError('A venue can have up to 12 photos.'); return; }
+    const invalid = files.find((file) => !file.type.startsWith('image/') || file.size >= 10 * 1024 * 1024);
+    if (invalid) { setFormError('Choose image files smaller than 10 MB.'); return; }
+    setUploading(true); setFormError('');
+    try {
+      const results = await Promise.allSettled(files.map(async (file) => {
+        const extension = file.name.split('.').at(-1)?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        const reference = storageRef(getFirebaseStorage(), `venue-images/${venueId}/${crypto.randomUUID()}.${extension}`);
+        await uploadBytes(reference, file, { contentType: file.type });
+        return getDownloadURL(reference);
+      }));
+      const uploaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+      setImages((current) => [...current, ...uploaded]);
+      setNewUploads((current) => [...current, ...uploaded]);
+      if (uploaded.length !== files.length) setFormError(`${files.length - uploaded.length} photo upload${files.length - uploaded.length === 1 ? '' : 's'} failed.`);
+    } catch (error) { setFormError(errorMessage(error)); }
+    finally { setUploading(false); }
+  }
+
+  async function cancel() {
+    await Promise.allSettled(newUploads.map(deleteManagedImage));
+    close();
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if ((values.latitude === '') !== (values.longitude === '')) {
+      setFormError('Latitude and longitude must be provided together.');
+      return;
+    }
+    const tags = commaSeparated(values.placeTags);
+    if (tags.length > 12) { setFormError('Use no more than 12 place tags.'); return; }
+    setBusy(true); setFormError('');
+    try {
+      await callAdmin('upsertVenue', {
+        venueId,
+        name: values.name,
+        city: values.city,
+        address: values.address,
+        category: values.category,
+        status: values.status,
+        imageUrl: images[0] ?? null,
+        photoUrls: images,
+        priceLevel: values.priceLevel ? Number(values.priceLevel) : null,
+        latitude: values.latitude ? Number(values.latitude) : null,
+        longitude: values.longitude ? Number(values.longitude) : null,
+        googlePlaceId: optionalText(values.googlePlaceId),
+        discoverTags,
+        phone: optionalText(values.phone),
+        website: optionalText(values.website),
+        openingHours,
+        placeTags: tags,
+        popularDishes,
+        featured: values.featured,
+        hotSpot: values.hotSpot,
+      });
+      const removedImages = initialImages.filter((url) => !images.includes(url));
+      await Promise.allSettled(removedImages.map(deleteManagedImage));
+      setNewUploads([]);
+      await saved();
+      close();
+    } catch (error) { setFormError(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !uploading) void cancel(); }}><form className="modal venue-editor" onSubmit={submit}>
+    <div className="panel-heading venue-editor-heading"><div><p className="eyebrow">VENUE</p><h2>{venue ? 'Edit venue' : 'Add venue'}</h2><p className="muted">Manage everything shown on the venue page.</p></div><button type="button" className="close" disabled={busy || uploading} onClick={() => void cancel()}>×</button></div>
+
+    <div className="venue-editor-body">
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Photos</h3><p>The first photo is used as the cover.</p></div><label className="button ghost upload-button">{uploading ? 'Uploading…' : 'Upload photos'}<input type="file" accept="image/*" multiple disabled={busy || uploading || images.length >= 12} onChange={(event) => void uploadImages(event)}/></label></div>
+        {images.length ? <div className="venue-photo-grid">{images.map((url, index) => <article key={url} className={index === 0 ? 'venue-photo cover' : 'venue-photo'}><img src={url} alt=""/><span>{index === 0 ? 'Cover' : index + 1}</span><div><button type="button" disabled={index === 0} onClick={() => moveImage(index, -1)} aria-label="Move photo left">←</button><button type="button" disabled={index === images.length - 1} onClick={() => moveImage(index, 1)} aria-label="Move photo right">→</button><button type="button" className="red" onClick={() => void removeImage(url)} aria-label="Remove photo">×</button></div></article>)}</div> : <div className="photo-empty"><span>＋</span><p>No photos yet. Upload a cover and gallery images.</p></div>}
+      </section>
+
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Basics</h3><p>Core information and publishing state.</p></div></div><div className="form-grid">
+        <label>Name<input required minLength={2} maxLength={160} value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })}/></label>
+        <label>Category<input required minLength={2} maxLength={80} value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })}/></label>
+        <label>City<input required minLength={2} maxLength={120} value={values.city} onChange={(event) => setValues({ ...values, city: event.target.value })}/></label>
+        <label>Status<select value={values.status} onChange={(event) => setValues({ ...values, status: event.target.value as typeof values.status })}><option value="active">Active</option><option value="pending">Pending</option><option value="hidden">Hidden</option><option value="removed">Removed</option></select></label>
+        <label className="wide">Address<input required minLength={2} maxLength={300} value={values.address} onChange={(event) => setValues({ ...values, address: event.target.value })}/></label>
+        <label>Price level<select value={values.priceLevel} onChange={(event) => setValues({ ...values, priceLevel: event.target.value })}><option value="">Not specified</option><option value="1">$</option><option value="2">$$</option><option value="3">$$$</option><option value="4">$$$$</option></select></label>
+        <div className="editor-toggles"><label><input type="checkbox" checked={values.featured} onChange={(event) => setValues({ ...values, featured: event.target.checked })}/>Featured</label><label><input type="checkbox" checked={values.hotSpot} onChange={(event) => setValues({ ...values, hotSpot: event.target.checked })}/>Hot spot</label></div>
+      </div></section>
+
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Location & contact</h3><p>Coordinates power map discovery and distance.</p></div></div><div className="form-grid">
+        <label>Latitude<input type="number" step="any" min="-90" max="90" placeholder="41.0082" value={values.latitude} onChange={(event) => setValues({ ...values, latitude: event.target.value })}/></label>
+        <label>Longitude<input type="number" step="any" min="-180" max="180" placeholder="28.9784" value={values.longitude} onChange={(event) => setValues({ ...values, longitude: event.target.value })}/></label>
+        <label>Phone<input type="tel" maxLength={40} value={values.phone} onChange={(event) => setValues({ ...values, phone: event.target.value })}/></label>
+        <label>Website<input maxLength={300} placeholder="https://…" value={values.website} onChange={(event) => setValues({ ...values, website: event.target.value })}/></label>
+        <label className="wide">Google Place ID<input maxLength={256} value={values.googlePlaceId} onChange={(event) => setValues({ ...values, googlePlaceId: event.target.value })}/></label>
+      </div></section>
+
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Discovery</h3><p>Choose curated feeds and add descriptive chips.</p></div></div>
+        <div className="tag-options">{discoverTagOptions.map((tag) => <label key={tag.value} className={discoverTags.includes(tag.value) ? 'selected' : ''}><input type="checkbox" checked={discoverTags.includes(tag.value)} onChange={() => toggleDiscoverTag(tag.value)}/>{tag.label}</label>)}</div>
+        <label>Place tags <span className="field-hint">Comma-separated, up to 12</span><input maxLength={970} placeholder="Romantic, Outdoor seating, Pet friendly" value={values.placeTags} onChange={(event) => setValues({ ...values, placeTags: event.target.value })}/></label>
+      </section>
+
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Opening hours</h3><p>Add the rows exactly as they should appear in the app.</p></div><button type="button" className="button ghost" onClick={() => setOpeningHours([...openingHours, { day: '', hours: '' }])}>＋ Add hours</button></div>
+        {openingHours.length ? <div className="repeat-list">{openingHours.map((item, index) => <div key={index} className="repeat-row hours-row"><input required maxLength={40} aria-label={`Days ${index + 1}`} placeholder="Monday – Friday" value={item.day} onChange={(event) => setOpeningHours(openingHours.map((row, rowIndex) => rowIndex === index ? { ...row, day: event.target.value } : row))}/><input required maxLength={80} aria-label={`Hours ${index + 1}`} placeholder="09:00 – 22:00" value={item.hours} onChange={(event) => setOpeningHours(openingHours.map((row, rowIndex) => rowIndex === index ? { ...row, hours: event.target.value } : row))}/><button type="button" aria-label="Remove hours" onClick={() => setOpeningHours(openingHours.filter((_, rowIndex) => rowIndex !== index))}>×</button></div>)}</div> : <p className="editor-empty-copy">No opening hours specified.</p>}
+      </section>
+
+      <section className="editor-section"><div className="editor-section-title"><div><h3>Popular dishes</h3><p>Optional editorial picks shown on the venue page.</p></div><button type="button" className="button ghost" onClick={() => setPopularDishes([...popularDishes, { name: '', rating: 5 }])}>＋ Add dish</button></div>
+        {popularDishes.length ? <div className="repeat-list">{popularDishes.map((dish, index) => <div key={index} className="repeat-row dish-row"><input required maxLength={120} aria-label={`Dish ${index + 1}`} placeholder="Dish name" value={dish.name} onChange={(event) => setPopularDishes(popularDishes.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))}/><input required type="number" min="0" max="5" step="0.1" aria-label={`Dish rating ${index + 1}`} value={dish.rating} onChange={(event) => setPopularDishes(popularDishes.map((item, itemIndex) => itemIndex === index ? { ...item, rating: Number(event.target.value) } : item))}/><button type="button" aria-label="Remove dish" onClick={() => setPopularDishes(popularDishes.filter((_, itemIndex) => itemIndex !== index))}>×</button></div>)}</div> : <p className="editor-empty-copy">No popular dishes added.</p>}
+      </section>
+    </div>
+
+    {formError && <p className="form-error venue-form-error">{formError}</p>}
+    <div className="actions end venue-editor-actions"><span>{images.length}/12 photos</span><button type="button" className="button ghost" disabled={busy || uploading} onClick={() => void cancel()}>Cancel</button><button className="button primary" disabled={busy || uploading}>{busy ? 'Saving…' : uploading ? 'Uploading…' : 'Save venue'}</button></div>
   </form></div>;
 }
 
@@ -258,7 +472,7 @@ function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; i
   }
   return <>
     {isAdmin && <div className="toolbar-right"><button className="button primary" onClick={() => setEditing('new')}><Icon name="plus"/> Add venue</button></div>}
-    <div className="table-wrap"><table><thead><tr><th>Venue</th><th>Location</th><th>Status</th><th>Flags</th><th>Reviews</th><th /></tr></thead><tbody>{venues.map((venue) => <tr key={venue.id}><td><strong>{venue.name}</strong><small>{venue.category}</small></td><td>{venue.city}<small>{venue.address}</small></td><td><span className={`status-pill ${venue.status}`}>{venue.status}</span></td><td><div className="flag-list"><button disabled={!isAdmin} className={venue.featured ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: !venue.featured, hotSpot: venue.hotSpot })}>Featured</button><button disabled={!isAdmin} className={venue.hotSpot ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: venue.featured, hotSpot: !venue.hotSpot })}>Hot spot</button></div></td><td>{venue.reviewCount}</td><td>{isAdmin && <div className="row-menu"><button className="text-button" onClick={() => setEditing(venue)}>Edit</button>{venue.status === 'active' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'hidden' })}>Hide</button> : venue.status === 'hidden' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'active' })}>Restore</button> : null}<button className="text-button" onClick={() => { setMerging(venue); setTargetVenueId(''); }}>Merge</button>{venue.status !== 'removed' && <button className="text-button red" onClick={() => setStatusAction({ venue, status: 'removed' })}>Remove</button>}</div>}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Venue</th><th>Location</th><th>Status</th><th>Flags</th><th>Reviews</th><th /></tr></thead><tbody>{venues.map((venue) => <tr key={venue.id}><td><div className="venue-cell">{venue.imageUrl ? <img src={venue.imageUrl} alt=""/> : <span className="venue-cell-placeholder">⌖</span>}<div><strong>{venue.name}</strong><small>{venue.category}{venue.priceLevel ? ` · ${'$'.repeat(venue.priceLevel)}` : ''}</small></div></div></td><td>{venue.city}<small>{venue.address}</small></td><td><span className={`status-pill ${venue.status}`}>{venue.status}</span></td><td><div className="flag-list"><button disabled={!isAdmin} className={venue.featured ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: !venue.featured, hotSpot: venue.hotSpot })}>Featured</button><button disabled={!isAdmin} className={venue.hotSpot ? 'flag active' : 'flag'} onClick={() => run('setVenueFlags', { venueId: venue.id, featured: venue.featured, hotSpot: !venue.hotSpot })}>Hot spot</button></div></td><td>{venue.reviewCount}</td><td>{isAdmin && <div className="row-menu"><button className="text-button" onClick={() => setEditing(venue)}>Edit</button>{venue.status === 'active' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'hidden' })}>Hide</button> : venue.status === 'hidden' ? <button className="text-button" onClick={() => setStatusAction({ venue, status: 'active' })}>Restore</button> : null}<button className="text-button" onClick={() => { setMerging(venue); setTargetVenueId(''); }}>Merge</button>{venue.status !== 'removed' && <button className="text-button red" onClick={() => setStatusAction({ venue, status: 'removed' })}>Remove</button>}</div>}</td></tr>)}</tbody></table></div>
     {editing && (editing === 'new'
       ? <VenueForm close={() => setEditing(null)} saved={refresh}/>
       : <VenueForm venue={editing} close={() => setEditing(null)} saved={refresh}/>)} 
