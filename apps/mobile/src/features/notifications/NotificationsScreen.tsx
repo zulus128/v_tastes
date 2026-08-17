@@ -1,39 +1,105 @@
 import type { AppNotification, AppRequest } from '@tastes/contracts';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import backIcon from '../../../assets/onboarding/back.png';
+import notificationIcon from '../../../assets/onboarding/permission-notifications.png';
+import patternDark from '../../../assets/onboarding/pattern-screen.png';
 import { useTastesApi } from '../../session/SessionProvider';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+
+type NotificationTab = 'activity' | 'badges';
+type FeedEntry =
+  | { id: string; createdAt: string; type: 'notification'; item: AppNotification }
+  | { id: string; createdAt: string; type: 'request'; item: AppRequest };
 
 const glyphs: Record<AppNotification['kind'], string> = {
-  comment: '◌',
+  comment: '○',
   follow: '+',
-  invite: '◷',
+  invite: '↗',
   reward: '★',
-  system: 'T',
+  system: '%',
 };
 
-function ago(iso: string) { const hours = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 3_600_000)); return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`; }
+function initials(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'T';
+}
 
-export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => void; onOpenTarget: (item: AppNotification) => void }) {
+function dateLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+}
+
+export function NotificationsScreen({
+  onBack,
+  onOpenTarget,
+}: {
+  onBack: () => void;
+  onOpenTarget: (item: AppNotification) => void;
+}) {
   const api = useTastesApi();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors, insets.top, isDark), [colors, insets.top, isDark]);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
-  const [tab, setTab] = useState<'activity' | 'badges'>('activity');
+  const [tab, setTab] = useState<NotificationTab>('activity');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const normalized = query.trim().toLowerCase();
-  const visible = items.filter((item) => (tab === 'badges' ? item.kind === 'reward' : item.kind !== 'reward') && (!normalized || `${item.title} ${item.body}`.toLowerCase().includes(normalized)));
-  const visibleRequests = tab === 'activity' ? requests.filter((item) => !normalized || `${item.title} ${item.body} ${item.senderName}`.toLowerCase().includes(normalized)) : [];
-  useEffect(() => { let active = true; void Promise.all([api.listNotifications({ limit: 20 }), api.listRequests()]).then(([notifications, pendingRequests]) => { if (active) { setItems(notifications.data.items); setNextCursor(notifications.data.nextCursor); setRequests(pendingRequests.data); } }).catch(() => Alert.alert('Could not load notifications', 'Please try again.')).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [api]);
+
+  const feed = useMemo<FeedEntry[]>(() => {
+    const notifications = items
+      .filter((item) => tab === 'badges' ? item.kind === 'reward' : item.kind !== 'reward')
+      .map((item): FeedEntry => ({ id: `notification-${item.id}`, createdAt: item.createdAt, type: 'notification', item }));
+    const pending = tab === 'activity'
+      ? requests.map((item): FeedEntry => ({ id: `request-${item.id}`, createdAt: item.createdAt, type: 'request', item }))
+      : [];
+    return [...pending, ...notifications].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  }, [items, requests, tab]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([api.listNotifications({ limit: 20 }), api.listRequests()])
+      .then(([notifications, pendingRequests]) => {
+        if (!active) return;
+        setItems(notifications.data.items);
+        setNextCursor(notifications.data.nextCursor);
+        setRequests(pendingRequests.data);
+      })
+      .catch(() => Alert.alert('Could not load notifications', 'Please try again.'))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
 
   async function loadMore() {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || loadingMore || tab === 'badges') return;
     setLoadingMore(true);
     try {
       const response = await api.listNotifications({ cursor: nextCursor, limit: 20 });
@@ -49,109 +115,231 @@ export function NotificationsScreen({ onBack, onOpenTarget }: { onBack: () => vo
     }
   }
 
-  async function open(item: AppNotification) { if (item.unread) { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate)); try { await api.markNotificationRead({ notificationId: item.id }); } catch { setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: true } : candidate)); Alert.alert('Could not mark notification as read', 'Please try again.'); } } onOpenTarget(item); }
-  async function clear() { await api.clearNotifications(); setItems([]); setNextCursor(null); }
-  async function respond(item: AppRequest, response: 'accepted' | 'declined') { await api.respondToRequest({ requestId: item.id, response }); setRequests((current) => current.filter((candidate) => candidate.id !== item.id)); }
+  async function open(item: AppNotification) {
+    if (item.unread) {
+      setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate));
+      try {
+        await api.markNotificationRead({ notificationId: item.id });
+      } catch {
+        setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: true } : candidate));
+        Alert.alert('Could not mark notification as read', 'Please try again.');
+      }
+    }
+    onOpenTarget(item);
+  }
 
+  async function clear() {
+    if (clearing || items.length === 0) return;
+    setClearing(true);
+    try {
+      await api.clearNotifications();
+      setItems([]);
+      setNextCursor(null);
+    } catch {
+      Alert.alert('Could not clear notifications', 'Please try again.');
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  async function respond(item: AppRequest, response: 'accepted' | 'declined') {
+    if (respondingId) return;
+    setRespondingId(item.id);
+    try {
+      await api.respondToRequest({ requestId: item.id, response });
+      setRequests((current) => current.filter((candidate) => candidate.id !== item.id));
+    } catch {
+      Alert.alert('Could not update request', 'Please try again.');
+    } finally {
+      setRespondingId(null);
+    }
+  }
+
+  function renderRequest(item: AppRequest) {
+    const busy = respondingId === item.id;
+    return (
+      <View style={styles.requestRow}>
+        <View style={styles.avatar}><Text style={styles.avatarInitials}>{initials(item.senderName)}</Text></View>
+        <View style={styles.requestCopy}>
+          <Text numberOfLines={1} style={styles.rowTitle}>{item.senderName}</Text>
+          <Text numberOfLines={1} style={styles.body}>{item.body || item.title}</Text>
+        </View>
+        <View style={styles.requestActions}>
+          <Pressable
+            accessibilityLabel={`Accept request from ${item.senderName}`}
+            disabled={busy}
+            onPress={() => void respond(item, 'accepted')}
+            style={({ pressed }) => [styles.actionButton, styles.accept, (busy || pressed) && styles.pressed]}
+          >
+            <Text style={styles.actionText}>Accept</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`Decline request from ${item.senderName}`}
+            disabled={busy}
+            onPress={() => void respond(item, 'declined')}
+            style={({ pressed }) => [styles.actionButton, styles.decline, (busy || pressed) && styles.pressed]}
+          >
+            <Text style={styles.actionText}>Decline</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  function renderNotification(item: AppNotification) {
+    const promotional = item.kind === 'system';
+    const emblem = item.kind === 'system' || item.kind === 'reward' ? glyphs[item.kind] : initials(item.title);
+    return (
+      <Pressable
+        accessibilityLabel={`${item.title}. ${item.body}`}
+        onPress={() => void open(item)}
+        style={({ pressed }) => [styles.row, promotional && styles.promotionRow, pressed && styles.pressed]}
+      >
+        <View style={[styles.avatar, promotional && styles.promotionAvatar, item.unread && !promotional && styles.avatarUnread]}>
+          <Text style={[styles.avatarGlyph, promotional && styles.promotionGlyph]}>{emblem}</Text>
+        </View>
+        <View style={styles.copy}>
+          <Text numberOfLines={1} style={[styles.rowTitle, item.unread && styles.rowTitleUnread]}>{item.title}</Text>
+          <Text numberOfLines={promotional ? 2 : 1} style={styles.body}>{item.body}</Text>
+        </View>
+        {!promotional ? <Text style={styles.time}>{dateLabel(item.createdAt)}</Text> : null}
+      </Pressable>
+    );
+  }
+
+  const hasClearableItems = items.length > 0;
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.headerButton}><Text style={styles.back}>‹</Text></Pressable>
+          <Pressable accessibilityLabel="Back" hitSlop={10} onPress={onBack} style={styles.backButton}>
+            <Image source={backIcon} style={styles.backIcon} />
+          </Pressable>
           <Text style={styles.title}>Notifications</Text>
-          <Pressable accessibilityLabel="Clear all notifications" disabled={items.length === 0} onPress={() => void clear()} style={styles.headerButton}>
-            <Text style={[styles.clear, items.length === 0 && styles.disabled]}>Clear all</Text>
+          <Pressable
+            accessibilityLabel="Clear all notifications"
+            disabled={!hasClearableItems || clearing}
+            onPress={() => void clear()}
+            style={styles.clearButton}
+          >
+            <Text style={[styles.clear, !hasClearableItems && styles.disabled]}>{clearing ? 'Clearing…' : '✓ Clear all'}</Text>
           </Pressable>
         </View>
-        <View style={styles.search}>
-          <Text style={styles.searchGlyph}>⌕</Text>
-          <TextInput onChangeText={setQuery} placeholder="Search notifications" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={query} />
+        <View accessibilityRole="tablist" style={styles.tabs}>
+          {(['activity', 'badges'] as const).map((value) => (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === value }}
+              key={value}
+              onPress={() => setTab(value)}
+              style={[styles.tab, tab === value && styles.activeTab]}
+            >
+              <Text style={[styles.tabText, tab === value && styles.activeTabText]}>{value === 'activity' ? 'Activity' : 'Badges'}</Text>
+            </Pressable>
+          ))}
         </View>
-        <View style={styles.tabs}>{(['activity', 'badges'] as const).map((value) => <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.activeTab]}><Text style={[styles.tabText, tab === value && styles.activeTabText]}>{value === 'activity' ? 'Activity' : 'Badges'}</Text></Pressable>)}</View>
       </View>
 
-      {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} /> : <FlatList
-        contentContainerStyle={[styles.content, visible.length === 0 && visibleRequests.length === 0 && styles.emptyContent]}
-        data={visible}
-        initialNumToRender={12}
-        keyExtractor={(item) => item.id}
-        maxToRenderPerBatch={12}
-        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
-        ListHeaderComponent={visibleRequests.length > 0 ? <View>{visibleRequests.map((item) => <View key={item.id} style={[styles.row, styles.requestRow]}><View style={[styles.avatar, styles.requestAvatar]}><Text style={styles.requestAvatarText}>+</Text></View><View style={styles.copy}><Text style={styles.rowTitle}>{item.senderName}</Text><Text style={styles.body}>{item.body}</Text><View style={styles.requestActions}><Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}><Text style={styles.acceptText}>Accept</Text></Pressable><Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}><Text style={styles.declineText}>Decline</Text></Pressable></View></View></View>)}</View> : null}
-        ListEmptyComponent={visibleRequests.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.loading} />
+      ) : feed.length === 0 ? (
+        <ImageBackground imageStyle={styles.emptyPatternImage} resizeMode="cover" source={patternDark} style={styles.emptyBackground}>
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}><Text style={styles.emptyIconText}>✓</Text></View>
-            <Text style={styles.emptyTitle}>{query ? 'Nothing found' : 'You’re all caught up'}</Text>
-            <Text style={styles.emptyBody}>{query ? 'Try another search.' : 'New reactions, invitations and updates will appear here.'}</Text>
+            <Image source={notificationIcon} style={styles.emptyIcon} />
+            <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <Text style={styles.emptyBody}>We’ll notify you when something{`\n`}new happens</Text>
           </View>
-        ) : null}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => void open(item)}
-            style={({ pressed }) => [styles.row, item.unread && styles.unreadRow, pressed && styles.pressed]}
-          >
-            <View style={[styles.avatar, item.unread && styles.avatarUnread]}><Text style={styles.avatarText}>{glyphs[item.kind]}</Text></View>
-            <View style={styles.copy}>
-              <View style={styles.heading}><Text style={[styles.rowTitle, item.unread && styles.rowTitleUnread]}>{item.title}</Text><Text style={styles.time}>{ago(item.createdAt)}</Text></View>
-              <Text numberOfLines={2} style={styles.body}>{item.body}</Text>
-            </View>
-            {item.unread ? <View style={styles.dot} /> : null}
-          </Pressable>
-        )}
-        onEndReached={() => void loadMore()}
-        onEndReachedThreshold={0.5}
-        windowSize={7}
-        showsVerticalScrollIndicator={false}
-      />}
+        </ImageBackground>
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.content}
+          data={feed}
+          initialNumToRender={12}
+          keyExtractor={(entry) => entry.id}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={styles.footerLoader} /> : null}
+          maxToRenderPerBatch={12}
+          onEndReached={() => void loadMore()}
+          onEndReachedThreshold={0.5}
+          renderItem={({ item }) => item.type === 'request' ? renderRequest(item.item) : renderNotification(item.item)}
+          showsVerticalScrollIndicator={false}
+          windowSize={7}
+        />
+      )}
     </View>
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
+function createStyles(colors: ThemeColors, safeTop: number, isDark: boolean) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.canvas },
-    header: { paddingTop: safeTop, paddingHorizontal: 16, paddingBottom: 18, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
-    titleRow: { height: 54, flexDirection: 'row', alignItems: 'center' },
-    headerButton: { width: 64, height: 44, alignItems: 'center', justifyContent: 'center' },
-    back: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300' },
-    title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },
-    clear: { color: colors.primary, fontSize: 12, textAlign: 'right' },
-    disabled: { opacity: 0.4 },
-    search: { height: 39, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, borderRadius: 44, backgroundColor: colors.surfaceRaised },
-    searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 22 },
-    searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-    tabs: { height: 38, marginTop: 12, padding: 3, borderRadius: 20, flexDirection: 'row', backgroundColor: colors.surfaceRaised },
-    tab: { flex: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    activeTab: { backgroundColor: colors.primary },
-    tabText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-    activeTabText: { color: colors.onPrimary },
+    header: {
+      zIndex: 2,
+      paddingTop: safeTop,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      backgroundColor: colors.background,
+    },
+    titleRow: { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    backButton: { position: 'absolute', left: -10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    backIcon: { width: 24, height: 24, tintColor: colors.text },
+    title: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
+    clearButton: { position: 'absolute', right: -8, minWidth: 84, height: 44, alignItems: 'flex-end', justifyContent: 'center', paddingHorizontal: 8 },
+    clear: { color: colors.textSecondary, fontSize: 14, letterSpacing: -0.24 },
+    disabled: { opacity: 0.42 },
+    tabs: { height: 40, padding: 4, borderRadius: 100, flexDirection: 'row', backgroundColor: isDark ? 'rgba(223,223,233,0.12)' : colors.surfaceRaised },
+    tab: { flex: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
+    activeTab: { backgroundColor: isDark ? '#D9DDE5' : colors.text },
+    tabText: { color: isDark ? '#C4CAD7' : colors.textMuted, opacity: 0.5, fontSize: 13, lineHeight: 18 },
+    activeTabText: { color: isDark ? '#000000' : colors.background, opacity: 1, fontWeight: '700' },
+    loading: { marginTop: 60 },
     content: { paddingBottom: 30 },
-    emptyContent: { flexGrow: 1 },
-    row: { minHeight: 96, paddingHorizontal: 16, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    unreadRow: { backgroundColor: 'rgba(184,47,41,0.08)' },
+    row: {
+      minHeight: 80,
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.canvas,
+    },
+    requestRow: {
+      minHeight: 80,
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.canvas,
+    },
+    promotionRow: { minHeight: 88, paddingVertical: 16, backgroundColor: isDark ? 'rgba(184,47,41,0.10)' : 'rgba(184,47,41,0.07)', borderColor: '#5D1209' },
     pressed: { opacity: 0.72 },
-    avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
-    avatarUnread: { backgroundColor: colors.primary },
-    avatarText: { color: colors.text, fontSize: 19, fontWeight: '700' },
-    copy: { flex: 1, marginLeft: 12 },
-    heading: { flexDirection: 'row', alignItems: 'flex-start' },
-    rowTitle: { flex: 1, color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: '500' },
+    avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
+    avatarUnread: { borderWidth: 1, borderColor: colors.primary },
+    avatarInitials: { color: colors.text, fontSize: 12, fontWeight: '700' },
+    avatarGlyph: { color: colors.textSecondary, fontSize: 16, fontWeight: '700' },
+    promotionAvatar: { backgroundColor: colors.primary },
+    promotionGlyph: { color: colors.onPrimary, fontSize: 20 },
+    requestCopy: { flex: 1, minWidth: 0, marginLeft: 7 },
+    copy: { flex: 1, minWidth: 0, marginLeft: 7 },
+    rowTitle: { color: colors.text, fontSize: 15, lineHeight: 18, fontWeight: '600', letterSpacing: -0.41 },
     rowTitleUnread: { fontWeight: '700' },
-    time: { marginLeft: 8, color: colors.textMuted, fontSize: 12 },
-    body: { marginTop: 5, color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
-    dot: { width: 7, height: 7, marginLeft: 8, borderRadius: 4, backgroundColor: colors.primary },
-    requestRow: { alignItems: 'flex-start' },
-    requestAvatar: { backgroundColor: colors.primary },
-    requestAvatarText: { color: colors.onPrimary, fontSize: 22, fontWeight: '800' },
-    requestActions: { marginTop: 10, flexDirection: 'row', gap: 8 },
-    accept: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 18, backgroundColor: colors.primary },
-    acceptText: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
-    decline: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 18, backgroundColor: colors.surfaceRaised },
-    declineText: { color: colors.text, fontSize: 12, fontWeight: '700' },
-    empty: { flex: 1, paddingHorizontal: 48, alignItems: 'center', justifyContent: 'center' },
-    emptyIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
-    emptyIconText: { color: colors.primary, fontSize: 30, fontWeight: '800' },
-    emptyTitle: { marginTop: 18, color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
-    emptyBody: { marginTop: 8, color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+    body: { marginTop: 2, color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
+    time: { marginLeft: 16, color: colors.textSecondary, opacity: 0.4, fontSize: 14, letterSpacing: -0.24 },
+    requestActions: { marginLeft: 8, flexDirection: 'row', gap: 8 },
+    actionButton: { height: 36, paddingHorizontal: 14, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+    accept: { backgroundColor: colors.primary },
+    decline: { borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.canvas },
+    actionText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
+    emptyBackground: { flex: 1, backgroundColor: colors.canvas },
+    emptyPatternImage: { opacity: isDark ? 1 : 0.08 },
+    empty: { flex: 1, width: 240, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', transform: [{ translateY: -20 }] },
+    emptyIcon: { width: 60, height: 60, tintColor: colors.text },
+    emptyTitle: { marginTop: 24, color: colors.text, fontSize: 17, lineHeight: 21, fontWeight: '600', letterSpacing: -0.24, textAlign: 'center' },
+    emptyBody: { marginTop: 8, color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
+    footerLoader: { paddingVertical: 20 },
   });
 }

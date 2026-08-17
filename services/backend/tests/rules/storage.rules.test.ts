@@ -85,4 +85,29 @@ describe('Storage security rules', () => {
         .put(new Uint8Array([1]), { contentType: 'text/plain' }),
     );
   });
+
+  it('allows admins to manage venue images', async () => {
+    const adminStorage = testEnvironment.authenticatedContext('admin-a', { role: 'admin' }).storage();
+    const readerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const path = 'venue-images/venue-a/hero.jpg';
+
+    await assertSucceeds(
+      adminStorage.ref(path).put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+    );
+    await assertSucceeds(readerStorage.ref(path).getDownloadURL());
+    await assertSucceeds(adminStorage.ref(path).delete());
+  });
+
+  it('rejects venue image writes from moderators and regular users', async () => {
+    const moderatorStorage = testEnvironment.authenticatedContext('moderator-a', { role: 'moderator' }).storage();
+    const userStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const path = 'venue-images/venue-a/hero.jpg';
+
+    await assertFails(
+      moderatorStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+    );
+    await assertFails(
+      userStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+    );
+  });
 });

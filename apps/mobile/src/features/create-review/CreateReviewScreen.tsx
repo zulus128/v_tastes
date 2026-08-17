@@ -848,7 +848,7 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
       <View style={styles.center}>
         <View style={styles.logo}>
           <SuccessMouthPink height={61} style={styles.logoPink} width={77} />
-          <SuccessMouthOutline height={76} style={styles.logoOutline} width={105} />
+          <SuccessMouthOutline color={colors.text} height={76} style={styles.logoOutline} width={105} />
         </View>
         <Text style={styles.copy}>Your review has been added</Text>
       </View>

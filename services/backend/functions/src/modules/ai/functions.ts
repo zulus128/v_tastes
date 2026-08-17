@@ -41,7 +41,7 @@ export const askTastesAi = onCall(callableOptions, async (request): Promise<Tast
     db.collection('venues').where('status', '==', 'active').limit(50).get(),
     db.collection('users').doc(uid).get(),
   ]);
-  const terms = expandedTerms(input.prompt);
+  const terms = expandedTerms([...(input.context ?? []), input.prompt].join(' '));
   const favoriteCuisines = Array.isArray(userDocument.get('favoriteCuisines'))
     ? (userDocument.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string')
     : [];

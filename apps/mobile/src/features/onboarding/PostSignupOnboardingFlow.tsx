@@ -185,7 +185,7 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
     <Header onBack={onBack} onSkip={onSkip} />
     <View style={styles.permissionContent}>
       <Image source={icon} style={styles.permissionIcon} />
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, styles.permissionTitle]}>{title}</Text>
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
     </View>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
@@ -668,7 +668,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionContent: { position: 'absolute', top: 132, left: 26, right: 26, alignItems: 'center' },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
-  permissionSubtitle: { width: 282, marginTop: 8, textAlign: 'center' },
+  permissionTitle: { fontSize: 24, lineHeight: 29 },
+  permissionSubtitle: { width: '100%', marginTop: 7, fontSize: 15, lineHeight: 18, textAlign: 'center' },
   permissionBodyText: { color: colors.textMuted },
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },

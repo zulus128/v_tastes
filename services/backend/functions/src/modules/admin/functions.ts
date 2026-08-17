@@ -2,7 +2,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { GoogleAuth, OAuth2Client } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
@@ -47,16 +47,44 @@ const userActionInputSchema = z.object({
   suspendedUntil: z.string().datetime().nullable().optional(),
 });
 const venueStatusSchema = z.enum(['active', 'hidden', 'pending', 'merged', 'removed']);
-const venueInputSchema = z.object({
+const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
+const venueInputObjectSchema = z.object({
   venueId: idSchema.optional(),
   name: z.string().trim().min(2).max(160),
   city: z.string().trim().min(2).max(120),
   address: z.string().trim().min(2).max(300),
   category: z.string().trim().min(2).max(80),
   status: venueStatusSchema.default('active'),
+  imageUrl: z.url().nullable().default(null),
+  photoUrls: z.array(z.url()).max(12).default([]),
+  priceLevel: z.number().int().min(1).max(4).nullable().default(null),
+  latitude: z.number().min(-90).max(90).nullable().default(null),
+  longitude: z.number().min(-180).max(180).nullable().default(null),
+  googlePlaceId: z.string().trim().min(1).max(256).nullable().default(null),
+  discoverTags: z.array(discoverTagSchema).max(5).default([]),
+  phone: z.string().trim().min(1).max(40).nullable().default(null),
+  website: z.string().trim().min(1).max(300).nullable().default(null),
+  openingHours: z.array(z.object({
+    day: z.string().trim().min(1).max(40),
+    hours: z.string().trim().min(1).max(80),
+  })).max(14).default([]),
+  placeTags: z.array(z.string().trim().min(1).max(80)).max(12).default([]),
+  popularDishes: z.array(z.object({
+    name: z.string().trim().min(1).max(120),
+    rating: z.number().min(0).max(5),
+  })).max(20).default([]),
+  featured: z.boolean().default(false),
+  hotSpot: z.boolean().default(false),
 });
-const createVenueInputSchema = venueInputSchema.omit({ venueId: true });
-const updateVenueInputSchema = venueInputSchema.extend({ venueId: idSchema });
+const coordinatePairOptions = {
+  message: 'Latitude and longitude must be provided together.',
+};
+const hasCoordinatePair = (input: { latitude: number | null; longitude: number | null }) => (
+  (input.latitude === null) === (input.longitude === null)
+);
+const venueInputSchema = venueInputObjectSchema.refine(hasCoordinatePair, coordinatePairOptions);
+const createVenueInputSchema = venueInputObjectSchema.omit({ venueId: true }).refine(hasCoordinatePair, coordinatePairOptions);
+const updateVenueInputSchema = venueInputObjectSchema.extend({ venueId: idSchema }).refine(hasCoordinatePair, coordinatePairOptions);
 const venueStatusInputSchema = z.object({ venueId: idSchema, status: venueStatusSchema });
 const venueFlagsInputSchema = z.object({
   venueId: idSchema,
@@ -88,11 +116,6 @@ interface AnalyticsBatchResponse {
   reports?: Array<{ rows?: Array<{ metricValues?: Array<{ value?: string }> }> }>;
 }
 
-interface AdSenseReportResponse {
-  headers?: Array<{ name?: string; currencyCode?: string }>;
-  totals?: { cells?: Array<{ value?: string }> };
-}
-
 async function getAnalyticsMetrics() {
   const propertyId = process.env.GA4_PROPERTY_ID ?? '546866444';
   try {
@@ -122,61 +145,6 @@ async function getAnalyticsMetrics() {
   }
 }
 
-async function getAdSenseMetrics() {
-  const accountId = process.env.ADSENSE_ACCOUNT_ID?.replace(/^accounts\//, '');
-  const clientId = process.env.ADSENSE_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.ADSENSE_OAUTH_CLIENT_SECRET;
-  const refreshToken = process.env.ADSENSE_OAUTH_REFRESH_TOKEN;
-  if (!accountId || !clientId || !clientSecret || !refreshToken) {
-    return {
-      connected: false,
-      estimatedEarnings: 0,
-      impressions: 0,
-      clicks: 0,
-      currencyCode: null,
-      error: 'AdSense is not configured.',
-    };
-  }
-
-  try {
-    const oauth = new OAuth2Client(clientId, clientSecret);
-    oauth.setCredentials({ refresh_token: refreshToken });
-    const accessToken = await oauth.getAccessToken();
-    if (!accessToken.token) throw new Error('AdSense access token is unavailable.');
-    const url = new URL(`https://adsense.googleapis.com/v2/accounts/${encodeURIComponent(accountId)}/reports:generate`);
-    url.searchParams.set('dateRange', 'LAST_30_DAYS');
-    for (const metric of ['ESTIMATED_EARNINGS', 'IMPRESSIONS', 'CLICKS']) {
-      url.searchParams.append('metrics', metric);
-    }
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken.token}` } });
-    if (!response.ok) throw new Error(`AdSense Management API returned ${response.status}.`);
-    const data = await response.json() as AdSenseReportResponse;
-    const values = new Map(data.headers?.map((header, index) => [
-      header.name ?? '',
-      data.totals?.cells?.[index]?.value ?? '0',
-    ]) ?? []);
-    const earningsHeader = data.headers?.find((header) => header.name === 'ESTIMATED_EARNINGS');
-    return {
-      connected: true,
-      estimatedEarnings: Number(values.get('ESTIMATED_EARNINGS') ?? 0),
-      impressions: Number(values.get('IMPRESSIONS') ?? 0),
-      clicks: Number(values.get('CLICKS') ?? 0),
-      currencyCode: earningsHeader?.currencyCode ?? null,
-      error: null,
-    };
-  } catch (error) {
-    console.warn('Unable to load AdSense metrics.', error);
-    return {
-      connected: false,
-      estimatedEarnings: 0,
-      impressions: 0,
-      clicks: 0,
-      currencyCode: null,
-      error: 'AdSense access is not configured or the refresh token is invalid.',
-    };
-  }
-}
-
 async function getReviewCities() {
   const snapshot = await db.collection('reviews').where('status', '==', 'published').limit(1_000).get();
   const counts = new Map<string, number>();
@@ -193,7 +161,7 @@ async function getReviewCities() {
 export const getAdminOverview = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const now = Date.now();
-  const [users, reviews, reports, venues, users24h, users7d, users30d, analytics, reviewCities, adsense] = await Promise.all([
+  const [users, reviews, reports, venues, users24h, users7d, users30d, analytics, reviewCities] = await Promise.all([
     db.collection('users').count().get(),
     db.collection('reviews').count().get(),
     db.collection('reports').where('status', '==', 'pending').count().get(),
@@ -203,7 +171,6 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
     getAnalyticsMetrics(),
     getReviewCities(),
-    getAdSenseMetrics(),
   ]);
 
   return {
@@ -218,7 +185,6 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
     },
     analytics,
     reviewCities,
-    adsense,
   };
 });
 
@@ -463,27 +429,63 @@ export const searchAdminVenues = onCall(callableOptions, async (request) => {
       featured: Boolean(venue.get('featured')),
       hotSpot: Boolean(venue.get('hotSpot')),
       reviewCount: Number(venue.get('reviewCount') ?? 0),
+      imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
+      photoUrls: Array.isArray(venue.get('photoUrls'))
+        ? (venue.get('photoUrls') as unknown[]).filter((value): value is string => typeof value === 'string')
+        : [],
+      priceLevel: venue.get('priceLevel') == null ? null : Number(venue.get('priceLevel')),
+      latitude: venue.get('latitude') == null ? null : Number(venue.get('latitude')),
+      longitude: venue.get('longitude') == null ? null : Number(venue.get('longitude')),
+      googlePlaceId: venue.get('googlePlaceId') ? String(venue.get('googlePlaceId')) : null,
+      discoverTags: Array.isArray(venue.get('discoverTags'))
+        ? (venue.get('discoverTags') as unknown[]).filter((value): value is z.infer<typeof discoverTagSchema> => discoverTagSchema.safeParse(value).success)
+        : [],
+      phone: venue.get('phone') ? String(venue.get('phone')) : null,
+      website: venue.get('website') ? String(venue.get('website')) : null,
+      openingHours: Array.isArray(venue.get('openingHours'))
+        ? (venue.get('openingHours') as unknown[]).flatMap((value) => {
+          if (!value || typeof value !== 'object') return [];
+          const item = value as { day?: unknown; hours?: unknown };
+          return typeof item.day === 'string' && typeof item.hours === 'string'
+            ? [{ day: item.day, hours: item.hours }]
+            : [];
+        })
+        : [],
+      placeTags: Array.isArray(venue.get('placeTags'))
+        ? (venue.get('placeTags') as unknown[]).filter((value): value is string => typeof value === 'string')
+        : [],
+      popularDishes: Array.isArray(venue.get('popularDishes'))
+        ? (venue.get('popularDishes') as unknown[]).flatMap((value) => {
+          if (!value || typeof value !== 'object') return [];
+          const item = value as { name?: unknown; rating?: unknown };
+          return typeof item.name === 'string' && typeof item.rating === 'number'
+            ? [{ name: item.name, rating: item.rating }]
+            : [];
+        })
+        : [],
     }));
 });
 
 export const upsertVenue = onCall(callableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(venueInputSchema, request.data);
-  const reference = input.venueId
-    ? db.collection('venues').doc(input.venueId)
+  const { venueId, ...venueData } = input;
+  const reference = venueId
+    ? db.collection('venues').doc(venueId)
     : db.collection('venues').doc();
+  const existing = await reference.get();
   await reference.set({
-    name: input.name,
-    city: input.city,
-    address: input.address,
-    category: input.category,
-    status: input.status,
-    source: 'admin',
+    ...venueData,
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: actorId,
-    ...(input.venueId ? {} : { createdAt: FieldValue.serverTimestamp(), reviewCount: 0 }),
+    ...(existing.exists ? {} : {
+      source: 'admin',
+      createdAt: FieldValue.serverTimestamp(),
+      rating: 0,
+      reviewCount: 0,
+    }),
   }, { merge: true });
-  await audit(actorId, input.venueId ? 'update-venue' : 'create-venue', reference.id);
+  await audit(actorId, existing.exists ? 'update-venue' : 'create-venue', reference.id);
   return { id: reference.id };
 });
 
@@ -507,15 +509,12 @@ export const createVenue = onCall(callableOptions, async (request) => {
 export const updateVenue = onCall(callableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(updateVenueInputSchema, request.data);
-  const reference = db.collection('venues').doc(input.venueId);
+  const { venueId, ...venueData } = input;
+  const reference = db.collection('venues').doc(venueId);
   const venue = await reference.get();
   if (!venue.exists) throw new HttpsError('not-found', 'The venue was not found.');
   await reference.update({
-    name: input.name,
-    city: input.city,
-    address: input.address,
-    category: input.category,
-    status: input.status,
+    ...venueData,
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: actorId,
   });
