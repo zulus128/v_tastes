@@ -1,5 +1,7 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { UpdateProfileSettingsInput, Venue } from '@tastes/contracts';
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -71,6 +73,8 @@ export function ProfileSettingsSheet({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom, isDark), [colors, insets.bottom, insets.top, isDark]);
   const { profile } = useProfile(userId, fallbackName);
+  const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
+  const buildVersion = Application.nativeBuildVersion;
   const [favoritePlace, setFavoritePlace] = useState('Select a place');
   const [editing, setEditing] = useState<EditableField | null>(null);
   const [draft, setDraft] = useState('');
@@ -356,6 +360,9 @@ export function ProfileSettingsSheet({
                 </Pressable>
               ))}
             </View>
+            <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
+              Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
+            </Text>
           </ScrollView>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
@@ -488,6 +495,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     photoLoader: { position: 'absolute', inset: 0 },
     editPhoto: { marginTop: 10, marginBottom: 10, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
     rows: { width: '100%', gap: 6 },
+    version: { marginTop: 16, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'center' },
     row: { width: '100%', height: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
     rowLabel: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41 },
     rowValue: { maxWidth: '55%', marginLeft: 8, color: colors.textMuted, fontSize: 15, fontWeight: '500', textAlign: 'right' },
