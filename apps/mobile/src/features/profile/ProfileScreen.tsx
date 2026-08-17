@@ -110,6 +110,7 @@ export function ProfileScreen({
   onOpenComments,
   onOpenFilters,
   onOpenPlace,
+  onOpenProfile,
   onSettings,
   targetUserId,
 }: {
@@ -122,6 +123,7 @@ export function ProfileScreen({
   onOpenComments: (reviewId: string) => void;
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
+  onOpenProfile: (userId: string, following: boolean) => void;
   onSettings: () => void;
   targetUserId: string;
 }) {
@@ -478,7 +480,17 @@ export function ProfileScreen({
         own={own}
         profile={profile}
       />
-      <ProfileExtras onClose={() => setExtra(null)} own={own} screen={extra} targetUserId={targetUserId} visible={extra !== null} />
+      <ProfileExtras
+        onClose={() => setExtra(null)}
+        onOpenProfile={(userId, personFollowing) => {
+          setExtra(null);
+          onOpenProfile(userId, personFollowing);
+        }}
+        own={own}
+        screen={extra}
+        targetUserId={targetUserId}
+        visible={extra !== null}
+      />
       <Modal animationType="fade" onRequestClose={() => setSelectedReview(null)} transparent visible={selectedReview !== null && !editingReview}>
         <Pressable onPress={() => setSelectedReview(null)} style={styles.reviewActionBackdrop}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>

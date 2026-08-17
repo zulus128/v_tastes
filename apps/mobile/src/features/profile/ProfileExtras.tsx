@@ -74,12 +74,14 @@ function rewardViews(data: ProfileExtrasResult | null): RewardView[] {
 
 export function ProfileExtras({
   onClose,
+  onOpenProfile,
   own = false,
   screen,
   targetUserId,
   visible,
 }: {
   onClose: () => void;
+  onOpenProfile: (userId: string, following: boolean) => void;
   own?: boolean;
   screen: ProfileExtra;
   targetUserId?: string;
@@ -200,10 +202,17 @@ export function ProfileExtras({
           <ScrollView contentContainerStyle={styles.peopleList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {!data ? <ActivityIndicator color={colors.primary} style={styles.peopleLoading} /> : visibleConnections.map((person) => (
               <View key={person.userId} style={styles.person}>
-                {person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} /> : (
-                  <View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
-                )}
-                <View style={styles.personCopy}><Text numberOfLines={1} style={styles.personName}>{person.displayName}</Text><Text numberOfLines={1} style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View>
+                <Pressable
+                  accessibilityLabel={`Open ${person.displayName}'s profile`}
+                  accessibilityRole="button"
+                  onPress={() => onOpenProfile(person.userId, person.following)}
+                  style={({ pressed }) => [styles.personLink, pressed && styles.pressed]}
+                >
+                  {person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} /> : (
+                    <View style={styles.avatar}><Text style={styles.avatarText}>{person.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}</Text></View>
+                  )}
+                  <View style={styles.personCopy}><Text numberOfLines={1} style={styles.personName}>{person.displayName}</Text><Text numberOfLines={1} style={styles.handle}>{person.username ? `@${person.username}` : ''}</Text></View>
+                </Pressable>
                 {screen === 'followers' && own ? (
                   <Pressable
                     accessibilityLabel={`Remove ${person.displayName}`}
@@ -342,6 +351,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     peopleList: { paddingBottom: Math.max(30, safeBottom) },
     peopleLoading: { marginTop: 32 },
     person: { height: 76, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
+    personLink: { flex: 1, height: '100%', flexDirection: 'row', gap: 7, alignItems: 'center' },
     avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     avatarImage: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceRaised },
     avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },

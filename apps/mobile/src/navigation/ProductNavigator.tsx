@@ -266,6 +266,10 @@ function MainTabs({
                 onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
                 onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
                 onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+                onOpenProfile={(profileUserId, profileFollowing) => navigation.navigate('Profile', {
+                  initialFollowing: profileFollowing,
+                  userId: profileUserId,
+                })}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}
               />
