@@ -243,8 +243,14 @@ export function CreateReviewScreen({
 
   if (success) return <ReviewAdded onDone={finish} />;
 
+  // The ScrollView below already handles iOS keyboard insets itself
+  // (automaticallyAdjustKeyboardInsets); adding KeyboardAvoidingView's own
+  // padding on top of that double-compensates, so the content doesn't settle
+  // back to its resting position once the keyboard closes and the footer
+  // reappears overlapping it. Android has no such prop, so it still needs
+  // KeyboardAvoidingView.
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? undefined : 'height'} style={styles.screen}>
       <ImageBackground imageStyle={styles.patternImage} source={successPattern} style={styles.screen}>
         <PatternBackgroundLift />
         <ScrollView
@@ -455,6 +461,11 @@ function RatingCurve({
   const curveBase = isDark ? '#3D1A1C' : '#FFCBCE';
   const curvePoint = isDark ? '#120606' : '#FFFFFF';
   const selectedMarker = reviewRatingMarkers.find((marker) => marker.value === value);
+  // The scale asset is authored at a fixed 359.903pt canvas, which overflows
+  // narrower screens (e.g. iPhone SE). Measure the space actually available
+  // and scale the design-space marker positions to fit it instead.
+  const [scaleWidth, setScaleWidth] = useState(0);
+  const markerScale = scaleWidth / 359.903;
   return (
     <View style={ratingStyles.wrap}>
       <Text style={ratingStyles.value}>{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
@@ -484,56 +495,60 @@ function RatingCurve({
         })}
       </View>
       {linear ? (
-        <View style={ratingStyles.scale}>
-          {isDark
-            ? <RatingScale height={15.1808} width={359.903} />
-            : <RatingScaleLight height={15.1808} width={359.903} />}
-          {!isDark && value >= 1 ? (
-            <Svg height={15.1808} pointerEvents="none" style={ratingStyles.linearProgress} width={359.903}>
-              <Line
-                stroke={accent}
-                strokeLinecap="round"
-                strokeWidth={4}
-                x1={4}
-                x2={dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4}
-                y1={8}
-                y2={8}
-              />
-              {dishRatingMarkers.filter((marker) => marker.value <= value).map((marker) => Number.isInteger(marker.value) ? (
-                <Circle
-                  cx={marker.x}
-                  cy={7.59038}
-                  fill="#FFFFFF"
+        <View onLayout={(event) => setScaleWidth(event.nativeEvent.layout.width)} style={ratingStyles.scale}>
+          {scaleWidth > 0 ? (
+            <>
+              {isDark
+                ? <RatingScale height={15.1808} width={scaleWidth} />
+                : <RatingScaleLight height={15.1808} width={scaleWidth} />}
+              {value >= 1 ? (
+                <Svg height={15.1808} pointerEvents="none" style={ratingStyles.linearProgress} width={scaleWidth}>
+                  <Line
+                    stroke={accent}
+                    strokeLinecap="round"
+                    strokeWidth={4}
+                    x1={4 * markerScale}
+                    x2={(dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4) * markerScale}
+                    y1={8}
+                    y2={8}
+                  />
+                  {dishRatingMarkers.filter((marker) => marker.value <= value).map((marker) => Number.isInteger(marker.value) ? (
+                    <Circle
+                      cx={marker.x * markerScale}
+                      cy={7.59038}
+                      fill="#FFFFFF"
+                      key={marker.value}
+                      r={6.09038}
+                      stroke={accent}
+                      strokeWidth={3}
+                    />
+                  ) : (
+                    <Line
+                      key={marker.value}
+                      stroke={accent}
+                      strokeLinecap="round"
+                      strokeWidth={2}
+                      x1={marker.x * markerScale}
+                      x2={marker.x * markerScale}
+                      y1={2}
+                      y2={13.3857}
+                    />
+                  ))}
+                </Svg>
+              ) : null}
+              {dishRatingMarkers.map((marker) => (
+                <Pressable
+                  accessibilityLabel={`${marker.value} stars`}
+                  accessibilityRole="button"
                   key={marker.value}
-                  r={6.09038}
-                  stroke={accent}
-                  strokeWidth={3}
-                />
-              ) : (
-                <Line
-                  key={marker.value}
-                  stroke={accent}
-                  strokeLinecap="round"
-                  strokeWidth={2}
-                  x1={marker.x}
-                  x2={marker.x}
-                  y1={2}
-                  y2={13.3857}
-                />
+                  onPress={() => onChange(marker.value)}
+                  style={[ratingStyles.linearPointHit, { left: marker.x * markerScale - 22 }]}
+                >
+                  {marker.value === value ? <RatingPin color="#B82F29" height={38} width={38} /> : null}
+                </Pressable>
               ))}
-            </Svg>
+            </>
           ) : null}
-          {dishRatingMarkers.map((marker) => (
-            <Pressable
-              accessibilityLabel={`${marker.value} stars`}
-              accessibilityRole="button"
-              key={marker.value}
-              onPress={() => onChange(marker.value)}
-              style={[ratingStyles.linearPointHit, { left: marker.x - 22 }]}
-            >
-              {marker.value === value ? <RatingPin color="#B82F29" height={38} width={38} /> : null}
-            </Pressable>
-          ))}
         </View>
       ) : (
         <View style={ratingStyles.curve}>
@@ -752,7 +767,9 @@ function DishEditor({
   const valid = Boolean(draft.photoUri && draft.title.trim() && draft.rating >= 1);
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
+      {/* Same double-compensation risk as the main review screen: the
+          ScrollView below already adjusts for the iOS keyboard itself. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? undefined : 'height'} style={styles.modalScreen}>
         <Pressable onPress={onClose} style={styles.scrim} />
         <View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom) }]}>
         <View style={styles.header}><Text style={styles.title}>Add Dish</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
@@ -870,7 +887,7 @@ const ratingStyles = StyleSheet.create({
   starFillClip: { position: 'absolute', height: 30, overflow: 'hidden' },
   starFill: { width: 26, color: '#B82F29', fontSize: 27, lineHeight: 30 },
   curve: { position: 'absolute', top: 36, width: 338, height: 139 },
-  scale: { position: 'absolute', top: 116, width: 360, height: 44, justifyContent: 'center' },
+  scale: { position: 'absolute', top: 116, alignSelf: 'center', width: '100%', maxWidth: 359.903, height: 44, justifyContent: 'center' },
   linearProgress: { position: 'absolute', left: 0, top: 14.4096 },
   pointHit: { position: 'absolute', zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   linearPointHit: { position: 'absolute', top: 0, zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
