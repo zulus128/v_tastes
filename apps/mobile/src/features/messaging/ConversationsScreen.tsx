@@ -136,7 +136,12 @@ export function ConversationsScreen({
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => { if (active) Alert.alert('Could not load requests', 'Open Requests to try again.'); }); return () => { active = false; }; }, [api]);
+  // This only feeds the badge count next to the Requests button, and the
+  // inbox stays mounted behind other screens (e.g. an open chat), so a
+  // transient failure here must fail quietly rather than interrupt whatever
+  // screen the user is actually looking at. RequestsScreen alerts on its own
+  // load failure since that one is a direct result of the user opening it.
+  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => undefined); return () => { active = false; }; }, [api]);
   const inbox = useConversationInbox(userId);
   const conversationHistory = useInfiniteQuery({
     queryKey: ['conversations', userId, 'history'],

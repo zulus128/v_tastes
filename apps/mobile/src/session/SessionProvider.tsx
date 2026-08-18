@@ -60,7 +60,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // state, so do not turn the expected 404 into a React Native redbox.
       if (
         error.code === 'not-found'
-        && (operation === 'getMessages' || operation === 'setTypingStatus')
+        && (operation === 'getMessages' || operation === 'setTypingStatus' || operation === 'markConversationRead')
+      ) return;
+      // Marking a conversation read is best-effort and reruns automatically
+      // whenever the conversation listener fires again. A stale "through"
+      // message id (new messages just arrived) or a retryable backend hiccup
+      // resolves itself on the next attempt, so it should not redbox either.
+      if (
+        operation === 'markConversationRead'
+        && (error.code === 'failed-precondition' || error.retryable)
       ) return;
       captureException(error, {
         source: 'api',
