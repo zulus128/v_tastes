@@ -23,7 +23,7 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, ClipPath, Defs, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Line, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
@@ -52,10 +52,38 @@ import { type DishReviewDraft, useCreateReview } from './api';
 const ratingCircle = { centerX: 169, centerY: -36.8226, radius: 167.8226 };
 const ratingCircleY = (x: number) => ratingCircle.centerY
   + Math.sqrt((ratingCircle.radius ** 2) - ((x - ratingCircle.centerX) ** 2));
-// The hero card's rounded bottom (Figma node 5978:18283, "Rectangle 9946") and the rating
-// arc drawn on top of it are two independently authored curves in the design — 210 is the
-// card's real corner radius per Figma, not derived from the arc's radius.
-const heroCurveRadius = 210;
+// Figma (node 5978:18283, "Rectangle 9946") draws the hero card's rounded bottom as a plain
+// CSS corner-radius (210) on the full-width card, independent of the rating arc's own circle
+// (node 5700:5935, centerX/centerY/radius above) — so the gap between the arc and the card's
+// edge isn't constant: it's small near the sides and large under the arc's deepest point.
+// Rather than reproduce that mismatch, the card's bottom edge below is drawn as a second
+// circle concentric with the arc (same center, radius + heroCurveGap), so the visible gap
+// stays the same all the way around. heroCurveGap is chosen so the card's overall height is
+// unchanged from the original 210-radius version (it already left ~31px under the arc's
+// deepest point; this just makes that clearance uniform instead of only happening at center).
+const heroCurveGap = 31;
+// The curve's own SVG is 338pt wide, but the selected-star pin (a 38pt badge, hit target 44pt)
+// sticks out ~22pt past the curve's drawn endpoints — so the widget actually needs ~382pt of
+// clear width to show the end pins in full (matches the ~21pt margin Figma itself leaves
+// around the pin within its 402pt-wide "rating" frame). Below that, shrink the whole curve
+// uniformly instead of letting the end pins get clipped by the hero card's edge.
+const curveDesignWidth = 382;
+const curveScaleFor = (availableWidth: number) => Math.min(1, availableWidth / curveDesignWidth);
+function heroCurveGeometry(heroWidth: number) {
+  // Hero has 16pt of padding on each side; that's the width actually available to the curve,
+  // so the background arc shrinks in lockstep with it and stays concentric.
+  const innerRadius = ratingCircle.radius * curveScaleFor(heroWidth - 32);
+  const outerRadius = innerRadius + heroCurveGap;
+  const halfWidth = heroWidth / 2;
+  // A circle can't span a chord wider than its own diameter — grow the radius just enough to
+  // still reach edge to edge on an unusually wide screen (flattening the curve slightly there)
+  // instead of leaving it too small, which would silently force the SVG arc below to scale up
+  // its own radius to close the path, leaving this computed height out of sync with what
+  // actually renders.
+  const radius = Math.max(outerRadius, halfWidth + 1);
+  const centerY = -Math.sqrt(Math.max(0, radius ** 2 - halfWidth ** 2));
+  return { height: radius + centerY, radius };
+}
 const reviewRatingMarkers = [
   { kind: 'dot', value: 1, x: 7, y: ratingCircleY(7) },
   { kind: 'tick', rotation: -30, value: 1.5, x: 25, y: ratingCircleY(25) },
@@ -115,6 +143,10 @@ export function CreateReviewScreen({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  // Measured so the hero's SVG background (HeroBackground) can be shaped to the card's real
+  // size — its bottom edge is drawn concentric with the rating arc (see heroCurveGeometry)
+  // instead of an independently-radiused CSS corner, so the gap to the arc stays constant.
+  const [heroSize, setHeroSize] = useState({ height: 0, width: 0 });
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
@@ -269,11 +301,19 @@ export function CreateReviewScreen({
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={isDark ? ['#080808', '#080808', '#190404'] : ['#FFFFFF', '#FFFFFF', '#F8EBEA']}
-            locations={[0, 0.65982, 1]}
+          <View
+            onLayout={({ nativeEvent }) => setHeroSize({ height: nativeEvent.layout.height, width: nativeEvent.layout.width })}
             style={[styles.hero, { paddingTop: insets.top + 8 }]}
           >
+            {heroSize.width > 0 ? (
+              <HeroBackground
+                borderColor={isDark ? 'rgba(255,255,255,0.18)' : colors.border}
+                colors={isDark ? ['#080808', '#080808', '#190404'] : ['#FFFFFF', '#FFFFFF', '#F8EBEA']}
+                heroHeight={heroSize.height}
+                heroWidth={heroSize.width}
+                locations={[0, 0.65982, 1]}
+              />
+            ) : null}
             <View style={styles.navigation}>
               <Pressable accessibilityLabel="Close review" hitSlop={14} onPress={requestClose}><Text style={styles.back}>‹</Text></Pressable>
               <Text maxFontSizeMultiplier={1.3} style={styles.title}>Write a Review</Text>
@@ -309,8 +349,7 @@ export function CreateReviewScreen({
                 )}
               </Pressable>
             )}
-            <View pointerEvents="none" style={styles.heroBorder} />
-          </LinearGradient>
+          </View>
 
           <SectionLabel label="Your feedback" />
           <TextInput
@@ -462,10 +501,12 @@ function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
 }
 
 function RatingCurve({
+  heroWidth = 0,
   linear = false,
   onChange,
   value,
 }: {
+  heroWidth?: number;
   linear?: boolean;
   onChange: (value: number) => void;
   value: number;
@@ -480,6 +521,9 @@ function RatingCurve({
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
   const markerScale = scaleWidth / 359.903;
+  // Same idea for the curved scale: shrink the whole arc+pins as one unit (see
+  // curveDesignWidth) rather than let the end pins overflow the hero card's edge.
+  const curveScale = heroWidth > 0 ? curveScaleFor(heroWidth - 32) : 1;
   return (
     <View style={ratingStyles.wrap}>
       {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt
@@ -568,7 +612,7 @@ function RatingCurve({
           ) : null}
         </View>
       ) : (
-        <View style={ratingStyles.curve}>
+        <View style={[ratingStyles.curve, curveScale < 1 && { transform: [{ scale: curveScale }] }]}>
           <Svg height={139} pointerEvents="none" width={338} style={StyleSheet.absoluteFill}>
             <Defs>
               <ClipPath id="review-rating-progress">
@@ -618,6 +662,39 @@ function RatingCurve({
         </View>
       )}
     </View>
+  );
+}
+
+// Renders the hero card's own fill + outline as a single SVG shape instead of a CSS
+// LinearGradient box with a corner-radius bottom: the bottom edge is a circle concentric
+// with the rating arc (same center, see heroCurveGeometry), so the gap between the arc and
+// the card's edge reads as constant all the way across instead of widening toward the
+// center, where a plain corner-radius would otherwise leave a mismatched pocket of empty
+// space under the arc's deepest point (visible as extra dark background there).
+function HeroBackground({ borderColor, colors, heroHeight, heroWidth, locations }: {
+  borderColor: string;
+  colors: string[];
+  heroHeight: number;
+  heroWidth: number;
+  locations: number[];
+}) {
+  const { height: arcDepth, radius } = heroCurveGeometry(heroWidth);
+  const straightBottom = Math.max(0, heroHeight - arcDepth);
+  const centerX = heroWidth / 2;
+  // Traversal order matters for the sweep-flag below: this mirrors the rating arc's own two
+  // segments (left-edge → center-bottom → right-edge, both "0 0" flags) exactly. Going the
+  // other way around with the same flags picks the other/complementary circle and produces a
+  // self-intersecting path — a sharp V instead of a smooth dip.
+  const d = `M0,${straightBottom} A${radius},${radius} 0 0 0 ${centerX},${heroHeight} A${radius},${radius} 0 0 0 ${heroWidth},${straightBottom} L${heroWidth},0 L0,0 Z`;
+  return (
+    <Svg height={heroHeight} pointerEvents="none" style={StyleSheet.absoluteFill} width={heroWidth}>
+      <Defs>
+        <SvgLinearGradient id="heroBackgroundGradient" x1="0" x2="0" y1="0" y2="1">
+          {colors.map((color, index) => <Stop key={color + index} offset={locations[index]} stopColor={color} />)}
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={d} fill="url(#heroBackgroundGradient)" stroke={borderColor} strokeWidth={1} />
+    </Svg>
   );
 }
 
@@ -916,8 +993,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   screen: { flex: 1, backgroundColor: isDark ? colors.background : colors.canvas },
   patternImage: { opacity: isDark ? 1 : 0.06, resizeMode: 'repeat', tintColor: '#161616' },
   content: { flexGrow: 1 },
-  hero: { minHeight: 438, paddingHorizontal: 16, borderBottomLeftRadius: heroCurveRadius, borderBottomRightRadius: heroCurveRadius, overflow: 'hidden' },
-  heroBorder: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.18)' : colors.border, borderBottomLeftRadius: heroCurveRadius, borderBottomRightRadius: heroCurveRadius },
+  // Background/border are drawn by HeroBackground (an absolutely-filled sibling), not a CSS
+  // gradient + corner-radius, so the bottom edge can follow the rating arc's own curvature.
+  hero: { minHeight: 438, paddingHorizontal: 16, overflow: 'hidden' },
   navigation: { height: 54, flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontSize: 36, lineHeight: 38 },
   title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },
