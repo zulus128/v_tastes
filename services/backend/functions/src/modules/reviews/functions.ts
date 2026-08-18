@@ -143,19 +143,27 @@ export const getComments = onCall(callableOptions, async (request) => {
     .get()));
   const replyDocuments = replySnapshots.flatMap((replySnapshot) => replySnapshot.docs);
   const pageDocuments = [...rootDocuments, ...replyDocuments];
-  const [reactionDocuments, author, reviewReaction] = await Promise.all([
+  const commentAuthorIds = [...new Set(pageDocuments.map((document) => String(document.get('authorId'))))];
+  const [reactionDocuments, author, reviewReaction, commentAuthorDocs] = await Promise.all([
     pageDocuments.length > 0
       ? db.getAll(...pageDocuments.map((document) => document.ref.collection('reactions').doc(uid)))
       : Promise.resolve([]),
     db.collection('users').doc(String(review.get('authorId'))).get(),
     review.ref.collection('reactions').doc(uid).get(),
+    commentAuthorIds.length > 0
+      ? db.getAll(...commentAuthorIds.map((id) => db.collection('users').doc(id)))
+      : Promise.resolve([]),
   ]);
   const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const commentAuthorPhotoById = new Map(
+    commentAuthorDocs.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]),
+  );
   const toComment = (document: QueryDocumentSnapshot) => ({
     id: document.id,
     reviewId: input.reviewId,
     authorId: String(document.get('authorId')),
     authorDisplayName: String(document.get('authorDisplayName')),
+    authorPhotoUrl: commentAuthorPhotoById.get(String(document.get('authorId'))) ?? null,
     parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
     reactionCount: Number(document.get('reactionCount') ?? 0),
     replyCount: Number(document.get('replyCount') ?? 0),

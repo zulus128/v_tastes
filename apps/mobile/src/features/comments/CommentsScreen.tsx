@@ -9,6 +9,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  type LayoutChangeEvent,
   Modal,
   Platform,
   Pressable,
@@ -19,10 +20,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
+import CaretDownIcon from '../../../assets/comments/caret-down.svg';
+import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import HeartIcon from '../../../assets/comments/heart-outline.svg';
+import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
+import SendIcon from '../../../assets/ai/send.svg';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -78,7 +85,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
     });
     return () => { active = false; };
   }, [normalizedPath]);
-  if (state.uri) return <Image source={{ uri: state.uri }} style={styles.dishImage} />;
+  if (state.uri) return <Image resizeMode="contain" source={{ uri: state.uri }} style={styles.dishImage} />;
   return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
 }
 
@@ -96,7 +103,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(review.rating)))}<Text style={styles.reviewEmptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(review.rating)))}</Text></Text></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
       {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
-      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact}><Text style={[styles.reviewAction, review.reacted && styles.reviewActionActive]}>♥ {review.reactionCount}</Text></Pressable><Text style={styles.reviewAction}>◯ {review.commentCount}</Text><Pressable onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}><Text style={styles.reviewAction}>↗</Text></Pressable></View>
+      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={20} width={20} /></Pressable></View>
     </View>
     <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
@@ -110,7 +117,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
   </View>;
 }
 
-function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport }: { item: Comment; nested?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void }) {
+function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { count: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -120,8 +127,8 @@ function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport
       { text: 'Report', style: 'destructive', onPress: onReport },
       ...(onDelete ? [{ text: 'Delete', style: 'destructive' as const, onPress: onDelete }] : []),
       { text: 'Cancel', style: 'cancel' },
-    ])} style={[styles.row, nested && styles.nestedRow]}>
-      <View style={styles.avatar}><Text style={styles.initial}>{item.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>
+    ])} onLayout={onLayout} style={[styles.row, nested && styles.nestedRow]}>
+      {item.authorPhotoUrl ? <Image source={{ uri: item.authorPhotoUrl }} style={styles.avatarImage} /> : <View style={styles.avatar}><Text style={styles.initial}>{item.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
       <View style={styles.copy}>
         <View style={styles.meta}>
           <Text style={styles.author}>{item.authorDisplayName}</Text>
@@ -129,9 +136,17 @@ function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport
         </View>
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>
-          <Pressable onPress={onReact}><Text style={[styles.action, item.reacted && styles.actionActive]}>♥ {item.reactionCount || ''}</Text></Pressable>
-          <Pressable onPress={onReply}><Text style={styles.action}>Reply</Text></Pressable>
-          <Pressable onPress={() => void Share.share({ message: `${item.authorDisplayName}: ${item.text}` })}><Text style={styles.action}>Share</Text></Pressable>
+          <Pressable onPress={onReact} style={styles.reactionAction}>
+            <HeartIcon color={item.reacted ? colors.primary : colors.text} height={20} width={20} />
+            {item.reactionCount ? <Text style={styles.reactionCount}>{item.reactionCount}</Text> : null}
+          </Pressable>
+          <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={20} width={20} /><Text style={styles.action}>Reply</Text></Pressable>
+          {repliesToggle ? (
+            <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
+              <Text style={styles.action}>{repliesToggle.hidden ? `Show replies (${repliesToggle.count})` : 'Hide replies'}</Text>
+              <CaretDownIcon color={colors.textSecondary} height={14} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={14} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -152,6 +167,7 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
   const [reportSent, setReportSent] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
+  const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
   const query = useComments(reviewId);
   const mutation = useAddComment(reviewId);
@@ -231,9 +247,19 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
               const replies = repliesByParent.get(item.id) ?? [];
               const hidden = hiddenReplies.has(item.id);
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
-              return <View><CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} />
-                {replies.length > 0 ? <Pressable onPress={() => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; })} style={styles.repliesToggle}><Text style={styles.repliesToggleText}>{hidden ? `Show ${replies.length} replies` : 'Hide replies'}</Text></Pressable> : null}
-                {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} />) : null}
+              const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
+              return <View style={styles.thread}>
+                <CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { count: replies.length, hidden, onToggle: toggleReplies } : undefined} />
+                {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
+                  const nextOffset = event.nativeEvent.layout.y;
+                  setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });
+                }} />) : null}
+                {!hidden && replies.length > 0 ? (
+                  <Svg height="100%" pointerEvents="none" style={styles.threadConnector} width="100%">
+                    {replies.map((reply) => replyOffsets[reply.id] == null ? null : <Line key={reply.id} stroke="rgba(0,0,0,0.2)" strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={63} y1={replyOffsets[reply.id] + 32} y2={replyOffsets[reply.id] + 32} />)}
+                    {Object.keys(replyOffsets).some((replyId) => replies.some((reply) => reply.id === replyId)) ? <Line stroke="rgba(0,0,0,0.2)" strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={36} y1={52} y2={Math.max(...replies.map((reply) => replyOffsets[reply.id] == null ? 52 : replyOffsets[reply.id] + 32))} /> : null}
+                  </Svg>
+                ) : null}
               </View>;
             }}
           />
@@ -249,12 +275,12 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
             }}
             onSubmitEditing={() => void submit()}
             placeholder={replyTarget ? `Reply to ${replyTarget.authorDisplayName}` : 'Add comment'}
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             style={styles.input}
             value={text}
           />
-          <Pressable disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
-            <Text style={styles.sendText}>↑</Text>
+          <Pressable accessibilityLabel="Send comment" disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
+            <SendIcon height={20} width={20} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -271,7 +297,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backText: { color: colors.text, fontSize: 38, lineHeight: 39, fontWeight: '300' },
   title: { color: colors.text, fontSize: 17, fontWeight: '700' },
   list: { flex: 1 },
-  content: { paddingBottom: 16 },
+  content: { paddingBottom: 16, backgroundColor: colors.canvas },
   empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
   mainReview: { marginBottom: 16, backgroundColor: colors.background },
   reviewAuthorRow: { minHeight: 72, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
@@ -307,31 +333,38 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dishModalRating: { alignSelf: 'flex-start', marginTop: 16, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, overflow: 'hidden', color: '#FFFFFF', backgroundColor: colors.primary, fontSize: 15, fontWeight: '700' },
   dishModalName: { marginTop: 10, color: colors.text, fontSize: 17, fontWeight: '700' },
   reviewText: { paddingHorizontal: 16, color: colors.text, fontSize: 14, lineHeight: 19 },
-  reviewActions: { paddingHorizontal: 16, paddingBottom: 4, flexDirection: 'row', gap: 18 },
+  reviewActions: { paddingHorizontal: 16, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 18 },
   reviewAction: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
-  reviewActionActive: { color: colors.primary },
+  reviewActionIconRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  reviewActionCount: { color: colors.text, fontSize: 14 },
   commentsHeading: { paddingHorizontal: 16, paddingBottom: 10, color: colors.text, fontSize: 18, fontWeight: '700' },
-  row: { padding: 16, flexDirection: 'row', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  nestedRow: { marginLeft: 46, paddingTop: 10, paddingBottom: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45312E' },
+  thread: { position: 'relative' },
+  // Figma's dotted tree connector is positioned over the rows so the nested
+  // row backgrounds cannot hide the vertical segment or its horizontal arms.
+  threadConnector: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  row: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', gap: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.canvas },
+  nestedRow: { paddingLeft: 63 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45312E' },
+  avatarImage: { width: 40, height: 40, borderRadius: 20 },
   initial: { color: colors.onPrimary, fontWeight: '700' },
   copy: { flex: 1, gap: 6 },
   meta: { flexDirection: 'row', justifyContent: 'space-between' },
   author: { color: colors.text, fontWeight: '700' },
   date: { color: colors.textMuted, fontSize: 12 },
   text: { color: colors.text, opacity: 0.82, lineHeight: 19 },
-  actions: { flexDirection: 'row', gap: 18, marginTop: 3 },
-  action: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 3 },
+  action: { color: colors.textSecondary, fontSize: 13 },
   actionActive: { color: colors.primary },
-  repliesToggle: { marginLeft: 62, paddingVertical: 8 },
-  repliesToggleText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  composer: { minHeight: 70, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background },
+  reactionAction: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  reactionCount: { color: colors.text, fontSize: 14 },
+  actionIconRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  caretFlipped: { transform: [{ rotate: '180deg' }] },
+  composer: { height: 89, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 33, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface },
   replyBanner: { position: 'absolute', left: 16, right: 16, top: -30, height: 30, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
   replyBannerText: { flex: 1, color: colors.textMuted, fontSize: 12 },
   replyClose: { color: colors.text, fontSize: 20 },
-  input: { flex: 1, height: 44, paddingHorizontal: 16, borderRadius: theme.radius.pill, color: colors.text, backgroundColor: colors.surfaceRaised },
-  send: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  sendText: { color: colors.onPrimary, fontSize: 23, fontWeight: '700' },
+  input: { flex: 1, height: 40, paddingHorizontal: 14, borderRadius: theme.radius.pill, color: colors.text, backgroundColor: colors.surfaceRaised },
+  send: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   reportScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
   reportSheet: { padding: 18, paddingBottom: 28, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
   reportTitle: { marginBottom: 8, color: colors.text, fontSize: 20, fontWeight: '700' },

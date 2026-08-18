@@ -540,6 +540,7 @@ export interface Comment {
   reviewId: string;
   authorId: string;
   authorDisplayName: string;
+  authorPhotoUrl: string | null;
   parentCommentId: string | null;
   reactionCount: number;
   replyCount: number;

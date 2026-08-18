@@ -18,6 +18,9 @@ import {
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
+import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import HeartIcon from '../../../assets/comments/heart-outline.svg';
+import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -94,7 +97,10 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
     };
   }, [normalizedPath]);
 
-  return uri ? <Image source={{ uri }} style={stylesStatic.dishPhoto} /> : <View style={stylesStatic.dishPhotoPlaceholder} />;
+  // Keep the full dish visible inside the fixed Figma tile. The default
+  // `cover` mode trims the photo edges when its aspect ratio differs from the
+  // tile, which is the slight side-cropping visible in the review carousel.
+  return uri ? <Image resizeMode="contain" source={{ uri }} style={stylesStatic.dishPhoto} /> : <View style={stylesStatic.dishPhotoPlaceholder} />;
 }
 
 function isOfflineError(error: Error) {
@@ -156,20 +162,16 @@ function FeedCard({
         </View>
       ) : null}
       <View style={styles.metrics}>
-        <Pressable disabled={reactionDisabled} onPress={onReaction}>
-          <Text style={[
-            styles.metric,
-            isReactionActive ? styles.metricActive : undefined,
-            reactionDisabled ? styles.metricDisabled : undefined,
-          ]}>
-            ♥ {item.reactionCount}
-          </Text>
+        <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
+          <HeartIcon color={isReactionActive ? colors.primary : colors.text} height={20} width={20} />
+          <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>{item.reactionCount}</Text>
         </Pressable>
-        <Pressable onPress={onComments}>
-          <Text style={styles.metric}>◯ {item.commentCount}</Text>
+        <Pressable onPress={onComments} style={styles.metricIconRow}>
+          <ChatIcon color={colors.text} height={20} width={20} />
+          <Text style={styles.metric}>{item.commentCount}</Text>
         </Pressable>
         <Pressable onPress={onShare}>
-          <Text style={styles.metric}>↗</Text>
+          <ShareIcon color={colors.text} height={20} width={20} />
         </Pressable>
       </View>
     </Pressable>
@@ -552,8 +554,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   dishRating: { color: '#D33B35', fontSize: 12, fontWeight: '700' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised, color: colors.textSecondary, fontSize: 12 },
-  metrics: { paddingTop: 10, flexDirection: 'row', gap: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  metrics: { paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   metric: { color: colors.textMuted, fontSize: 13 },
+  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metricActive: { color: colors.text, fontWeight: '700' },
   metricDisabled: { opacity: 0.5 },
 });

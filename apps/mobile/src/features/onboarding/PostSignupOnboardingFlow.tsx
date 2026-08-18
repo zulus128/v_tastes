@@ -200,6 +200,9 @@ export function PostSignupOnboardingFlow({
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const styles = useOnboardingStyles();
+  const collageWidth = Math.max(0, Math.min(402, viewportWidth));
+  const collageScale = collageWidth / 402;
+  const collageHeight = 288 * collageScale;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const dishGap = usesCompactDishLayout ? 5 : 8;
   const dishPanelHeight = viewportHeight - (usesCompactDishLayout ? 205 : 212) - (usesCompactDishLayout ? 105 : 110);
@@ -663,7 +666,7 @@ export function PostSignupOnboardingFlow({
 
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
     <View style={styles.readyContent}>
-      <Image source={readyCollage} resizeMode="contain" style={styles.reviewCollage} />
+      <Image source={readyCollage} resizeMode="contain" style={{ height: collageHeight, width: collageWidth }} />
       <View style={styles.readyCopy}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
       <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
     </View>
@@ -817,7 +820,6 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
   readyContent: { position: 'absolute', top: 170, left: 0, right: 0, alignItems: 'center' },
-  reviewCollage: { width: '100%', maxWidth: 402, aspectRatio: 402 / 288 },
   readyCopy: { width: '100%', maxWidth: 370, height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24, paddingHorizontal: 16 },
   readyTitle: { width: '100%', color: '#FFFFFF', fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   readySubtitle: { width: '100%', color: '#AAB2C5', fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
