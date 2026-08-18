@@ -254,7 +254,6 @@ export function DiscoverScreen({
           <AiMouthPink height={10} style={styles.aiFabMarkPink} width={13} />
           <AiMouthOutline color={colors.text} height={13} style={styles.aiFabMarkOutline} width={18} />
         </View>
-        <Text style={styles.aiFabText}>Ask AI</Text>
       </Pressable>
       <SeeAllPlacesModal onClose={() => setSeeAllPlaces(null)} onOpenPlace={onOpenPlace} onSave={setSaveTarget} savedVenueIds={savedVenueIds} venues={seeAllPlaces} />
     </View>
@@ -1408,11 +1407,10 @@ function ProfileSuggestion({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  aiFab: { position: 'absolute', right: 16, bottom: 18, height: 48, paddingHorizontal: 15, flexDirection: 'row', gap: 7, alignItems: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },
+  aiFab: { position: 'absolute', right: 16, bottom: 18, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },
   aiFabMark: { width: 20, height: 18 },
   aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
   aiFabMarkOutline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
-  aiFabText: { color: colors.text, fontSize: 13, fontWeight: '700' },
   header: { height: 106, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
   headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
   back: { color: colors.text, fontSize: 38, lineHeight: 40 },
