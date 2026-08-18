@@ -263,7 +263,7 @@ export function CreateReviewScreen({
         <PatternBackgroundLift />
         <ScrollView
           automaticallyAdjustKeyboardInsets
-          contentContainerStyle={[styles.content, { paddingBottom: footerHeight + 16 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: keyboardVisible ? 16 : footerHeight + 16 }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           ref={scrollRef}
@@ -356,7 +356,7 @@ export function CreateReviewScreen({
               style={styles.addDish}
             >
               <AddDishIcon color={colors.text} height={18.0654} width={20} />
-              <Text style={styles.addDishText}>Add Dish</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.addDishText}>Add Dish</Text>
             </Pressable>
           ) : null}
 
@@ -371,20 +371,23 @@ export function CreateReviewScreen({
                   style={[styles.tag, selected && styles.tagSelected]}
                 >
                   <TagGlyph color={selected ? colors.onPrimary : colors.text} value={tag.value} />
-                  <Text style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
         </ScrollView>
 
+        {/* Height is measured (see footerHeight/onLayout above), so a taller button here at
+            larger accessibility text sizes still gets fully reserved-for in the ScrollView's
+            bottom padding instead of overlapping "Add Dish". */}
         {!keyboardVisible ? <LinearGradient
           colors={isDark ? ['rgba(8,8,8,0)', colors.background] : ['rgba(255,255,255,0)', '#FFFFFF']}
           onLayout={({ nativeEvent }) => setFooterHeight(nativeEvent.layout.height)}
           style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}
         >
           <Pressable disabled={!valid || createReview.isPending} onPress={submit} style={[styles.post, (!valid || createReview.isPending) && styles.postDisabled]}>
-            {createReview.isPending ? <ActivityIndicator color="#fff" /> : <Text style={styles.postText}>Post Review</Text>}
+            {createReview.isPending ? <ActivityIndicator color="#fff" /> : <Text maxFontSizeMultiplier={1.3} style={styles.postText}>Post Review</Text>}
           </Pressable>
         </LinearGradient> : null}
 
@@ -448,7 +451,7 @@ export function CreateReviewScreen({
 
 function SectionLabel({ label }: { label: string }) {
   const { colors } = useAppTheme();
-  return <Text style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
+  return <Text maxFontSizeMultiplier={1.3} style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
 }
 
 function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
@@ -479,7 +482,10 @@ function RatingCurve({
   const markerScale = scaleWidth / 359.903;
   return (
     <View style={ratingStyles.wrap}>
-      <Text style={ratingStyles.value}>{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
+      {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt
+          out of font scaling entirely rather than drifting out of alignment with it. Screen
+          readers still get the rating via each star's accessibilityLabel. */}
+      <Text allowFontScaling={false} style={ratingStyles.value}>{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
       <View style={ratingStyles.stars}>
         {Array.from({ length: 5 }, (_, index) => {
           const star = index + 1;
@@ -494,10 +500,10 @@ function RatingCurve({
               style={ratingStyles.starButton}
             >
               <View style={ratingStyles.starGlyph}>
-                <Text style={ratingStyles.starOutline}>☆</Text>
+                <Text allowFontScaling={false} style={ratingStyles.starOutline}>☆</Text>
                 {fill > 0 ? (
                   <View style={[ratingStyles.starFillClip, { width: 26 * fill }]}>
-                    <Text style={ratingStyles.starFill}>★</Text>
+                    <Text allowFontScaling={false} style={ratingStyles.starFill}>★</Text>
                   </View>
                 ) : null}
               </View>
