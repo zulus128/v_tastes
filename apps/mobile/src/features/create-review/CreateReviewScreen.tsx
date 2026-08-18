@@ -295,11 +295,18 @@ export function CreateReviewScreen({
         <PatternBackgroundLift />
         <ScrollView
           automaticallyAdjustKeyboardInsets
-          contentContainerStyle={[styles.content, { paddingBottom: keyboardVisible ? 16 : footerHeight + 16 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: 16 }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
+          // A bottom padding on the content alone only helps once you've actually scrolled to
+          // the end — it doesn't stop the floating "Post Review" button from sitting on top of
+          // whatever unscrolled content happens to render near the screen's bottom edge (e.g.
+          // "Add Dish" on a short form). Shrinking the ScrollView's own viewport by the
+          // footer's height reserves that strip for real, so content can never land under the
+          // button in the first place, scrolled or not.
+          style={{ flex: 1, marginBottom: keyboardVisible ? 0 : footerHeight }}
         >
           <View
             onLayout={({ nativeEvent }) => setHeroSize({ height: nativeEvent.layout.height, width: nativeEvent.layout.width })}
@@ -334,7 +341,7 @@ export function CreateReviewScreen({
                 {/* Fixed-height card above the arc — the venue name/address are capped so a
                     larger accessibility text size can't grow the hero past its designed height
                     and pull the arc out of alignment with the card's rounded bottom. */}
-                <RatingCurve onChange={setRating} value={rating} />
+                <RatingCurve heroWidth={heroSize.width} onChange={setRating} value={rating} />
               </>
             ) : (
               <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.selectPlace}>
