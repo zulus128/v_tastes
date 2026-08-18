@@ -9,6 +9,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -503,13 +504,14 @@ export function ProfileScreen({
         </Pressable>
       </Modal>
       <Modal animationType="fade" onRequestClose={() => setEditingReview(false)} transparent visible={editingReview}>
-        <Pressable onPress={() => setEditingReview(false)} style={styles.actionBackdrop}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.actionBackdrop}>
+          <Pressable onPress={() => setEditingReview(false)} style={StyleSheet.absoluteFill} />
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.editSheet}>
             <Text style={styles.editTitle}>Edit review</Text>
             <TextInput autoFocus multiline onChangeText={setEditText} style={styles.editInput} value={editText} />
             <Pressable disabled={reviewActionPending} onPress={() => void saveReviewEdit()} style={styles.editSave}>{reviewActionPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.editSaveText}>Save</Text>}</Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

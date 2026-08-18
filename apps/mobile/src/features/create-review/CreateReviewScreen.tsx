@@ -52,6 +52,10 @@ import { type DishReviewDraft, useCreateReview } from './api';
 const ratingCircle = { centerX: 169, centerY: -36.8226, radius: 167.8226 };
 const ratingCircleY = (x: number) => ratingCircle.centerY
   + Math.sqrt((ratingCircle.radius ** 2) - ((x - ratingCircle.centerX) ** 2));
+// The hero card's rounded bottom (Figma node 5978:18283, "Rectangle 9946") and the rating
+// arc drawn on top of it are two independently authored curves in the design — 210 is the
+// card's real corner radius per Figma, not derived from the arc's radius.
+const heroCurveRadius = 210;
 const reviewRatingMarkers = [
   { kind: 'dot', value: 1, x: 7, y: ratingCircleY(7) },
   { kind: 'tick', rotation: -30, value: 1.5, x: 25, y: ratingCircleY(25) },
@@ -123,6 +127,10 @@ export function CreateReviewScreen({
   const [dishToRemove, setDishToRemove] = useState<DishReviewDraft | null>(null);
   const [exitPromptOpen, setExitPromptOpen] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Measured rather than a fixed guess: at larger accessibility text sizes the footer's own
+  // text/button grows taller, and a hardcoded padding would stop covering it, letting the
+  // scrolled content (e.g. "Add Dish") show through underneath the "Post Review" button.
+  const [footerHeight, setFooterHeight] = useState(112);
   const [submitError, setSubmitError] = useState<'failed' | 'offline' | null>(null);
   const [success, setSuccess] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('review'));
@@ -255,7 +263,7 @@ export function CreateReviewScreen({
         <PatternBackgroundLift />
         <ScrollView
           automaticallyAdjustKeyboardInsets
-          contentContainerStyle={[styles.content, { paddingBottom: 112 + insets.bottom }]}
+          contentContainerStyle={[styles.content, { paddingBottom: footerHeight + 16 }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           ref={scrollRef}
@@ -268,7 +276,7 @@ export function CreateReviewScreen({
           >
             <View style={styles.navigation}>
               <Pressable accessibilityLabel="Close review" hitSlop={14} onPress={requestClose}><Text style={styles.back}>‹</Text></Pressable>
-              <Text style={styles.title}>Write a Review</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.title}>Write a Review</Text>
               <View style={styles.navigationSpacer} />
             </View>
             {venue ? (
@@ -276,13 +284,16 @@ export function CreateReviewScreen({
                 <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.venueCard}>
                   <Image source={venueImage(venue.imageUrl)} style={styles.venueImage} />
                   <View style={styles.venueCopy}>
-                    <Text numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
-                    <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
+                    <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
+                    <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
                   </View>
                   <View style={styles.edit}>
                     <PenIcon color={colors.text} height={20} width={20} />
                   </View>
                 </Pressable>
+                {/* Fixed-height card above the arc — the venue name/address are capped so a
+                    larger accessibility text size can't grow the hero past its designed height
+                    and pull the arc out of alignment with the card's rounded bottom. */}
                 <RatingCurve onChange={setRating} value={rating} />
               </>
             ) : (
@@ -293,7 +304,7 @@ export function CreateReviewScreen({
                       <SelectPlaceCircle color={colors.text} height={21.5} style={styles.selectPlaceCircle} width={21.5} />
                       <SelectPlacePlus color={colors.text} height={7.5} style={styles.selectPlacePlus} width={7.5} />
                     </View>
-                    <Text style={styles.selectPlaceText}>Select Place</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.selectPlaceText}>Select Place</Text>
                   </View>
                 )}
               </Pressable>
@@ -307,7 +318,6 @@ export function CreateReviewScreen({
             multiline
             onChangeText={setText}
             onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(140, Math.max(50, nativeEvent.contentSize.height)))}
-            onFocus={() => requestAnimationFrame(() => scrollRef.current?.scrollTo({ animated: true, y: 360 }))}
             placeholder="Enter text"
             placeholderTextColor={colors.placeholder}
             scrollEnabled={feedbackHeight >= 140}
@@ -370,6 +380,7 @@ export function CreateReviewScreen({
 
         {!keyboardVisible ? <LinearGradient
           colors={isDark ? ['rgba(8,8,8,0)', colors.background] : ['rgba(255,255,255,0)', '#FFFFFF']}
+          onLayout={({ nativeEvent }) => setFooterHeight(nativeEvent.layout.height)}
           style={[styles.footer, { paddingBottom: Math.max(16, insets.bottom) }]}
         >
           <Pressable disabled={!valid || createReview.isPending} onPress={submit} style={[styles.post, (!valid || createReview.isPending) && styles.postDisabled]}>
@@ -899,8 +910,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   screen: { flex: 1, backgroundColor: isDark ? colors.background : colors.canvas },
   patternImage: { opacity: isDark ? 1 : 0.06, resizeMode: 'repeat', tintColor: '#161616' },
   content: { flexGrow: 1 },
-  hero: { minHeight: 438, paddingHorizontal: 16, borderBottomLeftRadius: 210, borderBottomRightRadius: 210, overflow: 'hidden' },
-  heroBorder: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.18)' : colors.border, borderBottomLeftRadius: 210, borderBottomRightRadius: 210 },
+  hero: { minHeight: 438, paddingHorizontal: 16, borderBottomLeftRadius: heroCurveRadius, borderBottomRightRadius: heroCurveRadius, overflow: 'hidden' },
+  heroBorder: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.18)' : colors.border, borderBottomLeftRadius: heroCurveRadius, borderBottomRightRadius: heroCurveRadius },
   navigation: { height: 54, flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontSize: 36, lineHeight: 38 },
   title: { flex: 1, color: colors.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },

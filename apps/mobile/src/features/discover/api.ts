@@ -1,5 +1,5 @@
 import type { DiscoverTag, PlaceReview } from '@tastes/contracts';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
 
 export const discoverFeedQueryKey = (userId: string) => ['discover', 'feed', userId] as const;
@@ -92,6 +92,10 @@ export function usePlaceReviews(venueId: string, sort: 'highest' | 'lowest' | 'p
     ).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     select: (data) => data.pages.flatMap(normalizePlaceReviewPage),
+    // Switching sort/scope changes the query key; without this, the whole
+    // toolbar+list would briefly get swapped for the loading spinner every
+    // time, leaving a jarring blank gap where the previous reviews were.
+    placeholderData: keepPreviousData,
   });
 }
 

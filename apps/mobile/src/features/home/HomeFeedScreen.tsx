@@ -4,6 +4,8 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -222,7 +224,7 @@ function ReportSheet({
 }) {
   const showDetails = selectedReason === 'Something else';
   return (
-    <View style={overlayStyles.scrim}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={overlayStyles.scrim}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
       <View style={overlayStyles.reportSheet}>
         <Text style={overlayStyles.sheetTitle}>Why are you reporting this post?</Text>
@@ -258,7 +260,7 @@ function ReportSheet({
           </Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
