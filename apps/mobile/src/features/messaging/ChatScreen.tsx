@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  AccessibilityInfo,
+  Easing,
   FlatList,
   Image,
   ImageBackground,
@@ -42,6 +45,72 @@ function MessageBubble({ item, mine, read, styles }: { item: ChatMessage; mine: 
     </View>
   );
 }
+
+function TypingIndicator({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  const progress = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.forEach((value) => value.setValue(0.65));
+      return undefined;
+    }
+    const animations = progress.map((value, index) => Animated.loop(Animated.sequence([
+      Animated.delay(index * 140),
+      Animated.timing(value, {
+        duration: 280,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(value, {
+        duration: 280,
+        easing: Easing.in(Easing.quad),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.delay((2 - index) * 140),
+    ])));
+    animations.forEach((animation) => animation.start());
+    return () => animations.forEach((animation) => animation.stop());
+  }, [progress, reduceMotion]);
+
+  return (
+    <View
+      accessibilityLabel="Someone is typing"
+      accessibilityLiveRegion="polite"
+      accessibilityRole="text"
+      style={[styles.messageRow, styles.theirRow]}
+    >
+      <View style={styles.typingBubble}>
+        {progress.map((value, index) => (
+          <Animated.View
+            key={index}
+            style={[
+              styles.typingDot,
+              {
+                opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.42, 1] }),
+                transform: [{
+                  translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }),
+                }],
+              },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+type ChatListItem =
+  | { kind: 'typing' }
+  | { kind: 'message'; message: ChatMessage };
 
 export function ChatScreen({
   conversationId,
@@ -87,6 +156,10 @@ export function ChatScreen({
   const typingStatusAvailable = useRef(true);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeActivityPreview = useCallback(() => setActivityPreviewOpen(false), []);
+  const listItems = useMemo<ChatListItem[]>(() => [
+    ...(someoneTyping ? [{ kind: 'typing' } as const] : []),
+    ...messageItems.map((message) => ({ kind: 'message' as const, message })),
+  ], [messageItems, someoneTyping]);
 
   useEffect(() => subscribeConversationDetails(
     conversationId,
@@ -194,7 +267,6 @@ export function ChatScreen({
         >
           <View style={styles.headerCopy}>
             <Text numberOfLines={1} style={styles.headerName}>{activity?.title ?? groupTitle ?? participant?.displayName ?? 'Conversation'}</Text>
-            {someoneTyping ? <Text numberOfLines={1} style={styles.headerUsername}>Typing…</Text> : null}
           </View>
           {participant?.photoUrl ? (
             <Image source={{ uri: participant.photoUrl }} style={styles.headerAvatar} />
@@ -223,11 +295,11 @@ export function ChatScreen({
         ) : (
           <FlatList
             style={styles.messages}
-            contentContainerStyle={[styles.messagesContent, messageItems.length === 0 && styles.emptyMessages]}
-            data={messageItems}
+            contentContainerStyle={[styles.messagesContent, listItems.length === 0 && styles.emptyMessages]}
+            data={listItems}
             initialNumToRender={16}
-            inverted={messageItems.length > 0}
-            keyExtractor={(item) => item.id}
+            inverted={listItems.length > 0}
+            keyExtractor={(item) => item.kind === 'typing' ? 'typing-indicator' : item.message.id}
             maxToRenderPerBatch={12}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
@@ -243,7 +315,9 @@ export function ChatScreen({
             }}
             onEndReachedThreshold={0.5}
             windowSize={9}
-            renderItem={({ item }) => <MessageBubble item={item} mine={item.senderId === userId} read={item.senderId === userId && item.id === lastMessageId && readByCount > 0} styles={styles} />}
+            renderItem={({ item }) => item.kind === 'typing'
+              ? <TypingIndicator styles={styles} />
+              : <MessageBubble item={item.message} mine={item.message.senderId === userId} read={item.message.senderId === userId && item.message.id === lastMessageId && readByCount > 0} styles={styles} />}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -294,7 +368,6 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     headerInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },
     headerCopy: { flex: 1, marginLeft: 4, marginRight: 8, alignItems: 'center' },
     headerName: { color: colors.text, fontSize: 17, fontWeight: '500', textAlign: 'center' },
-    headerUsername: { color: colors.textMuted, marginTop: 1, fontSize: 11 },
     messages: { flex: 1 },
     messagesContent: { paddingHorizontal: 14, paddingVertical: 12 },
     emptyMessages: { flexGrow: 1 },
@@ -305,6 +378,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     bubble: { maxWidth: '82%', minWidth: 72, paddingHorizontal: 13, paddingTop: 9, paddingBottom: 6, borderRadius: 19 },
     mineBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
     theirBubble: { backgroundColor: colors.surfaceRaised, borderBottomLeftRadius: 5 },
+    typingBubble: { height: 38, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 19, borderBottomLeftRadius: 5, backgroundColor: colors.surfaceRaised },
+    typingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.textMuted },
     messageText: { color: colors.text, fontSize: 16, lineHeight: 21 },
     mineText: { color: colors.onPrimary },
     messageTime: { color: colors.textMuted, marginTop: 3, fontSize: 10, textAlign: 'right' },
