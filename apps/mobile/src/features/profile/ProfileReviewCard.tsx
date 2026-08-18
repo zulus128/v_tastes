@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
+import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
@@ -86,7 +87,7 @@ export function ProfileReviewCard({
           <Text style={styles.reviewAuthor}>{profile.displayName}</Text>
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
         </View>
-        <Text style={styles.reviewDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        <Text style={styles.reviewDate}>{formatDisplayDate(item.createdAt)}</Text>
         <Pressable accessibilityLabel="Review actions" onPress={onMore}><Text style={styles.moreGlyph}>⋮</Text></Pressable>
       </View>
       <View style={styles.reviewBody}>

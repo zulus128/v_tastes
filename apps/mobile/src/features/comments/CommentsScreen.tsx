@@ -22,6 +22,7 @@ import {
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { formatDisplayDate } from '../../infrastructure/date';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -89,7 +90,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     <View style={styles.reviewAuthorRow}>
       {review.authorPhotoUrl ? <Image source={{ uri: review.authorPhotoUrl }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><Text style={styles.reviewAvatarInitial}>{review.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
       <View style={styles.reviewAuthorCopy}><Text style={styles.reviewAuthor}>{review.authorDisplayName}</Text><Text style={styles.reviewUsername}>{review.authorUsername ? `@${review.authorUsername}` : 'Tastes member'}</Text></View>
-      <Text style={styles.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+      <Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text>
     </View>
     <View style={styles.reviewBody}>
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(review.rating)))}<Text style={styles.reviewEmptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(review.rating)))}</Text></Text></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
@@ -124,7 +125,7 @@ function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport
       <View style={styles.copy}>
         <View style={styles.meta}>
           <Text style={styles.author}>{item.authorDisplayName}</Text>
-          <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
         </View>
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
+import { formatDisplayDate } from '../../infrastructure/date';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
@@ -296,7 +297,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
         </View>
         <Text style={styles.detailsTitle}>{group.name}</Text>
         <Text style={styles.detailsSubtitle}>
-          {group.members.length} members · Created {new Date(group.createdAt).toLocaleDateString()}
+          {group.members.length} members · Created {formatDisplayDate(group.createdAt)}
         </Text>
         <Pressable onPress={() => onOpenConversation(groupId)} style={styles.primaryOutline}>
           <Text style={styles.primaryOutlineText}>Open group chat</Text>

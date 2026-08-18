@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
+import { formatDisplayDate } from '../../infrastructure/date';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -130,7 +131,7 @@ function FeedCard({
         <Image source={avatar} style={styles.avatar} />
         <View style={styles.authorCopy}>
           <Text style={styles.author}>{item.authorDisplayName}</Text>
-          <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
         </View>
         <Text style={styles.rating}>{'★'.repeat(Math.round(item.rating))}</Text>
       </View>
