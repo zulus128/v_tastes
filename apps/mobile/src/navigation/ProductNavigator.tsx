@@ -270,6 +270,7 @@ function MainTabs({
                   initialFollowing: profileFollowing,
                   userId: profileUserId,
                 })}
+                onContinueDraft={() => navigation.navigate('Create')}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}
               />

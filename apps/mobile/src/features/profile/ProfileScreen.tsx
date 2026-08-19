@@ -4,6 +4,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +39,7 @@ import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
+import { useFocusEffect } from '@react-navigation/native';
 
 type ProfileTab = 'reviews' | 'map' | 'wishlist';
 type MapFilter = 'trending' | 'restaurant' | 'cafe' | 'bar' | 'my-reviews';
@@ -54,6 +56,7 @@ const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.p
 const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
 const FALLBACK_MAP_REGION = { latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 };
 const MAP_FOCUS_PIN_LIMIT = 5;
+const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
 
 function hasMapCoordinates(venue: Venue): venue is Venue & { latitude: number; longitude: number } {
   return typeof venue.latitude === 'number'
@@ -112,6 +115,7 @@ export function ProfileScreen({
   onOpenFilters,
   onOpenPlace,
   onOpenProfile,
+  onContinueDraft,
   onSettings,
   targetUserId,
 }: {
@@ -125,6 +129,7 @@ export function ProfileScreen({
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (userId: string, following: boolean) => void;
+  onContinueDraft: () => void;
   onSettings: () => void;
   targetUserId: string;
 }) {
@@ -151,8 +156,23 @@ export function ProfileScreen({
   const [reviewActionPending, setReviewActionPending] = useState(false);
   const [favoritePlaceName, setFavoritePlaceName] = useState<string | null>(null);
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<{ venueName: string; text: string } | null>(null);
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
+  useFocusEffect(useMemo(() => () => {
+    if (!own) return undefined;
+    let active = true;
+    void AsyncStorage.getItem(`${REVIEW_DRAFT_KEY_PREFIX}${currentUserId}`).then((stored) => {
+      if (!active) return;
+      try {
+        const value = stored ? JSON.parse(stored) as { selectedVenue?: { name?: string }; text?: string } : null;
+        setDraft(value?.text?.trim() ? { venueName: value.selectedVenue?.name ?? 'Untitled place', text: value.text.trim() } : null);
+      } catch {
+        setDraft(null);
+      }
+    });
+    return () => { active = false; };
+  }, [currentUserId, own]));
   useEffect(() => {
     if (activeTab !== 'map') return;
     const venueIds = [...new Set(profileReviews.reviews.map((review) => review.venueId))];
@@ -272,14 +292,15 @@ export function ProfileScreen({
     }
   }
 
-  async function unpinReview() {
+  async function togglePinnedReview() {
     if (!selectedReview || reviewActionPending) return;
+    const pinned = !selectedReview.pinned;
     setReviewActionPending(true);
     try {
-      await api.setReviewPinned({ reviewId: selectedReview.id, pinned: false });
+      await api.setReviewPinned({ reviewId: selectedReview.id, pinned });
       setSelectedReview(null);
     } catch (error) {
-      Alert.alert('Could not unpin review', apiErrorMessage(error));
+      Alert.alert(`Could not ${pinned ? 'pin' : 'unpin'} review`, apiErrorMessage(error));
     } finally {
       setReviewActionPending(false);
     }
@@ -381,7 +402,12 @@ export function ProfileScreen({
           initialNumToRender={6}
           keyExtractor={(review) => review.id}
           maxToRenderPerBatch={6}
-          ListHeaderComponent={<>{profileHeader}{controls}</>}
+          ListHeaderComponent={<>{profileHeader}{controls}{own && draft ? <View style={styles.draftCard}>
+            <View style={styles.draftHeader}><Text style={styles.draftAuthor}>{profile.displayName}</Text><Text style={styles.draftDate}>Draft</Text></View>
+            <Text style={styles.draftVenue}>{draft.venueName}</Text>
+            <Text numberOfLines={3} style={styles.draftText}>{draft.text}</Text>
+            <Pressable accessibilityRole="button" onPress={onContinueDraft} style={styles.continueDraft}><Text style={styles.continueDraftText}>Continue editing  →</Text></Pressable>
+          </View> : null}</>}
           ListEmptyComponent={!profileReviews.loading ? <View style={styles.empty}><Text style={styles.emptyTitle}>No reviews yet</Text><Text style={styles.emptyCopy}>{own ? 'Your reviews will appear here.' : 'This person has not posted a review yet.'}</Text></View> : null}
           ListFooterComponent={profileReviews.loading || profileReviews.loadingMore ? <ActivityIndicator color={colors.primary} style={styles.listLoader} /> : profileReviews.error ? <Pressable onPress={() => void profileReviews.loadMore()} style={styles.retryButton}><Text style={styles.retryText}>Try loading more</Text></Pressable> : null}
           onEndReached={() => void profileReviews.loadMore()}
@@ -496,7 +522,7 @@ export function ProfileScreen({
         <Pressable onPress={() => setSelectedReview(null)} style={styles.reviewActionBackdrop}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>
             <Pressable onPress={() => { setEditText(selectedReview?.text ?? ''); setEditingReview(true); }} style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}><PencilIcon color={colors.text} /><Text style={styles.actionText}>Edit</Text></Pressable>
-            <Pressable disabled={reviewActionPending} onPress={() => void unpinReview()} style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}><PinIcon color={colors.text} /><Text style={styles.actionText}>Unpin</Text></Pressable>
+            <Pressable disabled={reviewActionPending} onPress={() => void togglePinnedReview()} style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}><PinIcon color={colors.text} /><Text style={styles.actionText}>{selectedReview?.pinned ? 'Unpin' : 'Pin'}</Text></Pressable>
             <Pressable disabled={reviewActionPending} onPress={confirmDeleteReview} style={({ pressed }) => [styles.actionRow, styles.deleteAction, pressed && styles.actionPressed]}><TrashIcon color={actionDangerColor} /><Text style={styles.deleteActionText}>Delete</Text></Pressable>
             <View style={styles.actionDivider} />
             <Pressable onPress={() => setSelectedReview(null)} style={({ pressed }) => [styles.actionRow, styles.cancelAction, pressed && styles.actionPressed]}><Text style={styles.actionText}>Cancel</Text></Pressable>
@@ -540,6 +566,14 @@ const createStyles = (colors: ThemeColors) => {
   mapFilterTextActive: { color: '#FFFFFF' },
   reviewList: { gap: 14 },
   reviewItem: { paddingHorizontal: 15 },
+  draftCard: { marginHorizontal: 15, padding: 16, borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: isDark ? '#241111' : '#FFF3F1' },
+  draftHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  draftAuthor: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  draftDate: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.primary, color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  draftVenue: { marginTop: 16, color: colors.text, fontSize: 17, fontWeight: '700' },
+  draftText: { marginTop: 8, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  continueDraft: { alignSelf: 'flex-start', marginTop: 14 },
+  continueDraftText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   listLoader: { marginVertical: 36 },
   empty: { minHeight: 220, marginHorizontal: 16, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
