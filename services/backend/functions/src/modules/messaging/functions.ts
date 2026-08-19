@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import {
+  allowsNotification,
   createConversationInputSchema,
   getMessagesInputSchema,
   hideConversationInputSchema,
   listConversationsInputSchema,
   markConversationReadInputSchema,
   registerPushTokenInputSchema,
+  renderNotificationCopy,
   sendMessageInputSchema,
   setTypingStatusInputSchema,
   unregisterPushTokenInputSchema,
@@ -17,6 +19,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db, firestoreDatabaseId } from '../../shared/firebase';
 import { enforceRateLimit, idempotentDocumentId } from '../../shared/mutations';
+import { notificationPreferences, sendNotification } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
@@ -438,6 +441,7 @@ export const registerPushToken = onCall(callableOptions, async (request) => {
   const tokenId = pushTokenId(input.token);
   const tokenRef = userRef.collection('pushTokens').doc(tokenId);
   const registryRef = db.collection('_pushTokens').doc(tokenId);
+  let isNewDevice = false;
 
   await db.runTransaction(async (transaction) => {
     const [profile, registry, existing] = await Promise.all([
@@ -462,7 +466,21 @@ export const registerPushToken = onCall(callableOptions, async (request) => {
       updatedAt: now,
     }, { merge: true });
     transaction.set(registryRef, { uid, updatedAt: now });
+    isNewDevice = !existing.exists;
   });
+  if (isNewDevice) {
+    const knownTokens = await userRef.collection('pushTokens').limit(2).get();
+    // The very first device of an account is the sign-up itself, not a new sign-in.
+    if (knownTokens.size > 1) {
+      await sendNotification({
+        recipientId: uid,
+        type: 'new-sign-in',
+        eventKey: tokenId,
+        params: { device: input.platform },
+        targetId: uid,
+      });
+    }
+  }
   return { registered: true };
 });
 
@@ -506,11 +524,21 @@ export const pushMessageNotification = onDocumentCreated({
     return;
   }
 
+  const recipient = await db.collection('users').doc(recipientId).get();
+  if (!allowsNotification(notificationPreferences(recipient), 'message', 'push')) {
+    await notification.ref.update({ pushStatus: 'suppressed', pushUpdatedAt: FieldValue.serverTimestamp() });
+    return;
+  }
+  const copy = renderNotificationCopy('message', {
+    actor: String(notification.get('actorDisplayName') ?? 'Someone'),
+    text: String(notification.get('preview') ?? ''),
+  });
+
   const messages = tokens.docs.map((token) => ({
     to: String(token.get('token')),
     sound: 'default',
-    title: 'Tastes',
-    body: 'You have a new message.',
+    title: copy.title,
+    body: copy.body,
     data: {
       type: 'message',
       conversationId: String(notification.get('conversationId') ?? ''),

@@ -5,8 +5,14 @@ import * as backendExports from '../../services/backend/functions/src';
 const nonCallableExports = new Set([
   'ingestMobileTelemetry',
   'pushMessageNotification',
+  'pushUserNotification',
+  'refreshLeaderboardStandings',
   'reinstateExpiredSuspensions',
   'resetMonthlyXp',
+  'sendMonthlyRecapNotifications',
+  'sendMonthlyRecapReminders',
+  'sendReminderNotifications',
+  'sendTrendingSavedPlaceNotifications',
 ]);
 
 describe('callable operation registry', () => {

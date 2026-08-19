@@ -25,6 +25,7 @@ if (seedRemote) {
   process.env.GCLOUD_PROJECT ??= 'demo-tastes';
 }
 
+import { notificationCatalog, renderNotificationCopy } from '@tastes/contracts';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
@@ -923,15 +924,40 @@ async function main() {
     }, { merge: true }),
   ));
 
-  const notificationSeeds = [
-    { id: 'new-comment', kind: 'comment', title: 'Kristin commented on your review', body: '“Adding this to my list.”', targetType: 'comments', targetId: 'discover-review-gemini', unread: true, minutesAgo: 12 },
-    { id: 'new-follower', kind: 'follow', title: 'Cameron started following you', body: 'You share a taste for handmade pasta.', targetType: 'profile', targetId: 'discover-cameron', unread: true, minutesAgo: 48 },
-    { id: 'activity-invite', kind: 'invite', title: 'Dinner plan invitation', body: 'Wade invited you to Friday night dinner.', targetType: 'activity', targetId: 'seed-friday-dinner', unread: false, minutesAgo: 180 },
-    { id: 'monthly-recap', kind: 'reward', title: 'Your monthly recap is ready', body: 'See the places and flavours that made your month.', targetType: 'recap', targetId: 'monthly', unread: false, minutesAgo: 1_440 },
-    { id: 'badge-city-explorer', kind: 'reward', title: 'City Explorer unlocked', body: 'You reviewed places in five different areas.', targetType: 'recap', targetId: 'monthly', unread: true, minutesAgo: 2_880 },
-    { id: 'badge-tiramisu', kind: 'reward', title: 'Tiramisu Connaisseur unlocked', body: 'Your dessert hunt earned a new badge.', targetType: 'recap', targetId: 'monthly', unread: false, minutesAgo: 4_320 },
-    { id: 'weekend-pick', kind: 'system', title: 'Devon shared a weekend pick', body: 'A hidden café that matches your taste is waiting.', targetType: 'profile', targetId: 'discover-devon', unread: false, minutesAgo: 5_760 },
-  ] as const;
+  const notificationSeeds = ([
+    { id: 'new-comment', type: 'review-comment', actorId: 'discover-kristin', actorName: 'Kristin Watson', params: { text: 'Adding this to my list.' }, targetId: 'discover-review-gemini', unread: true, minutesAgo: 12 },
+    { id: 'new-follower', type: 'follow-new', actorId: 'discover-cameron', actorName: 'Cameron Williamson', params: {}, targetId: 'discover-cameron', unread: true, minutesAgo: 48 },
+    { id: 'review-like', type: 'review-like', actorId: 'discover-devon', actorName: 'Devon Lane', params: { place: 'Wasabi by Morimoto' }, targetId: 'discover-review-gemini', unread: true, minutesAgo: 90 },
+    { id: 'group-invite', type: 'group-added', actorId: 'discover-kristin', actorName: 'Kristin Watson', params: { group: 'Weekend Foodies' }, targetId: 'weekend-foodies', unread: false, minutesAgo: 180 },
+    { id: 'saved-place-trending', type: 'saved-place-trending', actorId: null, actorName: null, params: { place: 'Coffee Bar 940', city: 'Monaco' }, targetId: 'coffee-bar-940', unread: true, minutesAgo: 600 },
+    { id: 'monthly-recap', type: 'recap-ready', actorId: null, actorName: null, params: { month: 'August' }, targetId: 'monthly', unread: false, minutesAgo: 1_440 },
+    { id: 'badge-city-explorer', type: 'badge-unlocked', actorId: null, actorName: null, params: { badge: 'City Explorer' }, targetId: 'city', unread: true, minutesAgo: 2_880 },
+    { id: 'badge-tiramisu', type: 'badge-unlocked', actorId: null, actorName: null, params: { badge: 'Tiramisu Connaisseur' }, targetId: 'tiramisu', unread: false, minutesAgo: 4_320 },
+    { id: 'level-up', type: 'level-up', actorId: null, actorName: null, params: { level: 6 }, targetId: '6', unread: false, minutesAgo: 5_000 },
+    { id: 'partner-offer', type: 'partner-offer', actorId: null, actorName: null, params: { offer: '20% off', place: 'Coffee Bar 940', text: 'This week only.' }, targetId: 'coffee-bar-940', unread: false, minutesAgo: 5_760 },
+  ] as const).map((notification) => {
+    const definition = notificationCatalog[notification.type];
+    const copy = renderNotificationCopy(notification.type, {
+      actor: notification.actorName,
+      ...notification.params,
+    });
+    return {
+      id: notification.id,
+      type: notification.type,
+      kind: definition.kind,
+      group: definition.group,
+      category: definition.category,
+      channels: [...definition.channels],
+      title: copy.title,
+      body: copy.body,
+      actorId: notification.actorId,
+      actorName: notification.actorName,
+      targetType: definition.targetType,
+      targetId: notification.targetId,
+      unread: notification.unread,
+      minutesAgo: notification.minutesAgo,
+    };
+  });
   const requestSeeds = [
     { id: 'weekend-foodies-invite', kind: 'group', title: 'Weekend Foodies', body: 'Kristin invited you to join the group.', senderName: 'Kristin Watson', targetId: 'weekend-foodies' },
     { id: 'friday-dinner-invite', kind: 'activity', title: 'Friday night dinner', body: 'Wade invited you to a shared activity.', senderName: 'Wade Warren', targetId: 'seed-friday-dinner' },

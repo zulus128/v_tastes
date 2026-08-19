@@ -43,6 +43,7 @@ import SuccessMouthOutline from '../../../assets/create-review/success-mouth-out
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { cancelDraftReminder, scheduleDraftReminder } from '../../infrastructure/pushNotifications';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
@@ -227,6 +228,7 @@ export function CreateReviewScreen({
     setSuccess(false);
     setSubmitError(null);
     void AsyncStorage.removeItem(reviewDraftKey(userId));
+    void cancelDraftReminder();
   }
 
   async function persistDraft() {
@@ -241,6 +243,7 @@ export function CreateReviewScreen({
     };
     try {
       await AsyncStorage.setItem(reviewDraftKey(userId), JSON.stringify(draft));
+      await scheduleDraftReminder(venue?.name ?? selectedVenue?.name ?? '');
     } catch {
       // Leaving the form should not be blocked if local storage is unavailable.
     }

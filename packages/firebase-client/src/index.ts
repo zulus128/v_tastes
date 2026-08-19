@@ -77,6 +77,8 @@ import type {
   TastesGroup,
   GroupInput,
   NotificationInput,
+  SavedPlaceProximityInput,
+  SendCampaignNotificationInput,
   ProfileExtrasResult,
   ProfileExtrasInput,
   RequestInput,
@@ -146,6 +148,8 @@ export const callableOperationNames = [
   'submitUserVenue',
   'getPlaceReviews',
   'askTastesAi',
+  'reportSavedPlaceProximity',
+  'sendCampaignNotification',
   'listNotifications',
   'markNotificationRead',
   'clearNotifications',
@@ -383,6 +387,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<GetPlaceReviewsInput, Page<PlaceReview>>('getPlaceReviews', input),
     askTastesAi: (input: AskTastesAiInput) =>
       invoke<AskTastesAiInput, TastesAiAnswer>('askTastesAi', input),
+    reportSavedPlaceProximity: (input: SavedPlaceProximityInput) =>
+      invoke<SavedPlaceProximityInput, { notified: boolean }>('reportSavedPlaceProximity', input),
+    sendCampaignNotification: (input: SendCampaignNotificationInput) =>
+      invoke<SendCampaignNotificationInput, { type: string; recipients: number }>('sendCampaignNotification', input),
     listNotifications: (input: ListNotificationsInput = { limit: 20 }) => invoke<ListNotificationsInput, Page<AppNotification>>('listNotifications', input),
     markNotificationRead: (input: NotificationInput) => invoke<NotificationInput, IdResult>('markNotificationRead', input),
     clearNotifications: () => invoke<Record<string, never>, { cleared: number }>('clearNotifications', {}),

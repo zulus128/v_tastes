@@ -1,4 +1,15 @@
 import { z } from 'zod';
+import {
+  notificationCategoryPreferencesSchema,
+  type NotificationCategory,
+  type NotificationGroup,
+  type NotificationKind,
+  type NotificationPreferences,
+  type NotificationTargetType,
+  type NotificationType,
+} from './notifications';
+
+export * from './notifications';
 
 export const userProfileSchema = z.object({
   uid: z.string().min(1),
@@ -356,6 +367,18 @@ export const askTastesAiInputSchema = z.object({
 });
 
 export const notificationInputSchema = z.object({ notificationId: z.string().min(1).max(128) });
+export const sendCampaignNotificationInputSchema = z.object({
+  type: z.enum(['city-launched', 'new-feature', 'partner-offer']),
+  city: z.string().trim().min(2).max(120).optional(),
+  venueId: z.string().trim().min(1).max(128).optional(),
+  feature: z.string().trim().max(120).optional(),
+  offer: z.string().trim().max(120).optional(),
+  text: z.string().trim().max(280).optional(),
+});
+export const savedPlaceProximityInputSchema = z.object({
+  venueId: z.string().trim().min(1).max(128),
+  event: z.enum(['arrived', 'left']),
+});
 export const requestInputSchema = z.object({ requestId: z.string().min(1).max(128), response: z.enum(['accepted', 'declined']) });
 export const createGroupInputSchema = z.object({
   name: z.string().trim().min(2).max(60),
@@ -365,6 +388,7 @@ export const groupInputSchema = z.object({ groupId: z.string().min(1).max(128) }
 export const updateGroupMembersInputSchema = groupInputSchema.extend({ memberIds: z.array(z.string().min(1).max(128)).max(50) });
 export const updateNotificationPreferencesInputSchema = z.object({
   enabled: z.boolean(), push: z.boolean(), email: z.boolean(), sms: z.boolean(),
+  categories: notificationCategoryPreferencesSchema.optional(),
 });
 export const reportCommentInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
@@ -458,6 +482,8 @@ export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
 export type CompleteOnboardingInput = z.infer<typeof completeOnboardingInputSchema>;
 export type AskTastesAiInput = z.infer<typeof askTastesAiInputSchema>;
 export type NotificationInput = z.infer<typeof notificationInputSchema>;
+export type SavedPlaceProximityInput = z.infer<typeof savedPlaceProximityInputSchema>;
+export type SendCampaignNotificationInput = z.infer<typeof sendCampaignNotificationInputSchema>;
 export type RequestInput = z.infer<typeof requestInputSchema>;
 export type CreateGroupInput = z.infer<typeof createGroupInputSchema>;
 export type GroupInput = z.infer<typeof groupInputSchema>;
@@ -499,7 +525,22 @@ export interface TastesAiAnswer {
   places: TastesAiPlace[];
 }
 
-export interface AppNotification { id: string; kind: 'comment' | 'follow' | 'invite' | 'reward' | 'system'; title: string; body: string; targetType: 'comments' | 'profile' | 'activity' | 'recap' | null; targetId: string | null; unread: boolean; createdAt: string; }
+export interface AppNotification {
+  id: string;
+  /** Catalog entry the notification was raised from; `null` for legacy rows written before the catalog. */
+  type: NotificationType | null;
+  kind: NotificationKind;
+  group: NotificationGroup | null;
+  category: NotificationCategory | null;
+  title: string;
+  body: string;
+  actorId: string | null;
+  actorName: string | null;
+  targetType: NotificationTargetType | null;
+  targetId: string | null;
+  unread: boolean;
+  createdAt: string;
+}
 export interface AppRequest { id: string; kind: 'activity' | 'group'; title: string; body: string; senderName: string; targetId: string; createdAt: string; }
 export interface MonthlyRecapPlace { venueId: string; name: string; address: string; rating: number; imageUrl: string | null; area: string; }
 export interface MonthlyRecapDish { name: string; rating: number; imageUrl: string | null; }
@@ -520,7 +561,6 @@ export interface MonthlyRecapResult {
 }
 export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
 export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; createdAt: string; }
-export interface NotificationPreferences { enabled: boolean; push: boolean; email: boolean; sms: boolean; }
 export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
 export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
 export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }

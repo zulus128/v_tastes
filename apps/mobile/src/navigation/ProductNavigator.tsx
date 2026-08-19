@@ -98,7 +98,14 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
   config: {
     screens: {
-      MainTabs: '',
+      MainTabs: {
+        path: '',
+        screens: {
+          Profile: 'users/:userId',
+        },
+      },
+      Notifications: 'notifications',
+      Requests: 'requests',
       Comments: 'reviews/:reviewId/comments',
       Recap: 'recap/:mode',
       Leaderboard: 'leaderboard',
@@ -391,19 +398,57 @@ export function ProductNavigator({ user }: { user: User }) {
             <NotificationsScreen
               onBack={navigation.goBack}
               onOpenTarget={(item) => {
-                if (item.targetType === 'comments' && item.targetId)
-                  navigation.navigate('Comments', { reviewId: item.targetId });
-                else if (item.targetType === 'profile' && item.targetId)
-                  navigation.navigate('MainTabs', {
-                    screen: 'Profile',
-                    params: { userId: item.targetId },
-                  });
-                else if (item.targetType === 'activity' && item.targetId)
-                  navigation.navigate('ActivityDetails', {
-                    activityId: item.targetId,
-                  });
-                else if (item.targetType === 'recap')
-                  navigation.navigate('Recap', { mode: 'ready' });
+                const targetId = item.targetId ?? '';
+                switch (item.targetType) {
+                  case 'comments':
+                  case 'review':
+                    if (targetId) navigation.navigate('Comments', { reviewId: targetId });
+                    break;
+                  case 'profile':
+                    if (targetId)
+                      navigation.navigate('MainTabs', {
+                        screen: 'Profile',
+                        params: { userId: targetId },
+                      });
+                    break;
+                  case 'activity':
+                    if (targetId) navigation.navigate('ActivityDetails', { activityId: targetId });
+                    break;
+                  case 'place':
+                    if (targetId) navigation.navigate('Place', { venueId: targetId });
+                    break;
+                  case 'chat':
+                    if (targetId) navigation.navigate('Conversation', { conversationId: targetId });
+                    break;
+                  case 'recap':
+                    navigation.navigate('Recap', { mode: 'ready' });
+                    break;
+                  case 'leaderboard':
+                  case 'rewards':
+                    navigation.navigate('Leaderboard');
+                    break;
+                  case 'requests':
+                  case 'messageRequests':
+                    navigation.navigate('Requests');
+                    break;
+                  case 'discover':
+                    navigation.navigate('MainTabs', { screen: 'Discover' });
+                    break;
+                  case 'compose':
+                  case 'draft':
+                    navigation.navigate('MainTabs', {
+                      screen: 'Create',
+                      params: targetId ? { venueId: targetId } : undefined,
+                    });
+                    break;
+                  case 'settings':
+                  case 'account':
+                  case 'moderation':
+                    navigation.navigate('MainTabs', { screen: 'Profile' });
+                    break;
+                  default:
+                    break;
+                }
               }}
             />
           )}

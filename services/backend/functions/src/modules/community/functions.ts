@@ -8,6 +8,9 @@ import {
   updateGroupMembersInputSchema,
   updateNotificationPreferencesInputSchema,
   profileExtrasInputSchema,
+  defaultNotificationPreferences,
+  isNotificationType,
+  notificationCatalog,
   type AppNotification,
   type AppRequest,
   type ProfileExtrasResult,
@@ -20,35 +23,11 @@ import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
+import { notificationPreferences, sendNotification, sendNotifications } from '../../shared/notifications';
+import { computeRewards, levelForXp } from '../../shared/rewards';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
-const defaultPreferences = {
-  enabled: true,
-  push: true,
-  email: true,
-  sms: false,
-};
-
-function progress(value: number, target: number): number {
-  return Math.min(1, value / target);
-}
-
-function reviewText(document: FirebaseFirestore.QueryDocumentSnapshot): string {
-  const dishNames = Array.isArray(document.get('dishNames')) ? document.get('dishNames') : [];
-  const dishReviews = Array.isArray(document.get('dishReviews')) ? document.get('dishReviews') : [];
-  return [
-    document.get('text'),
-    ...dishNames,
-    ...dishReviews.map((dish: unknown) =>
-      dish && typeof dish === 'object' && 'title' in dish
-        ? (dish as { title?: unknown }).title
-        : '',
-    ),
-  ]
-    .join(' ')
-    .toLocaleLowerCase();
-}
 
 export const listNotifications = onCall(
   callableOptions,
@@ -67,19 +46,25 @@ export const listNotifications = onCall(
     }
     const snapshot = await notificationsQuery.limit(input.limit + 1).get();
     const pageDocs = snapshot.docs.slice(0, input.limit);
-    const items = pageDocs.map(
-      (doc) =>
-        ({
-          id: doc.id,
-          kind: doc.get('kind'),
-          title: doc.get('title'),
-          body: doc.get('body'),
-          targetType: doc.get('targetType') ?? null,
-          targetId: doc.get('targetId') ?? null,
-          unread: doc.get('unread') !== false,
-          createdAt: timestampToIso(doc.get('createdAt')),
-        }) as AppNotification,
-    );
+    const items = pageDocs.map((doc) => {
+      const type = doc.get('type');
+      const definition = isNotificationType(type) ? notificationCatalog[type] : null;
+      return {
+        id: doc.id,
+        type: definition?.type ?? null,
+        kind: doc.get('kind') ?? definition?.kind ?? 'system',
+        group: definition?.group ?? null,
+        category: definition?.category ?? null,
+        title: doc.get('title'),
+        body: doc.get('body'),
+        actorId: doc.get('actorId') ?? null,
+        actorName: doc.get('actorName') ?? null,
+        targetType: doc.get('targetType') ?? definition?.targetType ?? null,
+        targetId: doc.get('targetId') ?? null,
+        unread: doc.get('unread') !== false,
+        createdAt: timestampToIso(doc.get('createdAt')),
+      } as AppNotification;
+    });
     return {
       items,
       nextCursor: snapshot.size > input.limit && pageDocs.length > 0
@@ -277,6 +262,15 @@ export const createGroup = onCall(callableOptions, async (request) => {
     });
   }
   await batch.commit();
+  await sendNotifications(memberIds.filter((id) => id !== uid).map((memberId) => ({
+    recipientId: memberId,
+    type: 'group-added' as const,
+    eventKey: ref.id,
+    actorId: uid,
+    actorName: String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Someone'),
+    params: { group: input.name },
+    targetId: ref.id,
+  })));
   return { id: ref.id };
 });
 
@@ -347,6 +341,15 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
     });
   }
   await batch.commit();
+  await sendNotifications(invitedIds.map((invitedId) => ({
+    recipientId: invitedId,
+    type: 'group-added' as const,
+    eventKey: ref.id,
+    actorId: uid,
+    actorName: String(owner.get('displayName') ?? 'Someone'),
+    params: { group: String(group.get('name') ?? 'Group') },
+    targetId: ref.id,
+  })));
   return { id: ref.id };
 });
 
@@ -376,17 +379,12 @@ export const getProfileExtras = onCall(
     const input = parseInput(profileExtrasInputSchema, request.data ?? {});
     const profileId = input.targetUserId ?? viewerId;
     const userRef = db.collection('users').doc(profileId);
-    const [profile, followers, following, viewerFollowing, reviews] = await Promise.all([
+    const [profile, followers, following, viewerFollowing, rewards] = await Promise.all([
       userRef.get(),
       userRef.collection('followers').limit(100).get(),
       userRef.collection('following').limit(100).get(),
       db.collection('users').doc(viewerId).collection('following').get(),
-      db
-        .collection('reviews')
-        .where('authorId', '==', profileId)
-        .where('status', '==', 'published')
-        .limit(200)
-        .get(),
+      computeRewards(profileId),
     ]);
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
@@ -403,36 +401,6 @@ export const getProfileExtras = onCall(
         )
       : [];
     const viewerFollowingIds = new Set(viewerFollowing.docs.map((document) => document.id));
-    const venueIds = [
-      ...new Set(reviews.docs.map((review) => String(review.get('venueId') ?? '')).filter(Boolean)),
-    ];
-    const venueSnapshots = venueIds.length
-      ? await db.getAll(...venueIds.map((venueId) => db.collection('venues').doc(venueId)))
-      : [];
-    const venues = new Map(venueSnapshots.map((venue) => [venue.id, venue]));
-
-    const burgerVenues = new Set<string>();
-    const matchaCafes = new Set<string>();
-    const exploredAreas = new Set<string>();
-    let foundTiramisu = false;
-    reviews.docs.forEach((review) => {
-      const venueId = String(review.get('venueId') ?? '');
-      const venue = venues.get(venueId);
-      const category = String(venue?.get('category') ?? '').toLocaleLowerCase();
-      const name = String(venue?.get('name') ?? '').toLocaleLowerCase();
-      const searchable = reviewText(review);
-      if (category.includes('burger') || name.includes('burger') || searchable.includes('burger')) {
-        burgerVenues.add(venueId);
-      }
-      if (category.includes('cafe') && searchable.includes('matcha')) matchaCafes.add(venueId);
-      if (searchable.includes('tiramisu')) foundTiramisu = true;
-      const address = String(venue?.get('address') ?? '');
-      const area = (address.split(',').at(-1) || venue?.get('city') || '')
-        .toString()
-        .trim()
-        .toLocaleLowerCase();
-      if (area) exploredAreas.add(area);
-    });
 
     const xp = Math.max(0, Number(profile.get('xp') ?? 0));
     return {
@@ -450,46 +418,10 @@ export const getProfileExtras = onCall(
         photoUrl: followed.get('photoUrl') ? String(followed.get('photoUrl')) : null,
         following: viewerFollowingIds.has(followed.id),
       })),
-      level: Math.max(1, Math.floor(xp / 250) + 1),
+      level: levelForXp(xp),
       xp,
-      notificationPreferences: {
-        ...defaultPreferences,
-        ...(profile.get('notificationPreferences') ?? {}),
-      },
-      rewards: [
-        {
-          id: 'burger',
-          name: 'Burger Lover',
-          description: 'Review 10 burger places',
-          progress: progress(burgerVenues.size, 10),
-          completed: burgerVenues.size >= 10,
-          xp: 150,
-        },
-        {
-          id: 'tiramisu',
-          name: 'Tiramisu Connaisseur',
-          description: 'Find the perfect tiramisu',
-          progress: foundTiramisu ? 1 : 0,
-          completed: foundTiramisu,
-          xp: 100,
-        },
-        {
-          id: 'matcha',
-          name: 'Matcha Hunter',
-          description: 'Try matcha in 5 cafés',
-          progress: progress(matchaCafes.size, 5),
-          completed: matchaCafes.size >= 5,
-          xp: 100,
-        },
-        {
-          id: 'city',
-          name: 'City Explorer',
-          description: 'Review places in 5 areas',
-          progress: progress(exploredAreas.size, 5),
-          completed: exploredAreas.size >= 5,
-          xp: 150,
-        },
-      ],
+      notificationPreferences: notificationPreferences(profile),
+      rewards,
     };
   },
 );
@@ -497,8 +429,18 @@ export const getProfileExtras = onCall(
 export const updateNotificationPreferences = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(updateNotificationPreferencesInputSchema, request.data);
-  await db.collection('users').doc(uid).set({ notificationPreferences: input }, { merge: true });
-  return input;
+  const preferences = {
+    enabled: input.enabled,
+    push: input.push,
+    email: input.email,
+    sms: input.sms,
+    categories: {
+      ...defaultNotificationPreferences.categories,
+      ...(input.categories ?? {}),
+    },
+  };
+  await db.collection('users').doc(uid).set({ notificationPreferences: preferences }, { merge: true });
+  return preferences;
 });
 
 export const reportComment = onCall(callableOptions, async (request) => {
@@ -536,5 +478,11 @@ export const reportComment = onCall(callableOptions, async (request) => {
     },
     { merge: true },
   );
+  await sendNotification({
+    recipientId: uid,
+    type: 'report-received',
+    eventKey: ref.id,
+    targetId: ref.id,
+  });
   return { id: ref.id };
 });

@@ -24,7 +24,14 @@ import {
   enforceRateLimit,
   idempotentDocumentId,
 } from '../../shared/mutations';
+import {
+  queueNotification,
+  sendNotification,
+  sendNotifications,
+  type NotificationRequest,
+} from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
+import { levelForXp, notifyLevelChange, syncRewardNotifications } from '../../shared/rewards';
 import {
   compareDocumentIdsDesc,
   cursorDate,
@@ -213,6 +220,87 @@ export const getComments = onCall(callableOptions, async (request) => {
   };
 });
 
+/** Like counts that are worth telling the author about. */
+const REVIEW_LIKE_MILESTONES = [10, 50, 100];
+const MENTION_PATTERN = /@([a-zA-Z0-9._]{2,40})/g;
+const COMMENT_PREVIEW_LENGTH = 120;
+
+function commentPreview(text: string): string {
+  return text.length > COMMENT_PREVIEW_LENGTH ? `${text.slice(0, COMMENT_PREVIEW_LENGTH - 1)}…` : text;
+}
+
+/** Resolves the `@username` handles inside a comment to the accounts they belong to. */
+async function mentionedUserIds(text: string): Promise<string[]> {
+  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].map((match) => match[1]))].slice(0, 10);
+  if (usernames.length === 0) return [];
+  const profiles = await Promise.all(usernames.map((username) => db
+    .collection('users')
+    .where('username', '==', username)
+    .limit(1)
+    .get()));
+  return [...new Set(profiles.flatMap((profile) => profile.docs.map((document) => document.id)))];
+}
+
+/** Everyone who should hear about a freshly published review. */
+async function announceReview(
+  reviewId: string,
+  authorId: string,
+  authorName: string,
+  venue: { id: string; name: string; city: string; reviewCount: number },
+): Promise<void> {
+  const [followers, savers] = await Promise.all([
+    db.collection('users').doc(authorId).collection('followers').limit(400).get(),
+    db.collectionGroup('savedVenues').where('venueId', '==', venue.id).limit(400).get(),
+  ]);
+  const saverIds = new Set(savers.docs
+    .map((saved) => saved.ref.parent.parent?.id)
+    .filter((id): id is string => Boolean(id) && id !== authorId));
+  const requests: NotificationRequest[] = [];
+  for (const follower of followers.docs) {
+    requests.push({
+      recipientId: follower.id,
+      type: saverIds.has(follower.id) ? 'saved-place-review' : 'friend-review',
+      eventKey: reviewId,
+      actorId: authorId,
+      actorName: authorName,
+      params: { place: venue.name },
+      targetId: reviewId,
+    });
+  }
+  const followerIds = new Set(followers.docs.map((follower) => follower.id));
+  for (const saverId of saverIds) {
+    if (followerIds.has(saverId)) continue;
+    requests.push({
+      recipientId: saverId,
+      type: 'saved-place-review',
+      eventKey: reviewId,
+      actorId: authorId,
+      actorName: authorName,
+      params: { place: venue.name },
+      targetId: reviewId,
+    });
+  }
+  await sendNotifications(requests);
+
+  // The very first review of a venue is news for everyone living in that city.
+  if (venue.reviewCount > 0 || !venue.city) return;
+  const neighbours = await db.collection('users')
+    .where('status', '==', 'active')
+    .where('city', '==', venue.city)
+    .limit(400)
+    .get();
+  await sendNotifications(neighbours.docs
+    .filter((neighbour) => neighbour.id !== authorId)
+    .map((neighbour) => ({
+      recipientId: neighbour.id,
+      type: 'city-first-review' as const,
+      eventKey: venue.id,
+      actorId: authorId,
+      params: { place: venue.name, city: venue.city },
+      targetId: venue.id,
+    })));
+}
+
 export const createReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createReviewInputSchema, request.data);
@@ -225,6 +313,13 @@ export const createReview = onCall(callableOptions, async (request) => {
   if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(expectedPhotoPrefix))) {
     throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user and draft.');
   }
+
+  type ReviewAnnouncement = {
+    authorName: string;
+    venue: { id: string; name: string; city: string; reviewCount: number };
+    previousXp: number;
+  };
+  let announcement: ReviewAnnouncement | null = null;
 
   await db.runTransaction(async (transaction) => {
     const [user, venue, existingReview] = await Promise.all([
@@ -275,7 +370,25 @@ export const createReview = onCall(callableOptions, async (request) => {
     transaction.update(userRef, {
       reviewCount: FieldValue.increment(1),
     });
+    announcement = {
+      authorName: String(user.get('displayName') ?? 'Someone'),
+      venue: {
+        id: venue.id,
+        name: String(venue.get('name') ?? 'a place'),
+        city: String(venue.get('city') ?? ''),
+        reviewCount,
+      },
+      previousXp: Number(user.get('xp') ?? 0),
+    };
   });
+
+  const published = announcement as ReviewAnnouncement | null;
+  if (published) {
+    const { authorName, venue, previousXp } = published;
+    await announceReview(reviewRef.id, uid, authorName, venue);
+    await notifyLevelChange(uid, previousXp, previousXp + 50);
+    await syncRewardNotifications(uid);
+  }
 
   return { id: reviewRef.id };
 });
@@ -426,6 +539,27 @@ export const reactToContent = onCall(callableOptions, async (request) => {
       reactionCount,
       expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000),
     });
+    if (active && input.targetType === 'review') {
+      const venueName = String(review.get('venueName') ?? 'a place');
+      queueNotification(transaction, {
+        recipientId: String(content.get('authorId') ?? ''),
+        type: 'review-like',
+        eventKey: `${input.reviewId}:${uid}`,
+        actorId: uid,
+        actorName: String(profile.get('displayName') ?? 'Someone'),
+        params: { place: venueName },
+        targetId: input.reviewId,
+      });
+      if (REVIEW_LIKE_MILESTONES.includes(reactionCount)) {
+        queueNotification(transaction, {
+          recipientId: String(content.get('authorId') ?? ''),
+          type: 'review-milestone',
+          eventKey: `${input.reviewId}:${reactionCount}`,
+          params: { place: venueName, count: reactionCount },
+          targetId: input.reviewId,
+        });
+      }
+    }
     return { active, reactionCount };
   });
 });
@@ -461,6 +595,12 @@ export const reportContent = onCall(callableOptions, async (request) => {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: false });
+  await sendNotification({
+    recipientId: uid,
+    type: 'report-received',
+    eventKey: reportRef.id,
+    targetId: reportRef.id,
+  });
   return { id: reportRef.id };
 });
 
@@ -475,6 +615,8 @@ export const addComment = onCall(callableOptions, async (request) => {
   const parentRef = input.parentCommentId
     ? reviewRef.collection('comments').doc(input.parentCommentId)
     : null;
+  type CommentNotice = { actorName: string; preview: string; excludedIds: string[] };
+  let notified: CommentNotice | null = null;
 
   await db.runTransaction(async (transaction) => {
     const [user, review, existingComment, parentComment] = await Promise.all([
@@ -516,7 +658,55 @@ export const addComment = onCall(callableOptions, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (parentRef) transaction.update(parentRef, { replyCount: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() });
+
+    const actorName = String(user.get('displayName') ?? 'Someone');
+    const preview = commentPreview(input.text);
+    const parentAuthorId = parentComment ? String(parentComment.get('authorId') ?? '') : '';
+    queueNotification(transaction, {
+      recipientId: parentRef ? parentAuthorId : String(review.get('authorId') ?? ''),
+      type: parentRef ? 'comment-reply' : 'review-comment',
+      eventKey: commentRef.id,
+      actorId: uid,
+      actorName,
+      params: { text: preview, place: String(review.get('venueName') ?? '') },
+      targetId: input.reviewId,
+      data: { commentId: commentRef.id },
+    });
+    // A reply still deserves to reach the review author when they are not the one being replied to.
+    if (parentRef && String(review.get('authorId') ?? '') !== parentAuthorId) {
+      queueNotification(transaction, {
+        recipientId: String(review.get('authorId') ?? ''),
+        type: 'review-comment',
+        eventKey: commentRef.id,
+        actorId: uid,
+        actorName,
+        params: { text: preview, place: String(review.get('venueName') ?? '') },
+        targetId: input.reviewId,
+        data: { commentId: commentRef.id },
+      });
+    }
+    notified = {
+      actorName,
+      preview,
+      excludedIds: [uid, parentAuthorId, String(review.get('authorId') ?? '')].filter(Boolean),
+    };
   });
+
+  const notice = notified as CommentNotice | null;
+  if (notice) {
+    const { actorName, preview, excludedIds } = notice;
+    const mentioned = (await mentionedUserIds(input.text)).filter((id) => !excludedIds.includes(id));
+    await sendNotifications(mentioned.map((recipientId) => ({
+      recipientId,
+      type: 'mention' as const,
+      eventKey: commentRef.id,
+      actorId: uid,
+      actorName,
+      params: { text: preview },
+      targetId: input.reviewId,
+      data: { commentId: commentRef.id },
+    })));
+  }
 
   return { id: commentRef.id };
 });
@@ -669,6 +859,35 @@ export const reactToReview = onCall(callableOptions, async (request) => {
       expiresAt,
       createdAt: FieldValue.serverTimestamp(),
     });
+    const venueName = String(review.get('venueName') ?? 'a place');
+    queueNotification(transaction, {
+      recipientId: authorId,
+      type: 'review-like',
+      eventKey: `${input.reviewId}:${uid}`,
+      actorId: uid,
+      actorName: String(user.get('displayName') ?? 'Someone'),
+      params: { place: venueName },
+      targetId: input.reviewId,
+    });
+    if (REVIEW_LIKE_MILESTONES.includes(reactionCount)) {
+      queueNotification(transaction, {
+        recipientId: authorId,
+        type: 'review-milestone',
+        eventKey: `${input.reviewId}:${reactionCount}`,
+        params: { place: venueName, count: reactionCount },
+        targetId: input.reviewId,
+      });
+    }
+    const authorXp = Number(author.get('xp') ?? 0);
+    if (author.exists && levelForXp(authorXp + 5) > levelForXp(authorXp)) {
+      queueNotification(transaction, {
+        recipientId: authorId,
+        type: 'level-up',
+        eventKey: `level-${levelForXp(authorXp + 5)}`,
+        params: { level: levelForXp(authorXp + 5) },
+        targetId: String(levelForXp(authorXp + 5)),
+      });
+    }
     return { active: true, reactionCount };
   });
 });
@@ -739,6 +958,13 @@ export const reportReview = onCall(callableOptions, async (request) => {
       contentPreview: String(review.get('text') ?? '').slice(0, 180),
       status: 'pending',
       createdAt: FieldValue.serverTimestamp(),
+    });
+
+    queueNotification(transaction, {
+      recipientId: uid,
+      type: 'report-received',
+      eventKey: reportRef.id,
+      targetId: reportRef.id,
     });
 
     const expiresAt = Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000);

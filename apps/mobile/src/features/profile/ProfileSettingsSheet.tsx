@@ -1,5 +1,13 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import type { UpdateProfileSettingsInput, Venue } from '@tastes/contracts';
+import {
+  defaultNotificationPreferences,
+  notificationCategoryLabels,
+  notificationSettingCategories,
+  type NotificationPreferences,
+  type NotificationSettingCategory,
+  type UpdateProfileSettingsInput,
+  type Venue,
+} from '@tastes/contracts';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -89,10 +97,7 @@ export function ProfileSettingsSheet({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(false);
-  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
   const appearanceTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
   const appearanceClosing = useRef(false);
   const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -300,10 +305,11 @@ export function ProfileSettingsSheet({
     void api.getProfileExtras({ targetUserId: userId })
       .then((result) => {
         const preferences = result.data.notificationPreferences;
-        setNotificationsEnabled(preferences.enabled);
-        setPushEnabled(preferences.push);
-        setEmailEnabled(preferences.email);
-        setSmsEnabled(preferences.sms);
+        setNotifications({
+          ...defaultNotificationPreferences,
+          ...preferences,
+          categories: { ...defaultNotificationPreferences.categories, ...preferences.categories },
+        });
       })
       .catch(() => Alert.alert('Could not load notification settings', 'Please try again.'))
       .finally(() => setNotificationsLoading(false));
@@ -327,13 +333,18 @@ export function ProfileSettingsSheet({
     }).start(finish);
   }
 
-  function saveNotifications(next: { enabled: boolean; push: boolean; email: boolean; sms: boolean }) {
-    setNotificationsEnabled(next.enabled);
-    setPushEnabled(next.push);
-    setEmailEnabled(next.email);
-    setSmsEnabled(next.sms);
+  function saveNotifications(next: NotificationPreferences) {
+    const previous = notifications;
+    setNotifications(next);
     void api.updateNotificationPreferences(next)
-      .catch(() => Alert.alert('Could not save notification settings', 'Please try again.'));
+      .catch(() => {
+        setNotifications(previous);
+        Alert.alert('Could not save notification settings', 'Please try again.');
+      });
+  }
+
+  function saveCategory(category: NotificationSettingCategory, value: boolean) {
+    saveNotifications({ ...notifications, categories: { ...notifications.categories, [category]: value } });
   }
 
   const rows: Array<{ field?: EditableField; label: string; value?: string; valueFlag?: ReturnType<typeof cityFlag>; onPress?: () => void }> = profile ? [
@@ -418,9 +429,24 @@ export function ProfileSettingsSheet({
             </View>
             {notificationsLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
               <ScrollView contentContainerStyle={styles.notificationSettings}>
-                <NotificationSetting label="Enable notifications" onChange={(enabled) => saveNotifications({ enabled, push: pushEnabled, email: emailEnabled, sms: smsEnabled })} styles={styles} value={notificationsEnabled} />
-                <NotificationSetting disabled={!notificationsEnabled} label="Push notifications" onChange={(push) => saveNotifications({ enabled: notificationsEnabled, push, email: emailEnabled, sms: smsEnabled })} styles={styles} value={pushEnabled} />
-                <NotificationSetting disabled={!notificationsEnabled} label="SMS notifications" onChange={(sms) => saveNotifications({ enabled: notificationsEnabled, push: pushEnabled, email: emailEnabled, sms })} styles={styles} value={smsEnabled} />
+                <NotificationSetting label="Enable notifications" onChange={(enabled) => saveNotifications({ ...notifications, enabled })} styles={styles} value={notifications.enabled} />
+                <NotificationSetting disabled={!notifications.enabled} label="Push notifications" onChange={(push) => saveNotifications({ ...notifications, push })} styles={styles} value={notifications.push} />
+                <NotificationSetting disabled={!notifications.enabled} label="Email notifications" onChange={(email) => saveNotifications({ ...notifications, email })} styles={styles} value={notifications.email} />
+                <NotificationSetting disabled={!notifications.enabled} label="SMS notifications" onChange={(sms) => saveNotifications({ ...notifications, sms })} styles={styles} value={notifications.sms} />
+                <Text style={styles.notificationSectionTitle}>What you hear about</Text>
+                {notificationSettingCategories.map((category) => (
+                  <NotificationSetting
+                    disabled={!notifications.enabled}
+                    key={category}
+                    label={notificationCategoryLabels[category]}
+                    onChange={(value) => saveCategory(category, value)}
+                    styles={styles}
+                    value={notifications.categories[category] !== false}
+                  />
+                ))}
+                <Text style={styles.notificationFootnote}>
+                  Security, account and moderation messages are always delivered.
+                </Text>
               </ScrollView>
             )}
           </ImageBackground>
@@ -539,6 +565,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.canvas },
     notificationBackground: { flex: 1, backgroundColor: colors.canvas },
     notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: safeBottom + 30 },
+    notificationSectionTitle: { marginTop: 18, marginBottom: 10, marginLeft: 16, color: colors.textSecondary, fontSize: 13, lineHeight: 18, letterSpacing: -0.24, textTransform: 'uppercase' },
+    notificationFootnote: { marginTop: 14, marginHorizontal: 16, color: colors.textSecondary, opacity: 0.7, fontSize: 12, lineHeight: 16 },
     notificationRow: { height: 50, marginBottom: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
     notificationDisabled: { opacity: 0.45 },
     notificationLabel: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },

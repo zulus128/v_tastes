@@ -4,7 +4,9 @@ import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
+import { notificationTypes, sendCampaignNotificationInputSchema } from '@tastes/contracts';
 import { db } from '../../shared/firebase';
+import { sendNotification, sendNotifications } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
@@ -41,6 +43,7 @@ const editContentInputSchema = contentActionInputSchema.and(z.object({
   text: z.string().trim().min(1).max(2_000),
 }));
 const searchInputSchema = z.object({ query: z.string().trim().max(120).default('') });
+
 const userActionInputSchema = z.object({
   userId: idSchema,
   reason: z.string().trim().min(2).max(500),
@@ -158,6 +161,32 @@ async function getReviewCities() {
     .slice(0, 8);
 }
 
+/** Lets the reporter know their report was looked at, whatever the outcome was. */
+async function notifyReportResolved(report: FirebaseFirestore.DocumentSnapshot): Promise<void> {
+  if (!report.exists) return;
+  await sendNotification({
+    recipientId: String(report.get('reporterId') ?? ''),
+    type: 'report-resolved',
+    eventKey: report.id,
+    targetId: report.id,
+  });
+}
+
+/** Notifies everyone who saved a venue that something about it changed. */
+async function notifySavedPlaceChange(venueId: string, venueName: string, change: string): Promise<void> {
+  const savers = await db.collectionGroup('savedVenues').where('venueId', '==', venueId).limit(400).get();
+  await sendNotifications(savers.docs
+    .map((saved) => saved.ref.parent.parent?.id)
+    .filter((id): id is string => Boolean(id))
+    .map((recipientId) => ({
+      recipientId,
+      type: 'saved-place-changed' as const,
+      eventKey: `${venueId}:${change}`,
+      params: { place: venueName, text: change },
+      targetId: venueId,
+    })));
+}
+
 export const getAdminOverview = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const now = Date.now();
@@ -244,13 +273,15 @@ export const getReportedContent = onCall(callableOptions, async (request) => {
 export const dismissReport = onCall(callableOptions, async (request) => {
   const actorId = requireStaff(request).uid;
   const input = parseInput(reportIdInputSchema, request.data);
+  const report = await db.collection('reports').doc(input.reportId).get();
   await Promise.all([
-    db.collection('reports').doc(input.reportId).update({
+    report.ref.update({
       status: 'dismissed',
       resolvedBy: actorId,
       resolvedAt: FieldValue.serverTimestamp(),
     }),
     audit(actorId, 'dismiss-report', input.reportId),
+    notifyReportResolved(report),
   ]);
   return { id: input.reportId };
 });
@@ -269,6 +300,20 @@ export const deleteContent = onCall(callableOptions, async (request) => {
     if (report.exists) transaction.update(report.ref, { status: 'actioned', resolvedAt: FieldValue.serverTimestamp(), resolvedBy: actorId });
   });
   await audit(actorId, 'delete-content', input.targetId, { targetType: input.targetType });
+  const [content, report] = await Promise.all([
+    reference.get(),
+    db.collection('reports').doc(input.reportId).get(),
+  ]);
+  await Promise.all([
+    sendNotification({
+      recipientId: String(content.get('authorId') ?? ''),
+      type: 'content-removed',
+      eventKey: input.targetId,
+      params: { place: String(content.get('venueName') ?? 'a place') },
+      targetId: input.targetId,
+    }),
+    notifyReportResolved(report),
+  ]);
   return { id: input.targetId };
 });
 
@@ -282,6 +327,7 @@ export const editContent = onCall(callableOptions, async (request) => {
     if (report.exists) transaction.update(report.ref, { status: 'actioned', resolvedAt: FieldValue.serverTimestamp(), resolvedBy: actorId });
   });
   await audit(actorId, 'edit-content', input.targetId, { targetType: input.targetType });
+  await notifyReportResolved(await db.collection('reports').doc(input.reportId).get());
   return { id: input.targetId };
 });
 
@@ -384,6 +430,13 @@ async function updateUserStatus(
     }, { merge: true }),
     getAuth().updateUser(input.userId, { disabled }),
     audit(actorId, `user-${action}`, input.userId, { reason: input.reason, suspendedUntil: input.suspendedUntil ?? null }),
+    ...(disabled ? [sendNotification({
+      recipientId: input.userId,
+      type: 'account-restricted' as const,
+      eventKey: `${action}:${new Date().toISOString().slice(0, 10)}`,
+      params: { text: input.reason },
+      targetId: input.userId,
+    })] : []),
   ]);
   return { id: input.userId, status };
 }
@@ -544,6 +597,14 @@ export const setVenueStatus = onCall(callableOptions, async (request) => {
     updatedBy: actorId,
   });
   await audit(actorId, 'set-venue-status', input.venueId, { status: input.status });
+  if (input.status !== 'active') {
+    const venue = await db.collection('venues').doc(input.venueId).get();
+    await notifySavedPlaceChange(
+      input.venueId,
+      String(venue.get('name') ?? 'A saved place'),
+      input.status === 'removed' ? 'It has closed permanently' : 'It is temporarily unavailable',
+    );
+  }
   return { id: input.venueId };
 });
 
@@ -586,4 +647,38 @@ export const mergeVenues = onCall(callableOptions, async (request) => {
   ]);
   await audit(actorId, 'merge-venues', source.id, { targetVenueId: target.id, movedReviews });
   return { id: source.id, targetVenueId: target.id, movedReviews };
+});
+
+/**
+ * Sends one of the promotional catalog entries to an audience: a whole city, or everyone when no
+ * city is given. Staff only, and always subject to the recipient's promotions preference.
+ */
+export const sendCampaignNotification = onCall(callableOptions, async (request) => {
+  const actorId = requireAdmin(request);
+  const input = parseInput(sendCampaignNotificationInputSchema, request.data);
+  if (!notificationTypes.includes(input.type)) {
+    throw new HttpsError('invalid-argument', 'Unknown notification type.');
+  }
+  const venue = input.venueId ? await db.collection('venues').doc(input.venueId).get() : null;
+  if (input.venueId && !venue?.exists) throw new HttpsError('not-found', 'The venue was not found.');
+
+  let query = db.collection('users').where('status', '==', 'active');
+  if (input.city) query = query.where('city', '==', input.city);
+  const audience = await query.limit(400).get();
+  const eventKey = `${input.type}:${input.city ?? 'all'}:${input.venueId ?? input.feature ?? input.offer ?? ''}`;
+  const sent = await sendNotifications(audience.docs.map((profile) => ({
+    recipientId: profile.id,
+    type: input.type,
+    eventKey,
+    params: {
+      city: input.city ?? null,
+      place: venue ? String(venue.get('name')) : null,
+      feature: input.feature ?? null,
+      offer: input.offer ?? null,
+      text: input.text ?? null,
+    },
+    targetId: input.venueId ?? null,
+  })));
+  await audit(actorId, 'send-campaign', eventKey, { type: input.type, recipients: sent });
+  return { type: input.type, recipients: sent };
 });

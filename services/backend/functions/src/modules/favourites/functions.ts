@@ -3,6 +3,7 @@ import {
   deleteFolderInputSchema,
   getFavouritesInputSchema,
   renameFolderInputSchema,
+  savedPlaceProximityInputSchema,
   saveVenueInputSchema,
   unsaveVenueInputSchema,
 } from '@tastes/contracts';
@@ -11,6 +12,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { enforceRateLimit, idempotentDocumentId } from '../../shared/mutations';
+import { sendNotification } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
@@ -210,4 +212,49 @@ export const unsaveVenue = onCall(callableOptions, async (request) => {
   const input = parseInput(unsaveVenueInputSchema, request.data);
   await db.collection('users').doc(uid).collection('savedVenues').doc(input.venueId).delete();
   return { saved: false, folderIds: [] };
+});
+
+/**
+ * Called by the app when its geofence for a saved place fires. Arriving raises the "you are near"
+ * notification; leaving asks for a review when the visit did not produce one yet.
+ */
+export const reportSavedPlaceProximity = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(savedPlaceProximityInputSchema, request.data);
+  const savedRef = db.collection('users').doc(uid).collection('savedVenues').doc(input.venueId);
+  const [saved, venue] = await Promise.all([savedRef.get(), db.collection('venues').doc(input.venueId).get()]);
+  if (!saved.exists) throw new HttpsError('not-found', 'The place is not on your saved list.');
+  if (!venue.exists || venue.get('status') !== 'active') {
+    throw new HttpsError('not-found', 'The venue was not found.');
+  }
+  await db.runTransaction((transaction) => enforceRateLimit(transaction, uid, 'saved-place-proximity', 20, 24 * 60 * 60_000));
+
+  const day = new Date().toISOString().slice(0, 10);
+  const place = String(venue.get('name') ?? 'a saved place');
+  if (input.event === 'arrived') {
+    await sendNotification({
+      recipientId: uid,
+      type: 'saved-place-nearby',
+      eventKey: `${input.venueId}:${day}`,
+      params: { place },
+      targetId: input.venueId,
+    });
+    await savedRef.update({ lastVisitedAt: FieldValue.serverTimestamp() });
+    return { notified: true };
+  }
+
+  const reviewed = await db.collection('reviews')
+    .where('authorId', '==', uid)
+    .where('venueId', '==', input.venueId)
+    .limit(1)
+    .get();
+  if (!reviewed.empty) return { notified: false };
+  await sendNotification({
+    recipientId: uid,
+    type: 'visit-review-reminder',
+    eventKey: `${input.venueId}:${day}`,
+    params: { place },
+    targetId: input.venueId,
+  });
+  return { notified: true };
 });

@@ -26,10 +26,19 @@ export {
   deleteFolder,
   getFavourites,
   renameFolder,
+  reportSavedPlaceProximity,
   saveVenue,
   unsaveVenue,
 } from './modules/favourites/functions';
 export { resetMonthlyXp } from './modules/leaderboard/schedules';
+export { pushUserNotification } from './modules/notifications/functions';
+export {
+  refreshLeaderboardStandings,
+  sendMonthlyRecapNotifications,
+  sendMonthlyRecapReminders,
+  sendReminderNotifications,
+  sendTrendingSavedPlaceNotifications,
+} from './modules/notifications/schedules';
 export {
   getDiscoverFeed,
   getDiscoverPeople,
@@ -78,6 +87,7 @@ export {
   reinstateExpiredSuspensions,
   searchAdminVenues,
   searchUsers,
+  sendCampaignNotification,
   setVenueFlags,
   setVenueStatus,
   suspendUser,

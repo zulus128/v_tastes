@@ -2,13 +2,20 @@ import { followUserInputSchema, importContactsInputSchema, removeFollowerInputSc
 import { getAuth, type UserIdentifier, type UserRecord } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { createHash } from 'node:crypto';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { enforceRateLimit } from '../../shared/mutations';
+import { queueNotification } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { parseInput } from '../../shared/validation';
 
 const MAX_FOLLOWING = 500;
+
+/** Contact identifiers are only ever stored hashed, so an invite can be matched without keeping the address. */
+export function contactInviteId(identifier: string): string {
+  return createHash('sha256').update(identifier.trim().toLocaleLowerCase()).digest('hex');
+}
 
 export const importContacts = onCall(callableOptions, async (request): Promise<ImportContactsResult> => {
   const uid = requireUserId(request);
@@ -36,6 +43,26 @@ export const importContacts = onCall(callableOptions, async (request): Promise<I
     records.push(...result.users);
   }
   const matchedIds = [...new Set(records.map((record) => record.uid).filter((id) => id !== uid))];
+  const matchedIdentifiers = new Set(records.flatMap((record) => [
+    record.phoneNumber ?? '',
+    record.email?.toLocaleLowerCase() ?? '',
+  ].filter(Boolean)));
+  const invitedIdentifiers = [
+    ...new Set([
+      ...input.phoneNumbers,
+      ...input.emails.map((email) => email.toLocaleLowerCase()),
+    ]),
+  ].filter((identifier) => !matchedIdentifiers.has(identifier)).slice(0, 500);
+  for (let index = 0; index < invitedIdentifiers.length; index += 400) {
+    const batch = db.batch();
+    for (const identifier of invitedIdentifiers.slice(index, index + 400)) {
+      batch.set(db.collection('_contactInvites').doc(contactInviteId(identifier)), {
+        inviterIds: FieldValue.arrayUnion(uid),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    await batch.commit();
+  }
   if (matchedIds.length === 0) {
     return { matches: [], importedCount: identifiers.length };
   }
@@ -69,10 +96,11 @@ export const followUser = onCall(callableOptions, async (request) => {
   const followerRef = targetRef.collection('followers').doc(uid);
 
   return db.runTransaction(async (transaction) => {
-    const [user, target, following] = await Promise.all([
+    const [user, target, following, targetFollowsUser] = await Promise.all([
       transaction.get(userRef),
       transaction.get(targetRef),
       transaction.get(followingRef),
+      transaction.get(targetRef.collection('following').doc(uid)),
     ]);
     if (!user.exists || user.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
@@ -91,6 +119,14 @@ export const followUser = onCall(callableOptions, async (request) => {
     transaction.create(followerRef, { userId: uid, createdAt: now });
     transaction.update(userRef, { followingCount: FieldValue.increment(1), updatedAt: now });
     transaction.update(targetRef, { followerCount: FieldValue.increment(1), updatedAt: now });
+    queueNotification(transaction, {
+      recipientId: input.targetUserId,
+      type: targetFollowsUser.exists ? 'follow-back' : 'follow-new',
+      eventKey: `${uid}:${targetFollowsUser.exists ? 'follow-back' : 'follow-new'}`,
+      actorId: uid,
+      actorName: String(user.get('displayName') ?? 'Someone'),
+      targetId: uid,
+    });
     return { following: true };
   });
 });

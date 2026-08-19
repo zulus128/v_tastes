@@ -23,13 +23,32 @@ type FeedEntry =
   | { id: string; createdAt: string; type: 'notification'; item: AppNotification }
   | { id: string; createdAt: string; type: 'request'; item: AppRequest };
 
-const glyphs: Record<AppNotification['kind'], string> = {
+const kindGlyphs: Record<AppNotification['kind'], string> = {
   comment: '○',
   follow: '+',
   invite: '↗',
   reward: '★',
   system: '%',
 };
+
+/** One glyph per catalog group, so a like never looks like a moderation notice. */
+const groupGlyphs: Partial<Record<NonNullable<AppNotification['group']>, string>> = {
+  follows: '+',
+  likesComments: '♥',
+  friendsActivity: '○',
+  messages: '✉',
+  rewards: '★',
+  recap: '☾',
+  savedPlaces: '◎',
+  reminders: '↻',
+  moderation: '!',
+  account: '⚿',
+  promotions: '%',
+};
+
+function glyphFor(item: AppNotification): string {
+  return (item.group ? groupGlyphs[item.group] : undefined) ?? kindGlyphs[item.kind] ?? '○';
+}
 
 function initials(value: string) {
   return value
@@ -187,8 +206,12 @@ export function NotificationsScreen({
   }
 
   function renderNotification(item: AppNotification) {
-    const promotional = item.kind === 'system';
-    const emblem = item.kind === 'system' || item.kind === 'reward' ? glyphs[item.kind] : initials(item.title);
+    const promotional = item.group === 'promotions' || (!item.group && item.kind === 'system');
+    const emblem = item.actorName
+      ? initials(item.actorName)
+      : item.kind === 'system' || item.kind === 'reward'
+        ? glyphFor(item)
+        : initials(item.title);
     return (
       <Pressable
         accessibilityLabel={`${item.title}. ${item.body}`}

@@ -12,6 +12,8 @@ import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
+import { sendNotifications } from '../../shared/notifications';
+import { contactInviteId } from '../social/functions';
 import { callableOptions } from '../../shared/options';
 import { decodeCursor, encodeCursor } from '../../shared/pagination';
 import { parseInput } from '../../shared/validation';
@@ -23,6 +25,10 @@ export const getSessionStatus = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const profile = await db.collection('users').doc(uid).get();
   const onboardingVersion = profile.exists ? Number(profile.get('onboardingVersion') ?? 0) : 0;
+  if (profile.exists) {
+    // Powers the "been a while" reminder without an extra round trip from the app.
+    await profile.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
+  }
 
   return {
     profileExists: profile.exists,
@@ -79,6 +85,11 @@ export const getMonthlyRecap = onCall(callableOptions, async (request): Promise<
       topPlaces: [],
       topDishes: [],
     };
+  }
+
+  // Opening the recap is what stops the follow-up reminder three days later.
+  if (recap.get('ready') === true && !recap.get('openedAt')) {
+    await recap.ref.update({ openedAt: FieldValue.serverTimestamp() });
   }
 
   const number = (field: string) => Math.max(0, Number(recap.get(field) ?? 0));
@@ -184,8 +195,37 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
     );
   });
 
+  await notifyContactInviters(uid, input.displayName, [
+    authUser.phoneNumber ?? '',
+    authUser.email?.toLocaleLowerCase() ?? '',
+  ]);
+
   return { id: uid };
 });
+
+/** Tells everyone who imported this person's contact details that they finally joined. */
+async function notifyContactInviters(uid: string, displayName: string, identifiers: string[]): Promise<void> {
+  const known = identifiers.filter(Boolean);
+  if (known.length === 0) return;
+  const invites = await db.getAll(
+    ...known.map((identifier) => db.collection('_contactInvites').doc(contactInviteId(identifier))),
+  );
+  const inviterIds = [...new Set(invites.flatMap((invite) => {
+    const value = invite.get('inviterIds');
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  }))];
+  await sendNotifications(inviterIds.map((inviterId) => ({
+    recipientId: inviterId,
+    type: 'contact-joined' as const,
+    eventKey: uid,
+    actorId: uid,
+    actorName: displayName,
+    targetId: uid,
+  })));
+  await Promise.all(invites
+    .filter((invite) => invite.exists)
+    .map((invite) => invite.ref.delete().catch(() => undefined)));
+}
 
 export const updateProfilePhoto = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);

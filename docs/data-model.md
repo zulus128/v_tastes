@@ -63,6 +63,25 @@ Backend-owned activity metadata containing its organizer, participants, venue, s
 
 Backend-owned notification events. Message notifications use deterministic IDs derived from the recipient and message so retries cannot create duplicates. Only the recipient may read a notification. Push delivery status is server-owned and is not a synchronization source of truth.
 
+### `users/{uid}/notifications/{notificationId}`
+
+The in-app notification list. Every document is raised from an entry of the notification catalog in
+`@tastes/contracts` (`notificationCatalog`) and stores its `type`, `group`, `category`, declared
+`channels`, rendered `title`/`body`, actor, and deep-link target. The document ID hashes recipient,
+type, and the event key, so a repeated event overwrites rather than duplicates. `pushUserNotification`
+fans the document out to the declared channels: push through Expo, email through `_emailQueue`.
+Reads go through `listNotifications`; direct client access stays denied.
+
+### Notification support collections
+
+- `_emailQueue/{notificationId}` — email deliveries waiting for a mail worker; no provider is wired up yet.
+- `_contactInvites/{hash}` — hashed contact identifiers mapped to the users who invited them, used to raise `contact-joined` on sign-up. Deleted once the invite is announced.
+- `_leaderboardSnapshots/{city}` — yesterday's top ten per city, diffed daily to raise leaderboard notifications.
+
+Per-user delivery preferences live on `users/{uid}.notificationPreferences`: the `enabled`/`push`/`email`/`sms`
+channel switches plus a `categories` map, one flag per settings category. Catalog entries in the
+`always` category (security, account, and moderation) ignore every switch.
+
 ## Write policy
 
 Client writes are denied for the initial collections. Mutations are performed by Callable Functions using Admin SDK transactions. This protects ownership fields, counters, statuses, and server timestamps.
