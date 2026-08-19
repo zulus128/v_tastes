@@ -157,7 +157,7 @@ function MainTabs({
 }) {
   const { colors } = useAppTheme();
   const unreadMessages = useUnreadConversationCount(user.uid);
-  const { api, logout } = useSession();
+  const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   async function openConversation(targetUserId: string) {
@@ -280,6 +280,7 @@ function MainTabs({
       <ProfileSettingsSheet
         fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}
+        onDeleteAccount={deleteAccount}
         onLogout={logout}
         userId={user.uid}
         visible={settingsVisible}

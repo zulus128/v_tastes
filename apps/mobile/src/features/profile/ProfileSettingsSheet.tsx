@@ -29,7 +29,6 @@ import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern
 import backIcon from '../../../assets/onboarding/back.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
-import SignOutIcon from '../../../assets/profile/sign-out.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
@@ -58,12 +57,14 @@ const appearanceOptions: readonly { label: string; description: string; value: T
 export function ProfileSettingsSheet({
   fallbackName,
   onClose,
+  onDeleteAccount,
   onLogout,
   userId,
   visible,
 }: {
   fallbackName: string;
   onClose: () => void;
+  onDeleteAccount?: () => Promise<void>;
   onLogout: () => Promise<void>;
   userId: string;
   visible: boolean;
@@ -234,6 +235,23 @@ export function ProfileSettingsSheet({
     ]);
   }
 
+  function confirmDeleteAccount() {
+    Alert.alert('Delete account?', 'This will permanently delete your account and all your data. This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          if (onDeleteAccount) {
+            void onDeleteAccount();
+          } else {
+            void onLogout();
+          }
+        },
+      },
+    ]);
+  }
+
   function openAppearance() {
     appearanceClosing.current = false;
     if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
@@ -337,7 +355,7 @@ export function ProfileSettingsSheet({
         <View style={styles.header}>
           <Pressable accessibilityLabel="Back" hitSlop={8} onPress={() => settingsSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
           <Text style={styles.title}>Settings</Text>
-          <Pressable accessibilityLabel="Sign out" hitSlop={8} onPress={confirmLogout} style={styles.headerButton}><SignOutIcon color={colors.text} height={24} width={24} /></Pressable>
+          <View style={styles.headerButton} />
         </View>
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -359,6 +377,14 @@ export function ProfileSettingsSheet({
                   <Text style={styles.chevron}>›</Text>
                 </Pressable>
               ))}
+            </View>
+            <View style={styles.accountActions}>
+              <Pressable accessibilityLabel="Log out" accessibilityRole="button" hitSlop={8} onPress={confirmLogout}>
+                <Text style={styles.logout}>Log out</Text>
+              </Pressable>
+              <Pressable accessibilityLabel="Delete account" accessibilityRole="button" hitSlop={8} onPress={confirmDeleteAccount}>
+                <Text style={styles.deleteAccount}>Delete account</Text>
+              </Pressable>
             </View>
             <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
               Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
@@ -500,7 +526,10 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     photoLoader: { position: 'absolute', inset: 0 },
     editPhoto: { marginTop: 10, marginBottom: 10, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
     rows: { width: '100%', gap: 6 },
-    version: { marginTop: 16, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'center' },
+    accountActions: { width: '100%', marginTop: 32, gap: 16, alignItems: 'center' },
+    logout: { color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
+    deleteAccount: { color: colors.danger, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
+    version: { marginTop: 20, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'center' },
     row: { width: '100%', height: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
     rowLabel: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41 },
     rowValue: { maxWidth: '55%', marginLeft: 8, color: colors.textMuted, fontSize: 15, fontWeight: '500', textAlign: 'right' },

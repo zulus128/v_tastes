@@ -6,7 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CompleteOnboardingInput } from '@tastes/contracts';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { deleteUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   createContext,
   type PropsWithChildren,
@@ -39,6 +39,7 @@ interface SessionContextValue {
   refresh: () => Promise<void>;
   completeOnboarding: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -84,6 +85,23 @@ export function SessionProvider({ children }: PropsWithChildren) {
       await unregisterPushNotifications(api);
     } catch (error) {
       captureException(error, { source: 'push', operation: 'unregisterPushToken' });
+    } finally {
+      await clearLocalSession();
+    }
+  }, [api, clearLocalSession]);
+
+  const deleteAccount = useCallback(async () => {
+    try {
+      await unregisterPushNotifications(api);
+    } catch (error) {
+      captureException(error, { source: 'push', operation: 'unregisterPushToken' });
+    }
+    try {
+      if (auth.currentUser) {
+        await deleteUser(auth.currentUser);
+      }
+    } catch (error) {
+      captureException(error, { source: 'auth', operation: 'deleteUser' });
     } finally {
       await clearLocalSession();
     }
@@ -141,8 +159,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [api]);
 
   const value = useMemo(
-    () => ({ state, api, refresh, completeOnboarding, logout }),
-    [api, completeOnboarding, logout, refresh, state],
+    () => ({ state, api, refresh, completeOnboarding, logout, deleteAccount }),
+    [api, completeOnboarding, deleteAccount, logout, refresh, state],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
