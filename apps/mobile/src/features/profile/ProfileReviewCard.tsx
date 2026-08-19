@@ -8,6 +8,7 @@ import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
+import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 
 const tagLabels: Record<string, string> = {
   casual: 'Casual',
@@ -115,7 +116,10 @@ export function ProfileReviewCard({
         <Text numberOfLines={4} style={styles.reviewText}>{item.text}</Text>
         <View style={styles.metrics}>
           <Pressable onPress={onReact}><Text style={styles.metric}>♡ {item.reactionCount}</Text></Pressable>
-          <Pressable onPress={onComments}><Text style={styles.metric}>◯ {item.commentCount}</Text></Pressable>
+          <Pressable accessibilityLabel="Open comments" onPress={onComments} style={styles.metricIconRow}>
+            <ChatIcon color={colors.text} height={20} width={20} />
+            <Text style={styles.metric}>{item.commentCount}</Text>
+          </Pressable>
           <Pressable onPress={onShare}><Text style={styles.metric}>↗</Text></Pressable>
         </View>
       </View>
@@ -158,6 +162,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   dishRating: { position: 'absolute', bottom: 5, left: 0, paddingHorizontal: 10, paddingVertical: 4, borderTopRightRadius: 16, overflow: 'hidden', backgroundColor: 'rgba(22,22,22,0.72)', color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   reviewText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   metrics: { paddingTop: 2, flexDirection: 'row', gap: 20 },
+  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metric: { color: colors.text, fontSize: 14 },
   photoModalScrim: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.84)' },
   photoModal: { width: '100%', maxWidth: 430, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
