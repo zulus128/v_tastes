@@ -533,6 +533,8 @@ export interface Page<T> {
 export interface FeedItem extends Review {
   createdAt: string;
   pinned?: boolean;
+  authorUsername?: string | null;
+  authorPhotoUrl?: string | null;
 }
 
 export interface Comment {

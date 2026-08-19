@@ -18,9 +18,11 @@ import {
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
+import { LinearGradient } from 'expo-linear-gradient';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
+import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -44,11 +46,11 @@ import { useDiscoverFeed } from '../discover/api';
 import { useAuthenticatedUserId, useSession } from '../../session/SessionProvider';
 import { useProfile } from '../profile/api';
 
-const tagLabels: Record<string, string> = {
-  casual: 'Casual',
-  'date-night': 'Date night',
-  birthday: 'Birthday',
-  children: 'With children',
+const tagInfo: Record<string, { label: string; emoji?: string }> = {
+  casual: { label: 'Casual' },
+  'date-night': { label: 'Date night', emoji: '🌙' },
+  birthday: { label: 'Birthday', emoji: '🎂' },
+  children: { label: 'With children', emoji: '👶' },
 };
 
 const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 'Hate', 'Safety risk', 'Something else'] as const;
@@ -100,7 +102,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
   // Keep the full dish visible inside the fixed Figma tile. The default
   // `cover` mode trims the photo edges when its aspect ratio differs from the
   // tile, which is the slight side-cropping visible in the review carousel.
-  return uri ? <Image resizeMode="contain" source={{ uri }} style={stylesStatic.dishPhoto} /> : <View style={stylesStatic.dishPhotoPlaceholder} />;
+  return uri ? <Image resizeMode="cover" source={{ uri }} style={stylesStatic.dishPhoto} /> : <View style={stylesStatic.dishPhotoPlaceholder} />;
 }
 
 function isOfflineError(error: Error) {
@@ -127,52 +129,118 @@ function FeedCard({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  // Persisted query caches and reviews created before Increment 2 do not have
-  // the new arrays. Keep those records renderable while the cache refreshes.
+  const [expanded, setExpanded] = useState(false);
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
+  const primaryTag = tags[0] ? tagInfo[tags[0]] ?? { label: tags[0] } : null;
+  const username = item.authorUsername
+    ? `@${item.authorUsername}`
+    : `@${item.authorDisplayName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+  const isLongText = (item.text?.length ?? 0) > 120;
+
   return (
     <Pressable onLongPress={onLongPress} delayLongPress={350} style={styles.card}>
       <View style={styles.authorRow}>
-        <Image source={avatar} style={styles.avatar} />
+        <Image
+          source={item.authorPhotoUrl ? { uri: item.authorPhotoUrl } : avatar}
+          style={styles.avatar}
+        />
         <View style={styles.authorCopy}>
-          <Text style={styles.author}>{item.authorDisplayName}</Text>
-          <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
+          <Text numberOfLines={1} style={styles.authorName}>{item.authorDisplayName}</Text>
+          <Text numberOfLines={1} style={styles.authorHandle}>{username}</Text>
         </View>
-        <Text style={styles.rating}>{'★'.repeat(Math.round(item.rating))}</Text>
+        <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
       </View>
-      <Text style={styles.venue}>{item.venueName}</Text>
-      <Text style={styles.review}>{item.text}</Text>
+
+      <View style={styles.venueSection}>
+        <Text style={styles.venue}>{item.venueName}</Text>
+        <View style={styles.ratingTagRow}>
+          <View style={styles.starRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Text
+                key={star}
+                style={[
+                  styles.star,
+                  star <= Math.round(item.rating) ? styles.starFilled : styles.starEmpty,
+                ]}
+              >
+                ★
+              </Text>
+            ))}
+          </View>
+          {primaryTag ? (
+            <View style={styles.tagBadge}>
+              <Text style={styles.tagBadgeText}>
+                {primaryTag.emoji ? `${primaryTag.emoji} ` : ''}{primaryTag.label}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
       {dishReviews.length > 0 ? (
-        <ScrollView contentContainerStyle={styles.dishes} horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.dishes}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
           {dishReviews.map((dish) => (
             <View key={dish.id} style={styles.dish}>
               <DishPhoto photoPath={dish.photoPath} />
-              <View style={styles.dishCopy}>
-                <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
-                <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.15)', 'transparent']}
+                locations={[0, 0.55, 1]}
+                style={styles.dishGradient}
+              >
+                <Text numberOfLines={2} style={styles.dishTitle}>
+                  {dish.title}
+                </Text>
+              </LinearGradient>
+              <View style={styles.dishRatingBadge}>
+                <Text style={styles.dishRatingStar}>★</Text>
+                <Text style={styles.dishRatingValue}>{dish.rating.toFixed(1)}</Text>
               </View>
             </View>
           ))}
         </ScrollView>
       ) : null}
-      {tags.length > 0 ? (
-        <View style={styles.tags}>
-          {tags.map((tag) => <Text key={tag} style={styles.tag}>{tagLabels[tag] ?? tag}</Text>)}
-        </View>
+
+      {item.text ? (
+        <Pressable onPress={() => setExpanded((v) => !v)} style={styles.reviewPressable}>
+          <Text
+            numberOfLines={expanded ? undefined : 2}
+            style={styles.review}
+          >
+            {item.text}
+            {!expanded && isLongText ? (
+              <Text style={styles.seeMore}>  See more</Text>
+            ) : null}
+          </Text>
+        </Pressable>
       ) : null}
+
       <View style={styles.metrics}>
-        <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
-          <HeartIcon color={isReactionActive ? colors.primary : colors.text} height={20} width={20} />
-          <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>{item.reactionCount}</Text>
-        </Pressable>
-        <Pressable onPress={onComments} style={styles.metricIconRow}>
-          <ChatIcon color={colors.text} height={20} width={20} />
-          <Text style={styles.metric}>{item.commentCount}</Text>
-        </Pressable>
-        <Pressable onPress={onShare}>
-          <ShareIcon color={colors.text} height={20} width={20} />
-        </Pressable>
+        <View style={styles.metricsLeft}>
+          <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
+            <HeartIcon color={isReactionActive ? colors.primary : colors.text} height={20} width={20} />
+            <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
+              {item.reactionCount}
+            </Text>
+          </Pressable>
+          <Pressable onPress={onComments} style={styles.metricIconRow}>
+            <ChatIcon color={colors.text} height={20} width={20} />
+            <Text style={styles.metric}>{item.commentCount}</Text>
+          </Pressable>
+          <Pressable onPress={onShare} style={styles.metricIconRow}>
+            <ShareIcon color={colors.text} height={20} width={20} />
+          </Pressable>
+        </View>
+        {dishReviews.length > 0 ? (
+          <View style={styles.dishesButton}>
+            <TopRatedDishesIcon color={colors.primary} height={13} width={15} />
+            <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -538,32 +606,45 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   recommendationTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   recommendationMeta: { color: colors.text, fontSize: 12 },
   recommendationReason: { color: colors.textSecondary, fontSize: 11, marginTop: 4 },
-  card: { gap: 12, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: theme.radius.lg, backgroundColor: colors.surface },
+  card: { gap: 14, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface },
   authorRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
-  authorCopy: { flex: 1, paddingLeft: 10 },
-  author: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  date: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  rating: { color: '#D33B35', fontSize: 14 },
-  venue: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  review: { color: colors.text, opacity: 0.78, fontSize: 14, lineHeight: 20 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas },
+  authorCopy: { flex: 1, paddingLeft: 10, justifyContent: 'center', gap: 2 },
+  authorName: { color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  authorHandle: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
+  date: { color: colors.textMuted, fontSize: 13 },
+  venueSection: { gap: 6 },
+  venue: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
+  ratingTagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  starRow: { flexDirection: 'row', gap: 3 },
+  star: { fontSize: 18, lineHeight: 20 },
+  starFilled: { color: '#E53935' },
+  starEmpty: { color: '#E53935', opacity: 0.2 },
+  tagBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
+  tagBadgeText: { color: colors.text, fontSize: 12, fontWeight: '500' },
   dishes: { gap: 10 },
-  dish: { width: 126, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surfaceRaised },
-  dishCopy: { gap: 3, padding: 9 },
-  dishTitle: { color: colors.text, fontSize: 13, fontWeight: '600' },
-  dishRating: { color: '#D33B35', fontSize: 12, fontWeight: '700' },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, backgroundColor: colors.surfaceRaised, color: colors.textSecondary, fontSize: 12 },
-  metrics: { paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  dish: { width: 148, height: 156, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised, position: 'relative' },
+  dishGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 64, paddingHorizontal: 10, paddingTop: 8 },
+  dishTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  dishRatingBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.65)' },
+  dishRatingStar: { color: '#FFFFFF', fontSize: 11 },
+  dishRatingValue: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  reviewPressable: {},
+  review: { color: colors.text, opacity: 0.88, fontSize: 14, lineHeight: 20 },
+  seeMore: { color: colors.text, fontWeight: '700', opacity: 1 },
+  metrics: { paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  metricsLeft: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   metric: { color: colors.textMuted, fontSize: 13 },
   metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metricActive: { color: colors.text, fontWeight: '700' },
   metricDisabled: { opacity: 0.5 },
+  dishesButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
+  dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '500' },
 });
 
 const stylesStatic = StyleSheet.create({
-  dishPhoto: { width: 124, height: 84, backgroundColor: '#ECEEF2' },
-  dishPhotoPlaceholder: { width: 124, height: 84, backgroundColor: '#ECEEF2' },
+  dishPhoto: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
+  dishPhotoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
 });
 
 const overlayStyles = StyleSheet.create({

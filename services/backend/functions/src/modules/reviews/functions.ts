@@ -92,6 +92,8 @@ export const getFeed = onCall(callableOptions, async (request) => {
       id: document.id,
       authorId: String(document.get('authorId')),
       authorDisplayName: String(document.get('authorDisplayName')),
+      authorUsername: document.get('authorUsername') ? String(document.get('authorUsername')) : null,
+      authorPhotoUrl: document.get('authorPhotoUrl') ? String(document.get('authorPhotoUrl')) : null,
       venueId: String(document.get('venueId')),
       venueName: String(document.get('venueName')),
       rating: Number(document.get('rating')),
