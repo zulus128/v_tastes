@@ -1,14 +1,21 @@
 import type { PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, FlatList, Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import fallbackAvatar from '../../../assets/home/avatar.png';
+import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
+import CalendarIcon from '../../../assets/place/calendar.svg';
+import PhoneIcon from '../../../assets/place/phone.svg';
+import PlanetIcon from '../../../assets/place/planet.svg';
 import SortIcon from '../../../assets/place/sort.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
+import CloseCircle from '../../../assets/recap/story/close-circle.svg';
+import CloseX from '../../../assets/recap/story/close-x.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
@@ -19,6 +26,14 @@ import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
+const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Opening hours arrive Monday-first (or as a single "Daily" entry), so resolve
+// today's row by weekday name rather than assuming index 0 is the current day.
+function todayHours(hours: Array<{ day: string; hours: string }>) {
+  const today = weekdays[new Date().getDay()];
+  return hours.find((entry) => entry.day === today) ?? hours[0];
+}
 
 function placeImage(url: string | null | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
@@ -147,14 +162,30 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
 }
 
 function Overview({ details, openHours, openPhotos, styles }: { details: NonNullable<ReturnType<typeof usePlace>['data']>; openHours: () => void; openPhotos: () => void; styles: ReturnType<typeof createStyles> }) {
+  const iconColor = styles.detailIcon.color;
   return <View style={styles.section}>
-    <Pressable onPress={openHours} style={styles.detail}><Text style={styles.detailText}>▣  {details.openingHours[0]?.hours ?? 'Opening hours'}</Text><Text style={styles.arrow}>›</Text></Pressable>
-    {details.phone ? <Pressable onPress={() => void Linking.openURL(`tel:${details.phone!.replace(/[^+\d]/g, '')}`)} style={styles.detail}><Text style={styles.detailText}>⌕  {details.phone}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
-    {details.website ? <Pressable onPress={() => void Linking.openURL(/^https?:\/\//i.test(details.website!) ? details.website! : `https://${details.website}`)} style={styles.detail}><Text style={styles.detailText}>◒  {details.website}</Text><Text style={styles.arrow}>›</Text></Pressable> : null}
+    <DetailRow icon={<CalendarIcon color={iconColor} height={20} width={20} />} label={todayHours(details.openingHours)?.hours ?? 'Opening hours'} onPress={openHours} styles={styles} />
+    {details.phone ? <DetailRow icon={<PhoneIcon color={iconColor} height={20} width={20} />} label={details.phone} onPress={() => void Linking.openURL(`tel:${details.phone!.replace(/[^+\d]/g, '')}`)} styles={styles} /> : null}
+    {details.website ? <DetailRow icon={<PlanetIcon color={iconColor} height={20} width={20} />} label={details.website} onPress={() => void Linking.openURL(/^https?:\/\//i.test(details.website!) ? details.website! : `https://${details.website}`)} styles={styles} /> : null}
     <Pressable onPress={openPhotos} style={styles.strip}>{details.photoUrls.slice(0, 3).map((url, index) => <Image key={url + String(index)} source={placeImage(url)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
-    <View style={styles.sectionTitleRow}><TopRatedDishesIcon height={22} width={24} /><Text style={styles.sectionTitle}>Top rated dishes</Text></View>
+    <View style={styles.sectionTitleRow}><TopRatedDishesIcon color={styles.sectionTitleIcon.color} height={22} width={24} /><Text style={styles.sectionTitle}>Top rated dishes</Text></View>
     {details.popularDishes.map((dish, index) => <View key={dish.name} style={styles.dish}><Text style={styles.dishName}>{index + 1}. {dish.name}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>)}
   </View>;
+}
+
+function DetailRow({ icon, label, onPress, styles }: { icon: ReactNode; label: string; onPress: () => void; styles: ReturnType<typeof createStyles> }) {
+  return <Pressable onPress={onPress} style={styles.detail}>
+    {icon}
+    <Text numberOfLines={1} style={styles.detailText}>{label}</Text>
+    <ArrowUpRightIcon color={styles.detailIcon.color} height={20} style={styles.detailArrow} width={20} />
+  </Pressable>;
+}
+
+function CloseButton({ onPress, styles }: { onPress: () => void; styles: ReturnType<typeof createStyles> }) {
+  return <Pressable accessibilityLabel="Close" hitSlop={12} onPress={onPress} style={styles.closeButton}>
+    <CloseCircle color={styles.closeIcon.color} height={24} width={24} />
+    <CloseX color={styles.closeIcon.color} height={8} style={styles.closeX} width={8} />
+  </Pressable>;
 }
 
 function ReviewsHeader({ error, loading, openSort, retry, scope, setScope, sort, styles }: { error: string | null; loading: boolean; openSort: () => void; retry: () => void; scope: 'all' | 'friends'; setScope: (scope: 'all' | 'friends') => void; sort: PlaceReviewSort; styles: ReturnType<typeof createStyles> }) {
@@ -199,7 +230,18 @@ function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => 
   return <View style={[styles.screen, styles.errorPage]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
 }
 function Hours({ close, hours, styles, visible }: { close: () => void; hours: Array<{ day: string; hours: string }>; styles: ReturnType<typeof createStyles>; visible: boolean }) {
-  return <Modal animationType="slide" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sheet}><View style={styles.sheetHead}><Text style={styles.sheetTitle}>▣  Opening hours</Text><Pressable onPress={close}><Text style={styles.close}>×</Text></Pressable></View>{hours.map((item) => <View key={item.day} style={styles.hours}><Text style={styles.day}>{item.day}</Text><Text style={styles.hour}>{item.hours}</Text></View>)}</Pressable></Pressable></Modal>;
+  const today = todayHours(hours)?.day;
+  return <Modal animationType="slide" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sheet}>
+    <View style={styles.sheetHead}>
+      <CalendarIcon color={styles.sheetIcon.color} height={22} width={22} />
+      <Text style={styles.sheetTitle}>Opening hours</Text>
+      <CloseButton onPress={close} styles={styles} />
+    </View>
+    {hours.map((item, index) => <View key={item.day} style={[styles.hours, index > 0 && styles.hoursDivided, item.day === today && styles.hoursToday]}>
+      <Text style={[styles.day, item.day === today && styles.today]}>{item.day}</Text>
+      <Text style={[styles.hour, item.day === today && styles.today]}>{item.hours}</Text>
+    </View>)}
+  </Pressable></Pressable></Modal>;
 }
 function Gallery({ close, photos, styles, visible }: { close: () => void; photos: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
@@ -214,19 +256,28 @@ function GalleryImage({ index, styles, url }: { index: number; styles: ReturnTyp
   </View>;
 }
 function Sort({ close, select, selected, styles, visible }: { close: () => void; select: (sort: PlaceReviewSort) => void; selected: PlaceReviewSort; styles: ReturnType<typeof createStyles>; visible: boolean }) {
-  return <Modal animationType="fade" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sortSheet}><View style={styles.sheetHead}><Text style={styles.sheetTitle}>Sort by</Text><Pressable onPress={close}><Text style={styles.close}>×</Text></Pressable></View>{(Object.keys(sorts) as PlaceReviewSort[]).map((key) => <Pressable key={key} onPress={() => { select(key); close(); }} style={styles.sortRow}><Text style={styles.sortOption}>{sorts[key]}</Text><Text style={styles.radio}>{key === selected ? '◉' : '○'}</Text></Pressable>)}</Pressable></Pressable></Modal>;
+  return <Modal animationType="fade" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.dialogBackdrop}><Pressable style={styles.sortSheet}>
+    <Text style={styles.sortTitle}>Sort by</Text>
+    {(Object.keys(sorts) as PlaceReviewSort[]).map((key) => <Pressable key={key} onPress={() => { select(key); close(); }} style={styles.sortRow}>
+      <Text style={styles.sortOption}>{sorts[key]}</Text>
+      <View style={[styles.radio, key === selected && styles.radioSelected]}>{key === selected ? <CheckIcon height={8.6} width={12} /> : null}</View>
+    </Pressable>)}
+    <Pressable onPress={close} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+  </Pressable></Pressable></Modal>;
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas }, hero: { height: 365, overflow: 'hidden' }, heroImage: { height: 365, resizeMode: 'cover' }, topShade: { position: 'absolute', zIndex: 1, top: 0, right: 0, left: 0, height: 150 }, bottomShade: { position: 'absolute', zIndex: 1, right: 0, bottom: 0, left: 0, height: 135 },
   navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(33,33,33,0.64)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 40, lineHeight: 40, marginTop: -4 }, photoDots: { position: 'absolute', zIndex: 2, bottom: 28, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }, photoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' }, photoDotActive: { backgroundColor: '#fff' }, photoCount: { position: 'absolute', zIndex: 2, right: 18, bottom: 18, borderRadius: 13, backgroundColor: 'rgba(66,66,66,0.72)', paddingHorizontal: 11, paddingVertical: 6 }, photoCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   content: { paddingHorizontal: 16, paddingBottom: 95 }, reviewsContent: { paddingBottom: 0 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, compoundChip: { height: 33, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, backgroundColor: colors.background }, chipDivider: { width: StyleSheet.hairlineWidth, height: 18, marginHorizontal: 8, backgroundColor: colors.border }, chipText: { color: colors.text, fontSize: 11, fontWeight: '600' }, chipSecondary: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' }, chip: { height: 33, color: colors.text, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, fontSize: 11, fontWeight: '600' },
-  tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 9, paddingTop: 10 },
-  detail: { minHeight: 58, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', borderRadius: 29, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailText: { flex: 1, color: colors.textSecondary, fontSize: 13 }, arrow: { color: colors.textMuted, fontSize: 23 }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
+  tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 10, paddingTop: 10 },
+  detail: { height: 50, paddingHorizontal: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 25, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailIcon: { color: colors.text }, detailText: { flexShrink: 1, color: colors.text, opacity: 0.6, fontSize: 14, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 }, detailArrow: { position: 'absolute', right: 10, top: 15, opacity: 0.5 }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitleIcon: { color: colors.text }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
   reviewsHeader: { paddingTop: 10, paddingBottom: 10 }, reviewTools: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, scopeControl: { flex: 1, height: 34, padding: 3, flexDirection: 'row', borderRadius: 17, backgroundColor: colors.surfaceRaised }, scopeButton: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, scopeButtonActive: { backgroundColor: '#D9DDE5' }, scopeText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' }, scopeTextActive: { color: '#111' }, sortButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }, sort: { color: colors.text }, review: { overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewListCard: { marginHorizontal: 16, marginBottom: 12 }, reviewer: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted }, avatar: { width: 40, height: 40, borderRadius: 20 }, author: { flex: 1, gap: 3, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 15, fontWeight: '600' }, authorHandle: { color: colors.textSecondary, fontSize: 13 }, reviewDate: { color: colors.textMuted, fontSize: 12 }, reviewBody: { gap: 8, padding: 16 }, stars: { color: colors.primary, fontSize: 16 }, reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 }, dishes: { color: colors.text, fontSize: 12, fontWeight: '600' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metrics: { color: colors.text, fontSize: 13 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sortSheet: { margin: 18, borderRadius: 18, padding: 16, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, flexDirection: 'row', alignItems: 'center' }, sheetTitle: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' }, close: { color: colors.textMuted, fontSize: 26 }, hours: { minHeight: 35, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, day: { flex: 1, color: colors.text, fontSize: 11 }, hour: { color: colors.textMuted, fontSize: 10 }, sortRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center' }, sortOption: { flex: 1, color: colors.text, fontSize: 13 }, radio: { color: colors.primary, fontSize: 17 },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },
+  hours: { minHeight: 52, marginHorizontal: -16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderColor: colors.border }, hoursDivided: { borderTopWidth: StyleSheet.hairlineWidth }, hoursToday: { borderTopWidth: 0, backgroundColor: colors.surfaceRaised }, day: { flex: 1, color: colors.textSecondary, fontSize: 15 }, hour: { color: colors.textSecondary, fontSize: 15 }, today: { color: colors.text, fontWeight: '700' },
+  sortSheet: { margin: 18, borderRadius: 24, padding: 16, paddingTop: 20, backgroundColor: colors.surface }, sortTitle: { paddingBottom: 12, color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' }, sortRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, sortOption: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' }, radio: { width: 22, height: 22, borderWidth: 1.5, borderRadius: 11, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, radioSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, cancel: { height: 48, marginTop: 12, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised }, cancelText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   gallery: { flex: 1, paddingTop: 52, backgroundColor: colors.canvas }, galleryHead: { height: 42, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, galleryBack: { color: colors.text, fontSize: 34, lineHeight: 34 }, galleryTitle: { flex: 1, color: colors.text, fontWeight: '700', textAlign: 'center' }, spacer: { width: 24 }, grid: { padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }, gridImage: { width: '32.4%', aspectRatio: 1, borderRadius: 5, overflow: 'hidden', backgroundColor: colors.surfaceRaised }, galleryPhoto: { width: '100%', height: '100%', resizeMode: 'cover' }, hiddenPhoto: { opacity: 0 }, galleryLoading: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }, galleryError: { position: 'absolute', inset: 0, zIndex: 2, alignItems: 'center', justifyContent: 'center', gap: 3 }, galleryErrorIcon: { color: colors.primary, fontSize: 24, fontWeight: '700' }, galleryErrorText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },
 });
