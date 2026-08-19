@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -150,6 +151,7 @@ function FeedCard({
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [expanded, setExpanded] = useState(false);
+  const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(null);
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
   const primaryTag = tags[0] ? tagInfo[tags[0]] ?? { label: tags[0] } : null;
@@ -159,7 +161,8 @@ function FeedCard({
   const isLongText = (item.text?.length ?? 0) > 120;
 
   return (
-    <Pressable onLongPress={onLongPress} delayLongPress={350} style={styles.card}>
+    <>
+      <Pressable onLongPress={onLongPress} delayLongPress={350} style={styles.card}>
       <View style={styles.authorRow}>
         <Image
           source={item.authorPhotoUrl ? { uri: item.authorPhotoUrl } : avatar}
@@ -202,10 +205,21 @@ function FeedCard({
         <ScrollView
           contentContainerStyle={styles.dishes}
           horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
+          scrollEnabled
           showsHorizontalScrollIndicator={false}
         >
-          {dishReviews.map((dish) => (
-            <View key={dish.id} style={styles.dish}>
+          {dishReviews.map((dish, index) => (
+            <Pressable
+              key={dish.id}
+              accessibilityLabel={`Open dish review for ${dish.title}`}
+              onPress={(event) => {
+                event.stopPropagation();
+                setSelectedDishIndex(index);
+              }}
+              style={styles.dish}
+            >
               <DishPhoto photoPath={dish.photoPath} />
               <LinearGradient
                 colors={['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.15)', 'transparent']}
@@ -220,7 +234,7 @@ function FeedCard({
                 <Text style={styles.dishRatingStar}>★</Text>
                 <Text style={styles.dishRatingValue}>{dish.rating.toFixed(1)}</Text>
               </View>
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
       ) : null}
@@ -256,13 +270,80 @@ function FeedCard({
           </Pressable>
         </View>
         {dishReviews.length > 0 ? (
-          <View style={styles.dishesButton}>
+          <Pressable
+            accessibilityLabel="Open dish reviews"
+            onPress={(event) => {
+              event.stopPropagation();
+              setSelectedDishIndex(0);
+            }}
+            style={styles.dishesButton}
+          >
             <TopRatedDishesIcon color={colors.primary} height={13} width={15} />
             <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
-          </View>
+          </Pressable>
         ) : null}
       </View>
-    </Pressable>
+      </Pressable>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={selectedDishIndex !== null}
+        onRequestClose={() => setSelectedDishIndex(null)}
+      >
+        <View style={overlayStyles.dishReviewScrim}>
+          <Pressable
+            accessibilityLabel="Close dish review"
+            onPress={() => setSelectedDishIndex(null)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={overlayStyles.dishReviewSheet}>
+            <View style={overlayStyles.dishReviewHeader}>
+              <Text style={overlayStyles.dishReviewTitle}>Dish Review</Text>
+              <Pressable
+                accessibilityLabel="Close dish review"
+                hitSlop={10}
+                onPress={() => setSelectedDishIndex(null)}
+                style={overlayStyles.dishReviewClose}
+              >
+                <Text style={overlayStyles.dishReviewCloseText}>×</Text>
+              </Pressable>
+            </View>
+            {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
+              <>
+                <View style={overlayStyles.dishReviewPhoto}>
+                  <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} />
+                  {dishReviews.length > 1 ? (
+                    <View style={overlayStyles.dishReviewArrows} pointerEvents="box-none">
+                      <Pressable
+                        accessibilityLabel="Previous dish"
+                        onPress={() => setSelectedDishIndex((selectedDishIndex - 1 + dishReviews.length) % dishReviews.length)}
+                        style={overlayStyles.dishReviewArrow}
+                      >
+                        <Text style={overlayStyles.dishReviewArrowText}>‹</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel="Next dish"
+                        onPress={() => setSelectedDishIndex((selectedDishIndex + 1) % dishReviews.length)}
+                        style={overlayStyles.dishReviewArrow}
+                      >
+                        <Text style={overlayStyles.dishReviewArrowText}>›</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={overlayStyles.dishReviewDescription}>
+                  <View style={overlayStyles.dishReviewRating}>
+                    <Text style={overlayStyles.dishReviewRatingStar}>★</Text>
+                    <Text style={overlayStyles.dishReviewRatingValue}>{dishReviews[selectedDishIndex].rating.toFixed(1)}</Text>
+                  </View>
+                  <Text style={overlayStyles.dishReviewName}>{dishReviews[selectedDishIndex].title}</Text>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -779,4 +860,19 @@ const overlayStyles = StyleSheet.create({
   sentCopy: { marginTop: 10, maxWidth: 320, color: '#A6A8AD', fontSize: 15, lineHeight: 22, textAlign: 'center' },
   sentDone: { position: 'absolute', left: 36, right: 36, bottom: 34, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
   sentDoneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  dishReviewScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
+  dishReviewSheet: { paddingBottom: 30, borderTopWidth: 1, borderColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+  dishReviewHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dishReviewTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
+  dishReviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  dishReviewCloseText: { color: '#FFFFFF', fontSize: 30, fontWeight: '300', lineHeight: 30 },
+  dishReviewPhoto: { width: '100%', aspectRatio: 1, maxHeight: 434, paddingHorizontal: 16, position: 'relative' },
+  dishReviewArrows: { position: 'absolute', top: '50%', left: 21, right: 21, flexDirection: 'row', justifyContent: 'space-between' },
+  dishReviewArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,22,22,0.45)' },
+  dishReviewArrowText: { color: '#FFFFFF', fontSize: 34, fontWeight: '300', lineHeight: 30 },
+  dishReviewDescription: { width: '100%', paddingHorizontal: 16, paddingTop: 16, gap: 7 },
+  dishReviewRating: { height: 28, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 3, borderRadius: 100, backgroundColor: '#B82F29' },
+  dishReviewRatingStar: { color: '#FFFFFF', fontSize: 14 },
+  dishReviewRatingValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  dishReviewName: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', lineHeight: 20, letterSpacing: -0.24 },
 });

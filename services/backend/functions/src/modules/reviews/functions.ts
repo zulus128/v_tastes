@@ -86,25 +86,35 @@ export const getFeed = onCall(callableOptions, async (request) => {
   const visibleCandidates = candidates.filter((document) => !hiddenReviewIds.has(document.id));
   const pageDocs = visibleCandidates.slice(0, input.limit);
   const last = pageDocs.at(-1);
+  const authorIds = [...new Set(pageDocs.map((document) => String(document.get('authorId'))))];
+  const authorDocuments = authorIds.length > 0
+    ? await db.getAll(...authorIds.map((authorId) => db.collection('users').doc(authorId)))
+    : [];
+  const authorsById = new Map(authorDocuments.map((document) => [document.id, document]));
 
   return {
-    items: pageDocs.map((document) => ({
-      id: document.id,
-      authorId: String(document.get('authorId')),
-      authorDisplayName: String(document.get('authorDisplayName')),
-      authorUsername: document.get('authorUsername') ? String(document.get('authorUsername')) : null,
-      authorPhotoUrl: document.get('authorPhotoUrl') ? String(document.get('authorPhotoUrl')) : null,
-      venueId: String(document.get('venueId')),
-      venueName: String(document.get('venueName')),
-      rating: Number(document.get('rating')),
-      text: String(document.get('text')),
-      tags: Array.isArray(document.get('tags')) ? document.get('tags') : [],
-      dishReviews: Array.isArray(document.get('dishReviews')) ? document.get('dishReviews') : [],
-      status: 'published' as const,
-      commentCount: Number(document.get('commentCount') ?? 0),
-      reactionCount: Number(document.get('reactionCount') ?? 0),
-      createdAt: timestampToIso(document.get('createdAt')),
-    })),
+    items: pageDocs.map((document) => {
+      const author = authorsById.get(String(document.get('authorId')));
+      return {
+        id: document.id,
+        authorId: String(document.get('authorId')),
+        authorDisplayName: author?.exists && author.get('displayName')
+          ? String(author.get('displayName'))
+          : String(document.get('authorDisplayName')),
+        authorUsername: author?.exists && author.get('username') ? String(author.get('username')) : null,
+        authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
+        venueId: String(document.get('venueId')),
+        venueName: String(document.get('venueName')),
+        rating: Number(document.get('rating')),
+        text: String(document.get('text')),
+        tags: Array.isArray(document.get('tags')) ? document.get('tags') : [],
+        dishReviews: Array.isArray(document.get('dishReviews')) ? document.get('dishReviews') : [],
+        status: 'published' as const,
+        commentCount: Number(document.get('commentCount') ?? 0),
+        reactionCount: Number(document.get('reactionCount') ?? 0),
+        createdAt: timestampToIso(document.get('createdAt')),
+      };
+    }),
     nextCursor: candidates.length > input.limit && last
       ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
       : null,
