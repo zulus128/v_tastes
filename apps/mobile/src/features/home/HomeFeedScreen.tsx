@@ -35,7 +35,6 @@ import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
   useFeedReactionState,
-  useHideReview,
   useReactToReview,
   useLatestFeedItem,
   useReportReview,
@@ -459,11 +458,11 @@ export function HomeFeedScreen({
   const latestFeedQuery = useLatestFeedItem(scope);
   const recommendationQuery = useDiscoverFeed(userId);
   const reactionMutation = useReactToReview();
-  const hideMutation = useHideReview();
   const reportMutation = useReportReview();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
   const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
+  const [blockedAuthorIds, setBlockedAuthorIds] = useState<Set<string>>(new Set());
   const [recommendationMenu, setRecommendationMenu] = useState(false);
   const [recommendationHidden, setRecommendationHidden] = useState(false);
   const [reportReviewId, setReportReviewId] = useState<string | null>(null);
@@ -473,6 +472,7 @@ export function HomeFeedScreen({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const visibleItems = items.filter((item) => !blockedAuthorIds.has(item.authorId));
   const hasNewPosts = Boolean(items[0]?.id && latestFeedQuery.data?.id && items[0].id !== latestFeedQuery.data.id);
 
   useEffect(() => () => {
@@ -521,14 +521,16 @@ export function HomeFeedScreen({
     }
   };
 
-  const handleHidePress = async (itemId: string) => {
+  const handleBlockPress = (itemId: string) => {
+    const item = items.find((candidate) => candidate.id === itemId);
     setMenuReviewId(null);
-    try {
-      await hideMutation.mutateAsync(itemId);
-      showToast('Post hidden');
-    } catch {
-      Alert.alert('Could not hide post', 'Please try again.');
-    }
+    if (!item) return;
+    setBlockedAuthorIds((current) => {
+      const next = new Set(current);
+      next.add(item.authorId);
+      return next;
+    });
+    showToast('User blocked');
   };
 
   const handleReportSubmit = async () => {
@@ -606,7 +608,7 @@ export function HomeFeedScreen({
       ) : (
         <FlatList
           contentContainerStyle={styles.content}
-          data={items}
+          data={visibleItems}
           initialNumToRender={6}
           keyExtractor={(item) => item.id}
           maxToRenderPerBatch={6}
@@ -715,17 +717,11 @@ export function HomeFeedScreen({
       {menuReviewId ? (
         <ActionSheet
           actions={[
-            { label: 'Why am I seeing this?', onPress: () => {
-              setMenuReviewId(null);
-              showToast('Shown because it matches your tastes');
-            } },
             { label: 'Report post', destructive: true, onPress: () => {
               setReportReviewId(menuReviewId);
               setMenuReviewId(null);
             } },
-            { label: hideMutation.isPending ? 'Hiding…' : 'Not interested', onPress: () => {
-              void handleHidePress(menuReviewId);
-            } },
+            { label: 'Block this user', destructive: true, onPress: () => handleBlockPress(menuReviewId) },
           ]}
           onCancel={() => setMenuReviewId(null)}
         />
@@ -828,7 +824,7 @@ const stylesStatic = StyleSheet.create({
 });
 
 const overlayStyles = StyleSheet.create({
-  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', padding: 8, paddingBottom: 14, backgroundColor: 'rgba(0,0,0,0.64)' },
+  scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { gap: 8 },
   sheetGroup: { overflow: 'hidden', borderRadius: 16, backgroundColor: '#272727' },
   sheetAction: { height: 54, alignItems: 'center', justifyContent: 'center' },
