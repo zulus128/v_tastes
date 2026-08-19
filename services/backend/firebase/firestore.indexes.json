@@ -230,13 +230,6 @@
       ]
     },
     {
-      "collectionGroup": "savedVenues",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "venueId", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
