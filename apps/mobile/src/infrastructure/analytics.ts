@@ -1,7 +1,6 @@
 import {
   getAnalytics,
   logEvent,
-  logScreenView,
   setUserId,
   type Analytics,
 } from '@react-native-firebase/analytics';
@@ -29,12 +28,6 @@ function analytics(): Analytics | null {
 
 function swallow(error: unknown) {
   if (__DEV__) console.warn('[tastes] analytics delivery failed', error);
-}
-
-export function trackScreenView(screenName: string) {
-  const instance = analytics();
-  if (!instance) return;
-  logScreenView(instance, { screen_name: screenName, screen_class: screenName }).catch(swallow);
 }
 
 export function trackAnalyticsEvent(name: string, params?: AnalyticsParams) {

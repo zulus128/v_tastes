@@ -2,7 +2,6 @@ import {
   DarkTheme,
   DefaultTheme,
   NavigationContainer,
-  useNavigationContainerRef,
   type LinkingOptions,
   type NavigatorScreenParams,
   type Theme,
@@ -20,8 +19,7 @@ import type { DiscoverPerson } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { trackScreenView } from '../infrastructure/analytics';
+import { useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
@@ -307,23 +305,8 @@ export function ProductNavigator({ user }: { user: User }) {
       },
     };
   }, [colors, isDark]);
-  const navigationRef = useNavigationContainerRef<RootStackParamList>();
-  const currentScreen = useRef<string | undefined>(undefined);
-  const reportScreenView = useCallback(() => {
-    const screen = navigationRef.getCurrentRoute()?.name;
-    if (!screen || screen === currentScreen.current) return;
-    currentScreen.current = screen;
-    trackScreenView(screen);
-  }, [navigationRef]);
-
   return (
-    <NavigationContainer
-      ref={navigationRef}
-      linking={linking}
-      onReady={reportScreenView}
-      onStateChange={reportScreenView}
-      theme={navigationTheme}
-    >
+    <NavigationContainer linking={linking} theme={navigationTheme}>
       <RootStack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="MainTabs">
           {({ navigation }) => (
