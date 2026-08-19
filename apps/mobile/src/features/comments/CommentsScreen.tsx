@@ -2,7 +2,7 @@ import type { Comment, CommentReview, ReportReason } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Clipboard from 'expo-clipboard';
 import { getDownloadURL, ref as storageRef } from 'firebase/storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,6 +52,10 @@ const tagLabels: Record<string, string> = {
   birthday: 'Birthday',
   children: 'With children',
 };
+
+function commentShareUrl(reviewId: string, commentId: string) {
+  return `https://tastes.app/reviews/${encodeURIComponent(reviewId)}/comments?commentId=${encodeURIComponent(commentId)}`;
+}
 
 function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof createStyles> }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
@@ -117,17 +121,17 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
   </View>;
 }
 
-function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { count: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
+function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { count: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onLongPress={() => Alert.alert(item.authorDisplayName, 'Comment options', [
       { text: 'Copy', onPress: () => void Clipboard.setStringAsync(item.text) },
-      { text: 'Share', onPress: () => void Share.share({ message: `${item.authorDisplayName}: ${item.text}` }) },
+      { text: 'Share', onPress: () => void Share.share({ message: `${item.authorDisplayName}: ${item.text}\n${commentShareUrl(item.reviewId, item.id)}` }) },
       { text: 'Report', style: 'destructive', onPress: onReport },
       ...(onDelete ? [{ text: 'Delete', style: 'destructive' as const, onPress: onDelete }] : []),
       { text: 'Cancel', style: 'cancel' },
-    ])} onLayout={onLayout} style={[styles.row, nested && styles.nestedRow]}>
+    ])} onLayout={onLayout} style={[styles.row, nested && styles.nestedRow, highlighted && styles.highlightedRow]}>
       {item.authorPhotoUrl ? <Image source={{ uri: item.authorPhotoUrl }} style={styles.avatarImage} /> : <View style={styles.avatar}><Text style={styles.initial}>{item.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
       <View style={styles.copy}>
         <View style={styles.meta}>
@@ -153,7 +157,7 @@ function CommentRow({ item, nested = false, onDelete, onReact, onReply, onReport
   );
 }
 
-export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
+export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { commentId?: string; reviewId: string; onBack: () => void }) {
   const api = useTastesApi();
   const currentUserId = useAuthenticatedUserId();
   const { colors, isDark } = useAppTheme();
@@ -170,6 +174,7 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
+  const listRef = useRef<FlatList<Comment> | null>(null);
   const query = useComments(reviewId);
   const mutation = useAddComment(reviewId);
   const reaction = useReactToComment(reviewId);
@@ -183,6 +188,17 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
     replies.push(item);
     repliesByParent.set(item.parentCommentId!, replies);
   });
+  const targetRootIndex = commentId
+    ? rootItems.findIndex((item) => item.id === commentId || items.some((candidate) => candidate.id === commentId && candidate.parentCommentId === item.id))
+    : -1;
+
+  useEffect(() => {
+    if (!commentId || targetRootIndex < 0 || query.isPending) return undefined;
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ animated: false, index: targetRootIndex, viewPosition: 0.2 });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [commentId, query.isPending, targetRootIndex]);
 
   async function submit() {
     const value = text.trim();
@@ -227,6 +243,7 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
           <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
         ) : (
           <FlatList
+            ref={listRef}
             contentContainerStyle={styles.content}
             data={rootItems}
             initialNumToRender={10}
@@ -241,6 +258,9 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
               if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
             }}
             onEndReachedThreshold={0.5}
+            onScrollToIndexFailed={({ index }) => {
+              setTimeout(() => listRef.current?.scrollToIndex({ animated: false, index, viewPosition: 0.2 }), 50);
+            }}
             style={styles.list}
             windowSize={7}
             refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
@@ -250,8 +270,8 @@ export function PaginatedCommentsScreen({ reviewId, onBack }: { reviewId: string
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
               const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
               return <View style={styles.thread}>
-                <CommentRow item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { count: replies.length, hidden, onToggle: toggleReplies } : undefined} />
-                {!hidden ? replies.map((reply) => <CommentRow key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
+                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { count: replies.length, hidden, onToggle: toggleReplies } : undefined} />
+                {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
                   const nextOffset = event.nativeEvent.layout.y;
                   setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });
                 }} />) : null}
@@ -345,6 +365,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   threadConnector: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   row: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', gap: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.canvas },
   nestedRow: { paddingLeft: 63 },
+  highlightedRow: { borderLeftWidth: 2, borderLeftColor: colors.primary, backgroundColor: colors.surfaceRaised },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45312E' },
   avatarImage: { width: 40, height: 40, borderRadius: 20 },
   initial: { color: colors.onPrimary, fontWeight: '700' },

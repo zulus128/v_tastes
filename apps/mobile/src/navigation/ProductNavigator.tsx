@@ -53,7 +53,7 @@ import { consumePendingDeepLink } from './pendingDeepLink';
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
-  Comments: { reviewId: string };
+  Comments: { reviewId: string; commentId?: string };
   Recap: { mode: 'ready' | 'lowData' };
   Leaderboard: undefined;
   Place: { venueId: string };
@@ -316,7 +316,7 @@ export function ProductNavigator({ user }: { user: User }) {
         </RootStack.Screen>
         <RootStack.Screen name="Comments">
           {({ navigation, route }) => (
-            <PaginatedCommentsScreen reviewId={route.params.reviewId} onBack={navigation.goBack} />
+            <PaginatedCommentsScreen commentId={route.params.commentId} reviewId={route.params.reviewId} onBack={navigation.goBack} />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="Recap">

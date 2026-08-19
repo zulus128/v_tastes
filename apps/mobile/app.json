@@ -9,6 +9,9 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
+      "associatedDomains": [
+        "applinks:tastes.app"
+      ],
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
@@ -24,6 +27,23 @@
     },
     "android": {
       "package": "com.vkassin.tastes",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "host": "tastes.app",
+              "pathPrefix": "/reviews",
+              "scheme": "https"
+            }
+          ]
+        }
+      ],
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
