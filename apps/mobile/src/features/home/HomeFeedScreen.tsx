@@ -23,6 +23,9 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
+import RecommendationPlus from '../../../assets/home/recommendation-plus.svg';
+import RecommendationPlusRing from '../../../assets/home/recommendation-plus-ring.svg';
+import RecommendationStar from '../../../assets/home/recommendation-star.svg';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -52,6 +55,23 @@ const tagInfo: Record<string, { label: string; emoji?: string }> = {
   birthday: { label: 'Birthday', emoji: '🎂' },
   children: { label: 'With children', emoji: '👶' },
 };
+
+const cuisineFlags: Record<string, string> = {
+  french: '🇫🇷',
+  italian: '🇮🇹',
+  japanese: '🇯🇵',
+  korean: '🇰🇷',
+  mexican: '🇲🇽',
+  spanish: '🇪🇸',
+  thai: '🇹🇭',
+  turkish: '🇹🇷',
+  vietnamese: '🇻🇳',
+};
+
+function categoryLabel(category: string) {
+  const flag = cuisineFlags[category.toLowerCase()];
+  return flag ? `${category} ${flag}` : category;
+}
 
 const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 'Hate', 'Safety risk', 'Something else'] as const;
 
@@ -523,47 +543,54 @@ export function HomeFeedScreen({
                 onPress={() => onOpenPlace(rec.id)}
                 style={styles.recommendation}
               >
-                {/* Header strip: badge + match text */}
                 <View style={styles.recommendationHeader}>
                   <View style={styles.recommendedBadge}>
                     <Text style={styles.recommendedBadgeText}>Recommended</Text>
                   </View>
                   <Text numberOfLines={1} style={styles.recommendationMatch}>
-                    {rec.category ? `98% match on your ${rec.category.toLowerCase()} taste` : 'Based on your tastes and saves'}
+                    <Text style={styles.recommendationMatchScore}>98% </Text>
+                    {rec.category ? `match on your ${rec.category.toLowerCase()} taste` : 'match based on your tastes and saves'}
                   </Text>
                 </View>
 
-                {/* Horizontal venue row */}
-                <View style={styles.recommendationRow}>
-                  <Image
-                    source={rec.imageUrl ? { uri: rec.imageUrl } : avatar}
-                    style={styles.recommendationImage}
-                  />
-                  <View style={styles.recommendationInfo}>
-                    <Text numberOfLines={1} style={styles.recommendationTitle}>{rec.name}</Text>
-                    {rec.address ? (
-                      <Text numberOfLines={1} style={styles.recommendationAddress}>{rec.address}</Text>
-                    ) : null}
-                    {rec.rating != null ? (
-                      <View style={styles.recommendationRatingPill}>
-                        <Text style={styles.recommendationRatingStar}>★</Text>
-                        <Text style={styles.recommendationRatingValue}>{rec.rating.toFixed(1)}</Text>
-                        {rec.reviewCount != null ? (
-                          <Text style={styles.recommendationReviewCount}> {rec.reviewCount} reviews</Text>
-                        ) : null}
-                      </View>
-                    ) : null}
+                <View style={styles.recommendationBody}>
+                  <View style={styles.recommendationRow}>
+                    <Image
+                      source={rec.imageUrl ? { uri: rec.imageUrl } : avatar}
+                      style={styles.recommendationImage}
+                    />
+                    <View style={styles.recommendationInfo}>
+                      <Text numberOfLines={1} style={styles.recommendationTitle}>{rec.name}</Text>
+                      {rec.address ? (
+                        <Text numberOfLines={1} style={styles.recommendationAddress}>{rec.address}</Text>
+                      ) : null}
+                      {rec.rating != null ? (
+                        <View style={styles.recommendationRatingRow}>
+                          <View style={styles.recommendationRatingPill}>
+                            <RecommendationStar height={14} width={14} />
+                            <Text style={styles.recommendationRatingValue}>{rec.rating.toFixed(1)}</Text>
+                          </View>
+                          {rec.reviewCount != null ? (
+                            <Text numberOfLines={1} style={styles.recommendationReviewCount}>{rec.reviewCount} reviews</Text>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
 
-                {/* Tags row */}
-                {(rec.category || priceDots || distanceLabel) ? (
-                  <View style={styles.recommendationTags}>
-                    {rec.category ? <View style={styles.recTag}><Text style={styles.recTagText}>{rec.category}</Text></View> : null}
-                    {priceDots ? <View style={styles.recTag}><Text style={styles.recTagText}>{priceDots}</Text></View> : null}
-                    {distanceLabel ? <View style={styles.recTag}><Text style={styles.recTagText}>{distanceLabel}</Text></View> : null}
+                  <View style={styles.recommendationAddIcon} pointerEvents="none">
+                    <RecommendationPlusRing height={18} width={18} style={styles.recommendationPlusRing} />
+                    <RecommendationPlus height={7} width={7} style={styles.recommendationPlus} />
                   </View>
-                ) : null}
+
+                  {(rec.category || priceDots || distanceLabel) ? (
+                    <View style={styles.recommendationTags}>
+                      {rec.category ? <View style={styles.recTag}><Text style={styles.recTagText}>{categoryLabel(rec.category)}</Text></View> : null}
+                      {priceDots ? <View style={styles.recTag}><Text style={styles.recTagText}>{priceDots}</Text></View> : null}
+                      {distanceLabel ? <View style={styles.recTag}><Text style={styles.recTagText}>{distanceLabel.replace('.', ',')}</Text></View> : null}
+                    </View>
+                  ) : null}
+                </View>
               </Pressable>
             );
           })() : null}
@@ -656,23 +683,28 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   newPostsText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
   content: { padding: 15, gap: 16 },
-  recommendation: { marginBottom: 2, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  recommendationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12 },
-  recommendedBadge: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, backgroundColor: colors.primary },
-  recommendedBadgeText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  recommendationMatch: { flex: 1, color: colors.textSecondary, fontSize: 13 },
-  recommendationRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
-  recommendationImage: { width: 100, height: 100, borderRadius: 14, backgroundColor: isDark ? '#2C2C2E' : '#ECEEF2' },
-  recommendationInfo: { flex: 1, gap: 5, justifyContent: 'center' },
-  recommendationTitle: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 21 },
-  recommendationAddress: { color: colors.textSecondary, fontSize: 13 },
-  recommendationRatingPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, backgroundColor: colors.primary, gap: 4 },
-  recommendationRatingStar: { color: '#FFFFFF', fontSize: 12 },
-  recommendationRatingValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  recommendationReviewCount: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  recommendationTags: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
-  recTag: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#1A1A1A' },
-  recTagText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500' },
+  recommendation: { height: 230, marginBottom: 2, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#45474B', backgroundColor: '#161616' },
+  recommendationHeader: { height: 42, position: 'relative', backgroundColor: 'rgba(184,47,41,0.1)' },
+  recommendedBadge: { position: 'absolute', top: 0, left: 0, width: 104, height: 42, alignItems: 'center', justifyContent: 'center', borderBottomRightRadius: 30, backgroundColor: '#B82F29' },
+  recommendedBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '400', letterSpacing: -0.23 },
+  recommendationMatch: { position: 'absolute', top: 11, left: 124, right: 13, color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 17, letterSpacing: -0.24 },
+  recommendationMatchScore: { color: '#FFFFFF', fontWeight: '600' },
+  recommendationBody: { height: 187, position: 'relative', backgroundColor: '#161616' },
+  recommendationRow: { position: 'absolute', top: 14, left: 18, right: 28, height: 122, flexDirection: 'row', alignItems: 'center', gap: 17 },
+  recommendationImage: { width: 122, height: 122, borderRadius: 12, backgroundColor: '#2C2C2E' },
+  recommendationInfo: { flex: 1, minWidth: 0, gap: 6, justifyContent: 'center' },
+  recommendationTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', lineHeight: 18, letterSpacing: -0.41 },
+  recommendationAddress: { color: '#AAB2C5', fontSize: 14, lineHeight: 18, letterSpacing: -0.24 },
+  recommendationRatingRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  recommendationRatingPill: { height: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: '#B82F29', gap: 3 },
+  recommendationRatingValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', lineHeight: 17, letterSpacing: -0.23 },
+  recommendationReviewCount: { flex: 1, color: '#D8DDE8', opacity: 0.4, fontSize: 14, lineHeight: 18, letterSpacing: -0.24 },
+  recommendationAddIcon: { position: 'absolute', top: 14, right: 13, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  recommendationPlusRing: { position: 'absolute' },
+  recommendationPlus: { position: 'absolute' },
+  recommendationTags: { position: 'absolute', left: 18, right: 18, bottom: 9, height: 33, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  recTag: { height: 33, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 40, backgroundColor: '#080808' },
+  recTagText: { color: '#FFFFFF', fontSize: 15, fontWeight: '400', lineHeight: 20, letterSpacing: -0.24 },
   card: { gap: 14, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface },
   authorRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas },
