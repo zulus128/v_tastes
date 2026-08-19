@@ -523,26 +523,27 @@ export function HomeFeedScreen({
                 onPress={() => onOpenPlace(rec.id)}
                 style={styles.recommendation}
               >
-                <Image
-                  source={rec.imageUrl ? { uri: rec.imageUrl } : avatar}
-                  style={styles.recommendationImage}
-                />
-                <View style={styles.recommendationBody}>
-                  <View style={styles.recommendationTopRow}>
-                    <View style={styles.recommendedBadge}>
-                      <Text style={styles.recommendedBadgeText}>Recommended</Text>
-                    </View>
-                    <Text style={styles.recommendationMatch}>
-                      {rec.category ? `98% match on your ${rec.category.toLowerCase()} taste` : 'Based on your tastes and saves'}
-                    </Text>
+                {/* Header strip: badge + match text */}
+                <View style={styles.recommendationHeader}>
+                  <View style={styles.recommendedBadge}>
+                    <Text style={styles.recommendedBadgeText}>Recommended</Text>
                   </View>
-                  <View style={styles.recommendationMainRow}>
-                    <View style={styles.recommendationVenueInfo}>
-                      <Text numberOfLines={1} style={styles.recommendationTitle}>{rec.name}</Text>
-                      {rec.address ? (
-                        <Text numberOfLines={1} style={styles.recommendationAddress}>{rec.address}</Text>
-                      ) : null}
-                    </View>
+                  <Text numberOfLines={1} style={styles.recommendationMatch}>
+                    {rec.category ? `98% match on your ${rec.category.toLowerCase()} taste` : 'Based on your tastes and saves'}
+                  </Text>
+                </View>
+
+                {/* Horizontal venue row */}
+                <View style={styles.recommendationRow}>
+                  <Image
+                    source={rec.imageUrl ? { uri: rec.imageUrl } : avatar}
+                    style={styles.recommendationImage}
+                  />
+                  <View style={styles.recommendationInfo}>
+                    <Text numberOfLines={1} style={styles.recommendationTitle}>{rec.name}</Text>
+                    {rec.address ? (
+                      <Text numberOfLines={1} style={styles.recommendationAddress}>{rec.address}</Text>
+                    ) : null}
                     {rec.rating != null ? (
                       <View style={styles.recommendationRatingPill}>
                         <Text style={styles.recommendationRatingStar}>★</Text>
@@ -553,12 +554,16 @@ export function HomeFeedScreen({
                       </View>
                     ) : null}
                   </View>
+                </View>
+
+                {/* Tags row */}
+                {(rec.category || priceDots || distanceLabel) ? (
                   <View style={styles.recommendationTags}>
                     {rec.category ? <View style={styles.recTag}><Text style={styles.recTagText}>{rec.category}</Text></View> : null}
                     {priceDots ? <View style={styles.recTag}><Text style={styles.recTagText}>{priceDots}</Text></View> : null}
                     {distanceLabel ? <View style={styles.recTag}><Text style={styles.recTagText}>{distanceLabel}</Text></View> : null}
                   </View>
-                </View>
+                ) : null}
               </Pressable>
             );
           })() : null}
@@ -652,23 +657,22 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   list: { flex: 1 },
   content: { padding: 15, gap: 16 },
   recommendation: { marginBottom: 2, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  recommendationImage: { width: '100%', height: 160 },
-  recommendationBody: { padding: 14, gap: 10 },
-  recommendationTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  recommendedBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, backgroundColor: colors.primary },
-  recommendedBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  recommendationMatch: { flex: 1, color: colors.textSecondary, fontSize: 12 },
-  recommendationMainRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  recommendationVenueInfo: { flex: 1, gap: 3 },
-  recommendationTitle: { color: colors.text, fontSize: 18, fontWeight: '700', lineHeight: 22 },
+  recommendationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12 },
+  recommendedBadge: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, backgroundColor: colors.primary },
+  recommendedBadgeText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  recommendationMatch: { flex: 1, color: colors.textSecondary, fontSize: 13 },
+  recommendationRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
+  recommendationImage: { width: 100, height: 100, borderRadius: 14, backgroundColor: isDark ? '#2C2C2E' : '#ECEEF2' },
+  recommendationInfo: { flex: 1, gap: 5, justifyContent: 'center' },
+  recommendationTitle: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 21 },
   recommendationAddress: { color: colors.textSecondary, fontSize: 13 },
-  recommendationRatingPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 100, backgroundColor: colors.primary, gap: 3 },
-  recommendationRatingStar: { color: '#FFFFFF', fontSize: 13 },
+  recommendationRatingPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, backgroundColor: colors.primary, gap: 4 },
+  recommendationRatingStar: { color: '#FFFFFF', fontSize: 12 },
   recommendationRatingValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   recommendationReviewCount: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  recommendationTags: { flexDirection: 'row', gap: 8 },
-  recTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
-  recTagText: { color: colors.text, fontSize: 13, fontWeight: '500' },
+  recommendationTags: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
+  recTag: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#1A1A1A' },
+  recTagText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500' },
   card: { gap: 14, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface },
   authorRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas },
