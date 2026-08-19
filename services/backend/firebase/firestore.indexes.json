@@ -41,8 +41,7 @@
       "fields": [
         { "fieldPath": "venueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -51,8 +50,7 @@
       "fields": [
         { "fieldPath": "venueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
     },
     {
@@ -61,8 +59,7 @@
       "fields": [
         { "fieldPath": "venueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "rating", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "rating", "order": "DESCENDING" }
       ]
     },
     {
@@ -71,8 +68,7 @@
       "fields": [
         { "fieldPath": "venueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "rating", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        { "fieldPath": "rating", "order": "ASCENDING" }
       ]
     },
     {
@@ -81,8 +77,7 @@
       "fields": [
         { "fieldPath": "venueId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "reactionCount", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "reactionCount", "order": "DESCENDING" }
       ]
     },
     {
@@ -187,8 +182,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "rating", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "rating", "order": "DESCENDING" }
       ]
     },
     {
@@ -197,8 +191,7 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "rating", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "rating", "order": "DESCENDING" }
       ]
     },
     {
@@ -207,8 +200,7 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "discoverTags", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "rating", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        { "fieldPath": "rating", "order": "DESCENDING" }
       ]
     },
     {

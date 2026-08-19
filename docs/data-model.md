@@ -82,6 +82,22 @@ Per-user delivery preferences live on `users/{uid}.notificationPreferences`: the
 channel switches plus a `categories` map, one flag per settings category. Catalog entries in the
 `always` category (security, account, and moderation) ignore every switch.
 
+## Composite indexes
+
+`services/backend/firebase/firestore.indexes.json` describes the `tastes-eu` database, not `(default)`.
+Two rules keep `firebase deploy --only firestore:indexes` working:
+
+- Never write a `__name__` field into the file. The Firestore API always reports it, but the CLI strips it
+  before matching, so an explicit entry never matches and the deploy dies with `409 index already exists`.
+  The implicit `__name__` direction follows the last ordered field, which is what every query here needs.
+- Never pass `--force`. It deletes every index the file does not list, and the database holds four indexes
+  that repeat an existing definition with `__name__` ascending — they serve the queries that break ties on
+  `orderBy(documentId, 'asc')`, such as the leaderboard and Discover paging. Stripping `__name__` from the
+  file makes both variants match the same entry, so they survive a normal deploy but not a forced one.
+
+Note also that `firebase firestore:indexes` prints the `(default)` database unless `--database tastes-eu`
+is passed, which makes the two look inconsistent.
+
 ## Write policy
 
 Client writes are denied for the initial collections. Mutations are performed by Callable Functions using Admin SDK transactions. This protects ownership fields, counters, statuses, and server timestamps.
