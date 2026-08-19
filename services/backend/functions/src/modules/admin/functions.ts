@@ -129,8 +129,8 @@ async function getAnalyticsMetrics() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requests: [
-            { dateRanges: [{ startDate: 'yesterday', endDate: 'yesterday' }], metrics: [{ name: 'activeUsers' }] },
-            { dateRanges: [{ startDate: '30daysAgo', endDate: 'yesterday' }], metrics: [{ name: 'activeUsers' }] },
+            { dateRanges: [{ startDate: 'today', endDate: 'today' }], metrics: [{ name: 'activeUsers' }] },
+            { dateRanges: [{ startDate: '29daysAgo', endDate: 'today' }], metrics: [{ name: 'activeUsers' }] },
           ],
         }),
       },
@@ -161,7 +161,12 @@ async function getReviewCities() {
 export const getAdminOverview = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const now = Date.now();
-  const [users, reviews, reports, venues, users24h, users7d, users30d, analytics, reviewCities] = await Promise.all([
+  const [
+    users, reviews, reports, venues,
+    users24h, users7d, users30d,
+    reviews24h, reviews7d, reviews30d,
+    analytics, reviewCities,
+  ] = await Promise.all([
     db.collection('users').count().get(),
     db.collection('reviews').count().get(),
     db.collection('reports').where('status', '==', 'pending').count().get(),
@@ -169,6 +174,9 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000)).count().get(),
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000)).count().get(),
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
+    db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000)).count().get(),
+    db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000)).count().get(),
+    db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
     getAnalyticsMetrics(),
     getReviewCities(),
   ]);
@@ -182,6 +190,11 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
       last24Hours: users24h.data().count,
       last7Days: users7d.data().count,
       last30Days: users30d.data().count,
+    },
+    newReviews: {
+      last24Hours: reviews24h.data().count,
+      last7Days: reviews7d.data().count,
+      last30Days: reviews30d.data().count,
     },
     analytics,
     reviewCities,

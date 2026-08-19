@@ -16,6 +16,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { identifyAnalyticsUser } from '../infrastructure/analytics';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
 import {
@@ -117,6 +118,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [api]);
 
   useEffect(() => onAuthStateChanged(auth, (user) => {
+    identifyAnalyticsUser(user?.uid ?? null);
     if (!user) {
       queryClient.clear();
       void queryPersister.removeClient();

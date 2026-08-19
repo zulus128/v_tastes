@@ -1,3 +1,4 @@
+import { trackAnalyticsEvent } from './analytics';
 import { auth } from './firebase';
 
 export type ObservabilityContext = Record<string, string | number | boolean | null | undefined>;
@@ -72,5 +73,6 @@ export function captureException(error: unknown, context?: ObservabilityContext)
 }
 
 export function track(event: string, context?: ObservabilityContext) {
+  trackAnalyticsEvent(event, context);
   sink.track(event, context);
 }

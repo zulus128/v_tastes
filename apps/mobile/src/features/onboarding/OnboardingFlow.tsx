@@ -313,7 +313,15 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
         <RatingPin label="3.5" scale={heroScale} style={pinPositions[3]} />
       </View>
       <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, { height: panelHeight }]}>
-        <ImageBackground source={pattern} resizeMode="cover" imageStyle={styles.panelPattern} style={styles.consentPanelBackground}>
+        {/* pattern.png is dark linework on transparent, so on the dark theme's
+            near-black gradient it has to be tinted white to be visible at all —
+            same treatment EntryScreen gives it. */}
+        <ImageBackground
+          source={pattern}
+          resizeMode="cover"
+          imageStyle={isDark ? styles.panelPatternDark : styles.panelPattern}
+          style={styles.consentPanelBackground}
+        >
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
               <TastesLogo width={compact ? 80 : 98} />
@@ -535,6 +543,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.creat
   consentPanelBackground: { flex: 1 },
   consentScrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: compact ? 14 : 24, justifyContent: 'space-between' },
   panelPattern: { opacity: 0.06 },
+  panelPatternDark: { opacity: 0.04, tintColor: '#FFFFFF' },
   consentPrimary: { gap: compact ? 12 : 24, alignItems: 'center' },
   consentCopy: { gap: 8, alignItems: 'center' },
   consentTitle: { color: colors.text, fontSize: 20, fontWeight: '600', letterSpacing: -0.24 },

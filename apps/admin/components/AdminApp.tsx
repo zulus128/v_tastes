@@ -18,11 +18,12 @@ interface Overview {
   pendingReports: number;
   activeVenues: number;
   newUsers: { last24Hours: number; last7Days: number; last30Days: number };
+  newReviews: { last24Hours: number; last7Days: number; last30Days: number };
   analytics: { connected: boolean; propertyId: string; dau: number; mau: number; error: string | null };
   reviewCities: Array<{ city: string; count: number }>;
 }
 
-type SignupPeriod = '24h' | '7d' | '30d';
+type Period = '24h' | '7d' | '30d';
 
 interface ReportItem {
   id: string;
@@ -87,6 +88,7 @@ const emptyOverview: Overview = {
   pendingReports: 0,
   activeVenues: 0,
   newUsers: { last24Hours: 0, last7Days: 0, last30Days: 0 },
+  newReviews: { last24Hours: 0, last7Days: 0, last30Days: 0 },
   analytics: { connected: false, propertyId: '', dau: 0, mau: 0, error: null },
   reviewCities: [],
 };
@@ -163,15 +165,44 @@ function Metric({ label, value, note, tone = 'neutral' }: { label: string; value
   return <article className={`metric-card ${tone}`}><p>{label}</p><strong>{value.toLocaleString()}</strong><span>{note}</span></article>;
 }
 
-function OverviewView({ data }: { data: Overview }) {
-  const [signupPeriod, setSignupPeriod] = useState<SignupPeriod>('24h');
-  const max = Math.max(data.newUsers.last24Hours, data.newUsers.last7Days, data.newUsers.last30Days, 1);
+function PeriodPanel({ eyebrow, title, counts, unit }: {
+  eyebrow: string;
+  title: string;
+  counts: { last24Hours: number; last7Days: number; last30Days: number };
+  unit: string;
+}) {
+  const [period, setPeriod] = useState<Period>('24h');
   const periods = [
-    { key: '24h', label: '24h', description: 'last 24 hours', value: data.newUsers.last24Hours },
-    { key: '7d', label: '7d', description: 'last 7 days', value: data.newUsers.last7Days },
-    { key: '30d', label: '30d', description: 'last 30 days', value: data.newUsers.last30Days },
+    { key: '24h', label: '24h', description: 'last 24 hours', value: counts.last24Hours },
+    { key: '7d', label: '7d', description: 'last 7 days', value: counts.last7Days },
+    { key: '30d', label: '30d', description: 'last 30 days', value: counts.last30Days },
   ] as const;
-  const selectedPeriod = periods.find((period) => period.key === signupPeriod) ?? periods[0];
+  const max = Math.max(counts.last24Hours, counts.last7Days, counts.last30Days, 1);
+  const selected = periods.find((item) => item.key === period) ?? periods[0];
+  return <section className="panel">
+    <div className="panel-heading">
+      <div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div>
+      <div className="period-switcher" role="group" aria-label={`${title} period`}>
+        {periods.map((item) => <button
+          key={item.key}
+          type="button"
+          aria-pressed={period === item.key}
+          className={period === item.key ? 'active' : ''}
+          onClick={() => setPeriod(item.key)}
+        >{item.label}</button>)}
+      </div>
+    </div>
+    <div className="signup-period-value" aria-live="polite">
+      <strong>{selected.value.toLocaleString()}</strong>
+      <span>{unit} in the {selected.description}</span>
+    </div>
+    <div className="signup-period-bar" aria-hidden="true">
+      <div className="bar-track"><i style={{ width: `${selected.value === 0 ? 0 : Math.max(4, selected.value / max * 100)}%` }} /></div>
+    </div>
+  </section>;
+}
+
+function OverviewView({ data }: { data: Overview }) {
   return <>
     <div className="metrics">
       <Metric label="Total users" value={data.totalUsers} note="Registered profiles" />
@@ -180,31 +211,12 @@ function OverviewView({ data }: { data: Overview }) {
       <Metric label="Active venues" value={data.activeVenues} note="Available in discovery" />
     </div>
     <div className="metrics compact-metrics analytics-metrics">
-      <Metric label="DAU" value={data.analytics.dau} note={data.analytics.connected ? 'Google Analytics · yesterday' : 'Analytics permission needed'} />
-      <Metric label="MAU" value={data.analytics.mau} note={data.analytics.connected ? 'Google Analytics · 30 days' : `Property ${data.analytics.propertyId || 'not found'}`} />
+      <Metric label="Daily Active Users" value={data.analytics.dau} note={data.analytics.connected ? 'Google Analytics · today' : 'Analytics permission needed'} />
+      <Metric label="Monthly Active Users" value={data.analytics.mau} note={data.analytics.connected ? 'Google Analytics · 30 days' : `Property ${data.analytics.propertyId || 'not found'}`} />
     </div>
-    <div className="split-grid">
-      <section className="panel">
-        <div className="panel-heading">
-          <div><p className="eyebrow">GROWTH</p><h2>New signups</h2></div>
-          <div className="period-switcher" role="group" aria-label="New signups period">
-            {periods.map((period) => <button
-              key={period.key}
-              type="button"
-              aria-pressed={signupPeriod === period.key}
-              className={signupPeriod === period.key ? 'active' : ''}
-              onClick={() => setSignupPeriod(period.key)}
-            >{period.label}</button>)}
-          </div>
-        </div>
-        <div className="signup-period-value" aria-live="polite">
-          <strong>{selectedPeriod.value.toLocaleString()}</strong>
-          <span>new users in the {selectedPeriod.description}</span>
-        </div>
-        <div className="signup-period-bar" aria-hidden="true">
-          <div className="bar-track"><i style={{ width: `${selectedPeriod.value === 0 ? 0 : Math.max(4, selectedPeriod.value / max * 100)}%` }} /></div>
-        </div>
-      </section>
+    <div className="trio-grid">
+      <PeriodPanel eyebrow="GROWTH" title="New signups" counts={data.newUsers} unit="new users" />
+      <PeriodPanel eyebrow="CONTENT" title="Reviews posted" counts={data.newReviews} unit="reviews posted" />
       <section className="panel focus-panel">
         <p className="eyebrow">TODAY’S FOCUS</p>
         <h2>{data.pendingReports ? `${data.pendingReports} reports are waiting` : 'The moderation queue is clear'}</h2>
