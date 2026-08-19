@@ -79,6 +79,22 @@ const DARK_MAP_STYLE: MapStyleElement[] = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0D0D0D' }] },
 ];
 
+const LIGHT_MAP_STYLE: MapStyleElement[] = [
+  { elementType: 'geometry', stylers: [{ color: '#E8E7E5' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#6F7480' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#E8E7E5' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#C9C9C7' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#E8E7E5' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#DEDDDA' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#D5DED7' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#F5F4F1' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#D5D4D1' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#E1E0DD' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#D9D8D5' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C9D5DC' }] },
+];
+
 type Place = {
   venueId: string;
   name: string;
@@ -172,6 +188,7 @@ export function DiscoverScreen({
   const toggleFollow = useToggleFollow(userId);
   const [followPendingId, setFollowPendingId] = useState<string | null>(null);
   const [seeAllPlaces, setSeeAllPlaces] = useState<Venue[] | null>(null);
+  const mapMode = tab === 'places' && !favouritesOpen;
 
   function selectTab(value: DiscoverTab) {
     setTab(value);
@@ -191,8 +208,8 @@ export function DiscoverScreen({
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
+    <View style={[styles.screen, mapMode && styles.mapDiscoverScreen]}>
+      <View style={[styles.header, mapMode && styles.mapHeader]}>
         <View style={styles.switcher}>
           {(['trending', 'places', 'people'] as const).map((value) => (
             <Pressable
@@ -509,7 +526,7 @@ function PlacesMap({
   savedVenueIds: Set<string>;
   userId: string;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
@@ -669,7 +686,7 @@ function PlacesMap({
   return (
     <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
       <MapView
-        customMapStyle={DARK_MAP_STYLE}
+        customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
         initialRegion={region}
         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
         onRegionChangeComplete={setRegion}
@@ -680,7 +697,7 @@ function PlacesMap({
         showsUserLocation={locationEnabled}
         style={styles.mapNative}
         toolbarEnabled={false}
-        userInterfaceStyle="dark"
+        userInterfaceStyle={isDark ? 'dark' : 'light'}
       >
         {mappableVenues.map((venue) => {
           const saved = savedVenueIds.has(venue.id);
@@ -716,7 +733,10 @@ function PlacesMap({
           </Marker>
         ))}
       </MapView>
-      <View pointerEvents="none" style={styles.mapToneOverlay} />
+      <View
+        pointerEvents="none"
+        style={[styles.mapToneOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.19)' }]}
+      />
       <View style={styles.mapControls}>
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.55)} style={styles.mapControlButton}>
           <Text style={styles.mapControlGlyph}>+</Text>
@@ -1397,11 +1417,13 @@ function ProfileSuggestion({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
+  mapDiscoverScreen: { backgroundColor: colors.canvas },
   aiFab: { position: 'absolute', right: 16, bottom: 18, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },
   aiFabMark: { width: 20, height: 18 },
   aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
   aiFabMarkOutline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
   header: { height: 106, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
+  mapHeader: { position: 'absolute', zIndex: 10, top: 0, right: 0, left: 0, elevation: 10 },
   headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
   back: { color: colors.text, fontSize: 38, lineHeight: 40 },
   switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 999, backgroundColor: colors.surfaceRaised },
@@ -1521,7 +1543,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   gemReviews: { color: colors.textSecondary, fontSize: 12 },
   gemName: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gemMeta: { color: colors.textSecondary, fontSize: 11 },
-  mapScreen: { flex: 1, backgroundColor: '#161616', overflow: 'hidden' },
+  mapScreen: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
   mapNative: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   mapToneOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.32)' },
   mapRatingMarker: { width: 36, height: 44, shadowColor: '#E63946', shadowOpacity: 0.67, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
@@ -1536,28 +1558,28 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
   mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-  mapControls: { position: 'absolute', zIndex: 2, top: 88, right: 16, gap: 10 },
-  mapControlButton: { width: 40, height: 40, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 12, backgroundColor: 'rgba(22,22,22,0.88)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  mapControls: { position: 'absolute', zIndex: 5, top: 240, right: 16, gap: 10 },
+  mapControlButton: { width: 48, height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   mapControlButtonActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.9)' },
-  mapControlGlyph: { color: '#FFFFFF', fontSize: 22, lineHeight: 26, fontWeight: '700' },
-  layersMenu: { position: 'absolute', zIndex: 4, top: 88, right: 66, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1C1C1F', shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
-  layersTitle: { marginBottom: 4, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
+  mapControlGlyph: { color: colors.text, fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  layersMenu: { position: 'absolute', zIndex: 6, top: 240, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  layersTitle: { marginBottom: 4, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  layerOptionText: { color: '#FFFFFF', fontSize: 15 },
-  layerSwitch: { width: 38, height: 22, padding: 2, justifyContent: 'center', borderRadius: 11, backgroundColor: '#5A5B60' },
+  layerOptionText: { color: colors.text, fontSize: 15 },
+  layerSwitch: { width: 38, height: 22, padding: 2, justifyContent: 'center', borderRadius: 11, backgroundColor: colors.surfaceRaised },
   layerSwitchActive: { backgroundColor: colors.primary },
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
-  mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#161616', overflow: 'hidden' },
+  mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: '#242424' },
+  mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
   mapSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
   mapHeaderIcon: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center' },
   filterList: { flexGrow: 0, height: 38 },
   filterContent: { alignItems: 'center', gap: 6 },
-  filterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#161616' },
+  filterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   filterChipActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.12)' },
   filterIcon: { width: 14, height: 14, resizeMode: 'contain' },
   filterText: { color: colors.textSecondary, fontSize: 12 },
