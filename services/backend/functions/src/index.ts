@@ -1,7 +1,7 @@
 export { healthCheck } from './modules/health/functions';
 export { ingestMobileTelemetry } from './modules/observability/functions';
 export { askTastesAi } from './modules/ai/functions';
-export { clearNotifications, createGroup, getGroup, getProfileExtras, leaveGroup, listNotifications, listRequests, markNotificationRead, reportComment, respondToRequest, updateGroupMembers, updateNotificationPreferences } from './modules/community/functions';
+export { clearNotifications, createGroup, getGroup, getProfileExtras, getUnreadNotificationCount, leaveGroup, listNotifications, listRequests, markNotificationRead, reportComment, respondToRequest, updateGroupMembers, updateNotificationPreferences } from './modules/community/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
 export { followUser, importContacts, removeFollower, unfollowUser } from './modules/social/functions';
 export {

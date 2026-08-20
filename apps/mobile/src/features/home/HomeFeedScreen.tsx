@@ -54,6 +54,7 @@ import avatar from '../../../assets/home/avatar.png';
 import { useDiscoverFeed } from '../discover/api';
 import { useAuthenticatedUserId, useSession } from '../../session/SessionProvider';
 import { useProfile } from '../profile/api';
+import { useUnreadNotificationCount } from '../notifications/api';
 
 const tagInfo: Record<string, { label: string }> = {
   casual: { label: 'Casual' },
@@ -160,7 +161,7 @@ function FeedCard({
   reactionDisabled,
   isReactionActive,
   onShare,
-  onLongPress,
+  onOpenMenu,
 }: {
   item: FeedItem;
   onComments: () => void;
@@ -168,7 +169,7 @@ function FeedCard({
   reactionDisabled: boolean;
   isReactionActive: boolean;
   onShare: () => void;
-  onLongPress: () => void;
+  onOpenMenu: () => void;
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
@@ -189,7 +190,7 @@ function FeedCard({
 
   return (
     <>
-      <Pressable onLongPress={onLongPress} delayLongPress={350} style={styles.card}>
+      <Pressable onLongPress={onOpenMenu} delayLongPress={350} style={styles.card}>
       <View style={styles.authorRow}>
         <Image
           source={item.authorPhotoUrl ? { uri: item.authorPhotoUrl } : avatar}
@@ -200,6 +201,17 @@ function FeedCard({
           <Text numberOfLines={1} style={styles.authorHandle}>{username}</Text>
         </View>
         <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
+        <Pressable
+          accessibilityLabel="Open post menu"
+          hitSlop={10}
+          onPress={(event) => {
+            event.stopPropagation();
+            onOpenMenu();
+          }}
+          style={styles.moreButton}
+        >
+          <Text style={styles.moreButtonText}>•••</Text>
+        </Pressable>
       </View>
 
       <View style={styles.venueSection}>
@@ -487,12 +499,12 @@ export function HomeFeedScreen({
   const recommendationQuery = useDiscoverFeed(userId, recommendationProfileSignature);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
+  const { data: unreadNotificationCount = 0 } = useUnreadNotificationCount();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
   const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<Set<string>>(new Set());
   const [recommendationMenu, setRecommendationMenu] = useState(false);
-  const [recommendationHidden, setRecommendationHidden] = useState(false);
   const [reportReviewId, setReportReviewId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<ReportReason>(reportReasons[0] as ReportReason);
   const [reportDetails, setReportDetails] = useState('');
@@ -601,7 +613,7 @@ export function HomeFeedScreen({
       onShare={() => {
         void handleSharePress(item);
       }}
-      onLongPress={() => setMenuReviewId(item.id)}
+      onOpenMenu={() => setMenuReviewId(item.id)}
     />
   );
 
@@ -618,11 +630,16 @@ export function HomeFeedScreen({
           </Pressable>
           <TastesLogo />
           <Pressable
-            accessibilityLabel="Open notifications"
+            accessibilityLabel={unreadNotificationCount > 0 ? `Open notifications, ${unreadNotificationCount} unread` : 'Open notifications'}
             onPress={onOpenNotifications}
             style={styles.headerIcon}
           >
             <NotificationsGlyph />
+            {unreadNotificationCount > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{Math.min(unreadNotificationCount, 99)}</Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
         <View style={styles.switcher}>
@@ -661,7 +678,7 @@ export function HomeFeedScreen({
           maxToRenderPerBatch={6}
           ListHeaderComponent={<View style={styles.feedLead}>
             {visibleItems.slice(0, 2).map(renderFeedCard)}
-            {!recommendationHidden && typeof recommendationQuery.data?.forYou[0]?.matchPercent === 'number' ? (() => {
+            {typeof recommendationQuery.data?.forYou[0]?.matchPercent === 'number' ? (() => {
             const rec = recommendationQuery.data!.forYou[0]!;
             const priceDots = rec.priceLevel ? '$'.repeat(rec.priceLevel) : null;
             const distanceLabel = rec.distanceKm != null
@@ -762,7 +779,7 @@ export function HomeFeedScreen({
           onCancel={() => setMenuReviewId(null)}
         />
       ) : null}
-      {recommendationMenu ? <ActionSheet actions={[{ label: 'Why am I seeing this?', onPress: () => { setRecommendationMenu(false); showToast('Based on your tastes, ratings and saves'); } }, { label: 'Not interested', destructive: true, onPress: () => { setRecommendationMenu(false); setRecommendationHidden(true); showToast('Recommendation hidden'); } }]} onCancel={() => setRecommendationMenu(false)} /> : null}
+      {recommendationMenu ? <ActionSheet actions={[{ label: 'Why am I seeing this?', onPress: () => { setRecommendationMenu(false); showToast('Based on your tastes, ratings and saves'); } }]} onCancel={() => setRecommendationMenu(false)} /> : null}
       {reportReviewId ? (
         <ReportSheet
           selectedReason={selectedReason}
@@ -787,6 +804,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   header: { height: 157, paddingTop: 54, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
   headerTop: { height: 44, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  notificationBadge: { position: 'absolute', top: 2, right: 1, minWidth: 18, height: 18, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 2, borderColor: colors.background, backgroundColor: colors.primary },
+  notificationBadgeText: { color: colors.onPrimary, fontSize: 10, lineHeight: 12, fontWeight: '800' },
   switcher: { height: 40, marginTop: 7, marginHorizontal: 16, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: isDark ? colors.surfaceRaised : '#F3F0EB' },
   switch: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.pill },
   switchActive: { backgroundColor: isDark ? '#D9DDE5' : '#262626' },
@@ -826,6 +845,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   authorName: { color: colors.text, fontSize: 15, fontWeight: '600', lineHeight: 18, letterSpacing: -0.41 },
   authorHandle: { color: colors.textSecondary, fontSize: 13, lineHeight: 16, letterSpacing: -0.24 },
   date: { color: colors.text, fontSize: 14, letterSpacing: -0.24, opacity: 0.4 },
+  moreButton: { width: 32, height: 32, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
+  moreButtonText: { marginTop: -7, color: colors.text, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   venueSection: { paddingHorizontal: 16, gap: 4 },
   venue: { color: colors.text, fontSize: 16, fontWeight: '600', lineHeight: 20, letterSpacing: -0.24 },
   ratingTagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -1,3 +1,4 @@
+/* global module, process */
 const simulatorBuild = process.env.EXPO_PUBLIC_SIMULATOR_BUILD === 'true';
 
 module.exports = {

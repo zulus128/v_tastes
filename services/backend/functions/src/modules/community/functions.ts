@@ -74,6 +74,21 @@ export const listNotifications = onCall(
   },
 );
 
+export const getUnreadNotificationCount = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const notifications = db.collection('users').doc(uid).collection('notifications');
+  const [allNotifications, readNotifications] = await Promise.all([
+    notifications.count().get(),
+    notifications.where('unread', '==', false).count().get(),
+  ]);
+  return {
+    // Legacy notification rows did not always persist `unread: true`. Counting
+    // every row except explicitly read ones keeps the badge consistent with
+    // listNotifications, which treats a missing value as unread.
+    count: Math.max(0, allNotifications.data().count - readNotifications.data().count),
+  };
+});
+
 export const markNotificationRead = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(notificationInputSchema, request.data);

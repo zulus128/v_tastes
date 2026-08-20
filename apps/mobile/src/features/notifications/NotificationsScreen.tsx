@@ -1,4 +1,5 @@
 import type { AppNotification, AppRequest } from '@tastes/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,8 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import backIcon from '../../../assets/onboarding/back.png';
 import notificationIcon from '../../../assets/onboarding/permission-notifications.png';
 import patternDark from '../../../assets/onboarding/pattern-screen.png';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { unreadNotificationCountQueryKey } from './api';
 
 type NotificationTab = 'activity' | 'badges';
 type FeedEntry =
@@ -77,6 +79,8 @@ export function NotificationsScreen({
   onOpenTarget: (item: AppNotification) => void;
 }) {
   const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, isDark), [colors, insets.top, isDark]);
@@ -139,6 +143,7 @@ export function NotificationsScreen({
       setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: false } : candidate));
       try {
         await api.markNotificationRead({ notificationId: item.id });
+        queryClient.setQueryData<number>(unreadNotificationCountQueryKey(userId), (current) => Math.max(0, (current ?? 1) - 1));
       } catch {
         setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, unread: true } : candidate));
         Alert.alert('Could not mark notification as read', 'Please try again.');
@@ -154,6 +159,7 @@ export function NotificationsScreen({
       await api.clearNotifications();
       setItems([]);
       setNextCursor(null);
+      queryClient.setQueryData(unreadNotificationCountQueryKey(userId), 0);
     } catch {
       Alert.alert('Could not clear notifications', 'Please try again.');
     } finally {

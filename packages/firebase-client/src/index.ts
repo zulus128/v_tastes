@@ -150,6 +150,7 @@ export const callableOperationNames = [
   'askTastesAi',
   'reportSavedPlaceProximity',
   'sendCampaignNotification',
+  'getUnreadNotificationCount',
   'listNotifications',
   'markNotificationRead',
   'clearNotifications',
@@ -391,6 +392,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<SavedPlaceProximityInput, { notified: boolean }>('reportSavedPlaceProximity', input),
     sendCampaignNotification: (input: SendCampaignNotificationInput) =>
       invoke<SendCampaignNotificationInput, { type: string; recipients: number }>('sendCampaignNotification', input),
+    getUnreadNotificationCount: () =>
+      invoke<Record<string, never>, { count: number }>('getUnreadNotificationCount', {}),
     listNotifications: (input: ListNotificationsInput = { limit: 20 }) => invoke<ListNotificationsInput, Page<AppNotification>>('listNotifications', input),
     markNotificationRead: (input: NotificationInput) => invoke<NotificationInput, IdResult>('markNotificationRead', input),
     clearNotifications: () => invoke<Record<string, never>, { cleared: number }>('clearNotifications', {}),
