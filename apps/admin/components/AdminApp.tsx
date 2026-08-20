@@ -168,10 +168,10 @@ function Login() {
         <p className="eyebrow">STAFF PORTAL</p>
         <h1>Welcome back</h1>
         <p className="muted">Sign in with your administrator account.</p>
-        <label>Email<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@tastes.com" /></label>
-        <label>Password<input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" /></label>
+        <label>Email<input autoComplete="email" name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@tastes.com" /></label>
+        <label>Password<input autoComplete="current-password" name="password" type="password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" /></label>
         {error && <p className="form-error">{error}</p>}
-        <button className="button primary full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <button className="button primary full" disabled={busy} type="submit">{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </main>
   );
