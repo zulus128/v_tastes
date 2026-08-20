@@ -93,6 +93,19 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
   return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
 }
 
+function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<typeof createStyles> }) {
+  const clamped = Math.max(0, Math.min(5, rating));
+  return <View style={styles.ratingStars} accessibilityLabel={`${clamped.toFixed(1)} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((star) => {
+      const fill = Math.max(0, Math.min(1, clamped - star + 1));
+      return <View key={star} style={styles.ratingStarCell}>
+        <Text style={[styles.reviewStars, styles.reviewEmptyStars]}>★</Text>
+        {fill > 0 ? <View style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}><Text style={styles.reviewStars}>★</Text></View> : null}
+      </View>;
+    })}
+  </View>;
+}
+
 function MainReview({ onReact, reacting, review }: { onReact: () => void; reacting: boolean; review: CommentReview }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -104,7 +117,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
       <Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text>
     </View>
     <View style={styles.reviewBody}>
-      <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(review.rating)))}<Text style={styles.reviewEmptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(review.rating)))}</Text></Text></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
+      <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><RatingStars rating={review.rating} styles={styles} /></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
       {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
       <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={20} width={20} /></Pressable></View>
@@ -333,6 +346,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   reviewVenueRow: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
   reviewVenueCopy: { flex: 1, gap: 4 },
   reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  ratingStars: { flexDirection: 'row', gap: 1 },
+  ratingStarCell: { width: 17, height: 22, overflow: 'hidden' },
+  ratingStarFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
   reviewStars: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
   reviewEmptyStars: { color: colors.textMuted },
   reviewTag: { overflow: 'hidden', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20, color: colors.text, fontSize: 12, backgroundColor: colors.surfaceRaised },

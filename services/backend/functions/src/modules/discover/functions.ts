@@ -19,7 +19,7 @@ import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination'
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
-function toVenue(document: QueryDocumentSnapshot): Venue {
+function toVenue(document: QueryDocumentSnapshot, matchPercent?: number): Venue {
   return {
     id: document.id,
     name: String(document.get('name') ?? ''),
@@ -32,6 +32,7 @@ function toVenue(document: QueryDocumentSnapshot): Venue {
     distanceKm: document.get('distanceKm') != null ? Number(document.get('distanceKm')) : undefined,
     rating: document.get('rating') != null ? Number(document.get('rating')) : undefined,
     reviewCount: document.get('reviewCount') != null ? Number(document.get('reviewCount')) : undefined,
+    ...(matchPercent == null ? {} : { matchPercent }),
     latitude: document.get('latitude') != null ? Number(document.get('latitude')) : undefined,
     longitude: document.get('longitude') != null ? Number(document.get('longitude')) : undefined,
     discoverTags: Array.isArray(document.get('discoverTags'))
@@ -76,15 +77,34 @@ async function fetchTaggedVenues(
 
 export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
-  const [trending, newSpots, mostReviewed, forYou, hiddenGems, reviewsSnapshot, topReviewerSnapshot] = await Promise.all([
+  const userProfile = await db.collection('users').doc(uid).get();
+  const userCity = String(userProfile.get('city') ?? '').trim().toLocaleLowerCase();
+  const favoriteCuisines = Array.isArray(userProfile.get('favoriteCuisines'))
+    ? (userProfile.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string').map((value) => value.toLocaleLowerCase())
+    : [];
+  const favoriteDish = String((userProfile.get('tastePreferences') as { favoriteDish?: unknown } | undefined)?.favoriteDish ?? '').trim().toLocaleLowerCase();
+  const [trending, newSpots, mostReviewed, forYouCandidates, hiddenGems, reviewsSnapshot, topReviewerSnapshot] = await Promise.all([
     fetchTaggedVenues('trending', 'rating', 'desc', 3),
     fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
     fetchTaggedVenues('most-reviewed', 'reviewCount', 'desc', 6),
-    fetchTaggedVenues('for-you', 'rating', 'desc', 3),
+    fetchTaggedVenues('for-you', 'rating', 'desc', 12),
     fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
     db.collection('reviews').where('status', '==', 'published').orderBy('reactionCount', 'desc').limit(3).get(),
     db.collection('users').where('status', '==', 'active').orderBy('reviewCount', 'desc').limit(10).get(),
   ]);
+  const forYou = forYouCandidates
+    .filter((venue) => !userCity || venue.city.trim().toLocaleLowerCase() === userCity)
+    .map((venue) => {
+      const haystack = `${venue.name} ${venue.category ?? ''}`.toLocaleLowerCase();
+      const cuisineMatch = favoriteCuisines.some((cuisine) => haystack.includes(cuisine));
+      const dishMatch = Boolean(favoriteDish && haystack.includes(favoriteDish));
+      const ratingScore = Math.round(Math.max(0, Math.min(5, venue.rating ?? 0)));
+      const matchPercent = Math.min(99, 50 + (cuisineMatch ? 30 : 0) + (dishMatch ? 15 : 0) + ratingScore);
+      return { venue, matchPercent };
+    })
+    .sort((left, right) => right.matchPercent - left.matchPercent || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
+    .slice(0, 3)
+    .map(({ venue, matchPercent }) => ({ ...venue, matchPercent }));
 
   const reviewVenueIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('venueId'))))];
   const reviewAuthorIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('authorId'))))];

@@ -38,6 +38,7 @@ import {
   useReactToReview,
   useLatestFeedItem,
   useReportReview,
+  useHideReview,
 } from './api';
 import {
   HomeFeedEmptyState,
@@ -74,6 +75,19 @@ function categoryLabel(category: string) {
 }
 
 const reportReasons = ['Spam', 'Inappropriate', 'Harassment', 'Misinformation', 'Hate', 'Safety risk', 'Something else'] as const;
+
+function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<typeof createStyles> }) {
+  const clamped = Math.max(0, Math.min(5, rating));
+  return <View style={styles.starRow} accessibilityLabel={`${clamped.toFixed(1)} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((star) => {
+      const fill = Math.max(0, Math.min(1, clamped - star + 1));
+      return <View key={star} style={styles.starCell}>
+        <Text style={[styles.star, styles.starEmpty]}>★</Text>
+        {fill > 0 ? <View style={[styles.starFill, { width: `${fill * 100}%` }]}><Text style={[styles.star, styles.starFilled]}>★</Text></View> : null}
+      </View>;
+    })}
+  </View>;
+}
 
 function DishPhoto({ photoPath }: { photoPath?: string }) {
   const [uri, setUri] = useState<string>();
@@ -177,19 +191,7 @@ function FeedCard({
       <View style={styles.venueSection}>
         <Text style={styles.venue}>{item.venueName}</Text>
         <View style={styles.ratingTagRow}>
-          <View style={styles.starRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Text
-                key={star}
-                style={[
-                  styles.star,
-                  star <= Math.round(item.rating) ? styles.starFilled : styles.starEmpty,
-                ]}
-              >
-                ★
-              </Text>
-            ))}
-          </View>
+          <RatingStars rating={item.rating} styles={styles} />
           {primaryTag ? (
             <View style={styles.tagBadge}>
               <Text style={styles.tagBadgeText}>
@@ -255,7 +257,7 @@ function FeedCard({
       <View style={styles.metrics}>
         <View style={styles.metricsLeft}>
           <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
-            <HeartIcon color={isReactionActive ? colors.primary : colors.text} height={20} width={20} />
+            {isReactionActive ? <Text style={styles.filledHeart}>♥</Text> : <HeartIcon color={colors.text} height={20} width={20} />}
             <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
               {item.reactionCount}
             </Text>
@@ -459,6 +461,7 @@ export function HomeFeedScreen({
   const recommendationQuery = useDiscoverFeed(userId);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
+  const hideMutation = useHideReview();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
   const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
@@ -533,6 +536,16 @@ export function HomeFeedScreen({
     showToast('User blocked');
   };
 
+  const handleHidePress = async (itemId: string) => {
+    setMenuReviewId(null);
+    try {
+      await hideMutation.mutateAsync(itemId);
+      showToast('Post hidden');
+    } catch {
+      Alert.alert('Could not hide post', 'Please try again.');
+    }
+  };
+
   const handleReportSubmit = async () => {
     if (!reportReviewId) {
       return;
@@ -541,6 +554,7 @@ export function HomeFeedScreen({
     try {
       await reportMutation.mutateAsync({
         reviewId,
+        targetType: 'review',
         reason: selectedReason,
         details: reportDetails || undefined,
       });
@@ -631,7 +645,7 @@ export function HomeFeedScreen({
                     <Text style={styles.recommendedBadgeText}>Recommended</Text>
                   </View>
                   <Text numberOfLines={1} style={styles.recommendationMatch}>
-                    <Text style={styles.recommendationMatchScore}>98% </Text>
+                    <Text style={styles.recommendationMatchScore}>{rec.matchPercent ?? 0}% </Text>
                     {rec.category ? `match on your ${rec.category.toLowerCase()} taste` : 'match based on your tastes and saves'}
                   </Text>
                 </View>
@@ -721,6 +735,7 @@ export function HomeFeedScreen({
               setReportReviewId(menuReviewId);
               setMenuReviewId(null);
             } },
+            { label: 'Not interested', onPress: () => void handleHidePress(menuReviewId) },
             { label: 'Block this user', destructive: true, onPress: () => handleBlockPress(menuReviewId) },
           ]}
           onCancel={() => setMenuReviewId(null)}
@@ -793,6 +808,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   venue: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
   ratingTagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   starRow: { flexDirection: 'row', gap: 3 },
+  starCell: { width: 17, height: 22, overflow: 'hidden' },
+  starFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
   star: { fontSize: 18, lineHeight: 20 },
   starFilled: { color: '#E53935' },
   starEmpty: { color: '#E53935', opacity: 0.2 },
@@ -814,6 +831,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metricActive: { color: colors.text, fontWeight: '700' },
   metricDisabled: { opacity: 0.5 },
+  filledHeart: { color: colors.primary, fontSize: 21, lineHeight: 21 },
   dishesButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
   dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '500' },
 });

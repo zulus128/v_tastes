@@ -61,6 +61,7 @@ export const venueSchema = z.object({
   distanceKm: z.number().nonnegative().optional(),
   rating: z.number().min(0).max(5).optional(),
   reviewCount: z.number().int().nonnegative().optional(),
+  matchPercent: z.number().int().min(0).max(100).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   discoverTags: z.array(discoverTagSchema).optional(),

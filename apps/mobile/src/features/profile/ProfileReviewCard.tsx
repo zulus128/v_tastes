@@ -58,6 +58,19 @@ function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string;
     : <View style={[imageStyle, staticStyles.dishImagePlaceholder]}>{state.failed ? <Text style={staticStyles.dishImageError}>Photo unavailable</Text> : null}</View>;
 }
 
+function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<typeof createStyles> }) {
+  const clamped = Math.max(0, Math.min(5, rating));
+  return <View style={styles.ratingStars} accessibilityLabel={`${clamped.toFixed(1)} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((star) => {
+      const fill = Math.max(0, Math.min(1, clamped - star + 1));
+      return <View key={star} style={styles.ratingStarCell}>
+        <Text style={[styles.reviewStars, styles.emptyStars]}>★</Text>
+        {fill > 0 ? <View style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}><Text style={styles.reviewStars}>★</Text></View> : null}
+      </View>;
+    })}
+  </View>;
+}
+
 export function ProfileReviewCard({
   fallbackImageUrl,
   item,
@@ -97,10 +110,7 @@ export function ProfileReviewCard({
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>
             <Text numberOfLines={1} style={styles.reviewVenue}>{item.venueName}</Text>
-            <Text style={styles.reviewStars}>
-              {'★'.repeat(Math.max(1, Math.round(item.rating)))}
-              <Text style={styles.emptyStars}>{'★'.repeat(Math.max(0, 5 - Math.round(item.rating)))}</Text>
-            </Text>
+            <RatingStars rating={item.rating} styles={styles} />
           </View>
           {tags[0] ? <Text style={styles.visitTag}>{tagLabels[tags[0]] ?? tags[0]}</Text> : null}
         </View>
@@ -156,6 +166,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   reviewVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reviewVenueCopy: { flex: 1, gap: 3 },
   reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  ratingStars: { flexDirection: 'row', gap: 1 },
+  ratingStarCell: { width: 17, height: 22, overflow: 'hidden' },
+  ratingStarFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
   reviewStars: { color: '#D33B35', fontSize: 18, letterSpacing: 1 },
   emptyStars: { color: '#D33B35', opacity: 0.3 },
   visitTag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 40, overflow: 'hidden', backgroundColor: colors.surfaceRaised, color: colors.text, fontSize: 12 },

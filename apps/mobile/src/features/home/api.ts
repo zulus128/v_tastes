@@ -8,9 +8,7 @@ import {
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import type { FeedItem, Page } from '@tastes/contracts';
-import type {
-  ReportReviewInput,
-} from '@tastes/contracts';
+import type { ReportContentInput } from '@tastes/contracts';
 
 type FeedReactionState = Record<string, boolean>;
 
@@ -209,10 +207,11 @@ export function useHideReview() {
 
 export function useReportReview() {
   const api = useTastesApi();
-  return useMutation<{ id: string }, Error, Omit<ReportReviewInput, 'idempotencyKey'>>({
+  return useMutation<{ id: string }, Error, Omit<ReportContentInput, 'idempotencyKey'>>({
     mutationFn: async (input) => {
-      const response = await api.reportReview({
+      const response = await api.reportContent({
       ...input,
+      targetType: 'review',
       idempotencyKey: createIdempotencyKey('report-review'),
       });
       return response.data;
