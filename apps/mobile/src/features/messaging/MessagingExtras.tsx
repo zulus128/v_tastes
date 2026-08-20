@@ -16,8 +16,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
+import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
-import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -121,7 +122,7 @@ export function NewGroupScreen({
   onBack: () => void;
   onCreated: (groupId: string) => void;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const api = useTastesApi();
@@ -197,7 +198,7 @@ export function NewGroupScreen({
           onPress={() => setQuery('')}
           style={styles.contactsButton}
         >
-          <InviteUsersIcon height={20} width={22} />
+          {isDark ? <UserHeartIcon height={21.5} width={21.5} /> : <UserHeartLightIcon height={21.5} width={21.5} />}
         </Pressable>
       </View>
       {loading ? (
@@ -558,11 +559,11 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       marginHorizontal: 16,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 12,
     },
     search: {
       flex: 1,
-      height: 40,
+      height: 39,
       paddingHorizontal: 11,
       flexDirection: 'row',
       alignItems: 'center',
@@ -572,14 +573,10 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 21 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16 },
     contactsButton: {
-      width: 40,
-      height: 40,
-      borderWidth: 1,
-      borderColor: colors.primary,
-      borderRadius: 12,
+      width: 24,
+      height: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceRaised,
     },
     section: {
       marginHorizontal: 16,
@@ -595,8 +592,8 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       marginHorizontal: 16,
       flexDirection: 'row',
       alignItems: 'center',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.hairline,
     },
     avatar: { width: 42, height: 42, borderRadius: 21 },
     avatarFallback: {

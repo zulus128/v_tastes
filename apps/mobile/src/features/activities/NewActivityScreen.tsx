@@ -16,10 +16,14 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BookmarkBodyIcon from '../../../assets/activities/bookmark-body.svg';
+import BookmarkBodyLightIcon from '../../../assets/activities/bookmark-body-light.svg';
+import BookmarkLineIcon from '../../../assets/activities/bookmark-line.svg';
+import BookmarkLineLightIcon from '../../../assets/activities/bookmark-line-light.svg';
+import SearchTuneIcon from '../../../assets/activities/place-tuning.svg';
+import SearchTuneLightIcon from '../../../assets/activities/place-tuning-light.svg';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
-import SearchTuneIcon from '../../../assets/onboarding/place-tuning.svg';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -58,7 +62,7 @@ export function NewActivityScreen({
   onCreated: (activityId: string) => void;
   userId: string;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
@@ -193,7 +197,7 @@ export function NewActivityScreen({
         </Pressable>
       </View>
 
-      <PlaceSelector onClose={() => setPlaceOpen(false)} onSelect={(next) => { setVenue(next); setPlaceOpen(false); }} styles={styles} userId={userId} visible={placeOpen} />
+      <PlaceSelector dark={isDark} onClose={() => setPlaceOpen(false)} onSelect={(next) => { setVenue(next); setPlaceOpen(false); }} styles={styles} userId={userId} visible={placeOpen} />
       <MemberSelector candidates={candidates} onClose={() => setMembersOpen(false)} onConfirm={(ids) => { setMemberIds(ids); setMembersOpen(false); }} selectedIds={memberIds} styles={styles} visible={membersOpen} />
       <TimeSelector onClose={() => setTimeOpen(false)} onSelect={(hour, minute) => { const next = new Date(startsAt); next.setHours(hour, minute, 0, 0); setStartsAt(next); setTimeOpen(false); }} styles={styles} value={startsAt} visible={timeOpen} />
     </View>
@@ -210,7 +214,7 @@ function SheetHeader({ onClose, styles, title }: { onClose: () => void; styles: 
   return <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{title}</Text><Pressable accessibilityLabel="Close" onPress={onClose} style={styles.closeCircle}><Text style={styles.closeText}>×</Text></Pressable></View>;
 }
 
-function PlaceSelector({ onClose, onSelect, styles, userId, visible }: { onClose: () => void; onSelect: (venue: Venue) => void; styles: ReturnType<typeof createStyles>; userId: string; visible: boolean }) {
+function PlaceSelector({ dark, onClose, onSelect, styles, userId, visible }: { dark: boolean; onClose: () => void; onSelect: (venue: Venue) => void; styles: ReturnType<typeof createStyles>; userId: string; visible: boolean }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'Cafe' | 'Club' | 'Restaurant' | null>('Restaurant');
   const [priceFilter, setPriceFilter] = useState(false);
@@ -238,18 +242,23 @@ function PlaceSelector({ onClose, onSelect, styles, userId, visible }: { onClose
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.modalBackdrop}><View style={styles.sheet}>
         <SheetHeader onClose={onClose} styles={styles} title="Select Place" />
-        <View style={styles.sheetSearch}>
-          <Text style={styles.searchGlyph}>⌕</Text>
-          <TextInput onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} />
-          {search ? <Pressable accessibilityLabel="Clear search" onPress={() => setSearch('')}><Text style={styles.searchClear}>×</Text></Pressable> : null}
+        <View style={styles.sheetSearchRow}>
+          <View style={styles.sheetSearch}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} />
+            {search ? <Pressable accessibilityLabel="Clear search" onPress={() => setSearch('')}><Text style={styles.searchClear}>×</Text></Pressable> : null}
+          </View>
           <Pressable accessibilityLabel="Place filters" onPress={() => setCategoryFilter((value) => value ? null : 'Restaurant')} style={styles.searchAction}>
-            <SearchTuneIcon color={styles.searchPlaceholder.color} height={24} width={24} />
+            {dark ? <SearchTuneIcon height={21.184} width={17.184} /> : <SearchTuneLightIcon height={21.184} width={17.184} />}
           </Pressable>
-          <Pressable accessibilityLabel="Saved places" onPress={() => setSavedOnly((active) => !active)} style={[styles.searchAction, savedOnly && styles.searchActionActive]}>
-            <BookmarkIcon height={18} width={16} />
+          <Pressable accessibilityLabel="Saved places" accessibilityState={{ selected: savedOnly }} onPress={() => setSavedOnly((active) => !active)} style={[styles.searchAction, savedOnly && styles.searchActionActive]}>
+            <View style={styles.bookmarkIcon}>
+              {dark ? <BookmarkBodyIcon height={21.5} style={styles.bookmarkBody} width={19.5} /> : <BookmarkBodyLightIcon height={21.5} style={styles.bookmarkBody} width={19.5} />}
+              {dark ? <BookmarkLineIcon height={1.5} style={styles.bookmarkLine} width={7.5} /> : <BookmarkLineLightIcon height={1.5} style={styles.bookmarkLine} width={7.5} />}
+            </View>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
           {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
             const active = categoryFilter === filter;
             return (
@@ -323,7 +332,24 @@ function createStyles(colors: ThemeColors) {
     addMember: { width: 44, height: 44, marginLeft: 16, marginTop: 5, borderWidth: 1, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, addMemberText: { color: colors.text, fontSize: 28, fontWeight: '300' },
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 31, backgroundColor: colors.canvas }, createButton: { height: 54, borderWidth: 5, borderColor: colors.primaryBorder, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, createText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 }, disabled: { opacity: 0.45 },
     modalBackdrop: { flex: 1, paddingTop: 86, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' }, sheet: { maxHeight: '91%', minHeight: '72%', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, closeCircle: { width: 30, height: 30, borderWidth: 2, borderColor: colors.text, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
-    placeList: { flex: 1 }, sheetSearch: { height: 42, marginHorizontal: 16, marginTop: 16, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, fontSize: 21, marginRight: 8 }, sheetSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 }, searchPlaceholder: { color: colors.placeholder }, searchClear: { color: colors.textSecondary, fontSize: 22 }, searchAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#45474B' }, searchActionActive: { backgroundColor: colors.primary }, filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 }, filter: { height: 34, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }, filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised }, filterText: { color: colors.text, fontSize: 12, lineHeight: 16 }, loader: { marginTop: 40 }, emptyText: { color: colors.textMuted, margin: 32, textAlign: 'center' },
+    placeList: { flex: 1 },
+    sheetSearchRow: { marginHorizontal: 16, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    sheetSearch: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
+    searchGlyph: { color: colors.textSecondary, fontSize: 21, marginRight: 8 },
+    sheetSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    searchPlaceholder: { color: colors.placeholder },
+    searchClear: { color: colors.textSecondary, fontSize: 22 },
+    searchAction: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+    searchActionActive: { borderRadius: 12, backgroundColor: colors.primary },
+    bookmarkIcon: { width: 24, height: 24 },
+    bookmarkBody: { position: 'absolute', left: 2.25, top: 1.25 },
+    bookmarkLine: { position: 'absolute', left: 8.25, top: 5.25 },
+    filtersScroll: { flexGrow: 0, flexShrink: 0, height: 48 },
+    filters: { gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+    filter: { height: 28, paddingHorizontal: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+    filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
+    filterText: { color: colors.text, fontSize: 13, lineHeight: 20 },
+    loader: { marginTop: 40 }, emptyText: { color: colors.textMuted, margin: 32, textAlign: 'center' },
     placeRow: { minHeight: 165, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'flex-start' }, placeImage: { width: 122, height: 122, borderRadius: 10 }, placeCopy: { flex: 1, minWidth: 0, marginLeft: 15, paddingTop: 18 }, placeName: { color: colors.text, fontSize: 15, fontWeight: '700' }, placeAddress: { color: colors.textSecondary, marginTop: 5, fontSize: 13 }, placeMeta: { marginTop: 13, minWidth: 0, flexDirection: 'row', alignItems: 'center' }, rating: { color: '#FFFFFF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.primary, fontWeight: '700' }, reviews: { flexShrink: 1, color: colors.textMuted, marginLeft: 8, fontSize: 13, lineHeight: 16 }, rowPlus: { color: colors.text, fontSize: 23 },
     candidateRow: { minHeight: 76, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' }, radio: { width: 23, height: 23, borderWidth: 1.5, borderColor: colors.text, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, radioChecked: { borderColor: colors.primary, backgroundColor: colors.primary }, check: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     sheetFooter: { padding: 16, flexDirection: 'row', gap: 10, backgroundColor: colors.background }, cancelButton: { flex: 1, height: 45, borderWidth: 1, borderColor: colors.primary, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }, cancelText: { color: colors.text, fontWeight: '600' }, confirmButton: { flex: 1, minHeight: 45, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, confirmText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },

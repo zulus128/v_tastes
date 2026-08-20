@@ -110,7 +110,16 @@ export function ProfileReviewCard({
         </View>
         {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={16} width={16} /></View> : null}
         <Text style={styles.reviewDate}>{formatDisplayDate(item.createdAt)}</Text>
-        <Pressable accessibilityLabel="Review actions" onPress={onMore}><Text style={styles.moreGlyph}>⋮</Text></Pressable>
+        <Pressable
+          accessibilityLabel="Review actions"
+          accessibilityRole="button"
+          hitSlop={4}
+          onPress={onMore}
+          pressRetentionOffset={12}
+          style={styles.moreButton}
+        >
+          <Text style={styles.moreGlyph}>⋮</Text>
+        </Pressable>
       </View>
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
@@ -185,7 +194,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   reviewHandle: { color: colors.textSecondary, fontSize: 13 },
   reviewDate: { color: colors.text, fontSize: 14, opacity: 0.4 },
   pinBadge: { position: 'absolute', zIndex: 1, top: -2, right: -6, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  moreGlyph: { marginLeft: 8, color: colors.textMuted, fontSize: 24 },
+  moreButton: { width: 44, height: 44, marginRight: -12, alignItems: 'center', justifyContent: 'center' },
+  moreGlyph: { color: colors.textMuted, fontSize: 24, lineHeight: 28 },
   reviewBody: { padding: 16, gap: 16 },
   reviewVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reviewVenueCopy: { flex: 1, gap: 3 },

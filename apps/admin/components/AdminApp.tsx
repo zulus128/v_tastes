@@ -502,8 +502,11 @@ function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; i
   }
   async function changeStatus() {
     if (!statusAction) return;
-    if (!await run('setVenueStatus', { venueId: statusAction.venue.id, status: statusAction.status })) return;
+    const action = statusAction;
     setStatusAction(null);
+    if (!await run('setVenueStatus', { venueId: action.venue.id, status: action.status })) {
+      setStatusAction(action);
+    }
   }
   return <>
     {isAdmin && <div className="toolbar-right"><button className="button primary" onClick={() => setEditing('new')}><Icon name="plus"/> Add venue</button></div>}
@@ -512,7 +515,7 @@ function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; i
       ? <VenueForm close={() => setEditing(null)} saved={refresh}/>
       : <VenueForm venue={editing} close={() => setEditing(null)} saved={refresh}/>)} 
     {merging && <ModalShell eyebrow="VENUE MERGE" title={`Merge ${merging.name}`} close={() => setMerging(null)}><form onSubmit={merge}><p className="modal-copy">All reviews will move to the selected venue. The source venue will remain as a merged record.</p><label>Destination venue<select required value={targetVenueId} onChange={(event) => setTargetVenueId(event.target.value)}><option value="">Select a venue…</option>{venues.filter((venue) => venue.id !== merging.id && venue.status !== 'merged' && venue.status !== 'removed').map((venue) => <option key={venue.id} value={venue.id}>{venue.name} · {venue.city}</option>)}</select></label><div className="actions end"><button type="button" className="button ghost" onClick={() => setMerging(null)}>Cancel</button><button className="button danger" disabled={!targetVenueId}>Merge venues</button></div></form></ModalShell>}
-    {statusAction && <ModalShell eyebrow="VENUE STATUS" title={`${statusAction.status === 'active' ? 'Restore' : statusAction.status === 'hidden' ? 'Hide' : 'Remove'} ${statusAction.venue.name}`} close={() => setStatusAction(null)}><p className="modal-copy">{statusAction.status === 'removed' ? 'The venue will disappear from discovery but remain in the database and audit log.' : `The venue status will change to ${statusAction.status}.`}</p><div className="actions end"><button className="button ghost" onClick={() => setStatusAction(null)}>Cancel</button><button className={statusAction.status === 'removed' ? 'button danger' : 'button primary'} onClick={() => void changeStatus()}>Confirm</button></div></ModalShell>}
+    {statusAction && <ModalShell eyebrow="VENUE STATUS" title={`${statusAction.status === 'active' ? 'Restore' : statusAction.status === 'hidden' ? 'Hide' : 'Remove'} ${statusAction.venue.name}`} close={() => setStatusAction(null)}><p className="modal-copy">{statusAction.status === 'removed' ? 'The venue will disappear from discovery but remain in the database and audit log.' : `The venue status will change to ${statusAction.status}.`}</p><div className="actions end"><button type="button" className="button ghost" onClick={() => setStatusAction(null)}>Cancel</button><button type="button" className={statusAction.status === 'removed' ? 'button danger' : 'button primary'} onClick={() => void changeStatus()}>Confirm</button></div></ModalShell>}
   </>;
 }
 
