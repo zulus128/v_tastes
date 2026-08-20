@@ -45,19 +45,20 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
       active = false;
     };
   }, [api]);
+  const groupRequests = requests.filter((item) => item.kind === 'group');
   const respond = async (item: AppRequest, response: 'accepted' | 'declined') => {
     await api.respondToRequest({ requestId: item.id, response });
     setRequests((current) => current.filter((candidate) => candidate.id !== item.id));
   };
   const deleteAll = async () => {
-    const pending = [...requests];
+    const pending = [...groupRequests];
     await Promise.all(pending.map((item) => api.respondToRequest({ requestId: item.id, response: 'declined' })));
     setRequests([]);
   };
   return (
     <Screen style={styles.screen}>
       <Header
-        action={requests.length ? 'Delete all' : undefined}
+        action={groupRequests.length ? 'Delete all' : undefined}
         onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
         onBack={onBack}
         styles={styles}
@@ -75,7 +76,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
         ) : (
           <FlatList
             contentContainerStyle={styles.list}
-            data={requests}
+            data={groupRequests}
             keyExtractor={(item) => item.id}
             ListEmptyComponent={
               <Empty

@@ -201,7 +201,10 @@ export function ConversationsScreen({
             <Text style={styles.searchIcon}>⌕</Text>
             <TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} />
           </View>
-          <Pressable onPress={onOpenRequests}><Text style={styles.requests}>Requests {requestCount > 0 ? <Text style={styles.requestsCount}>({requestCount})</Text> : null}</Text></Pressable>
+          <Pressable accessibilityLabel={requestCount > 0 ? `Requests, ${requestCount} unread` : 'Requests'} onPress={onOpenRequests} style={styles.requestsButton}>
+            <Text style={styles.requests}>Requests</Text>
+            {requestCount > 0 ? <View style={styles.requestsBadge}><Text style={styles.requestsBadgeText}>{Math.min(requestCount, 99)}</Text></View> : null}
+          </Pressable>
         </View>
       </View>
       <ImageBackground
@@ -276,10 +279,13 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     addCircle: { width: 22, height: 22, borderWidth: 1.5, borderColor: colors.text, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.text, fontSize: 19, lineHeight: 19, fontWeight: '300' },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    requestsButton: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     searchBox: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
     searchIcon: { color: colors.textSecondary, fontSize: 22, marginRight: 8, marginTop: -2 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-    requests: { color: colors.textSecondary, fontSize: 14 }, requestsCount: { color: colors.primary },
+    requests: { color: colors.textSecondary, fontSize: 14 },
+    requestsBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    requestsBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
     listContent: { paddingTop: 10, paddingBottom: 24 },
     list: { flex: 1 },
     emptyContent: { flexGrow: 1 },

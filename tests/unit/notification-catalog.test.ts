@@ -10,7 +10,7 @@ import {
 
 describe('notification catalog', () => {
   it('describes every catalog entry with a channel and copy', () => {
-    expect(notificationTypes).toHaveLength(43);
+    expect(notificationTypes).toHaveLength(44);
     for (const type of notificationTypes) {
       const definition = notificationCatalog[type];
       expect(definition.type).toBe(type);

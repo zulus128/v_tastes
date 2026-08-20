@@ -7,6 +7,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { enforceRateLimit, idempotentDocumentId } from '../../shared/mutations';
+import { queueNotification } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { parseInput } from '../../shared/validation';
 
@@ -171,6 +172,18 @@ export const createActivity = onCall(callableOptions, async (request) => {
       status: 'active',
       createdAt: now,
       updatedAt: now,
+    });
+    const organizerName = String(user.get('displayName') ?? 'Someone');
+    input.memberIds.forEach((memberId) => {
+      queueNotification(transaction, {
+        recipientId: memberId,
+        type: 'activity-invite',
+        eventKey: activityRef.id,
+        actorId: uid,
+        actorName: organizerName,
+        params: { place: String(venue.get('name') ?? 'an activity') },
+        targetId: activityRef.id,
+      });
     });
   });
 
