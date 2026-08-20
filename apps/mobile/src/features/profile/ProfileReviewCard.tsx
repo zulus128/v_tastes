@@ -77,6 +77,7 @@ export function ProfileReviewCard({
   onComments,
   onMore,
   onReact,
+  reacted = false,
   onShare,
   profile,
 }: {
@@ -85,6 +86,7 @@ export function ProfileReviewCard({
   onComments: () => void;
   onMore: () => void;
   onReact: () => void;
+  reacted?: boolean;
   onShare: () => void;
   profile: ProfileData;
 }) {
@@ -127,7 +129,7 @@ export function ProfileReviewCard({
         ) : null}
         <Text numberOfLines={4} style={styles.reviewText}>{item.text}</Text>
         <View style={styles.metrics}>
-          <Pressable onPress={onReact}><Text style={styles.metric}>♡ {item.reactionCount}</Text></Pressable>
+          <Pressable onPress={onReact}><Text style={[styles.metric, reacted && styles.metricActive]}>{reacted ? '♥' : '♡'} {item.reactionCount}</Text></Pressable>
           <Pressable accessibilityLabel="Open comments" onPress={onComments} style={styles.metricIconRow}>
             <ChatIcon color={colors.text} height={20} width={20} />
             <Text style={styles.metric}>{item.commentCount}</Text>
@@ -180,6 +182,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   metrics: { paddingTop: 2, flexDirection: 'row', gap: 20 },
   metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metric: { color: colors.text, fontSize: 14 },
+  metricActive: { color: colors.primary },
   photoModalScrim: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.84)' },
   photoModal: { width: '100%', maxWidth: 430, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   photoModalHeader: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },

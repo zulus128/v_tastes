@@ -156,7 +156,17 @@ export function ProfileScreen({
   const [reviewActionPending, setReviewActionPending] = useState(false);
   const [favoritePlaceName, setFavoritePlaceName] = useState<string | null>(null);
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
+  const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<{ venueName: string; text: string } | null>(null);
+
+  async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
+    try {
+      const response = await api.reactToReview({ idempotencyKey: createIdempotencyKey(idempotencyPrefix), reviewId, reaction: 'like' });
+      setProfileReactions((current) => ({ ...current, [reviewId]: response.data.active }));
+    } catch (error) {
+      Alert.alert('Could not update reaction', apiErrorMessage(error));
+    }
+  }
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
   useFocusEffect(useMemo(() => () => {
@@ -418,7 +428,8 @@ export function ProfileScreen({
               item={review}
               onComments={() => onOpenComments(review.id)}
               onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
-              onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+              onReact={() => void reactToProfileReview(review.id, 'profile-reaction')}
+              reacted={profileReactions[review.id] ?? review.reacted}
               onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
               profile={profile}
             /></View>}
@@ -485,7 +496,8 @@ export function ProfileScreen({
               item={review}
               onComments={() => onOpenComments(review.id)}
               onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
-              onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('profile-map-reaction'), reviewId: review.id, reaction: 'like' }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
+              onReact={() => void reactToProfileReview(review.id, 'profile-map-reaction')}
+              reacted={profileReactions[review.id] ?? review.reacted}
               onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
               profile={profile}
             /></View>)}
