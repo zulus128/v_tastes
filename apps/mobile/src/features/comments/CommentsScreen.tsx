@@ -226,7 +226,13 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
     if (!reportCommentId || reporting) return;
     setReporting(true);
     try {
-      await api.reportComment({ idempotencyKey: createIdempotencyKey('comment-report'), reviewId, commentId: reportCommentId, reason: reportReason, details: reportDetails || undefined });
+      await api.reportComment({
+        idempotencyKey: createIdempotencyKey('comment-report'),
+        reviewId,
+        commentId: reportCommentId,
+        reason: reportReason,
+        ...(reportDetails.trim() ? { details: reportDetails.trim() } : {}),
+      });
       setReportCommentId(null); setReportDetails(''); setReportReason('Inappropriate'); setReportSent(true);
     } catch { Alert.alert('Could not send report', 'Please try again.'); } finally { setReporting(false); }
   }

@@ -253,7 +253,14 @@ function ReportsView({ reports, run }: { reports: ReportItem[]; run: RunAdmin })
   if (!reports.length) return <Empty title="No pending reports" text="New content reports will appear here." />;
   return <><div className="report-grid">{reports.map((report) => <article className="report-card" key={report.id}>
     <div className="report-top"><span className="status-pill warning">{report.reason}</span><time>{formatDate(report.createdAt)}</time></div>
-    <p className="content-preview">“{report.contentPreview || report.details || 'No preview available'}”</p>
+    <section className="report-content">
+      <p className="report-field-label">Reported content</p>
+      <p className="content-preview">“{report.contentPreview || 'No preview available'}”</p>
+    </section>
+    <section className="report-context">
+      <div><p className="report-field-label">Reason</p><p>{report.reason}</p></div>
+      <div><p className="report-field-label">Explanation</p><p>{report.details || 'No additional explanation provided.'}</p></div>
+    </section>
     <dl><div><dt>Reporter</dt><dd>{report.reporterName}</dd></div><div><dt>Content</dt><dd>{report.targetType} · {report.targetId.slice(0, 10)}</dd></div></dl>
     <div className="actions">
       <button className="button ghost" onClick={() => run('dismissReport', { reportId: report.id })}>Dismiss</button>

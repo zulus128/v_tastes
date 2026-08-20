@@ -1,4 +1,5 @@
 import { getDownloadURL, ref } from 'firebase/storage';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -43,7 +44,6 @@ import {
   useReactToReview,
   useLatestFeedItem,
   useReportReview,
-  useHideReview,
 } from './api';
 import {
   HomeFeedEmptyState,
@@ -487,7 +487,6 @@ export function HomeFeedScreen({
   const recommendationQuery = useDiscoverFeed(userId, recommendationProfileSignature);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
-  const hideMutation = useHideReview();
   const { data: reactionState = {} } = useFeedReactionState();
   const [pendingReactions, setPendingReactions] = useState<Record<string, boolean>>({});
   const [menuReviewId, setMenuReviewId] = useState<string | null>(null);
@@ -562,16 +561,6 @@ export function HomeFeedScreen({
     showToast('User blocked');
   };
 
-  const handleHidePress = async (itemId: string) => {
-    setMenuReviewId(null);
-    try {
-      await hideMutation.mutateAsync(itemId);
-      showToast('Post hidden');
-    } catch {
-      Alert.alert('Could not hide post', 'Please try again.');
-    }
-  };
-
   const handleReportSubmit = async () => {
     if (!reportReviewId) {
       return;
@@ -582,14 +571,15 @@ export function HomeFeedScreen({
         reviewId,
         targetType: 'review',
         reason: selectedReason,
-        details: reportDetails || undefined,
+        ...(reportDetails.trim() ? { details: reportDetails.trim() } : {}),
       });
       setReportReviewId(null);
       setSelectedReason(reportReasons[0] as ReportReason);
       setReportDetails('');
       setReportSent(true);
-    } catch {
-      Alert.alert('Could not send report', 'Please try again.');
+    } catch (error) {
+      captureException(error, { operation: 'report-review', reviewId });
+      Alert.alert('Could not send report', apiErrorMessage(error));
       setReportReviewId(reviewId);
     }
   };
@@ -767,7 +757,6 @@ export function HomeFeedScreen({
               setReportReviewId(menuReviewId);
               setMenuReviewId(null);
             } },
-            { label: 'Not interested', onPress: () => void handleHidePress(menuReviewId) },
             { label: 'Block this user', destructive: true, onPress: () => handleBlockPress(menuReviewId) },
           ]}
           onCancel={() => setMenuReviewId(null)}
