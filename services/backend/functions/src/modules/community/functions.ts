@@ -110,7 +110,22 @@ export const listRequests = onCall(callableOptions, async (request): Promise<App
     .where('status', '==', 'pending')
     .orderBy('createdAt', 'desc')
     .get();
-  return snapshot.docs.map(
+  const activityRequests = snapshot.docs.filter((doc) => doc.get('kind') === 'activity');
+  const activities = activityRequests.length > 0
+    ? await db.getAll(...activityRequests.map((doc) => db.collection('activities').doc(String(doc.get('targetId')))))
+    : [];
+  const pendingActivityIds = new Set(activities.flatMap((activity) => {
+    const statuses: unknown = activity.get('invitationStatuses');
+    return activity.exists
+      && statuses
+      && typeof statuses === 'object'
+      && (statuses as Record<string, unknown>)[uid] === 'pending'
+      ? [activity.id]
+      : [];
+  }));
+  return snapshot.docs.filter((doc) => (
+    doc.get('kind') !== 'activity' || pendingActivityIds.has(String(doc.get('targetId')))
+  )).map(
     (doc) =>
       ({
         id: doc.id,

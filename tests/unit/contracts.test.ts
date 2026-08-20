@@ -13,6 +13,7 @@ import {
   registerPushTokenInputSchema,
   requestPhoneOtpInputSchema,
   sendMessageInputSchema,
+  updateProfileSettingsInputSchema,
   verifyPhoneOtpInputSchema,
 } from '@tastes/contracts';
 import { describe, expect, it } from 'vitest';
@@ -73,6 +74,18 @@ describe('public API contracts', () => {
       reviewId: 'review-1',
       reaction: 'like',
     });
+  });
+
+  it('explains that usernames cannot contain spaces', () => {
+    const expectedMessage = 'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
+
+    expect(createUserProfileInputSchema.safeParse({
+      displayName: 'Demo User',
+      username: 'demo user',
+    }).error?.issues[0]?.message).toBe(expectedMessage);
+    expect(updateProfileSettingsInputSchema.safeParse({
+      username: 'demo user',
+    }).error?.issues[0]?.message).toBe(expectedMessage);
   });
 
   it('accepts an E.164 phone number and a 4-digit OTP code', () => {

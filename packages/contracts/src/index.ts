@@ -11,6 +11,8 @@ import {
 
 export * from './notifications';
 
+const usernameCharactersError = 'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
+
 export const userProfileSchema = z.object({
   uid: z.string().min(1),
   displayName: z.string().min(2).max(80),
@@ -27,7 +29,7 @@ export const createUserProfileInputSchema = z.object({
   username: z.string().trim()
     .min(2, 'The username must be at least 2 characters long.')
     .max(40, 'The username must be at most 40 characters long.')
-    .regex(/^[a-zA-Z0-9._]+$/, 'The username can only use Latin letters, numbers, dots, and underscores.')
+    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError)
     .optional(),
   city: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).optional(),
@@ -41,7 +43,7 @@ export const updateProfilePhotoInputSchema = z.object({
 export const updateProfileSettingsInputSchema = z.object({
   displayName: z.string().trim().min(2).max(80),
   username: z.string().trim().min(2).max(40)
-    .regex(/^[a-zA-Z0-9._]+$/, 'The username can only use Latin letters, numbers, dots, and underscores.'),
+    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
   city: z.string().trim().min(2).max(120),
   favoriteDish: z.string().trim().min(1).max(80),
   favoriteVenueId: z.string().trim().min(1).max(128),

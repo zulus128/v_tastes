@@ -16,7 +16,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
-import { profileAvatarSource } from './avatar';
+import { ProfileAvatar } from './avatar';
 
 const badgeAssets = [LevelBadge, BurgerBadge, TiramisuBadge, MatchaBadge, CityBadge];
 const badgeLabels = ['Level', 'Burger Lover', 'Tiramisu Connaisseur', 'Matcha Hunter', 'City Explorer'];
@@ -77,7 +77,7 @@ export function ProfileHeader({
     >
       <PatternBackgroundLift />
       <Pressable disabled={!own || uploadingPhoto} onPress={onAvatarPress} style={styles.avatarWrap}>
-        <Image source={profileAvatarSource(profile)} style={styles.avatar} />
+        <ProfileAvatar profile={profile} style={styles.avatar} />
         {uploadingPhoto ? (
           <View style={styles.avatarBusy}><ActivityIndicator color="#FFFFFF" /></View>
         ) : null}

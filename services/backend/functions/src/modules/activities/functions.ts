@@ -195,11 +195,14 @@ export const respondToActivityInvitation = onCall(callableOptions, async (reques
   const input = parseInput(respondToActivityInvitationInputSchema, request.data);
   const activityRef = db.collection('activities').doc(input.activityId);
   const conversationRef = db.collection('conversations').doc(input.activityId);
+  const pendingRequestQuery = db.collection('users').doc(uid).collection('requests')
+    .where('targetId', '==', input.activityId);
 
   await db.runTransaction(async (transaction) => {
-    const [activity, conversation] = await Promise.all([
+    const [activity, conversation, requestSnapshot] = await Promise.all([
       transaction.get(activityRef),
       transaction.get(conversationRef),
+      transaction.get(pendingRequestQuery),
     ]);
     if (!activity.exists || !conversation.exists) {
       throw new HttpsError('not-found', 'The activity invitation was not found.');
@@ -211,12 +214,21 @@ export const respondToActivityInvitation = onCall(callableOptions, async (reques
     const currentStatus = statuses && typeof statuses === 'object'
       ? (statuses as Record<string, unknown>)[uid]
       : undefined;
-    if (currentStatus === input.response) return;
+    const now = FieldValue.serverTimestamp();
+    const syncRequests = () => requestSnapshot.docs
+      .filter((document) => document.get('kind') === 'activity' && document.get('status') === 'pending')
+      .forEach((document) => transaction.update(document.ref, {
+        status: input.response,
+        respondedAt: now,
+      }));
+    if (currentStatus === input.response) {
+      syncRequests();
+      return;
+    }
     if (currentStatus !== 'pending') {
       throw new HttpsError('failed-precondition', 'This invitation is no longer pending.');
     }
 
-    const now = FieldValue.serverTimestamp();
     if (input.response === 'declined') {
       transaction.update(
         activityRef,
@@ -246,6 +258,7 @@ export const respondToActivityInvitation = onCall(callableOptions, async (reques
         'updatedAt', now,
       );
     }
+    syncRequests();
   });
 
   return { id: input.activityId };

@@ -1,6 +1,7 @@
 import type { ConversationSummary } from '@tastes/contracts';
+import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -141,7 +142,19 @@ export function ConversationsScreen({
   // transient failure here must fail quietly rather than interrupt whatever
   // screen the user is actually looking at. RequestsScreen alerts on its own
   // load failure since that one is a direct result of the user opening it.
-  useEffect(() => { let active = true; void api.listRequests().then((response) => { if (active) setRequestCount(response.data.length); }).catch(() => undefined); return () => { active = false; }; }, [api]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void api.listRequests()
+      .then((response) => {
+        if (active) setRequestCount(response.data.length);
+      })
+      .catch(() => {
+        if (active) setRequestCount(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]));
   const inbox = useConversationInbox(userId);
   const conversationHistory = useInfiniteQuery({
     queryKey: ['conversations', userId, 'history'],

@@ -31,6 +31,7 @@ import MapLayersControlIcon from '../../../assets/discover/map-layers-control.sv
 import MapLocateIcon from '../../../assets/discover/map-locate.svg';
 import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
+import SortIcon from '../../../assets/place/sort.svg';
 import PeopleSearchIcon from '../../../assets/discover/search.svg';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
@@ -63,6 +64,7 @@ import { matchesPlaceFilters } from './placeFilters';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
+type PlaceSort = 'rating' | 'reviews' | 'distance';
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#1B1B1B' }] },
@@ -535,6 +537,8 @@ function PlacesMap({
   const [layersOpen, setLayersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sort, setSort] = useState<PlaceSort>('rating');
+  const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
   const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
   const sheetHeight = useRef(new Animated.Value(330)).current;
@@ -573,7 +577,11 @@ function PlacesMap({
     return matchesPlaceFilters(venue, appliedFilters);
   });
 
-  const orderedVenues = [...filtered].sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0));
+  const orderedVenues = [...filtered].sort((left, right) => {
+    if (sort === 'reviews') return (right.reviewCount ?? 0) - (left.reviewCount ?? 0);
+    if (sort === 'distance') return (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY);
+    return (right.rating ?? 0) - (left.rating ?? 0);
+  });
   const mappableVenues = orderedVenues.filter((venue) => (
     venue.latitude != null
     && venue.longitude != null
@@ -602,6 +610,7 @@ function PlacesMap({
 
   function settleSheet(expanded: boolean) {
     setSheetExpanded(expanded);
+    if (!expanded) setSortOpen(false);
     Animated.spring(sheetHeight, {
       toValue: expanded ? sheetBounds.current.expanded : sheetBounds.current.collapsed,
       damping: 24,
@@ -759,7 +768,7 @@ function PlacesMap({
           onPress={() => void goToCurrentLocation()}
           style={[styles.mapControlButton, locationEnabled && styles.mapControlButtonActive]}
         >
-          <MapLocateIcon height={18} width={18} />
+          <MapLocateIcon color={locationEnabled ? '#FFFFFF' : colors.text} height={18} width={18} />
         </Pressable>
         <Pressable
           accessibilityLabel="Show on map"
@@ -767,7 +776,7 @@ function PlacesMap({
           onPress={() => setLayersOpen((value) => !value)}
           style={[styles.mapControlButton, layersOpen && styles.mapControlButtonActive]}
         >
-          <MapLayersControlIcon height={20} width={20} />
+          <MapLayersControlIcon color={layersOpen ? '#FFFFFF' : colors.text} height={20} width={20} />
         </Pressable>
       </View>
       {layersOpen ? (
@@ -789,7 +798,7 @@ function PlacesMap({
         </Pressable>
         <View style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
-            <SearchIcon height={24} width={24} />
+            <SearchIcon color={colors.textSecondary} height={24} width={24} />
             <TextInput
               autoCorrect={false}
               onChangeText={(value) => {
@@ -834,6 +843,43 @@ function PlacesMap({
             );
           })}
         </ScrollView>
+        {sheetExpanded ? (
+          <View style={styles.mapResultsMeta}>
+            <Text style={styles.mapResultsCount}>{filtered.length} places</Text>
+            <Pressable
+              accessibilityLabel="Sort places"
+              accessibilityState={{ expanded: sortOpen }}
+              onPress={() => setSortOpen((value) => !value)}
+              style={styles.mapSortButton}
+            >
+              <SortIcon color={colors.textSecondary} height={12} width={16} />
+              <Text style={styles.mapSortText}>
+                Sort by: {sort === 'rating' ? 'Top rated' : sort === 'reviews' ? 'Most reviewed' : 'Nearest'}
+              </Text>
+              <Text style={styles.mapSortChevron}>⌄</Text>
+            </Pressable>
+            {sortOpen ? (
+              <View style={styles.mapSortMenu}>
+                {([
+                  ['rating', 'Top rated'],
+                  ['reviews', 'Most reviewed'],
+                  ['distance', 'Nearest'],
+                ] as Array<[PlaceSort, string]>).map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => {
+                      setSort(value);
+                      setSortOpen(false);
+                    }}
+                    style={styles.mapSortOption}
+                  >
+                    <Text style={[styles.mapSortOptionText, sort === value && styles.mapSortOptionTextActive]}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         {venuesQuery.isPending ? (
           <View style={styles.placesStatus}><ActivityIndicator color={colors.primary} /></View>
         ) : venuesQuery.isError ? (
@@ -1596,6 +1642,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   filterIcon: { width: 14, height: 14, resizeMode: 'contain' },
   filterText: { color: colors.textSecondary, fontSize: 12 },
   filterTextActive: { color: colors.primary, fontWeight: '700' },
+  mapResultsMeta: { zIndex: 3, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  mapResultsCount: { color: colors.textSecondary, fontSize: 12 },
+  mapSortButton: { minHeight: 28, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surfaceRaised },
+  mapSortText: { color: colors.textSecondary, fontSize: 11 },
+  mapSortChevron: { marginTop: -3, color: colors.textSecondary, fontSize: 13 },
+  mapSortMenu: { position: 'absolute', zIndex: 12, elevation: 12, top: 30, right: 0, width: 140, paddingVertical: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  mapSortOption: { minHeight: 36, paddingHorizontal: 12, justifyContent: 'center' },
+  mapSortOptionText: { color: colors.textSecondary, fontSize: 12 },
+  mapSortOptionTextActive: { color: colors.primary, fontWeight: '700' },
   placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
   placesStatusText: { color: colors.textSecondary, fontSize: 13 },
   inlineRetry: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceRaised },

@@ -7,7 +7,7 @@ import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
-import { profileAvatarSource } from './avatar';
+import { ProfileAvatar } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
@@ -103,7 +103,7 @@ export function ProfileReviewCard({
   return (
     <View style={styles.reviewCard}>
       <View style={styles.reviewHeader}>
-        <Image source={profileAvatarSource(profile)} style={styles.reviewAvatar} />
+        <ProfileAvatar profile={profile} style={styles.reviewAvatar} />
         <View style={styles.reviewAuthorCopy}>
           <Text style={styles.reviewAuthor}>{profile.displayName}</Text>
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>

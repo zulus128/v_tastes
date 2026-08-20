@@ -46,7 +46,7 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
-import { profileAvatarSource } from './avatar';
+import { ProfileAvatar } from './avatar';
 
 type EditableField = 'displayName' | 'username' | 'favoriteDish' | 'city';
 
@@ -377,7 +377,7 @@ export function ProfileSettingsSheet({
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
           <View style={styles.content}>
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
-              <Image source={profileAvatarSource(profile)} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
+              <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
               {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
             </Pressable>
             <Pressable disabled={uploadingPhoto} onPress={editPhoto}><Text style={styles.editPhoto}>Edit photo</Text></Pressable>

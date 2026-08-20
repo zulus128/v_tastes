@@ -6,7 +6,7 @@ import type { DishReviewDraft } from '../create-review/api';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
-import { profileAvatarSource } from './avatar';
+import { ProfileAvatar } from './avatar';
 
 export interface ProfileReviewDraft {
   dishes: DishReviewDraft[];
@@ -46,7 +46,7 @@ export function ProfileDraftCard({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Image source={profileAvatarSource(profile)} style={styles.avatar} />
+        <ProfileAvatar profile={profile} style={styles.avatar} />
         <View style={styles.authorCopy}>
           <Text numberOfLines={1} style={styles.authorName}>{profile.displayName}</Text>
           <Text numberOfLines={1} style={styles.authorHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
