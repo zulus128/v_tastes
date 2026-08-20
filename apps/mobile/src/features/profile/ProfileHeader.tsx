@@ -164,7 +164,7 @@ export function ProfileTopBar({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  hero: { width: '100%', alignSelf: 'stretch', paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  hero: { width: '100%', zIndex: 1, alignSelf: 'stretch', paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   heroPattern: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   topBar: {
     position: 'absolute',
@@ -186,7 +186,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   avatarWrap: { width: 120, height: 120, marginTop: 18, alignSelf: 'center', borderRadius: 60 },
   avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.surfaceRaised },
   avatarBusy: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
-  name: { marginTop: 10, color: colors.text, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  name: { marginTop: 10, color: colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.24, textAlign: 'center' },
   bio: { marginTop: 6, marginHorizontal: 38, color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   stats: { height: 50, marginTop: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   statDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: colors.border },

@@ -23,6 +23,14 @@ import {
 } from 'react-native';
 import SearchIcon from '../../../assets/profile/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import MapFilterBarIcon from '../../../assets/profile/map-filter-bar.svg';
+import mapFilterCafeIcon from '../../../assets/profile/map-filter-cafe.png';
+import MapFilterFriendsIcon from '../../../assets/profile/map-filter-friends.svg';
+import MapFilterRestaurantIcon from '../../../assets/profile/map-filter-restaurant.svg';
+import MapFilterReviewsIcon from '../../../assets/profile/map-filter-reviews.svg';
+import MapFilterTrendingIcon from '../../../assets/profile/map-filter-trending.svg';
+import MapFilterTuningIcon from '../../../assets/profile/map-filter-tuning.svg';
+import MapSearchVoiceIcon from '../../../assets/profile/followers-voice.svg';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
@@ -42,14 +50,15 @@ import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
 import { useFocusEffect } from '@react-navigation/native';
 
 type ProfileTab = 'reviews' | 'map' | 'wishlist';
-type MapFilter = 'trending' | 'restaurant' | 'cafe' | 'bar' | 'my-reviews';
+type MapFilter = 'trending' | 'restaurant' | 'cafe' | 'bar' | 'my-reviews' | 'friends';
 
-const MAP_FILTERS: readonly { label: string; value: MapFilter }[] = [
-  { label: '🔥 Trending', value: 'trending' },
-  { label: '🍴 Restaurant', value: 'restaurant' },
-  { label: '☕ Cafe', value: 'cafe' },
-  { label: '🍸 Bar', value: 'bar' },
-  { label: '✓ My Reviews', value: 'my-reviews' },
+const MAP_FILTERS: readonly { emphasized: boolean; label: string; value: MapFilter; width: number }[] = [
+  { emphasized: true, label: 'Trending', value: 'trending', width: 87 },
+  { emphasized: false, label: 'Restaurant', value: 'restaurant', width: 100 },
+  { emphasized: true, label: 'Cafe', value: 'cafe', width: 62 },
+  { emphasized: true, label: 'Bar', value: 'bar', width: 54 },
+  { emphasized: false, label: 'My Reviews', value: 'my-reviews', width: 105 },
+  { emphasized: false, label: 'Friends', value: 'friends', width: 79 },
 ];
 
 const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
@@ -90,6 +99,15 @@ function mapVenueIcon(venue: Venue, active: boolean) {
   if (category.includes('bar') || category.includes('pub') || category.includes('club')) return mapBarIcon;
   if (active || venue.discoverTags?.includes('trending')) return mapTrendingIcon;
   return mapCafeIcon;
+}
+
+function MapFilterGlyph({ value }: { value: MapFilter }) {
+  if (value === 'trending') return <MapFilterTrendingIcon height={11.3438} width={9.9167} />;
+  if (value === 'restaurant') return <MapFilterRestaurantIcon height={11.053} width={11.0527} />;
+  if (value === 'cafe') return <Image source={mapFilterCafeIcon} style={staticStyles.mapFilterCafeIcon} />;
+  if (value === 'bar') return <MapFilterBarIcon height={13.2408} width={11.586} />;
+  if (value === 'my-reviews') return <MapFilterReviewsIcon height={8.3256} width={11.6603} />;
+  return <MapFilterFriendsIcon height={14} width={14} />;
 }
 
 function PencilIcon({ color }: { color: string }) {
@@ -476,20 +494,6 @@ export function ProfileScreen({
               </MapView>
               {controls}
               {mapError ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{mapError}</Text><Pressable onPress={() => setMapReload((value) => value + 1)} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable></View> : mapPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyCopy}>Try another search or filter.</Text></View> : mappedPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Locations unavailable</Text><Text style={styles.emptyCopy}>These places do not have map coordinates yet.</Text></View> : null}
-              <View style={styles.mapSearchPanel}>
-                <View style={styles.searchBar}>
-                  <SearchIcon color={colors.textMuted} width={24} height={24} />
-                  <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-                  <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={24} width={24} /></Pressable>
-                </View>
-                <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>
-                  {MAP_FILTERS.map((item) => (
-                    <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, mapFilter === item.value && styles.mapFilterChipActive]}>
-                      <Text style={[styles.mapFilterText, mapFilter === item.value && styles.mapFilterTextActive]}>{item.label}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
             </View>
             {mapPlaces.map(({ review }) => <View key={review.id} style={styles.mapReviewItem}><ProfileReviewCard
               fallbackImageUrl={venueImages[review.venueId]}
@@ -509,6 +513,28 @@ export function ProfileScreen({
           )}
         </ScrollView>
       )}
+      {activeTab === 'map' ? (
+        <View style={styles.mapSearchPanel}>
+          <View style={styles.mapSearchRow}>
+            <View style={[styles.searchBar, styles.mapSearchBar]}>
+            <SearchIcon color={colors.textMuted} width={24} height={24} />
+            <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
+              <MapSearchVoiceIcon color={colors.textMuted} height={24} width={24} />
+            </View>
+            <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapTuningButton}>
+              <MapFilterTuningIcon height={21.1838} width={17.1838} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>
+            {MAP_FILTERS.map((item) => (
+              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: item.width }]}>
+                <View style={[styles.mapFilterIcon, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}><MapFilterGlyph value={item.value} /></View>
+                <Text style={[styles.mapFilterText, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
       <ProfileTopBar
         onBack={onBack}
         onSettings={onSettings}
@@ -562,7 +588,7 @@ const createStyles = (colors: ThemeColors) => {
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 102, paddingBottom: 24 },
   controls: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, gap: 12 },
-  mapControls: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, paddingBottom: 0 },
+  mapControls: { position: 'absolute', top: 26, left: 0, right: 0, zIndex: 2, paddingBottom: 0 },
   switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 100, backgroundColor: isDark ? 'rgba(223,223,233,0.12)' : colors.surface },
   switchOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 100 },
   switchActive: { backgroundColor: isDark ? '#D9DDE5' : '#282828' },
@@ -570,12 +596,15 @@ const createStyles = (colors: ThemeColors) => {
   switchTextActive: { color: isDark ? '#161616' : '#FFFFFF', fontWeight: '700' },
   searchBar: { height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface },
   searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-  mapFilters: { gap: 8, paddingRight: 2 },
-  mapSearchPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2, overflow: 'hidden', gap: 10, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16, borderTopWidth: 1, borderTopColor: isDark ? '#45474B' : '#D9DDE5', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: isDark ? 'rgba(22,22,22,0.97)' : 'rgba(246,243,238,0.97)' },
-  mapFilterChip: { height: 34, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: isDark ? '#161616' : '#FFFFFF' },
-  mapFilterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
-  mapFilterText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  mapFilterTextActive: { color: '#FFFFFF' },
+  mapSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mapSearchBar: { flex: 1 },
+  mapTuningButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  mapFilters: { gap: 6, paddingRight: 16 },
+  mapSearchPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, elevation: 4, overflow: 'hidden', gap: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8, borderTopWidth: 1, borderTopColor: isDark ? '#45474B' : '#D9DDE5', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: isDark ? '#161616' : colors.surface },
+  mapFilterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border, borderRadius: 40, backgroundColor: isDark ? '#161616' : colors.surface },
+  mapFilterIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
+  mapFilterText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 },
+  mapFilterMuted: { opacity: 0.5 },
   reviewList: { gap: 14 },
   reviewItem: { paddingHorizontal: 15 },
   draftCard: { marginHorizontal: 15, padding: 16, borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: isDark ? '#241111' : '#FFF3F1' },
@@ -591,20 +620,20 @@ const createStyles = (colors: ThemeColors) => {
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   emptyCopy: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   mapContent: { gap: 0 },
-  mapPane: { height: 426, overflow: 'hidden', backgroundColor: '#17191D' },
+  mapPane: { height: 426, marginTop: -26, zIndex: 0, overflow: 'hidden', backgroundColor: '#17191D' },
   map: { width: '100%', height: '100%' },
-  mapMarkerRow: { maxWidth: 138, flexDirection: 'row', alignItems: 'flex-start' },
+  mapMarkerRow: { width: 122, flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   mapMarkerAnchor: { width: 38, alignItems: 'center' },
-  mapMarkerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF', borderRadius: 19, backgroundColor: '#161616' },
-  mapMarkerIconActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  mapMarkerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 18, backgroundColor: '#161616' },
+  mapMarkerIconActive: { borderColor: colors.primary },
   mapMarkerGlyph: { width: 21, height: 21 },
   mapMarkerTip: { width: 0, height: 0, marginTop: -1, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 7, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFFFFF' },
   mapMarkerTipActive: { borderTopColor: colors.primary },
   mapMarkerDot: { width: 5, height: 5, marginTop: 3, borderRadius: 3, backgroundColor: '#FFFFFF' },
   mapMarkerDotActive: { backgroundColor: colors.primary },
-  mapMarkerCopy: { maxWidth: 98, paddingTop: 4, paddingLeft: 6 },
-  mapMarkerName: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-  mapMarkerCategory: { color: '#FFFFFF', fontSize: 10 },
+  mapMarkerCopy: { width: 80, paddingTop: 4 },
+  mapMarkerName: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', letterSpacing: -0.41 },
+  mapMarkerCategory: { color: '#FFFFFF', fontSize: 12, letterSpacing: -0.24 },
   mapEmpty: { position: 'absolute', left: 24, right: 24, bottom: 122, zIndex: 3, padding: 18, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(8,8,8,0.82)' },
   mapReviewItem: { marginHorizontal: 16, marginTop: 12 },
   retryButton: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 18, backgroundColor: colors.primary },
@@ -627,3 +656,7 @@ const createStyles = (colors: ThemeColors) => {
   wishlistPane: { minHeight: 720 },
   });
 };
+
+const staticStyles = StyleSheet.create({
+  mapFilterCafeIcon: { width: 14, height: 14 },
+});
