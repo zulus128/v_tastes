@@ -47,6 +47,7 @@ import {
   useDiscoverFeed,
   useDiscoverPeople,
   useDiscoverVenues,
+  useVenueSearch,
   useToggleFollow,
 } from './api';
 import {
@@ -541,10 +542,18 @@ function PlacesMap({
   const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
-  const venuesQuery = useDiscoverVenues(userId, activeFilter ?? {});
+  const venueFilter = activeFilter
+    ? { category: activeFilter.category, tag: activeFilter.tag }
+    : {};
+  const venuesQuery = useDiscoverVenues(userId, venueFilter);
+  const venueSearchQuery = useVenueSearch(search);
   const peopleQuery = useDiscoverPeople(userId);
   const mapFeedQuery = useDiscoverFeed(userId);
   const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const searchResults = search.trim().length >= 2 ? (venueSearchQuery.data?.items ?? []) : [];
+  const searchableVenues = searchResults.length > 0
+    ? [...new Map([...venues, ...searchResults].map((venue) => [venue.id, venue])).values()]
+    : venues;
 
   const filters: Array<MapFilter & { icon: ImageSourcePropType }> = [
     { key: 'trending', label: 'Trending', tag: 'trending', icon: filterTrendingIcon },
@@ -554,7 +563,7 @@ function PlacesMap({
     { key: 'my-reviews', label: 'My Reviews', icon: filterReviewsIcon },
   ];
 
-  const filtered = venues.filter((venue) => {
+  const filtered = searchableVenues.filter((venue) => {
     const query = search.trim().toLowerCase();
     const searchable = [venue.name, venue.address, venue.city, venue.category]
       .filter(Boolean)
@@ -783,7 +792,10 @@ function PlacesMap({
             <SearchIcon height={24} width={24} />
             <TextInput
               autoCorrect={false}
-              onChangeText={setSearch}
+              onChangeText={(value) => {
+                setSearch(value);
+                if (value.trim().length >= 2) settleSheet(true);
+              }}
               onFocus={() => settleSheet(true)}
               onSubmitEditing={focusFirstSearchResult}
               placeholder="Search"
@@ -795,10 +807,10 @@ function PlacesMap({
             <VoiceIcon color={colors.text} height={24} width={24} />
           </View>
           <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapHeaderIcon}>
-            <MapTuneIcon height={24} width={20} />
+            <MapTuneIcon color={colors.text} height={24} width={20} />
           </Pressable>
           <Pressable accessibilityLabel="Open favourites" hitSlop={8} onPress={onOpenFavourites} style={styles.mapHeaderIcon}>
-            <MapFavouriteIcon height={22} width={20} />
+            <MapFavouriteIcon color={colors.text} height={22} width={20} />
           </Pressable>
         </View>
         <ScrollView
@@ -1558,11 +1570,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
   mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-  mapControls: { position: 'absolute', zIndex: 5, top: 240, right: 16, gap: 10 },
+  mapControls: { position: 'absolute', zIndex: 5, top: 124, right: 16, gap: 10 },
   mapControlButton: { width: 48, height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   mapControlButtonActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.9)' },
   mapControlGlyph: { color: colors.text, fontSize: 22, lineHeight: 26, fontWeight: '700' },
-  layersMenu: { position: 'absolute', zIndex: 6, top: 240, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  layersMenu: { position: 'absolute', zIndex: 6, top: 124, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
   layersTitle: { marginBottom: 4, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   layerOptionText: { color: colors.text, fontSize: 15 },
@@ -1570,12 +1582,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   layerSwitchActive: { backgroundColor: colors.primary },
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
-  mapSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, left: 0, right: 0, bottom: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  mapSearchRow: { height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapSearch: { flex: 1, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
-  mapSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+  mapSearchRow: { zIndex: 2, height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mapSearch: { flex: 1, minWidth: 0, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
+  mapSearchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: 16, paddingVertical: 0 },
   mapHeaderIcon: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center' },
   filterList: { flexGrow: 0, height: 38 },
   filterContent: { alignItems: 'center', gap: 6 },
