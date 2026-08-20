@@ -51,12 +51,13 @@ const userActionInputSchema = z.object({
 });
 const venueStatusSchema = z.enum(['active', 'hidden', 'pending', 'merged', 'removed']);
 const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
+const venueCategorySchema = z.enum(['Cafe', 'Restaurant', 'Bar', 'Italian', 'Japanese', 'Georgian', 'Thai', 'American', 'Russian', 'Korean', 'Indian', 'Mexican', 'Chinese']);
 const venueInputObjectSchema = z.object({
   venueId: idSchema.optional(),
   name: z.string().trim().min(2).max(160),
   city: z.string().trim().min(2).max(120),
   address: z.string().trim().min(2).max(300),
-  category: z.string().trim().min(2).max(80),
+  category: venueCategorySchema,
   status: venueStatusSchema.default('active'),
   imageUrl: z.url().nullable().default(null),
   photoUrls: z.array(z.url()).max(12).default([]),
@@ -482,6 +483,7 @@ export const searchAdminVenues = onCall(callableOptions, async (request) => {
   const query = input.query.toLowerCase();
   const snapshot = await db.collection('venues').limit(1_000).get();
   return snapshot.docs
+    .filter((venue) => venue.get('status') !== 'removed')
     .filter((venue) => !query || [venue.id, venue.get('name'), venue.get('city'), venue.get('category')]
       .some((value) => String(value ?? '').toLowerCase().includes(query)))
     .slice(0, 100)

@@ -127,7 +127,7 @@ dt { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spac
 dd { margin: 0; font-size: 11px; }
 .actions { display: flex; gap: 8px; padding-top: 17px; border-top: 1px solid var(--line); }
 .actions.end { justify-content: flex-end; margin-top: 26px; }
-.toolbar-right { display: flex; justify-content: flex-end; margin: -62px 0 22px; }
+.toolbar-right { display: flex; justify-content: flex-end; margin: 0 0 22px; }
 
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
