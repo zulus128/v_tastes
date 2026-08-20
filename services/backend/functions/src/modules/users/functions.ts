@@ -189,6 +189,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         followerCount: existing.exists ? Number(existing.get('followerCount') ?? 0) : 0,
         followingCount: existing.exists ? Number(existing.get('followingCount') ?? 0) : 0,
         createdAt: existing.exists ? existing.get('createdAt') : now,
+        lastSeenAt: now,
         updatedAt: now,
       },
       { merge: true },

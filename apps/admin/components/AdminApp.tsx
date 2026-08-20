@@ -227,8 +227,8 @@ function OverviewView({ data }: { data: Overview }) {
       <Metric label="Active venues" value={data.activeVenues} note="Available in discovery" />
     </div>
     <div className="metrics compact-metrics analytics-metrics">
-      <Metric label="Daily Active Users" value={data.analytics.dau} note={data.analytics.connected ? 'Google Analytics · today' : 'Analytics permission needed'} />
-      <Metric label="Monthly Active Users" value={data.analytics.mau} note={data.analytics.connected ? 'Google Analytics · 30 days' : `Property ${data.analytics.propertyId || 'not found'}`} />
+      <Metric label="Daily Active Users" value={data.analytics.dau} note="Live app activity · last 24 hours" />
+      <Metric label="Monthly Active Users" value={data.analytics.mau} note="Live app activity · last 30 days" />
     </div>
     <div className="trio-grid">
       <PeriodPanel eyebrow="GROWTH" title="New signups" counts={data.newUsers} unit="new users" />

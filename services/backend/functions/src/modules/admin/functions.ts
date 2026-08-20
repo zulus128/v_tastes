@@ -194,6 +194,7 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
   const [
     users, reviews, reports, venues,
     users24h, users7d, users30d,
+    activeUsers24h, activeUsers30d,
     reviews24h, reviews7d, reviews30d,
     analytics, reviewCities,
   ] = await Promise.all([
@@ -204,6 +205,8 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000)).count().get(),
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000)).count().get(),
     db.collection('users').where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
+    db.collection('users').where('lastSeenAt', '>=', Timestamp.fromMillis(now - 86_400_000)).count().get(),
+    db.collection('users').where('lastSeenAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
     db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000)).count().get(),
     db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000)).count().get(),
     db.collection('reviews').where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000)).count().get(),
@@ -226,7 +229,13 @@ export const getAdminOverview = onCall(callableOptions, async (request) => {
       last7Days: reviews7d.data().count,
       last30Days: reviews30d.data().count,
     },
-    analytics,
+    analytics: {
+      ...analytics,
+      // Standard GA4 reports can lag behind live usage. lastSeenAt is written by the
+      // authenticated session path, so these operational DAU/MAU values update immediately.
+      dau: activeUsers24h.data().count,
+      mau: activeUsers30d.data().count,
+    },
     reviewCities,
   };
 });
