@@ -4,7 +4,7 @@ import {
   notificationCatalog,
 } from '@tastes/contracts';
 import { FieldValue } from 'firebase-admin/firestore';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { db, firestoreDatabaseId } from '../../shared/firebase';
 import { notificationPreferences } from '../../shared/notifications';
 import { sendExpoPush } from '../../shared/push';
@@ -29,9 +29,18 @@ function stringMap(value: unknown): Record<string, string> {
  * Delivers the catalog channels of every stored notification: push straight away, email through the
  * `_emailQueue` collection that the delivery worker drains (no provider is configured in this repo yet).
  */
-export const pushUserNotification = onDocumentCreated(triggerOptions, async (event) => {
-  const notification = event.data;
-  if (!notification) return;
+export const pushUserNotification = onDocumentWritten(triggerOptions, async (event) => {
+  const notification = event.data?.after;
+  if (!notification?.exists) return;
+
+  // Likes and follows deliberately reuse a stable notification document. Treat a refreshed
+  // `createdAt` as a new delivery, while ignoring the push-status update made below.
+  const previous = event.data?.before;
+  if (previous?.exists) {
+    const previousCreatedAt = previous.get('createdAt');
+    const createdAt = notification.get('createdAt');
+    if (previousCreatedAt?.isEqual?.(createdAt) ?? previousCreatedAt === createdAt) return;
+  }
   const type = notification.get('type');
   if (!isNotificationType(type)) return;
   const definition = notificationCatalog[type];
