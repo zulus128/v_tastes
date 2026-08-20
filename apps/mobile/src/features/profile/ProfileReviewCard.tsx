@@ -9,6 +9,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import type { ProfileData } from './api';
 import { profileAvatarSource } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import PinnedIndicator from '../../../assets/profile/pinned-indicator.svg';
 
 const tagLabels: Record<string, string> = {
   casual: 'Casual',
@@ -88,6 +89,7 @@ export function ProfileReviewCard({
           <Text style={styles.reviewAuthor}>{profile.displayName}</Text>
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
         </View>
+        {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={16} width={16} /></View> : null}
         <Text style={styles.reviewDate}>{formatDisplayDate(item.createdAt)}</Text>
         <Pressable accessibilityLabel="Review actions" onPress={onMore}><Text style={styles.moreGlyph}>⋮</Text></Pressable>
       </View>
@@ -141,13 +143,14 @@ export function ProfileReviewCard({
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  reviewCard: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
-  reviewHeader: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
+  reviewCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
+  reviewHeader: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 23, borderTopRightRadius: 23, position: 'relative' },
   reviewAvatar: { width: 40, height: 40, borderRadius: 20 },
   reviewAuthorCopy: { flex: 1, marginLeft: 8, gap: 3 },
   reviewAuthor: { color: colors.text, fontSize: 15, fontWeight: '600' },
   reviewHandle: { color: colors.textSecondary, fontSize: 13 },
   reviewDate: { color: colors.textMuted, fontSize: 13 },
+  pinBadge: { position: 'absolute', zIndex: 1, top: -2, right: -6, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   moreGlyph: { marginLeft: 8, color: colors.textMuted, fontSize: 24 },
   reviewBody: { padding: 16, gap: 13 },
   reviewVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
