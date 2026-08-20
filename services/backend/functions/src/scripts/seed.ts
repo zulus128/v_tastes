@@ -267,7 +267,7 @@ async function main() {
       name: 'Le Jardin Salad Bar',
       city: 'Paris',
       address: '18 Rue du Marché Saint-Honoré, Paris',
-      category: 'Healthy',
+      category: 'Salads',
       imageUrl: venueMedia.restaurant,
       photoUrls: [venueMedia.restaurant, venueMedia.cafe, venueMedia.restaurant],
       photoCount: 15,

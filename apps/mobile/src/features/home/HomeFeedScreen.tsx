@@ -595,7 +595,7 @@ export function HomeFeedScreen({
   };
 
   const handleRefreshNewPosts = async () => {
-    await query.refetch();
+    await Promise.all([query.refetch(), recommendationQuery.refetch()]);
   };
 
   const renderFeedCard = (item: FeedItem) => (
