@@ -9,7 +9,21 @@ type View = 'overview' | 'reports' | 'venues' | 'users';
 type StaffRole = 'admin' | 'moderator';
 type DiscoverTag = 'trending' | 'most-reviewed' | 'new' | 'for-you' | 'hidden-gem';
 
-const venueCategoryOptions = ['Cafe', 'Restaurant', 'Bar', 'Italian', 'Japanese', 'Georgian', 'Thai', 'American', 'Russian', 'Korean', 'Indian', 'Mexican', 'Chinese'] as const;
+const venueCategoryOptions = [
+  { value: 'Cafe', label: 'Cafe' },
+  { value: 'Restaurant', label: 'Restaurant' },
+  { value: 'Bar', label: 'Bar' },
+  { value: 'Italian', label: 'Italian 🇮🇹' },
+  { value: 'Japanese', label: 'Japanese 🇯🇵' },
+  { value: 'Georgian', label: 'Georgian 🇬🇪' },
+  { value: 'Thai', label: 'Thai 🇹🇭' },
+  { value: 'American', label: 'American 🇺🇸' },
+  { value: 'Russian', label: 'Russian 🇷🇺' },
+  { value: 'Korean', label: 'Korean 🇰🇷' },
+  { value: 'Indian', label: 'Indian 🇮🇳' },
+  { value: 'Mexican', label: 'Mexican 🇲🇽' },
+  { value: 'Chinese', label: 'Chinese 🇨🇳' },
+] as const;
 
 interface OpeningHour { day: string; hours: string }
 interface PopularDish { name: string; rating: number }
@@ -440,7 +454,7 @@ function VenueForm({ venue, close, saved }: { venue?: AdminVenue; close: () => v
 
       <section className="editor-section"><div className="editor-section-title"><div><h3>Basics</h3><p>Core information and publishing state.</p></div></div><div className="form-grid">
         <label>Name<input required minLength={2} maxLength={160} value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })}/></label>
-        <label>Category<select required value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })}><option value="">Select a category…</option>{venueCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+        <label>Category<select required value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })}><option value="">Select a category…</option>{venueCategoryOptions.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
         <label>City<input required minLength={2} maxLength={120} value={values.city} onChange={(event) => setValues({ ...values, city: event.target.value })}/></label>
         <label>Status<select value={values.status} onChange={(event) => setValues({ ...values, status: event.target.value as typeof values.status })}><option value="active">Active</option><option value="pending">Pending</option><option value="hidden">Hidden</option>{venue ? <option value="removed">Removed</option> : null}</select></label>
         <label className="wide">Address<input required minLength={2} maxLength={300} value={values.address} onChange={(event) => setValues({ ...values, address: event.target.value })}/></label>

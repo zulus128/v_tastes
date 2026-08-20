@@ -74,7 +74,7 @@ nav b { min-width: 20px; margin-left: auto; padding: 3px 6px; border-radius: 20p
 .search { width: min(320px, 35vw); height: 42px; display: flex; align-items: center; gap: 8px; padding-left: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .search .icon { color: var(--muted); }
 .search input { height: 40px; padding-left: 0; border: 0; background: transparent; box-shadow: none; }
-.notice { width: 100%; display: flex; justify-content: space-between; margin: -13px 0 20px; padding: 11px 14px; border: 1px solid rgba(214,60,54,.25); border-radius: 9px; color: #f3aaa6; background: var(--red-soft); cursor: pointer; font-size: 12px; text-align: left; }
+.notice { width: 100%; display: flex; justify-content: space-between; margin: 0 0 20px; padding: 11px 14px; border: 1px solid rgba(214,60,54,.25); border-radius: 9px; color: #f3aaa6; background: var(--red-soft); cursor: pointer; font-size: 12px; text-align: left; }
 .view { transition: opacity .15s; }
 .view.busy { opacity: .52; pointer-events: none; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; }
