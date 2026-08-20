@@ -321,7 +321,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
                 style={styles.person}
               >
                 <Avatar name={person.displayName} photoUrl={person.photoUrl} styles={styles} />
-                <Text style={[styles.personName, { marginLeft: 10, flex: 1 }]}>
+                <Text style={[styles.personName, { flex: 1 }]}>
                   {person.displayName}
                 </Text>
                 <Text style={styles.primaryOutlineText}>Add</Text>
@@ -592,23 +592,25 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       height: 76,
       paddingHorizontal: 16,
       flexDirection: 'row',
+      gap: 7,
       alignItems: 'center',
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      backgroundColor: colors.canvas,
     },
-    avatar: { width: 42, height: 42, borderRadius: 21 },
+    avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarFallback: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
     },
     avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-    personCopy: { flex: 1, marginLeft: 10 },
-    personName: { color: colors.text, fontSize: 15, fontWeight: '600' },
-    personHandle: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
+    personCopy: { flex: 1 },
+    personName: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41 },
+    personHandle: { color: colors.textSecondary, fontSize: 13, letterSpacing: -0.24 },
     check: {
       width: 24,
       height: 24,
