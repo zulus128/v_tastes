@@ -3,7 +3,7 @@ import type { FeedItem, Venue } from '@tastes/contracts';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
@@ -69,6 +69,7 @@ const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png
 const FALLBACK_MAP_REGION = { latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 };
 const MAP_FOCUS_PIN_LIMIT = 5;
 const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
+const IOS_KEYBOARD_ASSISTANT_HEIGHT = 56;
 
 function hasMapCoordinates(venue: Venue): venue is Venue & { latitude: number; longitude: number } {
   return typeof venue.latitude === 'number'
@@ -180,7 +181,47 @@ export function ProfileScreen({
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [mapKeyboardInset, setMapKeyboardInset] = useState(0);
+  const mapKeyboardVisibleRef = useRef(false);
+  const screenRef = useRef<View>(null);
+
+  useEffect(() => {
+    mapKeyboardVisibleRef.current = false;
+    if (activeTab !== 'map') {
+      setMapKeyboardInset(0);
+      return;
+    }
+
+    const updateKeyboardInset = (screenY: number) => {
+      screenRef.current?.measureInWindow((_x, y, _width, height) => {
+        const assistantInset = Platform.OS === 'ios' ? IOS_KEYBOARD_ASSISTANT_HEIGHT : 0;
+        setMapKeyboardInset(Math.max(0, y + height - screenY + assistantInset));
+      });
+    };
+    const currentKeyboard = Keyboard.metrics();
+    if (currentKeyboard) {
+      mapKeyboardVisibleRef.current = true;
+      updateKeyboardInset(currentKeyboard.screenY);
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      if (mapKeyboardVisibleRef.current) return;
+      mapKeyboardVisibleRef.current = true;
+      Keyboard.scheduleLayoutAnimation(event);
+      updateKeyboardInset(event.endCoordinates.screenY);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      mapKeyboardVisibleRef.current = false;
+      Keyboard.scheduleLayoutAnimation(event);
+      setMapKeyboardInset(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [activeTab]);
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -192,22 +233,6 @@ export function ProfileScreen({
   }
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      Keyboard.scheduleLayoutAnimation(event);
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
-      Keyboard.scheduleLayoutAnimation(event);
-      setKeyboardHeight(0);
-    });
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
   useFocusEffect(useMemo(() => () => {
     if (!own) return undefined;
     let active = true;
@@ -464,7 +489,7 @@ export function ProfileScreen({
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
+    <View ref={screenRef} style={[styles.screen, { backgroundColor: colors.canvas }]}>
       {activeTab === 'reviews' ? (
         <FlatList
           contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + 24 }]}
@@ -551,11 +576,11 @@ export function ProfileScreen({
         </ScrollView>
       )}
       {activeTab === 'map' ? (
-        <View style={[styles.mapSearchPanel, { bottom: keyboardHeight }]}>
+        <View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
           <View style={styles.mapSearchRow}>
             <View style={[styles.searchBar, styles.mapSearchBar]}>
-            <SearchIcon color={colors.textMuted} width={24} height={24} />
-            <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
+              <SearchIcon color={colors.textMuted} width={24} height={24} />
+              <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
               <MapSearchVoiceIcon color={colors.textMuted} height={24} width={24} />
             </View>
             <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapTuningButton}>
@@ -637,7 +662,7 @@ const createStyles = (colors: ThemeColors) => {
   mapSearchBar: { flex: 1 },
   mapTuningButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   mapFilters: { gap: 6, paddingRight: 16 },
-  mapSearchPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, elevation: 4, overflow: 'hidden', gap: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8, borderTopWidth: 1, borderTopColor: isDark ? '#45474B' : '#D9DDE5', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: isDark ? '#161616' : colors.surface },
+  mapSearchPanel: { position: 'absolute', left: 0, right: 0, zIndex: 4, elevation: 4, overflow: 'hidden', gap: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8, borderTopWidth: 1, borderTopColor: isDark ? '#45474B' : '#D9DDE5', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: isDark ? '#161616' : colors.surface },
   mapFilterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border, borderRadius: 40, backgroundColor: isDark ? '#161616' : colors.surface },
   mapFilterIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
   mapFilterText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 },
