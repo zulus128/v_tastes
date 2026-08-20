@@ -94,9 +94,15 @@ export const getFeed = onCall(callableOptions, async (request) => {
   const pageDocs = visibleCandidates.slice(0, input.limit);
   const last = pageDocs.at(-1);
   const authorIds = [...new Set(pageDocs.map((document) => String(document.get('authorId'))))];
-  const authorDocuments = authorIds.length > 0
-    ? await db.getAll(...authorIds.map((authorId) => db.collection('users').doc(authorId)))
-    : [];
+  const [authorDocuments, reactionDocuments] = await Promise.all([
+    authorIds.length > 0
+      ? db.getAll(...authorIds.map((authorId) => db.collection('users').doc(authorId)))
+      : Promise.resolve([]),
+    pageDocs.length > 0
+      ? db.getAll(...pageDocs.map((document) => document.ref.collection('reactions').doc(uid)))
+      : Promise.resolve([]),
+  ]);
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
   const authorsById = new Map(authorDocuments.map((document) => [document.id, document]));
 
   return {
@@ -119,6 +125,7 @@ export const getFeed = onCall(callableOptions, async (request) => {
         status: 'published' as const,
         commentCount: Number(document.get('commentCount') ?? 0),
         reactionCount: Number(document.get('reactionCount') ?? 0),
+        reacted: reactedIds.has(document.id),
         createdAt: timestampToIso(document.get('createdAt')),
       };
     }),

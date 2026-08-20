@@ -29,6 +29,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,7 +81,12 @@ export function ProfileSettingsSheet({
   const api = useTastesApi();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom, isDark), [colors, insets.bottom, insets.top, isDark]);
+  const { height: screenHeight } = useWindowDimensions();
+  const settingsScale = settingsLayoutScale(screenHeight, insets.top, insets.bottom);
+  const styles = useMemo(
+    () => createStyles(colors, insets.top, insets.bottom, isDark, settingsScale),
+    [colors, insets.bottom, insets.top, isDark, settingsScale],
+  );
   const { profile } = useProfile(userId, fallbackName);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
   const buildVersion = Application.nativeBuildVersion;
@@ -369,7 +375,7 @@ export function ProfileSettingsSheet({
           <View style={styles.headerButton} />
         </View>
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
               <Image source={profileAvatarSource(profile)} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
               {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
@@ -400,7 +406,7 @@ export function ProfileSettingsSheet({
             <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
               Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
             </Text>
-          </ScrollView>
+          </View>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
           <LinearGradient
@@ -410,7 +416,7 @@ export function ProfileSettingsSheet({
             style={styles.inviteRing}
           >
             <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastes.app' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
-              <InviteUsersIcon height={24} width={24} />
+              <InviteUsersIcon height={Math.round(24 * settingsScale)} width={Math.round(24 * settingsScale)} />
               <Text style={styles.inviteText}>Invite a Friend</Text>
             </Pressable>
           </LinearGradient>
@@ -536,7 +542,15 @@ function NotificationSetting({ disabled = false, label, onChange, styles, value 
   return <View style={[styles.notificationRow, disabled && styles.notificationDisabled]}><Text style={styles.notificationLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} style={styles.notificationSwitch} thumbColor="#FFFFFF" trackColor={{ false: '#5A5B60', true: '#C8322D' }} value={value} /></View>;
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, isDark: boolean) {
+function settingsLayoutScale(screenHeight: number, safeTop: number, safeBottom: number) {
+  const baseLayoutHeight = 770;
+  const availableHeight = screenHeight - safeTop - Math.max(24, safeBottom) - 48;
+  return Math.max(0.6, Math.min(1, availableHeight / baseLayoutHeight));
+}
+
+function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, isDark: boolean, settingsScale: number) {
+  const s = (value: number) => Math.round(value * settingsScale);
+  const actionBottom = Math.max(24, safeBottom);
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.canvas },
     patternImage: { opacity: isDark ? 1 : 0.08 },
@@ -546,22 +560,22 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     backIcon: { width: 24, height: 24, tintColor: colors.text },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
     loader: { flex: 1 },
-    content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: safeBottom + 116, alignItems: 'center' },
-    avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.canvas },
+    content: { flex: 1, paddingHorizontal: 16, paddingTop: s(24), paddingBottom: actionBottom + s(70), alignItems: 'center' },
+    avatar: { width: s(120), height: s(120), borderRadius: s(60), backgroundColor: colors.canvas },
     photoUploading: { opacity: 0.55 },
     photoLoader: { position: 'absolute', inset: 0 },
-    editPhoto: { marginTop: 10, marginBottom: 10, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
-    rows: { width: '100%', gap: 6 },
-    accountActions: { width: '100%', marginTop: 32, gap: 16, alignItems: 'center' },
-    logout: { color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
-    deleteAccount: { color: colors.danger, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
-    version: { marginTop: 20, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'center' },
-    row: { width: '100%', height: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
-    rowLabel: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '400', letterSpacing: -0.41 },
-    rowValue: { maxWidth: '55%', marginLeft: 8, color: colors.textMuted, fontSize: 15, fontWeight: '500', textAlign: 'right' },
-    cityFlag: { width: 18, height: 18, marginLeft: 5 },
-    chevron: { width: 8, marginLeft: 8, color: colors.textMuted, fontSize: 27, lineHeight: 29 },
-    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingBottom: Math.max(24, safeBottom), alignItems: 'center', justifyContent: 'center' },
+    editPhoto: { marginTop: s(10), marginBottom: s(10), color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
+    rows: { width: '100%', gap: s(6) },
+    accountActions: { width: '100%', marginTop: s(32), gap: s(16), alignItems: 'center' },
+    logout: { color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
+    deleteAccount: { color: colors.danger, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
+    version: { marginTop: s(20), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
+    row: { width: '100%', height: s(50), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
+    rowLabel: { flex: 1, color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41 },
+    rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
+    cityFlag: { width: s(18), height: s(18), marginLeft: s(5) },
+    chevron: { width: s(8), marginLeft: s(8), color: colors.textMuted, fontSize: s(27), lineHeight: s(29) },
+    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: s(16), paddingBottom: actionBottom, alignItems: 'center', justifyContent: 'center' },
     notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.canvas },
     notificationBackground: { flex: 1, backgroundColor: colors.canvas },
     notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: safeBottom + 30 },
@@ -581,9 +595,9 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     selectionCircle: { width: 20, height: 20, marginLeft: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.textMuted, borderRadius: 10 },
     selectionCircleSelected: { borderColor: colors.primary },
     selectionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-    inviteRing: { width: 330, height: 54, padding: 5, borderRadius: 36 },
-    invite: { flex: 1, paddingHorizontal: 20, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#B82F29' },
-    inviteText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
+    inviteRing: { width: s(330), height: s(54), padding: s(5), borderRadius: s(36) },
+    invite: { flex: 1, paddingHorizontal: s(20), flexDirection: 'row', gap: s(8), alignItems: 'center', justifyContent: 'center', borderRadius: s(31), backgroundColor: '#B82F29' },
+    inviteText: { color: '#FFFFFF', fontSize: s(14), fontWeight: '500', letterSpacing: 0.6 },
     pressed: { opacity: 0.72 },
     modalBackdrop: { flex: 1, padding: 16, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.76)' },
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },

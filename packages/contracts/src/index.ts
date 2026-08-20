@@ -574,6 +574,7 @@ export interface Page<T> {
 export interface FeedItem extends Review {
   createdAt: string;
   pinned?: boolean;
+  reacted?: boolean;
   authorUsername?: string | null;
   authorPhotoUrl?: string | null;
 }

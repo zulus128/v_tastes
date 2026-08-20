@@ -708,7 +708,7 @@ export function HomeFeedScreen({
             <FeedCard
               item={item}
               onComments={() => onOpenComments(item.id)}
-              isReactionActive={Boolean(reactionState[item.id])}
+              isReactionActive={Boolean(reactionState[item.id] ?? item.reacted)}
               reactionDisabled={Boolean(pendingReactions[item.id])}
               onReaction={() => {
                 void handleReactionPress(item);
