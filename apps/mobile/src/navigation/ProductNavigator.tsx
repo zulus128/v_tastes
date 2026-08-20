@@ -247,7 +247,12 @@ function MainTabs({
             />
           )}
         </Tabs.Screen>
-        <Tabs.Screen name="Profile">
+        <Tabs.Screen
+          listeners={({ navigation }) => ({
+            tabPress: () => navigation.setParams({ initialFollowing: undefined, userId: undefined }),
+          })}
+          name="Profile"
+        >
           {({ navigation, route }) => {
             const targetUserId = route.params?.userId ?? user.uid;
             return (

@@ -119,6 +119,7 @@ interface StoredReviewDraft {
   dishes: DishReviewDraft[];
   idempotencyKey: string;
   rating: number;
+  savedAt?: string;
   selectedVenue: Venue | null;
   tags: ReviewTag[];
   text: string;
@@ -236,6 +237,7 @@ export function CreateReviewScreen({
       dishes,
       idempotencyKey,
       rating,
+      savedAt: new Date().toISOString(),
       selectedVenue: venue,
       tags,
       text,

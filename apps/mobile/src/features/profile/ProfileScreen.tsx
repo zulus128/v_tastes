@@ -46,8 +46,10 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
+import { ProfileDraftCard, type ProfileReviewDraft } from './ProfileDraftCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
 import { useFocusEffect } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 type ProfileTab = 'reviews' | 'map' | 'wishlist';
 type MapFilter = 'trending' | 'restaurant' | 'cafe' | 'bar' | 'my-reviews' | 'friends';
@@ -152,6 +154,7 @@ export function ProfileScreen({
   targetUserId: string;
 }) {
   const { colors, isDark } = useAppTheme();
+  const tabBarHeight = useBottomTabBarHeight();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const actionDangerColor = colors.background === '#080808' ? '#D32620' : '#A00E0B';
   const own = currentUserId === targetUserId;
@@ -175,7 +178,7 @@ export function ProfileScreen({
   const [favoritePlaceName, setFavoritePlaceName] = useState<string | null>(null);
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
-  const [draft, setDraft] = useState<{ venueName: string; text: string } | null>(null);
+  const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -193,8 +196,29 @@ export function ProfileScreen({
     void AsyncStorage.getItem(`${REVIEW_DRAFT_KEY_PREFIX}${currentUserId}`).then((stored) => {
       if (!active) return;
       try {
-        const value = stored ? JSON.parse(stored) as { selectedVenue?: { name?: string }; text?: string } : null;
-        setDraft(value?.text?.trim() ? { venueName: value.selectedVenue?.name ?? 'Untitled place', text: value.text.trim() } : null);
+        const value = stored ? JSON.parse(stored) as {
+          dishes?: ProfileReviewDraft['dishes'];
+          rating?: number;
+          savedAt?: string;
+          selectedVenue?: { name?: string };
+          tags?: unknown[];
+          text?: string;
+          venueId?: string;
+        } : null;
+        const hasSavedDraft = Boolean(value && (
+          value.venueId
+          || (typeof value.rating === 'number' && value.rating > 0)
+          || value.text?.trim()
+          || (Array.isArray(value.tags) && value.tags.length > 0)
+          || (Array.isArray(value.dishes) && value.dishes.length > 0)
+        ));
+        setDraft(hasSavedDraft ? {
+          dishes: Array.isArray(value?.dishes) ? value.dishes : [],
+          rating: typeof value?.rating === 'number' ? value.rating : 0,
+          savedAt: typeof value?.savedAt === 'string' ? value.savedAt : new Date().toISOString(),
+          venueName: value?.selectedVenue?.name ?? 'Untitled place',
+          text: value?.text?.trim() || 'Your unfinished review is ready to continue.',
+        } : null);
       } catch {
         setDraft(null);
       }
@@ -425,17 +449,12 @@ export function ProfileScreen({
     <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
       {activeTab === 'reviews' ? (
         <FlatList
-          contentContainerStyle={[styles.content, styles.reviewList]}
+          contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + 24 }]}
           data={sortedReviews}
           initialNumToRender={6}
           keyExtractor={(review) => review.id}
           maxToRenderPerBatch={6}
-          ListHeaderComponent={<>{profileHeader}{controls}{own && draft ? <View style={styles.draftCard}>
-            <View style={styles.draftHeader}><Text style={styles.draftAuthor}>{profile.displayName}</Text><Text style={styles.draftDate}>Draft</Text></View>
-            <Text style={styles.draftVenue}>{draft.venueName}</Text>
-            <Text numberOfLines={3} style={styles.draftText}>{draft.text}</Text>
-            <Pressable accessibilityRole="button" onPress={onContinueDraft} style={styles.continueDraft}><Text style={styles.continueDraftText}>Continue editing  →</Text></Pressable>
-          </View> : null}</>}
+          ListHeaderComponent={<>{profileHeader}{controls}{own && draft ? <View style={styles.draftCardWrap}><ProfileDraftCard draft={draft} onContinue={onContinueDraft} profile={profile} /></View> : null}</>}
           ListEmptyComponent={!profileReviews.loading ? <View style={styles.empty}><Text style={styles.emptyTitle}>No reviews yet</Text><Text style={styles.emptyCopy}>{own ? 'Your reviews will appear here.' : 'This person has not posted a review yet.'}</Text></View> : null}
           ListFooterComponent={profileReviews.loading || profileReviews.loadingMore ? <ActivityIndicator color={colors.primary} style={styles.listLoader} /> : profileReviews.error ? <Pressable onPress={() => void profileReviews.loadMore()} style={styles.retryButton}><Text style={styles.retryText}>Try loading more</Text></Pressable> : null}
           onEndReached={() => void profileReviews.loadMore()}
@@ -454,7 +473,7 @@ export function ProfileScreen({
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={activeTab === 'map' ? undefined : [1]}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]} showsVerticalScrollIndicator={false} stickyHeaderIndices={activeTab === 'map' ? undefined : [1]}>
           {profileHeader}
           {activeTab !== 'map' ? controls : null}
           {activeTab === 'map' ? (
@@ -607,14 +626,7 @@ const createStyles = (colors: ThemeColors) => {
   mapFilterMuted: { opacity: 0.5 },
   reviewList: { gap: 14 },
   reviewItem: { paddingHorizontal: 15 },
-  draftCard: { marginHorizontal: 15, padding: 16, borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: isDark ? '#241111' : '#FFF3F1' },
-  draftHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  draftAuthor: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  draftDate: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.primary, color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  draftVenue: { marginTop: 16, color: colors.text, fontSize: 17, fontWeight: '700' },
-  draftText: { marginTop: 8, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  continueDraft: { alignSelf: 'flex-start', marginTop: 14 },
-  continueDraftText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  draftCardWrap: { marginHorizontal: 15 },
   listLoader: { marginVertical: 36 },
   empty: { minHeight: 220, marginHorizontal: 16, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
