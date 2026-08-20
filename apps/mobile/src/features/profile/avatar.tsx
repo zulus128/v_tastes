@@ -7,10 +7,18 @@ export function ProfileAvatar({ profile, style }: {
   profile: ProfileData | null;
   style?: StyleProp<ViewStyle>;
 }) {
+  return <UserAvatar displayName={profile?.displayName} photoUrl={profile?.photoUrl} style={style} />;
+}
+
+export function UserAvatar({ displayName, photoUrl, style }: {
+  displayName?: string | null;
+  photoUrl?: string | null;
+  style?: StyleProp<ViewStyle>;
+}) {
   return (
-    <View accessibilityLabel={profile?.photoUrl ? `${profile.displayName} profile photo` : 'Default profile avatar'} style={[styles.frame, style]}>
-      {profile?.photoUrl ? (
-        <Image resizeMode="cover" source={{ uri: profile.photoUrl }} style={StyleSheet.absoluteFill} />
+    <View accessibilityLabel={photoUrl ? `${displayName ?? 'User'} profile photo` : 'Default profile avatar'} style={[styles.frame, style]}>
+      {photoUrl ? (
+        <Image resizeMode="cover" source={{ uri: photoUrl }} style={StyleSheet.absoluteFill} />
       ) : (
         <Svg height="58%" viewBox="0 0 24 24" width="58%">
           <Circle cx="12" cy="8" fill="#B82F29" r="4" />

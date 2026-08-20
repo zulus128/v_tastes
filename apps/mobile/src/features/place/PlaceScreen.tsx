@@ -5,7 +5,6 @@ import { ActivityIndicator, Animated, FlatList, Image, Linking, Modal, Pressable
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import fallbackAvatar from '../../../assets/home/avatar.png';
 import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
@@ -24,6 +23,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
+import { UserAvatar } from '../profile/avatar';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -38,10 +38,6 @@ function todayHours(hours: Array<{ day: string; hours: string }>) {
 function placeImage(url: string | null | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
 }
-function personImage(url: string | null): ImageSourcePropType {
-  return url ? { uri: url } : fallbackAvatar;
-}
-
 export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, venueId }: { onBack: () => void; onOpenComments: (reviewId: string) => void; onWriteReview: () => void; userId: string; venueId: string }) {
   const api = useTastesApi();
   const { colors } = useAppTheme();
@@ -216,7 +212,7 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
 
 function ReviewCard({ item: review, onComments, onReact, onShare, reactingId, styles }: { item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reactingId: string | null; styles: ReturnType<typeof createStyles> }) {
   return <View style={[styles.review, styles.reviewListCard]}>
-      <View style={styles.reviewer}><Image source={personImage(review.authorPhotoUrl)} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
+      <View style={styles.reviewer}><UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
       <View style={styles.reviewBody}>
         <RatingStars rating={review.rating} styles={styles} /><Text style={styles.reviewText}>{review.text}</Text>
         {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)}><Text style={styles.metrics}>♡ {review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)}><Text style={styles.metrics}>◯ {review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)}><Text style={styles.metrics}>↗</Text></Pressable></View>

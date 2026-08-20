@@ -22,7 +22,6 @@ import {
 } from 'react-native';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import fallbackAvatar from '../../../assets/home/avatar.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import MapFavouriteIcon from '../../../assets/discover/map-favourite.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
@@ -61,6 +60,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { matchesPlaceFilters } from './placeFilters';
+import { UserAvatar } from '../profile/avatar';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
@@ -112,10 +112,6 @@ type Place = {
 
 function venueImage(imageUrl?: string | null): ImageSourcePropType {
   return imageUrl ? { uri: imageUrl } : restaurantImage;
-}
-
-function avatarSource(photoUrl: string | null): ImageSourcePropType {
-  return photoUrl ? { uri: photoUrl } : fallbackAvatar;
 }
 
 function formatDistance(km?: number): string {
@@ -444,7 +440,7 @@ function TrendingFeed({
             {feed.popularReviews.map((review) => (
               <ReviewCard
                 author={review.authorDisplayName}
-                avatar={avatarSource(review.authorPhotoUrl)}
+                avatarUrl={review.authorPhotoUrl}
                 image={venueImage(review.venueImageUrl)}
                 key={review.id}
                 onComments={() => onOpenComments(review.id)}
@@ -537,6 +533,7 @@ function PlacesMap({
   const [layersOpen, setLayersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetExpandedRef = useRef(false);
   const [sort, setSort] = useState<PlaceSort>('rating');
   const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
@@ -609,6 +606,7 @@ function PlacesMap({
   }, [sheetHeight]);
 
   function settleSheet(expanded: boolean) {
+    sheetExpandedRef.current = expanded;
     setSheetExpanded(expanded);
     if (!expanded) setSortOpen(false);
     Animated.spring(sheetHeight, {
@@ -647,14 +645,23 @@ function PlacesMap({
   })).current;
 
   function handleMapLayout(height: number) {
-    const collapsed = Math.max(330, Math.round(height * 0.53));
-    const expanded = Math.max(collapsed, height - 8);
+    const availableHeight = Math.max(0, height - 8);
+    const collapsed = Math.min(availableHeight, Math.max(330, Math.round(height * 0.53)));
+    const expanded = availableHeight;
     sheetBounds.current = { collapsed, expanded };
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
       currentSheetHeight.current = collapsed;
       sheetHeight.setValue(collapsed);
+      return;
     }
+
+    // The keyboard changes the available map height. Stop an animation that may
+    // still target the pre-keyboard bounds and keep the search row on-screen.
+    sheetHeight.stopAnimation();
+    const nextHeight = sheetExpandedRef.current ? expanded : collapsed;
+    currentSheetHeight.current = nextHeight;
+    sheetHeight.setValue(nextHeight);
   }
 
   function zoom(multiplier: number) {
@@ -740,7 +747,7 @@ function PlacesMap({
           >
             <View style={styles.mapFriendMarker}>
               <View style={styles.mapFriendAvatarWrap}>
-                <Image source={avatarSource(review.authorPhotoUrl)} style={styles.mapFriendAvatar} />
+                <UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.mapFriendAvatar} />
               </View>
               <View style={styles.mapLayerMarkerDot} />
               <View style={styles.mapLayerMarkerCopy}>
@@ -1223,7 +1230,7 @@ function GridPlace({ onOpen, place }: { onOpen: () => void; place: Place }) {
 
 function ReviewCard({
   author,
-  avatar,
+  avatarUrl,
   image,
   place,
   rating,
@@ -1238,7 +1245,7 @@ function ReviewCard({
   reacted,
 }: {
   author: string;
-  avatar: ImageSourcePropType;
+  avatarUrl: string | null;
   image: ImageSourcePropType;
   place: string;
   rating: string;
@@ -1259,7 +1266,7 @@ function ReviewCard({
       <Image source={image} style={styles.reviewImage} />
       <View style={styles.reviewBody}>
         <View style={styles.reviewHead}>
-          <Image source={avatar} style={styles.reviewAvatar} />
+          <UserAvatar displayName={author} photoUrl={avatarUrl} style={styles.reviewAvatar} />
           <View style={styles.reviewWho}>
             <Text numberOfLines={1} style={styles.reviewAuthor}>{author}</Text>
             <Text numberOfLines={2} style={styles.reviewPlace}>on {place}</Text>
@@ -1290,7 +1297,7 @@ function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => vo
     >
       <View style={styles.reviewerHead}>
         <View>
-          <Image source={avatarSource(person.photoUrl)} style={styles.reviewerAvatar} />
+          <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.reviewerAvatar} />
           <View style={styles.reviewerBadge}><Text style={styles.reviewerBadgeText}>★</Text></View>
         </View>
         <View style={styles.reviewerCopy}>
@@ -1390,7 +1397,7 @@ function TastemakerCard({
   return (
     <LinearGradient colors={['rgba(184,47,41,0.35)', colors.surface]} style={styles.tastemakerCard}>
       <Pressable onPress={onOpen}>
-        <Image source={avatarSource(person.photoUrl)} style={styles.tastemakerAvatar} />
+        <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.tastemakerAvatar} />
       </Pressable>
       <Text numberOfLines={1} onPress={onOpen} style={styles.tastemakerName}>{person.displayName}</Text>
       <Text style={styles.tastemakerTastes}>{person.favoriteCuisines.join(' · ') || (person.username ? `@${person.username}` : '')}</Text>
@@ -1417,7 +1424,7 @@ function CompactPerson({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.compactPerson}>
-      <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl)} style={styles.compactAvatar} /></Pressable>
+      <Pressable onPress={onOpen}><UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.compactAvatar} /></Pressable>
       <Pressable onPress={onOpen} style={styles.compactCopy}>
         <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.displayName}</Text></View>
         <Text numberOfLines={1} style={styles.compactTastes}>
@@ -1452,7 +1459,7 @@ function ProfileSuggestion({
   return (
     <View style={styles.profileSuggestion}>
       <View style={styles.suggestionHead}>
-        <Pressable onPress={onOpen}><Image source={avatarSource(person.photoUrl)} style={styles.suggestionAvatar} /></Pressable>
+        <Pressable onPress={onOpen}><UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.suggestionAvatar} /></Pressable>
         <Pressable onPress={onOpen} style={styles.suggestionCopy}>
           <Text style={styles.suggestionName}>{person.displayName}</Text>
           <Text style={styles.suggestionHandle}>{person.username ? `@${person.username}` : ''}</Text>
@@ -1541,7 +1548,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
   placeRows: { paddingHorizontal: 16, gap: 10 },
-  placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1A1A1A' },
+  placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
   newChip: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 7, borderRadius: 9, backgroundColor: '#E63946', justifyContent: 'center' },
   newChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },

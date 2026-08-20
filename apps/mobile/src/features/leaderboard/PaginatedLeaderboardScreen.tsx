@@ -11,13 +11,8 @@ import {
   StyleSheet,
   Text,
   View,
-  type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import avatarA from '../../../assets/leaderboard/avatar-a.png';
-import avatarB from '../../../assets/leaderboard/avatar-b.jpg';
-import avatarC from '../../../assets/leaderboard/avatar-c.png';
-import avatarD from '../../../assets/leaderboard/avatar-d.png';
 import backIcon from '../../../assets/leaderboard/back.png';
 import emptyFriendsIcon from '../../../assets/leaderboard/empty-friends.png';
 import infoIcon from '../../../assets/leaderboard/info.png';
@@ -29,28 +24,19 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { UserAvatar } from '../profile/avatar';
 import { useLeaderboard } from './api';
 
 type Period = 'month' | 'allTime';
-
-const fallbackAvatars: ImageSourcePropType[] = [avatarB, avatarA, avatarD, avatarA, avatarC];
-
-function avatarSource(item: LeaderboardEntry, currentUserId: string): ImageSourcePropType {
-  if (item.photoUrl) return { uri: item.photoUrl };
-  if (item.userId === currentUserId) return avatarC;
-  return fallbackAvatars[(item.rank - 1) % fallbackAvatars.length] ?? avatarA;
-}
 
 function handleFor(item: LeaderboardEntry) {
   return item.username ? `@${item.username}` : `@${item.displayName.toLowerCase().replace(/\s+/g, '')}`;
 }
 
 function RankingRow({
-  currentUserId,
   item,
   styles,
 }: {
-  currentUserId: string;
   item: LeaderboardEntry;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -58,7 +44,7 @@ function RankingRow({
   return (
     <View style={styles.rankingRow}>
       <Text style={styles.rowRank}>{item.rank}</Text>
-      <Image source={avatarSource(item, currentUserId)} style={styles.rowAvatar} />
+      <UserAvatar displayName={item.displayName} photoUrl={item.photoUrl} style={styles.rowAvatar} />
       <View style={styles.rowIdentity}>
         <Text numberOfLines={1} style={styles.rowName}>{item.displayName}</Text>
         <Text numberOfLines={1} style={styles.rowHandle}>{handleFor(item)}</Text>
@@ -74,11 +60,9 @@ function RankingRow({
 }
 
 function PodiumPerson({
-  currentUserId,
   person,
   styles,
 }: {
-  currentUserId: string;
   person: LeaderboardEntry;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -87,8 +71,9 @@ function PodiumPerson({
   return (
     <View style={[styles.podiumPerson, winner && styles.winner]}>
       <View style={styles.podiumAvatarWrap}>
-        <Image
-          source={avatarSource(person, currentUserId)}
+        <UserAvatar
+          displayName={person.displayName}
+          photoUrl={person.photoUrl}
           style={[styles.podiumAvatar, winner && styles.winnerAvatar]}
         />
         <View style={[styles.rankBadge, rankStyle]}>
@@ -169,12 +154,10 @@ function LeaderboardHeader({
 
 function CurrentUserBar({
   current,
-  currentUserId,
   preceding,
   styles,
 }: {
   current: LeaderboardEntry;
-  currentUserId: string;
   preceding?: LeaderboardEntry;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -182,7 +165,7 @@ function CurrentUserBar({
   return (
     <View style={styles.currentUser}>
       <Text style={styles.currentRank}>{current.rank}</Text>
-      <Image source={avatarSource(current, currentUserId)} style={styles.rowAvatar} />
+      <UserAvatar displayName={current.displayName} photoUrl={current.photoUrl} style={styles.rowAvatar} />
       <View style={styles.rowIdentity}>
         <Text numberOfLines={1} style={styles.currentName}>{current.displayName}</Text>
         <Text numberOfLines={1} style={styles.currentHandle}>{handleFor(current)}</Text>
@@ -333,7 +316,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
         <>
           <View style={styles.podium}>
             {podium.map((person) => (
-              <PodiumPerson key={person.userId} currentUserId={currentUserId} person={person} styles={styles} />
+              <PodiumPerson key={person.userId} person={person} styles={styles} />
             ))}
           </View>
           <FlatList
@@ -354,7 +337,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
                 tintColor={colors.primary}
               />
             )}
-            renderItem={({ item }) => <RankingRow currentUserId={currentUserId} item={item} styles={styles} />}
+            renderItem={({ item }) => <RankingRow item={item} styles={styles} />}
             showsVerticalScrollIndicator={false}
             style={styles.rankingList}
           />
@@ -362,7 +345,6 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
           {current ? (
             <CurrentUserBar
               current={current}
-              currentUserId={currentUserId}
               preceding={preceding}
               styles={styles}
             />

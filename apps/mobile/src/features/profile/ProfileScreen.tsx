@@ -10,6 +10,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -179,6 +180,7 @@ export function ProfileScreen({
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -190,6 +192,22 @@ export function ProfileScreen({
   }
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
   useFocusEffect(useMemo(() => () => {
     if (!own) return undefined;
     let active = true;
@@ -533,7 +551,7 @@ export function ProfileScreen({
         </ScrollView>
       )}
       {activeTab === 'map' ? (
-        <View style={styles.mapSearchPanel}>
+        <View style={[styles.mapSearchPanel, { bottom: keyboardHeight }]}>
           <View style={styles.mapSearchRow}>
             <View style={[styles.searchBar, styles.mapSearchBar]}>
             <SearchIcon color={colors.textMuted} width={24} height={24} />

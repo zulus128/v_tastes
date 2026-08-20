@@ -228,8 +228,10 @@ export function NewGroupScreen({
                     {item.username ? `@${item.username}` : 'Mutual follower'}
                   </Text>
                 </View>
-                <View style={[styles.check, active && styles.checkActive]}>
-                  <Text style={styles.checkText}>{active ? '✓' : ''}</Text>
+                <View style={styles.check}>
+                  <View style={[styles.checkCircle, active && styles.checkActive]}>
+                    <Text style={styles.checkText}>{active ? '✓' : ''}</Text>
+                  </View>
                 </View>
               </Pressable>
             );
@@ -588,11 +590,11 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     peopleList: { flex: 1 },
     person: {
       height: 76,
-      marginHorizontal: 16,
+      paddingHorizontal: 16,
       flexDirection: 'row',
       alignItems: 'center',
       borderBottomWidth: 1,
-      borderBottomColor: colors.hairline,
+      borderBottomColor: colors.border,
     },
     avatar: { width: 42, height: 42, borderRadius: 21 },
     avatarFallback: {
@@ -610,17 +612,24 @@ function createStyles(colors: ThemeColors, safeTop: number) {
     check: {
       width: 24,
       height: 24,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkCircle: {
+      width: 22,
+      height: 22,
+      borderWidth: 1.5,
+      borderColor: colors.background === '#080808' ? colors.border : '#C7C7CC',
+      borderRadius: 11,
       alignItems: 'center',
       justifyContent: 'center',
     },
     checkActive: {
+      borderWidth: 0,
       borderColor: colors.primary,
       backgroundColor: colors.primary,
     },
-    checkText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+    checkText: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '600' },
     createFooter: { paddingTop: 12, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas },
     createGroup: { height: 58, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },

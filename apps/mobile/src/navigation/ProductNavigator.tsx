@@ -125,6 +125,7 @@ function tabOptions(
     headerShown: false,
     tabBarActiveTintColor: colors.text,
     tabBarInactiveTintColor: colors.textMuted,
+    tabBarHideOnKeyboard: true,
     tabBarStyle: [styles.tabBar, { backgroundColor: colors.background }],
     tabBarLabelStyle: styles.tabLabel,
     tabBarLabel: create ? () => null : undefined,

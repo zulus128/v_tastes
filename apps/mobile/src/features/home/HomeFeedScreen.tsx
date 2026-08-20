@@ -29,6 +29,7 @@ import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import RecommendationPlus from '../../../assets/home/recommendation-plus.svg';
 import RecommendationPlusRing from '../../../assets/home/recommendation-plus-ring.svg';
 import RecommendationStar from '../../../assets/home/recommendation-star.svg';
+import restaurantImage from '../../../assets/discover/restaurant.png';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import BirthdayTagIcon from '../../../assets/create-review/tag-birthday.svg';
@@ -50,10 +51,10 @@ import {
   HomeFeedLoadingState,
   HomeFeedOfflineState,
 } from './HomeFeedStates';
-import avatar from '../../../assets/home/avatar.png';
 import { useDiscoverFeed } from '../discover/api';
 import { useAuthenticatedUserId, useSession } from '../../session/SessionProvider';
 import { useProfile } from '../profile/api';
+import { UserAvatar } from '../profile/avatar';
 import { useUnreadNotificationCount } from '../notifications/api';
 
 const tagInfo: Record<string, { label: string }> = {
@@ -192,10 +193,7 @@ function FeedCard({
     <>
       <Pressable onLongPress={onOpenMenu} delayLongPress={350} style={styles.card}>
       <View style={styles.authorRow}>
-        <Image
-          source={item.authorPhotoUrl ? { uri: item.authorPhotoUrl } : avatar}
-          style={styles.avatar}
-        />
+        <UserAvatar displayName={item.authorDisplayName} photoUrl={item.authorPhotoUrl} style={styles.avatar} />
         <View style={styles.authorCopy}>
           <Text numberOfLines={1} style={styles.authorName}>{item.authorDisplayName}</Text>
           <Text numberOfLines={1} style={styles.authorHandle}>{username}</Text>
@@ -705,7 +703,7 @@ export function HomeFeedScreen({
                 <View style={styles.recommendationBody}>
                   <View style={styles.recommendationRow}>
                     <Image
-                      source={rec.imageUrl ? { uri: rec.imageUrl } : avatar}
+                      source={rec.imageUrl ? { uri: rec.imageUrl } : restaurantImage}
                       style={styles.recommendationImage}
                     />
                     <View style={styles.recommendationInfo}>

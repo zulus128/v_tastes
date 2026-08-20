@@ -584,7 +584,14 @@ export function AdminApp() {
     setBusy(true);
     try {
       if (target === 'overview') setOverview(await callAdmin('getAdminOverview', {}));
-      if (target === 'reports') setReports(await callAdmin('getReportedContent', {}));
+      if (target === 'reports') {
+        const [nextReports, nextOverview] = await Promise.all([
+          callAdmin<unknown, ReportItem[]>('getReportedContent', {}),
+          callAdmin<unknown, Overview>('getAdminOverview', {}),
+        ]);
+        setReports(nextReports);
+        setOverview(nextOverview);
+      }
       if (target === 'venues') setVenues(await callAdmin('searchAdminVenues', { query: search }));
       if (target === 'users') setUsers(await callAdmin('searchUsers', { query: search }));
     } catch (error) { setNotice(errorMessage(error)); } finally { setBusy(false); }
