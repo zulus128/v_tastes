@@ -94,7 +94,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const categoryLabel = categoryChip
     ? [categoryChip, cuisineFlag(categoryChip)].filter(Boolean).join(' ')
     : categoryChip;
-  const priceChip = '$'.repeat(place.venue.priceLevel ?? 1);
+  const priceChip = place.venue.priceLevel == null ? null : '$'.repeat(place.venue.priceLevel);
   const detailChips = place.chips
     .filter((value) => !(categoryChip && (value === categoryChip || value.startsWith(categoryChip))) && !/^\$+$/.test(value))
     .slice(0, 2);
@@ -119,8 +119,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     <View style={styles.chips}>
       <View style={styles.compoundChip}>
         <Text style={styles.chipText}>{categoryLabel}</Text>
-        <View style={styles.chipDivider} />
-        <Text style={styles.chipSecondary}>{priceChip}</Text>
+        {priceChip ? <><View style={styles.chipDivider} /><Text style={styles.chipSecondary}>{priceChip}</Text></> : null}
       </View>
       {detailChips.map((value) => <Text key={value} style={styles.chip}>{value}</Text>)}
     </View>
