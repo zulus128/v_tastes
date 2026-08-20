@@ -10,7 +10,18 @@ export interface ObservabilitySink {
 
 const consoleSink: ObservabilitySink = {
   captureException(error, context) {
-    if (__DEV__) console.error('[tastes]', context, error);
+    if (!__DEV__) return;
+
+    const retryable = (error as { retryable?: unknown } | null)?.retryable === true;
+    if (retryable) {
+      // React Query retries transient API failures. Keep them visible in the
+      // development console without turning a brief network outage into a
+      // React Native redbox before the retry has a chance to succeed.
+      console.info('[tastes] retryable error', context, error);
+      return;
+    }
+
+    console.error('[tastes]', context, error);
   },
   track(event, context) {
     if (__DEV__) console.info(`[tastes] ${event}`, context);
