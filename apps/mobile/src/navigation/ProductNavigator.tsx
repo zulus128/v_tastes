@@ -16,7 +16,6 @@ import {
 } from '@react-navigation/native-stack';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { DiscoverPerson } from '@tastes/contracts';
-import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { useMemo, useState } from 'react';
@@ -132,16 +131,11 @@ function tabOptions(
     tabBarItemStyle: create ? styles.createTabItem : undefined,
     tabBarIcon: ({ focused }) =>
       create ? (
-        <LinearGradient
-          colors={[colors.background, colors.brandGradientEnd]}
-          end={{ x: 0.5, y: 1 }}
-          start={{ x: 0.5, y: 0 }}
-          style={styles.createIconBorder}
-        >
+        <View style={[styles.createIconBorder, { backgroundColor: colors.background }]}>
           <View style={[styles.createIcon, { backgroundColor: colors.primary }]}>
             <CreateTabGlyph />
           </View>
-        </LinearGradient>
+        </View>
       ) : (
         <View style={styles.tabIcon}>
           <TabBarGlyph

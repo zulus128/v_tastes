@@ -21,12 +21,17 @@ import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import RecommendationPlus from '../../../assets/home/recommendation-plus.svg';
 import RecommendationPlusRing from '../../../assets/home/recommendation-plus-ring.svg';
 import RecommendationStar from '../../../assets/home/recommendation-star.svg';
+import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
+import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
+import BirthdayTagIcon from '../../../assets/create-review/tag-birthday.svg';
+import NightTagIcon from '../../../assets/create-review/tag-night.svg';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -50,11 +55,11 @@ import { useDiscoverFeed } from '../discover/api';
 import { useAuthenticatedUserId, useSession } from '../../session/SessionProvider';
 import { useProfile } from '../profile/api';
 
-const tagInfo: Record<string, { label: string; emoji?: string }> = {
+const tagInfo: Record<string, { label: string }> = {
   casual: { label: 'Casual' },
-  'date-night': { label: 'Date night', emoji: '🌙' },
-  birthday: { label: 'Birthday', emoji: '🎂' },
-  children: { label: 'With children', emoji: '👶' },
+  'date-night': { label: 'Date night' },
+  birthday: { label: 'Birthday' },
+  children: { label: 'With children' },
 };
 
 const cuisineFlags: Record<string, string> = {
@@ -82,8 +87,12 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
     {[1, 2, 3, 4, 5].map((star) => {
       const fill = Math.max(0, Math.min(1, clamped - star + 1));
       return <View key={star} style={styles.starCell}>
-        <Text style={[styles.star, styles.starEmpty]}>★</Text>
-        {fill > 0 ? <View style={[styles.starFill, { width: `${fill * 100}%` }]}><Text style={[styles.star, styles.starFilled]}>★</Text></View> : null}
+        <ReviewStarOutline color="#B82F29" height={17.9166} opacity={0.3} width={17.9179} />
+        {fill > 0 ? (
+          <View style={[styles.starFill, { width: `${fill * 100}%` }]}>
+            <ReviewStarFilled color="#B82F29" height={16.6666} width={16.6671} />
+          </View>
+        ) : null}
       </View>;
     })}
   </View>;
@@ -168,6 +177,11 @@ function FeedCard({
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
   const primaryTag = tags[0] ? tagInfo[tags[0]] ?? { label: tags[0] } : null;
+  const PrimaryTagIcon = tags[0] === 'date-night'
+    ? NightTagIcon
+    : tags[0] === 'birthday'
+      ? BirthdayTagIcon
+      : null;
   const username = item.authorUsername
     ? `@${item.authorUsername}`
     : `@${item.authorDisplayName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
@@ -194,9 +208,8 @@ function FeedCard({
           <RatingStars rating={item.rating} styles={styles} />
           {primaryTag ? (
             <View style={styles.tagBadge}>
-              <Text style={styles.tagBadgeText}>
-                {primaryTag.emoji ? `${primaryTag.emoji} ` : ''}{primaryTag.label}
-              </Text>
+              {PrimaryTagIcon ? <PrimaryTagIcon color={colors.text} height={12} width={12} /> : null}
+              <Text style={styles.tagBadgeText}>{primaryTag.label}</Text>
             </View>
           ) : null}
         </View>
@@ -223,16 +236,15 @@ function FeedCard({
             >
               <DishPhoto photoPath={dish.photoPath} />
               <LinearGradient
-                colors={['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.15)', 'transparent']}
-                locations={[0, 0.55, 1]}
+                colors={['#161616', 'rgba(22,22,22,0)']}
+                locations={[0.0167, 0.3067]}
                 style={styles.dishGradient}
-              >
-                <Text numberOfLines={2} style={styles.dishTitle}>
-                  {dish.title}
-                </Text>
-              </LinearGradient>
+              />
+              <View style={styles.dishTitleRow}>
+                <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
+              </View>
               <View style={styles.dishRatingBadge}>
-                <Text style={styles.dishRatingStar}>★</Text>
+                <RecommendationStar height={14} width={14} />
                 <Text style={styles.dishRatingValue}>{dish.rating.toFixed(1)}</Text>
               </View>
             </Pressable>
@@ -240,49 +252,58 @@ function FeedCard({
         </ScrollView>
       ) : null}
 
-      {item.text ? (
-        <Pressable onPress={() => setExpanded((v) => !v)} style={styles.reviewPressable}>
-          <Text
-            numberOfLines={expanded ? undefined : 2}
-            style={styles.review}
-          >
-            {item.text}
+      <View style={styles.reviewAndMetrics}>
+        {item.text ? (
+          <Pressable onPress={() => setExpanded((v) => !v)} style={styles.reviewPressable}>
+            <Text numberOfLines={expanded ? undefined : 2} style={styles.review}>{item.text}</Text>
             {!expanded && isLongText ? (
-              <Text style={styles.seeMore}>  See more</Text>
+              <LinearGradient
+                colors={['rgba(22,22,22,0)', colors.surface, colors.surface]}
+                locations={[0, 0.37, 1]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.seeMoreFade}
+              >
+                <Text style={styles.seeMore}>See more</Text>
+              </LinearGradient>
             ) : null}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <View style={styles.metrics}>
-        <View style={styles.metricsLeft}>
-          <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
-            {isReactionActive ? <Text style={styles.filledHeart}>♥</Text> : <HeartIcon color={colors.text} height={20} width={20} />}
-            <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
-              {item.reactionCount}
-            </Text>
-          </Pressable>
-          <Pressable onPress={onComments} style={styles.metricIconRow}>
-            <ChatIcon color={colors.text} height={20} width={20} />
-            <Text style={styles.metric}>{item.commentCount}</Text>
-          </Pressable>
-          <Pressable onPress={onShare} style={styles.metricIconRow}>
-            <ShareIcon color={colors.text} height={20} width={20} />
-          </Pressable>
-        </View>
-        {dishReviews.length > 0 ? (
-          <Pressable
-            accessibilityLabel="Open dish reviews"
-            onPress={(event) => {
-              event.stopPropagation();
-              setSelectedDishIndex(0);
-            }}
-            style={styles.dishesButton}
-          >
-            <TopRatedDishesIcon color={colors.primary} height={13} width={15} />
-            <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
           </Pressable>
         ) : null}
+
+        <View style={styles.metrics}>
+          <View style={styles.metricsLeft}>
+            <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
+              <View style={styles.heartIcon}>
+                {isReactionActive
+                  ? <HeartBoldIcon height={14.3462} width={16.6667} />
+                  : <HeartIcon color={colors.text} height={15.5978} width={17.9167} />}
+              </View>
+              <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
+                {item.reactionCount}
+              </Text>
+            </Pressable>
+            <Pressable onPress={onComments} style={styles.metricIconRow}>
+              <ChatIcon color={colors.text} height={20} width={20} />
+              <Text style={styles.metric}>{item.commentCount}</Text>
+            </Pressable>
+            <Pressable onPress={onShare} style={styles.metricIconRow}>
+              <ShareIcon color={colors.text} height={20} width={20} />
+            </Pressable>
+          </View>
+          {dishReviews.length > 0 ? (
+            <Pressable
+              accessibilityLabel="Open dish reviews"
+              onPress={(event) => {
+                event.stopPropagation();
+                setSelectedDishIndex(0);
+              }}
+              style={styles.dishesButton}
+            >
+              <TopRatedDishesIcon color={colors.primary} height={14} width={14} />
+              <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       </Pressable>
       <Modal
@@ -577,6 +598,23 @@ export function HomeFeedScreen({
     await query.refetch();
   };
 
+  const renderFeedCard = (item: FeedItem) => (
+    <FeedCard
+      key={item.id}
+      item={item}
+      onComments={() => onOpenComments(item.id)}
+      isReactionActive={Boolean(reactionState[item.id] ?? item.reacted)}
+      reactionDisabled={Boolean(pendingReactions[item.id])}
+      onReaction={() => {
+        void handleReactionPress(item);
+      }}
+      onShare={() => {
+        void handleSharePress(item);
+      }}
+      onLongPress={() => setMenuReviewId(item.id)}
+    />
+  );
+
   return (
     <Screen background="homeFeed">
       <View style={styles.header}>
@@ -627,11 +665,13 @@ export function HomeFeedScreen({
       ) : (
         <FlatList
           contentContainerStyle={styles.content}
-          data={visibleItems}
+          data={visibleItems.slice(2)}
           initialNumToRender={6}
           keyExtractor={(item) => item.id}
           maxToRenderPerBatch={6}
-          ListHeaderComponent={!recommendationHidden && typeof recommendationQuery.data?.forYou[0]?.matchPercent === 'number' ? (() => {
+          ListHeaderComponent={<View style={styles.feedLead}>
+            {visibleItems.slice(0, 2).map(renderFeedCard)}
+            {!recommendationHidden && typeof recommendationQuery.data?.forYou[0]?.matchPercent === 'number' ? (() => {
             const rec = recommendationQuery.data!.forYou[0]!;
             const priceDots = rec.priceLevel ? '$'.repeat(rec.priceLevel) : null;
             const distanceLabel = rec.distanceKm != null
@@ -695,7 +735,8 @@ export function HomeFeedScreen({
                 </View>
               </Pressable>
             );
-          })() : null}
+            })() : null}
+          </View>}
           ListFooterComponent={<ListFooter loading={query.isFetchingNextPage} />}
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
@@ -709,21 +750,7 @@ export function HomeFeedScreen({
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item }) => (
-            <FeedCard
-              item={item}
-              onComments={() => onOpenComments(item.id)}
-              isReactionActive={Boolean(reactionState[item.id] ?? item.reacted)}
-              reactionDisabled={Boolean(pendingReactions[item.id])}
-              onReaction={() => {
-                void handleReactionPress(item);
-              }}
-              onShare={() => {
-                void handleSharePress(item);
-              }}
-              onLongPress={() => setMenuReviewId(item.id)}
-            />
-          )}
+          renderItem={({ item }) => renderFeedCard(item)}
           showsVerticalScrollIndicator={false}
           style={styles.list}
         />
@@ -768,10 +795,10 @@ export function HomeFeedScreen({
 }
 
 const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
-  header: { height: 157, paddingTop: 54, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
-  headerTop: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  switcher: { height: 40, marginTop: 7, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: isDark ? colors.surfaceRaised : '#F3F0EB' },
+  header: { height: 157, paddingTop: 54, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
+  headerTop: { height: 44, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  switcher: { height: 40, marginTop: 7, marginHorizontal: 16, padding: 4, flexDirection: 'row', borderRadius: theme.radius.pill, backgroundColor: isDark ? colors.surfaceRaised : '#F3F0EB' },
   switch: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.pill },
   switchActive: { backgroundColor: isDark ? '#D9DDE5' : '#262626' },
   switchText: { color: isDark ? colors.textSecondary : '#858585', opacity: isDark ? 0.5 : 1, fontSize: 13 },
@@ -779,8 +806,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   newPostsBanner: { position: 'absolute', top: 152, left: 16, right: 16, zIndex: 3, alignSelf: 'center', alignItems: 'center', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#161616CC' },
   newPostsText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   list: { flex: 1 },
-  content: { padding: 15, gap: 16 },
-  recommendation: { height: 230, marginBottom: 2, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 15, gap: 12 },
+  feedLead: { gap: 12 },
+  recommendation: { height: 236, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   recommendationHeader: { height: 42, position: 'relative', backgroundColor: isDark ? 'rgba(184,47,41,0.1)' : 'rgba(184,47,41,0.08)' },
   recommendedBadge: { position: 'absolute', top: 0, left: 0, width: 104, height: 42, alignItems: 'center', justifyContent: 'center', borderBottomRightRadius: 30, backgroundColor: '#B82F29' },
   recommendedBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '400', letterSpacing: -0.23 },
@@ -802,43 +830,42 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   recommendationTags: { position: 'absolute', left: 18, right: 18, bottom: 9, height: 33, flexDirection: 'row', alignItems: 'center', gap: 7 },
   recTag: { height: 33, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 40, backgroundColor: colors.surfaceRaised },
   recTagText: { color: colors.text, fontSize: 15, fontWeight: '400', lineHeight: 20, letterSpacing: -0.24 },
-  card: { gap: 14, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.surface },
-  authorRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.canvas },
-  authorCopy: { flex: 1, paddingLeft: 10, justifyContent: 'center', gap: 2 },
-  authorName: { color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 20 },
-  authorHandle: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-  date: { color: colors.textMuted, fontSize: 13 },
-  venueSection: { gap: 6 },
-  venue: { color: colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
+  card: { gap: 16, paddingBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
+  authorRow: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.canvas },
+  authorCopy: { flex: 1, paddingLeft: 7, justifyContent: 'center', gap: 4 },
+  authorName: { color: colors.text, fontSize: 15, fontWeight: '600', lineHeight: 18, letterSpacing: -0.41 },
+  authorHandle: { color: colors.textSecondary, fontSize: 13, lineHeight: 16, letterSpacing: -0.24 },
+  date: { color: colors.text, fontSize: 14, letterSpacing: -0.24, opacity: 0.4 },
+  venueSection: { paddingHorizontal: 16, gap: 4 },
+  venue: { color: colors.text, fontSize: 16, fontWeight: '600', lineHeight: 20, letterSpacing: -0.24 },
   ratingTagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  starRow: { flexDirection: 'row', gap: 3 },
-  starCell: { width: 17, height: 22, overflow: 'hidden' },
-  starFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
-  star: { fontSize: 18, lineHeight: 20 },
-  starFilled: { color: '#E53935' },
-  starEmpty: { color: '#E53935', opacity: 0.2 },
-  tagBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
-  tagBadgeText: { color: colors.text, fontSize: 12, fontWeight: '500' },
-  dishes: { gap: 10 },
-  dish: { width: 148, height: 156, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised, position: 'relative' },
-  dishGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 64, paddingHorizontal: 10, paddingTop: 8 },
-  dishTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  dishRatingBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.65)' },
-  dishRatingStar: { color: '#FFFFFF', fontSize: 11 },
-  dishRatingValue: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  reviewPressable: {},
-  review: { color: colors.text, opacity: 0.88, fontSize: 14, lineHeight: 20 },
-  seeMore: { color: colors.text, fontWeight: '700', opacity: 1 },
-  metrics: { paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  metricsLeft: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  metric: { color: colors.textMuted, fontSize: 13 },
-  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  starRow: { flexDirection: 'row', gap: 2 },
+  starCell: { width: 20, height: 20, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  starFill: { position: 'absolute', left: 1.6665, top: 1.6667, height: 16.6666, overflow: 'hidden' },
+  tagBadge: { minHeight: 22, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 40, backgroundColor: colors.surfaceMuted },
+  tagBadgeText: { color: colors.text, fontSize: 12, fontWeight: '400', lineHeight: 14, letterSpacing: -0.23 },
+  dishes: { paddingHorizontal: 16, gap: 9 },
+  dish: { width: 150, height: 150, overflow: 'hidden', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised, position: 'relative' },
+  dishGradient: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  dishTitleRow: { position: 'absolute', top: -1, left: -1, width: 150, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6, alignItems: 'center' },
+  dishTitle: { width: 123, color: '#FFFFFF', fontSize: 13, fontWeight: '600', lineHeight: 16, letterSpacing: -0.24, textAlign: 'center' },
+  dishRatingBadge: { position: 'absolute', bottom: -1, left: -1, height: 24, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 4, borderBottomLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' },
+  dishRatingValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', lineHeight: 16, letterSpacing: -0.23 },
+  reviewAndMetrics: { paddingHorizontal: 16, gap: 20 },
+  reviewPressable: { position: 'relative' },
+  review: { color: colors.text, fontSize: 14, lineHeight: 18, letterSpacing: -0.41 },
+  seeMoreFade: { position: 'absolute', right: 0, bottom: 0, width: 104, height: 18, alignItems: 'flex-end', justifyContent: 'center' },
+  seeMore: { color: isDark ? '#C2C2C2' : colors.textSecondary, fontSize: 14, fontWeight: '700', lineHeight: 17, letterSpacing: -0.41 },
+  metrics: { height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  metricsLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  metric: { color: colors.text, fontSize: 14, lineHeight: 17, letterSpacing: -0.41 },
+  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   metricActive: { color: colors.text, fontWeight: '700' },
   metricDisabled: { opacity: 0.5 },
-  filledHeart: { color: colors.primary, fontSize: 21, lineHeight: 21 },
-  dishesButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: isDark ? '#232326' : '#ECE9E2' },
-  dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '500' },
+  heartIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  dishesButton: { height: 24, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(184,47,41,0.4)', borderRadius: 40 },
+  dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '400', lineHeight: 14, letterSpacing: -0.23 },
 });
 
 const stylesStatic = StyleSheet.create({
