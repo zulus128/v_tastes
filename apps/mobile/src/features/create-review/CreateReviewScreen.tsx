@@ -795,6 +795,7 @@ function PlaceSelector({
           <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
         ) : (
           <FlatList
+            style={styles.placeList}
             data={filtered}
             initialNumToRender={8}
             keyExtractor={(venue) => venue.id}
@@ -1054,15 +1055,16 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
   searchIcon: { color: colors.text, marginRight: 8, fontSize: 22 },
   search: { flex: 1, height: 42, paddingVertical: 0, color: colors.text, fontSize: 16 },
   clear: { color: colors.textSecondary, fontSize: 22 },
+  placeList: { flex: 1 },
   filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
-  filter: { height: 29, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  filter: { height: 34, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
   filterText: { color: colors.text, fontSize: 12 },
   loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' }, error: { color: colors.primary, textAlign: 'center' },
   row: { minHeight: 176, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowImage: { width: 122, height: 122, borderRadius: 14 }, rowCopy: { flex: 1, gap: 7 },
   rowName: { color: colors.text, fontSize: 15, fontWeight: '600' }, rowAddress: { color: colors.textSecondary, fontSize: 13 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 8 }, ratingPill: { color: '#fff', borderRadius: 15, paddingHorizontal: 11, paddingVertical: 6, backgroundColor: '#D33B35', fontWeight: '700' }, metaText: { color: colors.textMuted, fontSize: 12 },
+  meta: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }, ratingPill: { color: '#fff', borderRadius: 15, paddingHorizontal: 11, paddingVertical: 6, backgroundColor: '#D33B35', fontWeight: '700' }, metaText: { flexShrink: 1, color: colors.textMuted, fontSize: 12, lineHeight: 16 },
   add: { color: colors.text, fontSize: 21 }, empty: { color: colors.textMuted, padding: 36, textAlign: 'center' },
   more: { height: 54, alignItems: 'center', justifyContent: 'center' }, moreText: { color: colors.primary, fontWeight: '600' },
 });

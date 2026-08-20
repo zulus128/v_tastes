@@ -204,6 +204,7 @@ export function NewGroupScreen({
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : (
         <FlatList
+          style={styles.peopleList}
           data={filtered}
           keyExtractor={(item) => item.userId}
           renderItem={({ item }) => {
@@ -588,6 +589,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       fontSize: 12,
     },
     loader: { marginTop: 40 },
+    peopleList: { flex: 1 },
     person: {
       height: 76,
       marginHorizontal: 16,
