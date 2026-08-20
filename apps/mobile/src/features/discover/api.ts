@@ -2,7 +2,7 @@ import type { DiscoverTag, PlaceReview } from '@tastes/contracts';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
 
-export const discoverFeedQueryKey = (userId: string) => ['discover', 'feed', userId] as const;
+export const discoverFeedQueryKey = (userId: string, profileSignature?: string) => ['discover', 'feed', userId, profileSignature] as const;
 export const discoverPeopleQueryKey = (userId: string) => ['discover', 'people', userId] as const;
 export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
 export const venueSearchQueryKey = (query: string) => ['venues', 'search', query] as const;
@@ -35,10 +35,10 @@ function normalizePlaceReviewPage(page: unknown): PlaceReview[] {
   return Array.isArray(items) ? items.filter(isPlaceReview) : [];
 }
 
-export function useDiscoverFeed(userId: string) {
+export function useDiscoverFeed(userId: string, profileSignature?: string) {
   const api = useTastesApi();
   return useQuery({
-    queryKey: discoverFeedQueryKey(userId),
+    queryKey: discoverFeedQueryKey(userId, profileSignature),
     queryFn: async () => (await api.getDiscoverFeed()).data,
   });
 }

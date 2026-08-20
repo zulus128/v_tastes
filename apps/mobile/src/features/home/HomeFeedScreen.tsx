@@ -458,7 +458,12 @@ export function HomeFeedScreen({
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
-  const recommendationQuery = useDiscoverFeed(userId);
+  const recommendationProfileSignature = [
+    profile?.city ?? '',
+    ...(profile?.favoriteCuisines ?? []),
+    profile?.favoriteDish ?? '',
+  ].join('|');
+  const recommendationQuery = useDiscoverFeed(userId, recommendationProfileSignature);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
   const hideMutation = useHideReview();
@@ -626,7 +631,7 @@ export function HomeFeedScreen({
           initialNumToRender={6}
           keyExtractor={(item) => item.id}
           maxToRenderPerBatch={6}
-          ListHeaderComponent={!recommendationHidden && recommendationQuery.data?.forYou[0] ? (() => {
+          ListHeaderComponent={!recommendationHidden && typeof recommendationQuery.data?.forYou[0]?.matchPercent === 'number' ? (() => {
             const rec = recommendationQuery.data!.forYou[0]!;
             const priceDots = rec.priceLevel ? '$'.repeat(rec.priceLevel) : null;
             const distanceLabel = rec.distanceKm != null
@@ -645,8 +650,8 @@ export function HomeFeedScreen({
                     <Text style={styles.recommendedBadgeText}>Recommended</Text>
                   </View>
                   <Text numberOfLines={1} style={styles.recommendationMatch}>
-                    <Text style={styles.recommendationMatchScore}>{rec.matchPercent ?? 0}% </Text>
-                    {rec.category ? `match on your ${rec.category.toLowerCase()} taste` : 'match based on your tastes and saves'}
+                    <Text style={styles.recommendationMatchScore}>{rec.matchPercent}% </Text>
+                    match based on your saved tastes
                   </Text>
                 </View>
 

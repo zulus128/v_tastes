@@ -18,6 +18,7 @@ import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { calculateRecommendationMatch, isRecommendation } from './recommendations';
 
 function toVenue(document: QueryDocumentSnapshot, matchPercent?: number): Venue {
   return {
@@ -75,6 +76,38 @@ async function fetchTaggedVenues(
   return snapshot.docs.map(toVenue);
 }
 
+interface RecommendationCandidate {
+  searchableText: string;
+  venue: Venue;
+}
+
+async function fetchRecommendationCandidates(take: number): Promise<RecommendationCandidate[]> {
+  const snapshot = await db.collection('venues')
+    .where('status', '==', 'active')
+    .where('discoverTags', 'array-contains', 'for-you')
+    .orderBy('rating', 'desc')
+    .limit(take)
+    .get();
+
+  return snapshot.docs.map((document) => {
+    const placeTags = Array.isArray(document.get('placeTags'))
+      ? (document.get('placeTags') as unknown[]).filter((value): value is string => typeof value === 'string')
+      : [];
+    const popularDishes = Array.isArray(document.get('popularDishes'))
+      ? (document.get('popularDishes') as unknown[]).flatMap((value) => {
+        if (!value || typeof value !== 'object') return [];
+        const name = (value as { name?: unknown }).name;
+        return typeof name === 'string' ? [name] : [];
+      })
+      : [];
+    const venue = toVenue(document);
+    return {
+      venue,
+      searchableText: [venue.name, venue.category, ...placeTags, ...popularDishes].filter(Boolean).join(' '),
+    };
+  });
+}
+
 export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const userProfile = await db.collection('users').doc(uid).get();
@@ -87,24 +120,21 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     fetchTaggedVenues('trending', 'rating', 'desc', 3),
     fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
     fetchTaggedVenues('most-reviewed', 'reviewCount', 'desc', 6),
-    fetchTaggedVenues('for-you', 'rating', 'desc', 12),
+    fetchRecommendationCandidates(12),
     fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
     db.collection('reviews').where('status', '==', 'published').orderBy('reactionCount', 'desc').limit(3).get(),
     db.collection('users').where('status', '==', 'active').orderBy('reviewCount', 'desc').limit(10).get(),
   ]);
   const forYou = forYouCandidates
-    .filter((venue) => !userCity || venue.city.trim().toLocaleLowerCase() === userCity)
-    .map((venue) => {
-      const haystack = `${venue.name} ${venue.category ?? ''}`.toLocaleLowerCase();
-      const cuisineMatch = favoriteCuisines.some((cuisine) => haystack.includes(cuisine));
-      const dishMatch = Boolean(favoriteDish && haystack.includes(favoriteDish));
-      const ratingScore = Math.round(Math.max(0, Math.min(5, venue.rating ?? 0)));
-      const matchPercent = Math.min(99, 50 + (cuisineMatch ? 30 : 0) + (dishMatch ? 15 : 0) + ratingScore);
-      return { venue, matchPercent };
+    .filter(({ venue }) => !userCity || venue.city.trim().toLocaleLowerCase() === userCity)
+    .map(({ venue, searchableText }) => {
+      const match = calculateRecommendationMatch({ favoriteCuisines, favoriteDish, rating: venue.rating, searchableText });
+      return { venue, match };
     })
-    .sort((left, right) => right.matchPercent - left.matchPercent || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
+    .filter(({ match }) => isRecommendation(match))
+    .sort((left, right) => right.match.matchPercent - left.match.matchPercent || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
     .slice(0, 3)
-    .map(({ venue, matchPercent }) => ({ ...venue, matchPercent }));
+    .map(({ venue, match }) => ({ ...venue, matchPercent: match.matchPercent }));
 
   const reviewVenueIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('venueId'))))];
   const reviewAuthorIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('authorId'))))];
