@@ -98,6 +98,29 @@ interface UserHistory {
 type RunAdmin = (name: string, input: unknown) => Promise<boolean>;
 type AccountActionName = 'suspendUser' | 'banUser' | 'unbanUser' | 'reinstateUser';
 
+const reportActionNames = new Set(['dismissReport', 'editContent', 'deleteContent']);
+
+function successMessage(name: string, input: unknown) {
+  const messages: Record<string, string> = {
+    dismissReport: 'Report dismissed.',
+    editContent: 'Reported content updated.',
+    deleteContent: 'Reported content removed.',
+    mergeVenues: 'Venues merged.',
+    setVenueFlags: 'Venue flags updated.',
+    suspendUser: 'User suspended.',
+    banUser: 'User banned.',
+    unbanUser: 'User unbanned.',
+    reinstateUser: 'User reinstated.',
+  };
+  if (name === 'setVenueStatus') {
+    const status = (input as { status?: unknown })?.status;
+    if (status === 'hidden') return 'Venue hidden.';
+    if (status === 'active') return 'Venue restored.';
+    if (status === 'removed') return 'Venue removed.';
+  }
+  return messages[name] ?? 'Changes saved.';
+}
+
 const emptyOverview: Overview = {
   totalUsers: 0,
   totalReviews: 0,
@@ -589,6 +612,7 @@ export function AdminApp() {
         ]);
         setReports(nextReports);
         setOverview(nextOverview);
+        return nextReports;
       }
       if (target === 'venues') setVenues(await callAdmin('searchAdminVenues', { query: search }));
       if (target === 'users') setUsers(await callAdmin('searchUsers', { query: search }));
@@ -599,7 +623,20 @@ export function AdminApp() {
 
   async function run(name: string, input: unknown) {
     setBusy(true); setNotice('');
-    try { await callAdmin(name, input); setNotice('Changes saved.'); await refresh(); return true; }
+    try {
+      await callAdmin(name, input);
+      setNotice(successMessage(name, input));
+      const refreshedReports = await refresh();
+      if (reportActionNames.has(name)) {
+        const reportId = (input as { reportId?: unknown })?.reportId;
+        if (typeof reportId === 'string') {
+          const pending = (refreshedReports ?? reports).filter((report) => report.id !== reportId);
+          setReports(pending);
+          setOverview((currentOverview) => ({ ...currentOverview, pendingReports: pending.length }));
+        }
+      }
+      return true;
+    }
     catch (error) { setNotice(errorMessage(error)); setBusy(false); return false; }
   }
 
@@ -618,10 +655,10 @@ export function AdminApp() {
       <header><div><p className="eyebrow">TASTES CONTROL CENTER</p><h1>{titles[view][0]}</h1><p>{titles[view][1]}</p></div>{view !== 'overview' && <form className="search" onSubmit={(event) => { event.preventDefault(); void refresh(view, query); }}><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${view}…`}/></form>}</header>
       {notice && <button className="notice" onClick={() => setNotice('')}>{notice}<span>×</span></button>}
       <div className={busy ? 'view busy' : 'view'}>
-        {view === 'overview' && <OverviewView data={overview}/>} 
-        {view === 'reports' && <ReportsView reports={reports} run={run}/>} 
-        {view === 'venues' && <VenuesView venues={venues} isAdmin={role === 'admin'} refresh={() => refresh('venues', query)} run={run}/>} 
-        {view === 'users' && <UsersView users={users} run={run}/>} 
+        {view === 'overview' && <OverviewView data={overview}/>}
+        {view === 'reports' && <ReportsView reports={reports} run={run}/>}
+        {view === 'venues' && <VenuesView venues={venues} isAdmin={role === 'admin'} refresh={async () => { await refresh('venues', query); }} run={run}/>}
+        {view === 'users' && <UsersView users={users} run={run}/>}
       </div>
     </main>
   </div>;
