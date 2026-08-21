@@ -258,6 +258,13 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "savedVenues",
+      "fieldPath": "venueId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "_otpChallenges",
       "fieldPath": "expiresAt",
       "ttl": true,

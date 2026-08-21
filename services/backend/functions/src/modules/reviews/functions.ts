@@ -392,9 +392,17 @@ export const createReview = onCall(callableOptions, async (request) => {
   const published = announcement as ReviewAnnouncement | null;
   if (published) {
     const { authorName, venue, previousXp } = published;
-    await announceReview(reviewRef.id, uid, authorName, venue);
-    await notifyLevelChange(uid, previousXp, previousXp + 50);
-    await syncRewardNotifications(uid);
+    const effects = await Promise.allSettled([
+      announceReview(reviewRef.id, uid, authorName, venue),
+      notifyLevelChange(uid, previousXp, previousXp + 50),
+      syncRewardNotifications(uid),
+    ]);
+    const effectNames = ['review announcement', 'level notification', 'reward notification'] as const;
+    effects.forEach((effect, index) => {
+      if (effect.status === 'rejected') {
+        console.warn(`Unable to complete the post-create ${effectNames[index]}.`, effect.reason);
+      }
+    });
   }
 
   return { id: reviewRef.id };
