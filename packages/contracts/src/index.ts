@@ -662,6 +662,8 @@ export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
+  senderDisplayName: string | null;
+  senderPhotoUrl: string | null;
   recipientId: string;
   recipientIds: string[];
   text: string;

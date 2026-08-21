@@ -369,6 +369,7 @@ export function ProductNavigator({ user }: { user: User }) {
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Dialog' });
               }}
+              onOpenGroupDetails={(groupId) => navigation.navigate('GroupDetails', { groupId })}
               userId={user.uid}
             />
           )}

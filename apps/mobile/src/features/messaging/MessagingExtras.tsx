@@ -13,6 +13,8 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
@@ -128,8 +130,10 @@ export function NewGroupScreen({
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
   const [people, setPeople] = useState<ActivityCandidate[]>([]);
+  const [searchResults, setSearchResults] = useState<ActivityCandidate[]>([]);
   const [selected, setSelected] = useState(new Set<string>());
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     let active = true;
@@ -146,11 +150,39 @@ export function NewGroupScreen({
       active = false;
     };
   }, [api]);
-  const filtered = people.filter(
-    (person) =>
-      !query ||
-      `${person.displayName} ${person.username ?? ''}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const normalizedQuery = query.trim();
+  useEffect(() => {
+    if (normalizedQuery.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return undefined;
+    }
+    let active = true;
+    setSearching(true);
+    const timeout = setTimeout(() => {
+      void api.searchPeople({ query: normalizedQuery, limit: 50 })
+        .then((result) => {
+          if (active) setSearchResults(result.data);
+        })
+        .catch((error) => {
+          if (active) Alert.alert('Could not search people', apiErrorMessage(error));
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [api, normalizedQuery]);
+  const filtered = normalizedQuery.length >= 2
+    ? searchResults
+    : people.filter(
+        (person) =>
+          !normalizedQuery ||
+          `${person.displayName} ${person.username ?? ''}`.toLowerCase().includes(normalizedQuery.toLowerCase()),
+      );
   const create = async () => {
     setCreating(true);
     try {
@@ -163,9 +195,10 @@ export function NewGroupScreen({
     }
   };
   return (
-    <Screen style={styles.screen}>
+    <View style={styles.newGroupScreen}>
       <Header
         onBack={onBack}
+        style={styles.newGroupHeader}
         styles={styles}
         title="New group"
       />
@@ -181,7 +214,7 @@ export function NewGroupScreen({
         />
       </View>
       <View style={styles.searchRow}>
-        <View style={styles.search}>
+        <View style={[styles.search, styles.newGroupSearch]}>
           <Text style={styles.searchGlyph}>⌕</Text>
           <TextInput
             onChangeText={setQuery}
@@ -200,7 +233,7 @@ export function NewGroupScreen({
           {isDark ? <UserHeartIcon height={21.5} width={21.5} /> : <UserHeartLightIcon height={21.5} width={21.5} />}
         </Pressable>
       </View>
-      {loading ? (
+      {loading || searching ? (
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : (
         <FlatList
@@ -247,7 +280,7 @@ export function NewGroupScreen({
           {creating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createGroupText}>Create group</Text>}
         </Pressable>
       </View>
-    </Screen>
+    </View>
   );
 }
 
@@ -259,7 +292,10 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [group, setGroup] = useState<TastesGroup | null>(null);
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ActivityCandidate[]>([]);
   const [adding, setAdding] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const load = async () => {
     const [g, people] = await Promise.all([
@@ -272,6 +308,32 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   useEffect(() => {
     void load().catch((e) => Alert.alert('Could not load group', apiErrorMessage(e)));
   }, [api, groupId]);
+  const normalizedMemberQuery = memberQuery.trim();
+  useEffect(() => {
+    if (!adding || normalizedMemberQuery.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return undefined;
+    }
+    let active = true;
+    setSearching(true);
+    const timeout = setTimeout(() => {
+      void api.searchPeople({ query: normalizedMemberQuery, limit: 50 })
+        .then((result) => {
+          if (active) setSearchResults(result.data);
+        })
+        .catch((error) => {
+          if (active) Alert.alert('Could not search people', apiErrorMessage(error));
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [adding, api, normalizedMemberQuery]);
   if (!group)
     return (
       <Screen style={styles.screen}>
@@ -292,7 +354,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     }
   };
   const pendingMembers = group.pendingMembers ?? [];
-  const available = candidates.filter(
+  const available = (normalizedMemberQuery.length >= 2 ? searchResults : candidates).filter(
     (candidate) =>
       !group.members.some((member) => member.userId === candidate.userId)
       && !pendingMembers.some((member) => member.userId === candidate.userId),
@@ -322,10 +384,27 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
           <Text style={styles.primaryOutlineText}>Open group chat</Text>
         </Pressable>
         {admin ? (
-          <Pressable onPress={() => setAdding((value) => !value)} style={styles.primaryOutline}>
+          <Pressable onPress={() => {
+            setAdding((value) => !value);
+            setMemberQuery('');
+          }} style={styles.primaryOutline}>
             <Text style={styles.primaryOutlineText}>{adding ? 'Done' : '+ Add members'}</Text>
           </Pressable>
         ) : null}
+        {adding ? (
+          <View style={[styles.search, styles.detailsSearch]}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput
+              autoCorrect={false}
+              onChangeText={setMemberQuery}
+              placeholder="Search people"
+              placeholderTextColor={colors.placeholder}
+              style={styles.searchInput}
+              value={memberQuery}
+            />
+          </View>
+        ) : null}
+        {adding && searching ? <ActivityIndicator color={colors.primary} style={styles.searchLoader} /> : null}
         {adding
           ? available.map((person) => (
               <View key={person.userId} style={styles.person}>
@@ -424,6 +503,7 @@ function Header({
   actionDisabled,
   onAction,
   onBack,
+  style,
   styles,
   title,
 }: {
@@ -431,11 +511,12 @@ function Header({
   actionDisabled?: boolean;
   onAction?: () => void;
   onBack: () => void;
+  style?: StyleProp<ViewStyle>;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, style]}>
       <Pressable onPress={onBack} style={styles.headerButton}>
         <Text style={styles.back}>‹</Text>
       </Pressable>
@@ -490,6 +571,8 @@ function Empty({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
+    newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
+    newGroupHeader: { backgroundColor: colors.canvas },
     patternBody: { flex: 1 },
     header: {
       height: safeTop + 62,
@@ -592,7 +675,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       paddingHorizontal: 14,
       borderRadius: 12,
       color: colors.text,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
       fontSize: 16,
     },
     searchRow: {
@@ -611,8 +694,11 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       borderRadius: 22,
       backgroundColor: colors.surfaceRaised,
     },
+    newGroupSearch: { backgroundColor: colors.surface },
     searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 21 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16 },
+    detailsSearch: { marginHorizontal: 16, marginBottom: 4 },
+    searchLoader: { marginVertical: 16 },
     contactsButton: {
       width: 24,
       height: 24,

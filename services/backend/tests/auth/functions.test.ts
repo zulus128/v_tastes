@@ -892,7 +892,12 @@ describe('messaging callables', () => {
     const conversationDocument = await db.collection('conversations').doc(conversation.id).get();
     expect(conversationDocument.get('messageCount')).toBe(1);
     expect(conversationDocument.get(`unreadCounts.${secondUid}`)).toBe(1);
-    expect((await conversationDocument.ref.collection('messages').get()).size).toBe(1);
+    const storedMessages = await conversationDocument.ref.collection('messages').get();
+    expect(storedMessages.size).toBe(1);
+    expect(storedMessages.docs[0]?.data()).toMatchObject({
+      senderDisplayName: 'First Messenger',
+      senderPhotoUrl: null,
+    });
 
     const inbox = await callFunction<{
       items: Array<{ id: string; unreadCount: number; otherParticipant: { userId: string } }>;
@@ -908,12 +913,21 @@ describe('messaging callables', () => {
     );
 
     const messages = await callFunction<{
-      items: Array<{ id: string; senderId: string; recipientId: string; text: string }>;
+      items: Array<{
+        id: string;
+        senderId: string;
+        senderDisplayName: string | null;
+        senderPhotoUrl: string | null;
+        recipientId: string;
+        text: string;
+      }>;
     }>('getMessages', { conversationId: conversation.id, limit: 20 }, second.token);
     expect(messages.items).toEqual([
       expect.objectContaining({
         id: firstMessage.id,
         senderId: firstUid,
+        senderDisplayName: 'First Messenger',
+        senderPhotoUrl: null,
         recipientId: secondUid,
         text: command.text,
       }),
@@ -1123,6 +1137,11 @@ describe('Milestone 2 completion callables', () => {
     ]));
     const requestId = `group-${group.id}`;
     expect((await db.collection('users').doc(firstUid).collection('requests').doc(requestId).get()).exists).toBe(true);
+    const message = await callFunction<{ id: string }>('sendMessage', {
+      conversationId: group.id, idempotencyKey: 'm2-group-message-001', text: 'Welcome to the group',
+    }, owner.token);
+    expect((await db.collection('conversations').doc(group.id).collection('messages').doc(message.id).get()).exists)
+      .toBe(true);
     await callFunction('respondToRequest', { requestId, response: 'accepted' }, firstFriend.token);
 
     await callFunction('setTypingStatus', { conversationId: group.id, typing: true }, firstFriend.token);
@@ -1130,9 +1149,6 @@ describe('Milestone 2 completion callables', () => {
     await callFunction('setTypingStatus', { conversationId: group.id, typing: false }, firstFriend.token);
     expect((await db.collection('conversations').doc(group.id).get()).get(`typing.${firstUid}`)).toBeUndefined();
 
-    const message = await callFunction<{ id: string }>('sendMessage', {
-      conversationId: group.id, idempotencyKey: 'm2-group-message-001', text: 'Welcome to the group',
-    }, owner.token);
     await callFunction('markConversationRead', { conversationId: group.id, throughMessageId: message.id }, firstFriend.token);
     const conversation = await db.collection('conversations').doc(group.id).get();
     expect(conversation.get('kind')).toBe('group');

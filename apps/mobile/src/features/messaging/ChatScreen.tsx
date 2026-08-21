@@ -34,13 +34,46 @@ function messageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-function MessageBubble({ item, mine, read, styles }: { item: ChatMessage; mine: boolean; read: boolean; styles: ReturnType<typeof createStyles> }) {
+function MessageBubble({
+  item,
+  mine,
+  read,
+  sender,
+  showSender,
+  styles,
+}: {
+  item: ChatMessage;
+  mine: boolean;
+  read: boolean;
+  sender?: ConversationParticipant;
+  showSender: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const senderName = item.senderDisplayName ?? sender?.displayName ?? 'Tastes user';
+  const senderPhotoUrl = item.senderPhotoUrl ?? sender?.photoUrl ?? null;
+  const bubble = (
+    <View style={[styles.bubble, mine ? styles.mineBubble : styles.theirBubble]}>
+      <Text style={[styles.messageText, mine && styles.mineText]}>{item.text}</Text>
+      <Text style={[styles.messageTime, mine && styles.mineTime]}>{messageTime(item.createdAt)}</Text>
+    </View>
+  );
   return (
     <View style={[styles.messageRow, mine ? styles.mineRow : styles.theirRow]}>
-      <View style={[styles.bubble, mine ? styles.mineBubble : styles.theirBubble]}>
-        <Text style={[styles.messageText, mine && styles.mineText]}>{item.text}</Text>
-        <Text style={[styles.messageTime, mine && styles.mineTime]}>{messageTime(item.createdAt)}</Text>
-      </View>
+      {showSender ? (
+        <View style={styles.groupMessage}>
+          {senderPhotoUrl ? (
+            <Image source={{ uri: senderPhotoUrl }} style={styles.messageAvatar} />
+          ) : (
+            <View style={styles.messageAvatarFallback}>
+              <Text style={styles.messageAvatarInitial}>{senderName.slice(0, 1).toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.groupMessageContent}>
+            <Text numberOfLines={1} style={styles.senderName}>{senderName}</Text>
+            {bubble}
+          </View>
+        </View>
+      ) : bubble}
       {read ? <Text style={styles.readReceipt}>Read</Text> : null}
     </View>
   );
@@ -115,10 +148,12 @@ type ChatListItem =
 export function ChatScreen({
   conversationId,
   onBack,
+  onOpenGroupDetails,
   userId,
 }: {
   conversationId: string;
   onBack: () => void;
+  onOpenGroupDetails: (groupId: string) => void;
   userId: string;
 }) {
   const { colors, isDark } = useAppTheme();
@@ -141,6 +176,7 @@ export function ChatScreen({
     return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }, [messageHistory.data?.pages, realtimeMessages.data]);
   const [participant, setParticipant] = useState<ConversationParticipant | null>(null);
+  const [groupMembers, setGroupMembers] = useState<Map<string, ConversationParticipant>>(new Map());
   const [activity, setActivity] = useState<{ id: string; title: string } | null>(null);
   const [groupTitle, setGroupTitle] = useState<string | null>(null);
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
@@ -187,6 +223,25 @@ export function ChatScreen({
     },
     setConversationError,
   ), [api, conversationId, userId]);
+
+  useEffect(() => {
+    if (!groupTitle) {
+      setGroupMembers(new Map());
+      return undefined;
+    }
+    let active = true;
+    void api.getGroup({ groupId: conversationId })
+      .then((result) => {
+        if (!active) return;
+        setGroupMembers(new Map(result.data.members.map((member) => [member.userId, member])));
+      })
+      .catch(() => {
+        if (active) setGroupMembers(new Map());
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, conversationId, groupTitle]);
 
   useEffect(() => {
     typingStatusAvailable.current = true;
@@ -260,9 +315,16 @@ export function ChatScreen({
           <Text style={styles.backText}>‹</Text>
         </Pressable>
         <Pressable
-          accessibilityLabel={activity ? 'Open activity details' : undefined}
-          disabled={!activity}
-          onPress={() => activity && setActivityPreviewOpen(true)}
+          accessibilityLabel={activity
+            ? 'Open activity details'
+            : groupTitle
+              ? 'Open group details'
+              : undefined}
+          disabled={!activity && !groupTitle}
+          onPress={() => {
+            if (activity) setActivityPreviewOpen(true);
+            else if (groupTitle) onOpenGroupDetails(conversationId);
+          }}
           style={styles.headerIdentity}
         >
           <View style={styles.headerCopy}>
@@ -317,7 +379,14 @@ export function ChatScreen({
             windowSize={9}
             renderItem={({ item }) => item.kind === 'typing'
               ? <TypingIndicator styles={styles} />
-              : <MessageBubble item={item.message} mine={item.message.senderId === userId} read={item.message.senderId === userId && item.message.id === lastMessageId && readByCount > 0} styles={styles} />}
+              : <MessageBubble
+                  item={item.message}
+                  mine={item.message.senderId === userId}
+                  read={item.message.senderId === userId && item.message.id === lastMessageId && readByCount > 0}
+                  sender={groupMembers.get(item.message.senderId)}
+                  showSender={Boolean(groupTitle) && item.message.senderId !== userId}
+                  styles={styles}
+                />}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -375,6 +444,12 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     messageRow: { width: '100%', marginVertical: 3 },
     mineRow: { alignItems: 'flex-end' },
     theirRow: { alignItems: 'flex-start' },
+    groupMessage: { maxWidth: '88%', flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
+    groupMessageContent: { flexShrink: 1, alignItems: 'flex-start' },
+    senderName: { maxWidth: '100%', marginLeft: 10, marginBottom: 3, color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+    messageAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.skeleton },
+    messageAvatarFallback: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    messageAvatarInitial: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
     bubble: { maxWidth: '82%', minWidth: 72, paddingHorizontal: 13, paddingTop: 9, paddingBottom: 6, borderRadius: 19 },
     mineBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
     theirBubble: { backgroundColor: colors.surfaceRaised, borderBottomLeftRadius: 5 },

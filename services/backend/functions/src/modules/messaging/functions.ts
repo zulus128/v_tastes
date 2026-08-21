@@ -253,6 +253,12 @@ export const getMessages = onCall(callableOptions, async (request) => {
       id: document.id,
       conversationId: input.conversationId,
       senderId: String(document.get('senderId')),
+      senderDisplayName: document.get('senderDisplayName')
+        ? String(document.get('senderDisplayName'))
+        : null,
+      senderPhotoUrl: document.get('senderPhotoUrl')
+        ? String(document.get('senderPhotoUrl'))
+        : null,
       recipientId: String(document.get('recipientId')),
       recipientIds: Array.isArray(document.get('recipientIds'))
         ? document.get('recipientIds').filter((value: unknown): value is string => typeof value === 'string')
@@ -280,10 +286,12 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     if (conversation.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'The conversation is not active.');
     }
-    const recipientIds = participantIds.filter((participantId) => participantId !== uid);
-    if (recipientIds.length === 0) throw new HttpsError('internal', 'The conversation participants are invalid.');
     const rawKind = conversation.get('kind');
     const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
+    const recipientIds = participantIds.filter((participantId) => participantId !== uid);
+    if (recipientIds.length === 0 && kind !== 'group') {
+      throw new HttpsError('internal', 'The conversation participants are invalid.');
+    }
     if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
       throw new HttpsError('failed-precondition', 'Accept the invitation before sending messages.');
     }
@@ -319,6 +327,8 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     transaction.create(messageRef, {
       conversationId: conversationRef.id,
       senderId: uid,
+      senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
+      senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
       recipientId: recipientIds.length === 1 ? recipientIds[0] : '',
       recipientIds,
       text: input.text,

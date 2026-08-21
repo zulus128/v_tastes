@@ -218,6 +218,12 @@ export function useConversationMessages(
             id: message.id,
             conversationId,
             senderId: String(data.senderId ?? ''),
+            senderDisplayName: typeof data.senderDisplayName === 'string'
+              ? data.senderDisplayName
+              : null,
+            senderPhotoUrl: typeof data.senderPhotoUrl === 'string'
+              ? data.senderPhotoUrl
+              : null,
             recipientId: String(data.recipientId ?? ''),
             recipientIds: Array.isArray(data.recipientIds)
               ? data.recipientIds.filter((value): value is string => typeof value === 'string')
