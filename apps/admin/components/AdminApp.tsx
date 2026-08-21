@@ -2,7 +2,7 @@
 
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import { callAdmin, getFirebaseAuth, getFirebaseStorage } from '../infrastructure/firebase';
 
 type View = 'overview' | 'reports' | 'venues' | 'users';
@@ -591,6 +591,7 @@ export function AdminApp() {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const searchRequestId = useRef(0);
 
   useEffect(() => onAuthStateChanged(getFirebaseAuth(), async (nextUser) => {
     setUser(nextUser);
@@ -614,8 +615,16 @@ export function AdminApp() {
         setOverview(nextOverview);
         return nextReports;
       }
-      if (target === 'venues') setVenues(await callAdmin('searchAdminVenues', { query: search }));
-      if (target === 'users') setUsers(await callAdmin('searchUsers', { query: search }));
+      if (target === 'venues') {
+        const requestId = ++searchRequestId.current;
+        const nextVenues = await callAdmin<unknown, AdminVenue[]>('searchAdminVenues', { query: search });
+        if (requestId === searchRequestId.current) setVenues(nextVenues);
+      }
+      if (target === 'users') {
+        const requestId = ++searchRequestId.current;
+        const nextUsers = await callAdmin<unknown, AdminUser[]>('searchUsers', { query: search });
+        if (requestId === searchRequestId.current) setUsers(nextUsers);
+      }
     } catch (error) { setNotice(errorMessage(error)); } finally { setBusy(false); }
   }, [query, view]);
 
@@ -652,7 +661,7 @@ export function AdminApp() {
       <div className="staff-card"><div className="avatar">{(user.email?.[0] ?? 'A').toUpperCase()}</div><div><strong>{user.email?.split('@')[0]}</strong><span>{role}</span></div><button aria-label="Sign out" onClick={() => signOut(getFirebaseAuth())}><Icon name="logout"/></button></div>
     </aside>
     <main className="content">
-      <header><div><p className="eyebrow">TASTES CONTROL CENTER</p><h1>{titles[view][0]}</h1><p>{titles[view][1]}</p></div>{view !== 'overview' && <form className="search" onSubmit={(event) => { event.preventDefault(); void refresh(view, query); }}><Icon name="search"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${view}…`}/></form>}</header>
+      <header><div><p className="eyebrow">TASTES CONTROL CENTER</p><h1>{titles[view][0]}</h1><p>{titles[view][1]}</p></div>{view !== 'overview' && <form className="search" onSubmit={(event) => { event.preventDefault(); void refresh(view, query); }}><Icon name="search"/><input value={query} onChange={(event) => { const nextQuery = event.target.value; setQuery(nextQuery); if (!nextQuery.trim()) void refresh(view, ''); }} placeholder={`Search ${view}…`}/></form>}</header>
       {notice && <button className="notice" onClick={() => setNotice('')}>{notice}<span>×</span></button>}
       <div className={busy ? 'view busy' : 'view'}>
         {view === 'overview' && <OverviewView data={overview}/>}

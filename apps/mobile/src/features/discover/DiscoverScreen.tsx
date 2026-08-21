@@ -33,6 +33,7 @@ import MapLocateIcon from '../../../assets/discover/map-locate.svg';
 import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
 import SortIcon from '../../../assets/place/sort.svg';
+import CheckIcon from '../../../assets/place/check.svg';
 import PeopleSearchIcon from '../../../assets/discover/search.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
@@ -70,7 +71,15 @@ import { UserAvatar } from '../profile/avatar';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
-type PlaceSort = 'rating' | 'reviews' | 'distance';
+type PlaceSort = 'best-match' | 'rating' | 'distance' | 'reviews' | 'newest';
+
+const placeSortOptions: Array<{ label: string; value: PlaceSort }> = [
+  { label: 'Best match', value: 'best-match' },
+  { label: 'Top rated', value: 'rating' },
+  { label: 'Nearest first', value: 'distance' },
+  { label: 'Most reviewed', value: 'reviews' },
+  { label: 'Newest', value: 'newest' },
+];
 
 const DISCOVER_HEADER_HEIGHT = 106;
 const KEYBOARD_SEARCH_GAP = 8;
@@ -543,7 +552,7 @@ function PlacesMap({
   const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetExpandedRef = useRef(false);
-  const [sort, setSort] = useState<PlaceSort>('rating');
+  const [sort, setSort] = useState<PlaceSort>('best-match');
   const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
   const searchRowRef = useRef<View | null>(null);
@@ -589,10 +598,18 @@ function PlacesMap({
   });
 
   const orderedVenues = [...filtered].sort((left, right) => {
+    if (sort === 'best-match') {
+      return (right.matchPercent ?? 0) - (left.matchPercent ?? 0)
+        || (right.rating ?? 0) - (left.rating ?? 0);
+    }
     if (sort === 'reviews') return (right.reviewCount ?? 0) - (left.reviewCount ?? 0);
     if (sort === 'distance') return (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY);
+    if (sort === 'newest') {
+      return Number(right.discoverTags?.includes('new')) - Number(left.discoverTags?.includes('new'));
+    }
     return (right.rating ?? 0) - (left.rating ?? 0);
   });
+  const sortLabel = placeSortOptions.find((option) => option.value === sort)?.label ?? 'Best match';
   const mappableVenues = orderedVenues.filter((venue) => (
     venue.latitude != null
     && venue.longitude != null
@@ -866,6 +883,10 @@ function PlacesMap({
         </View>
       ) : null}
       <Animated.View
+        pointerEvents="none"
+        style={[styles.mapSheetUnderlay, { height: sheetHeight }]}
+      />
+      <Animated.View
         style={[
           styles.mapSheet,
           { height: sheetHeight, transform: [{ translateY: sheetKeyboardTranslate }] },
@@ -932,31 +953,9 @@ function PlacesMap({
               style={styles.mapSortButton}
             >
               <SortIcon color={colors.textSecondary} height={12} width={16} />
-              <Text style={styles.mapSortText}>
-                Sort by: {sort === 'rating' ? 'Top rated' : sort === 'reviews' ? 'Most reviewed' : 'Nearest'}
-              </Text>
+              <Text style={styles.mapSortText}>Sort by: {sortLabel}</Text>
               <Text style={styles.mapSortChevron}>⌄</Text>
             </Pressable>
-            {sortOpen ? (
-              <View style={styles.mapSortMenu}>
-                {([
-                  ['rating', 'Top rated'],
-                  ['reviews', 'Most reviewed'],
-                  ['distance', 'Nearest'],
-                ] as Array<[PlaceSort, string]>).map(([value, label]) => (
-                  <Pressable
-                    key={value}
-                    onPress={() => {
-                      setSort(value);
-                      setSortOpen(false);
-                    }}
-                    style={styles.mapSortOption}
-                  >
-                    <Text style={[styles.mapSortOptionText, sort === value && styles.mapSortOptionTextActive]}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
           </View>
         ) : null}
         {venuesQuery.isPending ? (
@@ -997,6 +996,45 @@ function PlacesMap({
           </ScrollView>
         )}
       </Animated.View>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setSortOpen(false)}
+        transparent
+        visible={sortOpen}
+      >
+        <View style={styles.sortModalScrim}>
+          <Pressable accessibilityLabel="Close sort options" onPress={() => setSortOpen(false)} style={StyleSheet.absoluteFill} />
+          <View accessibilityViewIsModal style={styles.sortSheet}>
+            <View style={styles.sortSheetHandle} />
+            <View style={styles.sortSheetHeader}>
+              <Text style={styles.sortSheetTitle}>Sort by</Text>
+              <Pressable accessibilityLabel="Close" hitSlop={8} onPress={() => setSortOpen(false)} style={styles.sortSheetClose}>
+                <Text style={styles.sortSheetCloseText}>×</Text>
+              </Pressable>
+            </View>
+            {placeSortOptions.map((option, index) => {
+              const selected = sort === option.value;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  key={option.value}
+                  onPress={() => {
+                    setSort(option.value);
+                    setSortOpen(false);
+                  }}
+                  style={[styles.sortSheetRow, index === placeSortOptions.length - 1 && styles.sortSheetRowLast]}
+                >
+                  <Text style={styles.sortSheetLabel}>{option.label}</Text>
+                  <View style={[styles.sortSheetRadio, selected && styles.sortSheetRadioSelected]}>
+                    {selected ? <CheckIcon height={8} width={11} /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1891,6 +1929,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
   mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapSheetUnderlay: { position: 'absolute', zIndex: 7, elevation: 7, right: 0, bottom: 0, left: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { zIndex: 2, height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -1909,10 +1948,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   mapSortButton: { minHeight: 28, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surfaceRaised },
   mapSortText: { color: colors.textSecondary, fontSize: 11 },
   mapSortChevron: { marginTop: -3, color: colors.textSecondary, fontSize: 13 },
-  mapSortMenu: { position: 'absolute', zIndex: 12, elevation: 12, top: 30, right: 0, width: 140, paddingVertical: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  mapSortOption: { minHeight: 36, paddingHorizontal: 12, justifyContent: 'center' },
-  mapSortOptionText: { color: colors.textSecondary, fontSize: 12 },
-  mapSortOptionTextActive: { color: colors.primary, fontWeight: '700' },
+  sortModalScrim: { flex: 1, paddingHorizontal: 16, paddingBottom: 24, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  sortSheet: { height: 340, paddingHorizontal: 24, borderRadius: 22, backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
+  sortSheetHandle: { position: 'absolute', top: 10, left: '50%', width: 36, height: 4, marginLeft: -18, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
+  sortSheetHeader: { height: 65, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sortSheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  sortSheetClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  sortSheetCloseText: { color: colors.text, fontSize: 26, lineHeight: 28 },
+  sortSheetRow: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+  sortSheetRowLast: { borderBottomWidth: 0 },
+  sortSheetLabel: { color: colors.text, fontSize: 16 },
+  sortSheetRadio: { width: 20, height: 20, borderWidth: 1.5, borderColor: colors.textMuted, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sortSheetRadioSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
   placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
   placesStatusText: { color: colors.textSecondary, fontSize: 13 },
   inlineRetry: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceRaised },
