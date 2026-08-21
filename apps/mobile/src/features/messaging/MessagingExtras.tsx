@@ -260,6 +260,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   const [group, setGroup] = useState<TastesGroup | null>(null);
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [adding, setAdding] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const load = async () => {
     const [g, people] = await Promise.all([
       api.getGroup({ groupId }),
@@ -279,12 +280,22 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
       </Screen>
     );
   const admin = currentUserId === group.adminId;
-  const update = async (ids: string[]) => {
-    await api.updateGroupMembers({ groupId, memberIds: ids });
-    await load();
+  const update = async (ids: string[], userId: string) => {
+    setUpdatingUserId(userId);
+    try {
+      await api.updateGroupMembers({ groupId, memberIds: ids });
+      await load();
+    } catch (error) {
+      Alert.alert('Could not update group', apiErrorMessage(error));
+    } finally {
+      setUpdatingUserId(null);
+    }
   };
+  const pendingMembers = group.pendingMembers ?? [];
   const available = candidates.filter(
-    (candidate) => !group.members.some((member) => member.userId === candidate.userId),
+    (candidate) =>
+      !group.members.some((member) => member.userId === candidate.userId)
+      && !pendingMembers.some((member) => member.userId === candidate.userId),
   );
   return (
     <Screen style={styles.screen}>
@@ -301,7 +312,11 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
         </View>
         <Text style={styles.detailsTitle}>{group.name}</Text>
         <Text style={styles.detailsSubtitle}>
-          {group.members.length} members · Created {formatDisplayDate(group.createdAt)}
+          {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
+          {pendingMembers.length > 0
+            ? ` · ${pendingMembers.length} invited`
+            : ''}
+          {' · '}Created {formatDisplayDate(group.createdAt)}
         </Text>
         <Pressable onPress={() => onOpenConversation(groupId)} style={styles.primaryOutline}>
           <Text style={styles.primaryOutlineText}>Open group chat</Text>
@@ -313,21 +328,45 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
         ) : null}
         {adding
           ? available.map((person) => (
-              <Pressable
-                key={person.userId}
-                onPress={() =>
-                  void update([...group.members.map((member) => member.userId), person.userId])
-                }
-                style={styles.person}
-              >
+              <View key={person.userId} style={styles.person}>
                 <Avatar name={person.displayName} photoUrl={person.photoUrl} styles={styles} />
                 <Text style={[styles.personName, { flex: 1 }]}>
                   {person.displayName}
                 </Text>
-                <Text style={styles.primaryOutlineText}>Add</Text>
-              </Pressable>
+                <Pressable
+                  accessibilityLabel={`Add ${person.displayName}`}
+                  accessibilityRole="button"
+                  disabled={updatingUserId !== null}
+                  hitSlop={8}
+                  onPress={() =>
+                    void update(
+                      [...group.members.map((member) => member.userId), person.userId],
+                      person.userId,
+                    )
+                  }
+                  style={styles.addMember}
+                >
+                  {updatingUserId === person.userId
+                    ? <ActivityIndicator color={colors.primary} />
+                    : <Text style={styles.addMemberText}>Add</Text>}
+                </Pressable>
+              </View>
             ))
           : null}
+        {pendingMembers.length > 0 ? (
+          <>
+            <Text style={styles.section}>INVITED ({pendingMembers.length})</Text>
+            {pendingMembers.map((member) => (
+              <View key={member.userId} style={styles.person}>
+                <Avatar name={member.displayName} photoUrl={member.photoUrl} styles={styles} />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{member.displayName}</Text>
+                  <Text style={styles.personHandle}>Invitation pending</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        ) : null}
         <Text style={styles.section}>MEMBERS ({group.members.length})</Text>
         {group.members.map((member) => (
           <View key={member.userId} style={styles.person}>
@@ -350,6 +389,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
                     group.members
                       .filter((candidate) => candidate.userId !== member.userId)
                       .map((candidate) => candidate.userId),
+                    member.userId,
                   )
                 }
                 style={styles.remove}
@@ -670,6 +710,13 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       justifyContent: 'center',
     },
     primaryOutlineText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+    addMember: {
+      minWidth: 48,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addMemberText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
     admin: {
       paddingHorizontal: 10,
       paddingVertical: 5,

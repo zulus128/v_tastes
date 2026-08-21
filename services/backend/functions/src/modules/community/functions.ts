@@ -312,21 +312,25 @@ export const getGroup = onCall(callableOptions, async (request): Promise<TastesG
   const memberIds = (group.get('memberIds') ?? []) as string[];
   if (!memberIds.includes(uid) || group.get('status') !== 'active')
     throw new HttpsError('not-found', 'Group not found.');
-  const profiles = memberIds.length
-    ? await db.getAll(...memberIds.map((id) => db.collection('users').doc(id)))
+  const invitedMemberIds = (group.get('invitedMemberIds') ?? []) as string[];
+  const profileIds = [...new Set([...memberIds, ...invitedMemberIds])];
+  const profiles = profileIds.length
+    ? await db.getAll(...profileIds.map((id) => db.collection('users').doc(id)))
     : [];
+  const memberFromProfile = (profile: FirebaseFirestore.DocumentSnapshot) => ({
+    userId: profile.id,
+    displayName: String(profile.get('displayName') ?? 'Tastes user'),
+    username: profile.get('username') ? String(profile.get('username')) : null,
+    photoUrl: profile.get('photoUrl') ? String(profile.get('photoUrl')) : null,
+    admin: profile.id === group.get('adminId'),
+  });
   return {
     id: group.id,
     name: String(group.get('name')),
     adminId: String(group.get('adminId')),
     createdAt: timestampToIso(group.get('createdAt')),
-    members: profiles.map((profile) => ({
-      userId: profile.id,
-      displayName: String(profile.get('displayName') ?? 'Tastes user'),
-      username: profile.get('username') ? String(profile.get('username')) : null,
-      photoUrl: profile.get('photoUrl') ? String(profile.get('photoUrl')) : null,
-      admin: profile.id === group.get('adminId'),
-    })),
+    members: profiles.filter((profile) => memberIds.includes(profile.id)).map(memberFromProfile),
+    pendingMembers: profiles.filter((profile) => invitedMemberIds.includes(profile.id)).map(memberFromProfile),
   };
 });
 
