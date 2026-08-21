@@ -49,6 +49,11 @@ export const updateProfileSettingsInputSchema = z.object({
   favoriteVenueId: z.string().trim().min(1).max(128),
 }).partial().refine((input) => Object.keys(input).length > 0, 'Provide at least one profile field.');
 
+export const searchPeopleInputSchema = z.object({
+  query: z.string().trim().min(2).max(80),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
 export const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
 
 export const venueSchema = z.object({
@@ -432,6 +437,7 @@ export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
 export type UpdateProfilePhotoInput = z.infer<typeof updateProfilePhotoInputSchema>;
 export type UpdateProfileSettingsInput = z.infer<typeof updateProfileSettingsInputSchema>;
+export type SearchPeopleInput = z.infer<typeof searchPeopleInputSchema>;
 export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
 export type GetVenuesInput = z.infer<typeof getVenuesInputSchema>;

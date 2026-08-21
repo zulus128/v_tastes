@@ -32,6 +32,7 @@ import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
+import { userSearchTokens } from '../modules/users/search';
 
 if (getApps().length === 0) {
   initializeApp({
@@ -495,6 +496,7 @@ async function main() {
       db.collection('users').doc(id).set(
         {
           ...user,
+          searchTokens: userSearchTokens(user.displayName, user.username),
           uid: id,
           photoUrl: 'photoUrl' in user ? user.photoUrl : null,
           avatarKey: FieldValue.delete(),
@@ -520,6 +522,10 @@ async function main() {
           xp: Math.max(Number(profile.get('xp') ?? 0), 820),
           city: profile.get('city') || 'Istanbul',
           followingCount: Math.max(Number(profile.get('followingCount') ?? 0), 3),
+          searchTokens: userSearchTokens(
+            String(profile.get('displayName') ?? ''),
+            profile.get('username') ? String(profile.get('username')) : null,
+          ),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },

@@ -4,6 +4,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 
 export const discoverFeedQueryKey = (userId: string, profileSignature?: string) => ['discover', 'feed', userId, profileSignature] as const;
 export const discoverPeopleQueryKey = (userId: string) => ['discover', 'people', userId] as const;
+export const peopleSearchQueryKey = (userId: string, query: string) => ['discover', 'people-search', userId, query] as const;
 export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
 export const venueSearchQueryKey = (query: string) => ['venues', 'search', query] as const;
 export const placeReviewsQueryKey = (venueId: string, sort: string, scope = 'all') => ['place', venueId, 'reviews', sort, scope] as const;
@@ -48,6 +49,16 @@ export function useDiscoverPeople(userId: string) {
   return useQuery({
     queryKey: discoverPeopleQueryKey(userId),
     queryFn: async () => (await api.getDiscoverPeople()).data,
+  });
+}
+
+export function usePeopleSearch(userId: string, query: string) {
+  const api = useTastesApi();
+  const normalized = query.trim();
+  return useQuery({
+    queryKey: peopleSearchQueryKey(userId, normalized),
+    queryFn: async () => (await api.searchPeople({ query: normalized, limit: 20 })).data,
+    enabled: normalized.length >= 2,
   });
 }
 

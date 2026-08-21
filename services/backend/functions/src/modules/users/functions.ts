@@ -17,6 +17,7 @@ import { contactInviteId } from '../social/functions';
 import { callableOptions } from '../../shared/options';
 import { decodeCursor, encodeCursor } from '../../shared/pagination';
 import { parseInput } from '../../shared/validation';
+import { userSearchTokens } from './search';
 
 const CURRENT_ONBOARDING_VERSION = 1;
 const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
@@ -179,6 +180,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         phoneNumber: authUser.phoneNumber ?? null,
         displayName: input.displayName,
         username: input.username ?? existing.get('username') ?? null,
+        searchTokens: userSearchTokens(input.displayName, input.username ?? existing.get('username') ?? null),
         city: input.city ?? existing.get('city') ?? null,
         bio: input.bio ?? '',
         photoPath: input.photoPath ?? existing.get('photoPath') ?? null,
@@ -282,6 +284,12 @@ export const updateProfileSettings = onCall(callableOptions, async (request) => 
   await userRef.update({
     ...(input.displayName ? { displayName: input.displayName } : {}),
     ...(input.username ? { username: input.username } : {}),
+    ...((input.displayName || input.username) ? {
+      searchTokens: userSearchTokens(
+        input.displayName ?? String(user.get('displayName') ?? ''),
+        input.username ?? (user.get('username') ? String(user.get('username')) : null),
+      ),
+    } : {}),
     ...(input.city ? { city: input.city } : {}),
     ...(input.favoriteDish ? { 'tastePreferences.favoriteDish': input.favoriteDish } : {}),
     ...(input.favoriteVenueId ? { 'tastePreferences.favoriteVenueId': input.favoriteVenueId } : {}),

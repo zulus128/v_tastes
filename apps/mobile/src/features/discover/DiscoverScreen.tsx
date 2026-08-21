@@ -34,6 +34,9 @@ import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
 import SortIcon from '../../../assets/place/sort.svg';
 import PeopleSearchIcon from '../../../assets/discover/search.svg';
+import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
+import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
+import searchCloseIcon from '../../../assets/onboarding/search-close.png';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
@@ -48,6 +51,7 @@ import {
   type DiscoverVenueFilter,
   useDiscoverFeed,
   useDiscoverPeople,
+  usePeopleSearch,
   useDiscoverVenues,
   useVenueSearch,
   useToggleFollow,
@@ -1063,13 +1067,20 @@ function MapLayerToggle({
 }
 
 function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: DiscoverPerson) => void; userId: string }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const peopleQuery = useDiscoverPeople(userId);
+  const peopleSearchQuery = usePeopleSearch(userId, debouncedQuery);
   const toggleFollow = useToggleFollow(userId);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [seeMore, setSeeMore] = useState(false);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timeout);
+  }, [query]);
 
   function handleFollow(person: DiscoverPerson) {
     if (person.userId === userId || toggleFollow.isPending) return;
@@ -1083,10 +1094,20 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
     );
   }
 
-  const matches = (name: string) => name.toLowerCase().includes(query.trim().toLowerCase());
-  const trending = (peopleQuery.data?.trending ?? []).filter((person) => matches(person.displayName));
-  const freshPeople = (peopleQuery.data?.new ?? []).filter((person) => matches(person.displayName));
-  const suggested = (peopleQuery.data?.suggested ?? []).filter((person) => matches(person.displayName));
+  const normalizedQuery = query.trim();
+  const hasQuery = normalizedQuery.length > 0;
+  const isSearching = normalizedQuery.length >= 2;
+  const searchIsSettled = debouncedQuery === normalizedQuery;
+  const trending = peopleQuery.data?.trending ?? [];
+  const freshPeople = peopleQuery.data?.new ?? [];
+  const suggested = peopleQuery.data?.suggested ?? [];
+  const searchResults = isSearching && searchIsSettled ? peopleSearchQuery.data ?? [] : [];
+  const resultIds = new Set(searchResults.map((person) => person.userId));
+  const peopleYouMayKnow = suggested.filter((person) => !resultIds.has(person.userId));
+  const resultsPending = isSearching
+    ? !searchIsSettled || peopleSearchQuery.isPending
+    : peopleQuery.isPending;
+  const resultsError = isSearching ? peopleSearchQuery.error : peopleQuery.error;
   const seeMorePeople = [
     ...new Map(
       [...trending, ...freshPeople, ...suggested].map((person) => [person.userId, person]),
@@ -1094,28 +1115,82 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.peopleContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.peopleSearch}>
-        <PeopleSearchIcon color={colors.textSecondary} height={24} width={24} />
-        <TextInput
-          onChangeText={setQuery}
-          placeholder="Search people, cuisines, cities"
-          placeholderTextColor={colors.textSecondary}
-          style={styles.peopleSearchInput}
-          value={query}
-        />
+    <ScrollView contentContainerStyle={styles.peopleContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={styles.peopleSearchRow}>
+        <View style={styles.peopleSearch}>
+          <PeopleSearchIcon color={colors.text} height={24} width={24} />
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={setQuery}
+            placeholder="Search people"
+            placeholderTextColor={colors.placeholder}
+            returnKeyType="search"
+            style={styles.peopleSearchInput}
+            value={query}
+          />
+          {hasQuery ? (
+            <Pressable accessibilityLabel="Clear people search" hitSlop={8} onPress={() => setQuery('')}>
+              <Image source={searchCloseIcon} style={styles.peopleSearchClear} />
+            </Pressable>
+          ) : null}
+        </View>
+        <View accessibilityLabel="People you may know" style={styles.peopleSearchFriends}>
+          {isDark
+            ? <UserHeartIcon height={24} width={24} />
+            : <UserHeartLightIcon height={24} width={24} />}
+        </View>
       </View>
 
-      {peopleQuery.isPending ? (
+      {resultsPending ? (
         <View style={styles.centerState}><Text style={styles.stateCopy}>Loading people…</Text></View>
-      ) : peopleQuery.isError ? (
+      ) : resultsError ? (
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Could not load people</Text>
-          <Text style={styles.stateCopy}>{peopleQuery.error.message}</Text>
-          <Pressable onPress={() => void peopleQuery.refetch()} style={styles.retry}>
+          <Text style={styles.stateCopy}>{resultsError.message}</Text>
+          <Pressable onPress={() => void (isSearching ? peopleSearchQuery.refetch() : peopleQuery.refetch())} style={styles.retry}>
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
+      ) : hasQuery ? (
+        <>
+          {isSearching && searchResults.length > 0 ? (
+            <>
+              <Text style={styles.peopleResultCount}>
+                {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'} for &quot;{normalizedQuery}&quot;
+              </Text>
+              <View style={styles.peopleSearchResults}>
+                {searchResults.map((person) => (
+                  <PeopleSearchResult
+                    following={person.following}
+                    key={person.userId}
+                    onFollow={() => handleFollow(person)}
+                    onOpen={() => onOpenProfile(person)}
+                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    person={person}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.peopleSearchEmpty}>
+              <PeopleSearchIcon color={colors.text} height={60} width={60} />
+              <Text style={styles.peopleSearchEmptyTitle}>
+                {isSearching ? 'No people found' : 'Search people'}
+              </Text>
+              <Text style={styles.peopleSearchEmptyCopy}>
+                {isSearching ? 'Try another name, or invite friends to Tastes.' : 'Type at least 2 characters.'}
+              </Text>
+            </View>
+          )}
+          <PeopleYouMayKnow
+            onFollow={handleFollow}
+            onOpen={onOpenProfile}
+            pendingId={pendingId}
+            people={peopleYouMayKnow}
+            togglePending={toggleFollow.isPending}
+          />
+        </>
       ) : (
         <>
           {trending.length > 0 ? (
@@ -1160,7 +1235,11 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
 
           {suggested.length > 0 ? (
             <>
-              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Based on mutual connections" title="Similar to people you follow" />
+              <PeopleSectionHeader
+                onSeeMore={isSearching ? undefined : () => setSeeMore(true)}
+                subtitle="Popular people on Tastes"
+                title="Suggested people"
+              />
               <View style={styles.profileList}>
                 {suggested.map((person) => (
                   <ProfileSuggestion
@@ -1177,7 +1256,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
           ) : null}
 
           {trending.length === 0 && freshPeople.length === 0 && suggested.length === 0 ? (
-            <View style={styles.centerState}><Text style={styles.stateCopy}>No people match your search.</Text></View>
+            <View style={styles.centerState}>
+              <Text style={styles.stateCopy}>No people to show yet.</Text>
+            </View>
           ) : null}
         </>
       )}
@@ -1419,7 +1500,7 @@ function HiddenGem({ onOpen, place }: { onOpen: () => void; place: Place }) {
   );
 }
 
-function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore: () => void; subtitle: string; title: string }) {
+function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore?: () => void; subtitle: string; title: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -1428,8 +1509,114 @@ function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore: () => 
         <Text style={styles.peopleSectionTitle}>{title}</Text>
         <Text style={styles.peopleSectionSubtitle}>{subtitle}</Text>
       </View>
-      <Pressable onPress={onSeeMore}><Text style={styles.seeMoreLink}>See more →</Text></Pressable>
+      {onSeeMore ? <Pressable onPress={onSeeMore}><Text style={styles.seeMoreLink}>See more →</Text></Pressable> : null}
     </View>
+  );
+}
+
+function PeopleSearchResult({
+  following,
+  onFollow,
+  onOpen,
+  pending,
+  person,
+}: {
+  following: boolean;
+  onFollow: () => void;
+  onOpen: () => void;
+  pending: boolean;
+  person: DiscoverPerson;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Pressable onPress={onOpen} style={styles.peopleResultCard}>
+      <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.peopleResultAvatar} />
+      <View style={styles.peopleResultCopy}>
+        <Text numberOfLines={1} style={styles.peopleResultName}>{person.displayName}</Text>
+        <Text numberOfLines={1} style={styles.peopleResultHandle}>
+          {person.username ? `@${person.username}` : 'Tastes member'}
+        </Text>
+      </View>
+      <SearchFollowButton following={following} onPress={onFollow} pending={pending} />
+    </Pressable>
+  );
+}
+
+function PeopleYouMayKnow({
+  onFollow,
+  onOpen,
+  pendingId,
+  people,
+  togglePending,
+}: {
+  onFollow: (person: DiscoverPerson) => void;
+  onOpen: (person: DiscoverPerson) => void;
+  pendingId: string | null;
+  people: DiscoverPerson[];
+  togglePending: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (people.length === 0) return null;
+  return (
+    <View style={styles.peopleMayKnowSection}>
+      <Text style={styles.peopleMayKnowTitle}>People you may know</Text>
+      <ScrollView
+        contentContainerStyle={styles.peopleMayKnowList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {people.map((person) => (
+          <View key={person.userId} style={styles.peopleMayKnowCard}>
+            <Pressable onPress={() => onOpen(person)}>
+              <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.peopleMayKnowAvatar} />
+            </Pressable>
+            <Pressable onPress={() => onOpen(person)} style={styles.peopleMayKnowCopy}>
+              <Text numberOfLines={1} style={styles.peopleMayKnowName}>{person.displayName}</Text>
+              <Text numberOfLines={1} style={styles.peopleMayKnowHandle}>
+                {person.username ? `@${person.username}` : 'Tastes member'}
+              </Text>
+            </Pressable>
+            <SearchFollowButton
+              following={person.following}
+              onPress={() => onFollow(person)}
+              pending={togglePending || pendingId === person.userId}
+              wide
+            />
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function SearchFollowButton({ following, onPress, pending, wide = false }: {
+  following: boolean;
+  onPress: () => void;
+  pending: boolean;
+  wide?: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Pressable
+      disabled={pending}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      style={[
+        styles.searchFollowButton,
+        wide && styles.searchFollowButtonWide,
+        following && styles.searchFollowingButton,
+        pending && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.searchFollowButtonText, following && styles.searchFollowingButtonText]}>
+        {following ? 'Following' : 'Follow'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1736,8 +1923,34 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   loadMoreText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   placeSave: { alignSelf: 'flex-start', paddingTop: 2 },
   peopleContent: { padding: 16, paddingBottom: 24, gap: 16 },
-  peopleSearch: { height: 44, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: colors.surface },
-  peopleSearchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+  peopleSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  peopleSearch: { flex: 1, minWidth: 0, height: 39, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 22, backgroundColor: colors.surfaceRaised },
+  peopleSearchInput: { flex: 1, color: colors.text, fontSize: 16, letterSpacing: -0.41, paddingVertical: 0 },
+  peopleSearchClear: { width: 24, height: 24 },
+  peopleSearchFriends: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  peopleResultCount: { marginTop: -2, color: colors.textSecondary, fontSize: 13, letterSpacing: -0.24 },
+  peopleSearchResults: { gap: 8 },
+  peopleResultCard: { minHeight: 64, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.hairline, borderRadius: 14, backgroundColor: colors.surface },
+  peopleResultAvatar: { width: 44, height: 44, borderRadius: 22 },
+  peopleResultCopy: { flex: 1, minWidth: 0, gap: 4 },
+  peopleResultName: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41 },
+  peopleResultHandle: { color: colors.textMuted, fontSize: 13, letterSpacing: -0.24 },
+  peopleSearchEmpty: { minHeight: 380, paddingTop: 42, alignItems: 'center', gap: 10 },
+  peopleSearchEmptyTitle: { color: colors.text, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  peopleSearchEmptyCopy: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
+  peopleMayKnowSection: { marginTop: 14, gap: 8 },
+  peopleMayKnowTitle: { color: colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.24 },
+  peopleMayKnowList: { gap: 10 },
+  peopleMayKnowCard: { width: 165, minHeight: 174, padding: 16, alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1, borderColor: colors.hairline, borderRadius: 16, backgroundColor: colors.surface },
+  peopleMayKnowAvatar: { width: 40, height: 40, borderRadius: 20 },
+  peopleMayKnowCopy: { width: '100%', alignItems: 'center', gap: 4 },
+  peopleMayKnowName: { width: '100%', color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41, textAlign: 'center' },
+  peopleMayKnowHandle: { width: '100%', color: colors.textMuted, fontSize: 13, letterSpacing: -0.24, textAlign: 'center' },
+  searchFollowButton: { minWidth: 74, height: 31, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  searchFollowButtonWide: { width: '100%', height: 40 },
+  searchFollowButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
+  searchFollowingButton: { borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
+  searchFollowingButtonText: { color: colors.primary },
   peopleSectionHead: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 4 },
   peopleSectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   peopleSectionSubtitle: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },

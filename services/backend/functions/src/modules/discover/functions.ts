@@ -1,4 +1,4 @@
-import { getPlaceInputSchema, getPlaceReviewsInputSchema, getVenuesInputSchema } from '@tastes/contracts';
+import { getPlaceInputSchema, getPlaceReviewsInputSchema, getVenuesInputSchema, searchPeopleInputSchema } from '@tastes/contracts';
 import type {
   DiscoverFeed,
   DiscoverPeopleResult,
@@ -19,6 +19,7 @@ import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination'
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { calculateRecommendationMatch, isRecommendation } from './recommendations';
+import { userSearchCandidateTokens, userSearchScore } from '../users/search';
 
 function toVenue(document: QueryDocumentSnapshot, matchPercent?: number): Venue {
   return {
@@ -230,6 +231,39 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
     suggested: toPeople(suggestedDocs),
   };
   return result;
+});
+
+export const searchPeople = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(searchPeopleInputSchema, request.data);
+  const candidateTokens = userSearchCandidateTokens(input.query);
+  if (candidateTokens.length === 0) return [];
+
+  const snapshot = await db.collection('users')
+    .where('status', '==', 'active')
+    .where('searchTokens', 'array-contains-any', candidateTokens)
+    .limit(100)
+    .get();
+  const ranked = snapshot.docs
+    .filter((document) => document.id !== uid)
+    .flatMap((document) => {
+      const score = userSearchScore(
+        input.query,
+        String(document.get('displayName') ?? ''),
+        document.get('username') ? String(document.get('username')) : null,
+      );
+      return score == null ? [] : [{ document, score }];
+    })
+    .sort((left, right) => left.score - right.score
+      || Number(right.document.get('followerCount') ?? 0) - Number(left.document.get('followerCount') ?? 0)
+      || left.document.id.localeCompare(right.document.id))
+    .slice(0, input.limit);
+
+  const followingDocs = ranked.length > 0
+    ? await db.getAll(...ranked.map(({ document }) => db.collection('users').doc(uid).collection('following').doc(document.id)))
+    : [];
+  const followingIds = new Set(followingDocs.filter((document) => document.exists).map((document) => document.id));
+  return ranked.map(({ document }) => toDiscoverPerson(document, followingIds.has(document.id)));
 });
 
 export const getVenues = onCall(callableOptions, async (request) => {

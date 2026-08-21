@@ -17,6 +17,7 @@ import type {
   DeleteCommentInput,
   DeleteReviewInput,
   DiscoverFeed,
+  DiscoverPerson,
   DiscoverPeopleResult,
   FeedItem,
   FavouritesResult,
@@ -32,6 +33,7 @@ import type {
   GetPlaceReviewsInput,
   GetVenuesInput,
   SearchVenuesInput,
+  SearchPeopleInput,
   HealthCheckResult,
   ActivityCandidate,
   LeaderboardEntry,
@@ -139,6 +141,7 @@ export const callableOperationNames = [
   'getLeaderboard',
   'getDiscoverFeed',
   'getDiscoverPeople',
+  'searchPeople',
   'getFriendFeed',
   'importContacts',
   'getVenues',
@@ -370,6 +373,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<Record<string, never>, DiscoverFeed>('getDiscoverFeed', {}),
     getDiscoverPeople: () =>
       invoke<Record<string, never>, DiscoverPeopleResult>('getDiscoverPeople', {}),
+    searchPeople: (input: SearchPeopleInput) =>
+      invoke<SearchPeopleInput, DiscoverPerson[]>('searchPeople', input),
     getFriendFeed: (input: GetFeedInput) =>
       invoke<GetFeedInput, Page<FeedItem>>('getFriendFeed', { ...input, scope: 'friends' }),
     importContacts: (input: ImportContactsInput) =>

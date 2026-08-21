@@ -11,6 +11,7 @@
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "node lib/scripts/seed.js",
+    "search:backfill": "node lib/scripts/backfill-user-search.js",
     "staff:set-role": "node lib/scripts/set-staff-role.js"
   },
   "dependencies": {

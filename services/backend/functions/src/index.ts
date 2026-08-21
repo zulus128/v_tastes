@@ -42,6 +42,7 @@ export {
 export {
   getDiscoverFeed,
   getDiscoverPeople,
+  searchPeople,
   getPlace,
   getPlace as getVenue,
   getPlaceReviews,
