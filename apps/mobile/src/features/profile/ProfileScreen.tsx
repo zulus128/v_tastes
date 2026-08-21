@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Keyboard,
@@ -69,7 +71,6 @@ const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png
 const FALLBACK_MAP_REGION = { latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 };
 const MAP_FOCUS_PIN_LIMIT = 5;
 const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
-const IOS_KEYBOARD_ASSISTANT_HEIGHT = 56;
 
 function hasMapCoordinates(venue: Venue): venue is Venue & { latitude: number; longitude: number } {
   return typeof venue.latitude === 'number'
@@ -181,47 +182,66 @@ export function ProfileScreen({
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
-  const [mapKeyboardInset, setMapKeyboardInset] = useState(0);
+  const mapKeyboardInset = useRef(new Animated.Value(0)).current;
+  const mapKeyboardContentTranslate = useMemo(
+    () => Animated.multiply(mapKeyboardInset, -1),
+    [mapKeyboardInset],
+  );
   const mapKeyboardVisibleRef = useRef(false);
   const screenRef = useRef<View>(null);
 
   useEffect(() => {
     mapKeyboardVisibleRef.current = false;
     if (activeTab !== 'map') {
-      setMapKeyboardInset(0);
+      mapKeyboardInset.stopAnimation();
+      mapKeyboardInset.setValue(0);
       return;
     }
 
-    const updateKeyboardInset = (screenY: number) => {
+    const updateKeyboardInset = (screenY: number, duration?: number, animate = true) => {
       screenRef.current?.measureInWindow((_x, y, _width, height) => {
-        const assistantInset = Platform.OS === 'ios' ? IOS_KEYBOARD_ASSISTANT_HEIGHT : 0;
-        setMapKeyboardInset(Math.max(0, y + height - screenY + assistantInset));
+        const nextInset = Math.max(0, y + height - screenY);
+        mapKeyboardInset.stopAnimation();
+        if (!animate) {
+          mapKeyboardInset.setValue(nextInset);
+          return;
+        }
+        Animated.timing(mapKeyboardInset, {
+          toValue: nextInset,
+          duration: duration && duration > 0 ? duration : 250,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }).start();
       });
     };
     const currentKeyboard = Keyboard.metrics();
     if (currentKeyboard) {
       mapKeyboardVisibleRef.current = true;
-      updateKeyboardInset(currentKeyboard.screenY);
+      updateKeyboardInset(currentKeyboard.screenY, undefined, false);
     }
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       if (mapKeyboardVisibleRef.current) return;
       mapKeyboardVisibleRef.current = true;
-      Keyboard.scheduleLayoutAnimation(event);
-      updateKeyboardInset(event.endCoordinates.screenY);
+      updateKeyboardInset(event.endCoordinates.screenY, event.duration);
     });
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
       mapKeyboardVisibleRef.current = false;
-      Keyboard.scheduleLayoutAnimation(event);
-      setMapKeyboardInset(0);
+      mapKeyboardInset.stopAnimation();
+      Animated.timing(mapKeyboardInset, {
+        toValue: 0,
+        duration: event.duration && event.duration > 0 ? event.duration : 250,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: false,
+      }).start();
     });
 
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [activeTab]);
+  }, [activeTab, mapKeyboardInset]);
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -492,10 +512,13 @@ export function ProfileScreen({
     <View ref={screenRef} style={[styles.screen, { backgroundColor: colors.canvas }]}>
       {activeTab === 'reviews' ? (
         <FlatList
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + 24 }]}
           data={sortedReviews}
           initialNumToRender={6}
           keyExtractor={(review) => review.id}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           maxToRenderPerBatch={6}
           ListHeaderComponent={<>{profileHeader}{controls}{own && draft ? <View style={styles.draftCardWrap}><ProfileDraftCard draft={draft} onContinue={onContinueDraft} profile={profile} /></View> : null}</>}
           ListEmptyComponent={!profileReviews.loading ? <View style={styles.empty}><Text style={styles.emptyTitle}>No reviews yet</Text><Text style={styles.emptyCopy}>{own ? 'Your reviews will appear here.' : 'This person has not posted a review yet.'}</Text></View> : null}
@@ -516,7 +539,15 @@ export function ProfileScreen({
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]} showsVerticalScrollIndicator={false} stickyHeaderIndices={activeTab === 'map' ? undefined : [1]}>
+        <Animated.ScrollView
+          automaticallyAdjustKeyboardInsets={activeTab !== 'map'}
+          contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={activeTab === 'map' ? undefined : [1]}
+          style={activeTab === 'map' ? { transform: [{ translateY: mapKeyboardContentTranslate }] } : undefined}
+        >
           {profileHeader}
           {activeTab !== 'map' ? controls : null}
           {activeTab === 'map' ? (
@@ -573,10 +604,10 @@ export function ProfileScreen({
         ) : (
           <View style={styles.empty}><Text style={styles.emptyTitle}>Wishlist is private</Text><Text style={styles.emptyCopy}>Saved places are only visible to their owner.</Text></View>
           )}
-        </ScrollView>
+        </Animated.ScrollView>
       )}
       {activeTab === 'map' ? (
-        <View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
+        <Animated.View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
           <View style={styles.mapSearchRow}>
             <View style={[styles.searchBar, styles.mapSearchBar]}>
               <SearchIcon color={colors.textMuted} width={24} height={24} />
@@ -595,7 +626,7 @@ export function ProfileScreen({
               </Pressable>
             ))}
           </ScrollView>
-        </View>
+        </Animated.View>
       ) : null}
       <ProfileTopBar
         onBack={onBack}

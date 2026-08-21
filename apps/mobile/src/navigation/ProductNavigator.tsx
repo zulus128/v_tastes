@@ -191,7 +191,7 @@ function MainTabs({
             />
           )}
         </Tabs.Screen>
-        <Tabs.Screen name="Discover">
+        <Tabs.Screen name="Discover" options={{ tabBarHideOnKeyboard: false }}>
           {({ navigation }) => (
             <DiscoverScreen
               appliedFilters={discoverFilters}
@@ -253,6 +253,7 @@ function MainTabs({
             tabPress: () => navigation.setParams({ initialFollowing: undefined, userId: undefined }),
           })}
           name="Profile"
+          options={{ tabBarHideOnKeyboard: false }}
         >
           {({ navigation, route }) => {
             const targetUserId = route.params?.userId ?? user.uid;

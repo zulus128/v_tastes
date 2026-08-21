@@ -69,7 +69,7 @@ type MapFilter = DiscoverVenueFilter & { key: string; label: string };
 type PlaceSort = 'rating' | 'reviews' | 'distance';
 
 const DISCOVER_HEADER_HEIGHT = 106;
-const KEYBOARD_SHEET_HEIGHT = 184;
+const KEYBOARD_SEARCH_GAP = 8;
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#1B1B1B' }] },
@@ -542,18 +542,17 @@ function PlacesMap({
   const [sort, setSort] = useState<PlaceSort>('rating');
   const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
-  const mapScreenRef = useRef<View | null>(null);
-  const mapWindowBottom = useRef(0);
+  const searchRowRef = useRef<View | null>(null);
   const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
   const sheetHeight = useRef(new Animated.Value(330)).current;
   const sheetKeyboardTranslate = useRef(new Animated.Value(0)).current;
   const currentSheetHeight = useRef(330);
   const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
-  const restingCollapsedHeight = useRef(330);
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
   const keyboardVisibleRef = useRef(false);
   const keyboardTransitionRef = useRef(false);
+  const keyboardAdjustedRef = useRef(false);
   const venueFilter = activeFilter
     ? { category: activeFilter.category, tag: activeFilter.tag }
     : {};
@@ -619,49 +618,48 @@ function PlacesMap({
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const animateSheet = (height: number, translateY: number, duration?: number) => {
-      sheetHeight.stopAnimation();
+    const animateKeyboardOffset = (translateY: number, duration?: number) => {
       sheetKeyboardTranslate.stopAnimation();
       const animationDuration = duration && duration > 0 ? duration : 250;
-      const easing = Easing.inOut(Easing.ease);
-      Animated.parallel([
-        Animated.timing(sheetHeight, {
-          toValue: height,
-          duration: animationDuration,
-          easing,
-          useNativeDriver: false,
-        }),
-        Animated.timing(sheetKeyboardTranslate, {
-          toValue: translateY,
-          duration: animationDuration,
-          easing,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
+      Animated.timing(sheetKeyboardTranslate, {
+        toValue: translateY,
+        duration: animationDuration,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: false,
+      }).start(({ finished }) => {
         if (finished) keyboardTransitionRef.current = false;
       });
     };
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      keyboardTransitionRef.current = true;
       keyboardVisibleRef.current = true;
-      sheetExpandedRef.current = false;
-      setSheetExpanded(false);
       setSortOpen(false);
-      const keyboardOverlap = Platform.OS === 'ios'
-        ? Math.max(0, mapWindowBottom.current - event.endCoordinates.screenY)
-        : 0;
-      animateSheet(KEYBOARD_SHEET_HEIGHT, -keyboardOverlap, event.duration);
+      searchRowRef.current?.measureInWindow((_x, y, _width, height) => {
+        const keyboardOverlap = Math.max(
+          0,
+          y + height + KEYBOARD_SEARCH_GAP - event.endCoordinates.screenY,
+        );
+        keyboardAdjustedRef.current = keyboardOverlap > 0;
+        keyboardTransitionRef.current = keyboardAdjustedRef.current;
+        if (keyboardAdjustedRef.current) {
+          animateKeyboardOffset(-keyboardOverlap, event.duration);
+        }
+      });
     });
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
-      keyboardTransitionRef.current = true;
       keyboardVisibleRef.current = false;
-      animateSheet(restingCollapsedHeight.current, 0, event.duration);
+      if (!keyboardAdjustedRef.current) {
+        keyboardTransitionRef.current = false;
+        return;
+      }
+      keyboardAdjustedRef.current = false;
+      keyboardTransitionRef.current = true;
+      animateKeyboardOffset(0, event.duration);
     });
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [sheetHeight, sheetKeyboardTranslate]);
+  }, [sheetKeyboardTranslate]);
 
   function settleSheet(expanded: boolean) {
     if (keyboardVisibleRef.current) {
@@ -707,15 +705,11 @@ function PlacesMap({
   })).current;
 
   function handleMapLayout(height: number) {
-    mapScreenRef.current?.measureInWindow((_x, y, _width, measuredHeight) => {
-      mapWindowBottom.current = y + measuredHeight;
-    });
     const availableHeight = Math.max(0, height - 8);
     const expanded = Math.max(0, availableHeight - DISCOVER_HEADER_HEIGHT);
     const collapsed = Math.min(expanded, Math.max(330, Math.round(height * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
-      restingCollapsedHeight.current = collapsed;
       sheetBounds.current = { collapsed, expanded };
       currentSheetHeight.current = collapsed;
       sheetHeight.setValue(collapsed);
@@ -723,7 +717,6 @@ function PlacesMap({
     }
     if (keyboardVisibleRef.current || keyboardTransitionRef.current) return;
 
-    restingCollapsedHeight.current = collapsed;
     sheetBounds.current = { collapsed, expanded };
 
     // Animate orientation and container-size changes without jumping.
@@ -783,11 +776,7 @@ function PlacesMap({
   }
 
   return (
-    <View
-      onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)}
-      ref={mapScreenRef}
-      style={styles.mapScreen}
-    >
+    <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
       <MapView
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
         initialRegion={region}
@@ -886,7 +875,7 @@ function PlacesMap({
         >
           <View style={styles.sheetHandle} />
         </Pressable>
-        <View style={styles.mapSearchRow}>
+        <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
             <SearchIcon color={colors.textSecondary} height={24} width={24} />
             <TextInput
