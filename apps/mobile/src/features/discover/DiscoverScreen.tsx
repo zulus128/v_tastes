@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Easing,
   Image,
+  Keyboard,
   PanResponder,
   Platform,
   Pressable,
@@ -65,6 +67,9 @@ import { UserAvatar } from '../profile/avatar';
 type DiscoverTab = 'trending' | 'places' | 'people';
 type MapFilter = DiscoverVenueFilter & { key: string; label: string };
 type PlaceSort = 'rating' | 'reviews' | 'distance';
+
+const DISCOVER_HEADER_HEIGHT = 106;
+const KEYBOARD_SHEET_HEIGHT = 184;
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#1B1B1B' }] },
@@ -537,12 +542,18 @@ function PlacesMap({
   const [sort, setSort] = useState<PlaceSort>('rating');
   const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
+  const mapScreenRef = useRef<View | null>(null);
+  const mapWindowBottom = useRef(0);
   const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
   const sheetHeight = useRef(new Animated.Value(330)).current;
+  const sheetKeyboardTranslate = useRef(new Animated.Value(0)).current;
   const currentSheetHeight = useRef(330);
   const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
+  const restingCollapsedHeight = useRef(330);
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
+  const keyboardVisibleRef = useRef(false);
+  const keyboardTransitionRef = useRef(false);
   const venueFilter = activeFilter
     ? { category: activeFilter.category, tag: activeFilter.tag }
     : {};
@@ -605,7 +616,58 @@ function PlacesMap({
     return () => sheetHeight.removeListener(listener);
   }, [sheetHeight]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const animateSheet = (height: number, translateY: number, duration?: number) => {
+      sheetHeight.stopAnimation();
+      sheetKeyboardTranslate.stopAnimation();
+      const animationDuration = duration && duration > 0 ? duration : 250;
+      const easing = Easing.inOut(Easing.ease);
+      Animated.parallel([
+        Animated.timing(sheetHeight, {
+          toValue: height,
+          duration: animationDuration,
+          easing,
+          useNativeDriver: false,
+        }),
+        Animated.timing(sheetKeyboardTranslate, {
+          toValue: translateY,
+          duration: animationDuration,
+          easing,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) keyboardTransitionRef.current = false;
+      });
+    };
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      keyboardTransitionRef.current = true;
+      keyboardVisibleRef.current = true;
+      sheetExpandedRef.current = false;
+      setSheetExpanded(false);
+      setSortOpen(false);
+      const keyboardOverlap = Platform.OS === 'ios'
+        ? Math.max(0, mapWindowBottom.current - event.endCoordinates.screenY)
+        : 0;
+      animateSheet(KEYBOARD_SHEET_HEIGHT, -keyboardOverlap, event.duration);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      keyboardTransitionRef.current = true;
+      keyboardVisibleRef.current = false;
+      animateSheet(restingCollapsedHeight.current, 0, event.duration);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [sheetHeight, sheetKeyboardTranslate]);
+
   function settleSheet(expanded: boolean) {
+    if (keyboardVisibleRef.current) {
+      Keyboard.dismiss();
+      return;
+    }
     sheetExpandedRef.current = expanded;
     setSheetExpanded(expanded);
     if (!expanded) setSortOpen(false);
@@ -645,23 +707,35 @@ function PlacesMap({
   })).current;
 
   function handleMapLayout(height: number) {
+    mapScreenRef.current?.measureInWindow((_x, y, _width, measuredHeight) => {
+      mapWindowBottom.current = y + measuredHeight;
+    });
     const availableHeight = Math.max(0, height - 8);
-    const collapsed = Math.min(availableHeight, Math.max(330, Math.round(height * 0.53)));
-    const expanded = availableHeight;
-    sheetBounds.current = { collapsed, expanded };
+    const expanded = Math.max(0, availableHeight - DISCOVER_HEADER_HEIGHT);
+    const collapsed = Math.min(expanded, Math.max(330, Math.round(height * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
+      restingCollapsedHeight.current = collapsed;
+      sheetBounds.current = { collapsed, expanded };
       currentSheetHeight.current = collapsed;
       sheetHeight.setValue(collapsed);
       return;
     }
+    if (keyboardVisibleRef.current || keyboardTransitionRef.current) return;
 
-    // The keyboard changes the available map height. Stop an animation that may
-    // still target the pre-keyboard bounds and keep the search row on-screen.
+    restingCollapsedHeight.current = collapsed;
+    sheetBounds.current = { collapsed, expanded };
+
+    // Animate orientation and container-size changes without jumping.
     sheetHeight.stopAnimation();
     const nextHeight = sheetExpandedRef.current ? expanded : collapsed;
     currentSheetHeight.current = nextHeight;
-    sheetHeight.setValue(nextHeight);
+    Animated.timing(sheetHeight, {
+      toValue: nextHeight,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
   }
 
   function zoom(multiplier: number) {
@@ -709,7 +783,11 @@ function PlacesMap({
   }
 
   return (
-    <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
+    <View
+      onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)}
+      ref={mapScreenRef}
+      style={styles.mapScreen}
+    >
       <MapView
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
         initialRegion={region}
@@ -794,7 +872,12 @@ function PlacesMap({
           <MapLayerToggle active={mapLayers.openNow} label="Open now" onPress={() => toggleMapLayer('openNow')} styles={styles} />
         </View>
       ) : null}
-      <Animated.View style={[styles.mapSheet, { height: sheetHeight }]}>
+      <Animated.View
+        style={[
+          styles.mapSheet,
+          { height: sheetHeight, transform: [{ translateY: sheetKeyboardTranslate }] },
+        ]}
+      >
         <Pressable
           accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
           onPress={() => settleSheet(!sheetExpanded)}
@@ -808,11 +891,7 @@ function PlacesMap({
             <SearchIcon color={colors.textSecondary} height={24} width={24} />
             <TextInput
               autoCorrect={false}
-              onChangeText={(value) => {
-                setSearch(value);
-                if (value.trim().length >= 2) settleSheet(true);
-              }}
-              onFocus={() => settleSheet(true)}
+              onChangeText={setSearch}
               onSubmitEditing={focusFirstSearchResult}
               placeholder="Search"
               placeholderTextColor={colors.placeholder}
@@ -1487,7 +1566,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   aiFabMark: { width: 20, height: 18 },
   aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
   aiFabMarkOutline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
-  header: { height: 106, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
+  header: { height: DISCOVER_HEADER_HEIGHT, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
   mapHeader: { position: 'absolute', zIndex: 10, top: 0, right: 0, left: 0, elevation: 10 },
   headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
   back: { color: colors.text, fontSize: 38, lineHeight: 40 },
@@ -1635,7 +1714,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   layerSwitchActive: { backgroundColor: colors.primary },
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
-  mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, left: 0, right: 0, bottom: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { zIndex: 2, height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },

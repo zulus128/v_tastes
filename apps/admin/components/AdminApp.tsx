@@ -504,9 +504,7 @@ function VenuesView({ venues, isAdmin, refresh, run }: { venues: AdminVenue[]; i
     if (!statusAction) return;
     const action = statusAction;
     setStatusAction(null);
-    if (!await run('setVenueStatus', { venueId: action.venue.id, status: action.status })) {
-      setStatusAction(action);
-    }
+    await run('setVenueStatus', { venueId: action.venue.id, status: action.status });
   }
   return <>
     {isAdmin && <div className="toolbar-right"><button className="button primary" onClick={() => setEditing('new')}><Icon name="plus"/> Add venue</button></div>}

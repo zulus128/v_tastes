@@ -175,17 +175,21 @@ async function notifyReportResolved(report: FirebaseFirestore.DocumentSnapshot):
 
 /** Notifies everyone who saved a venue that something about it changed. */
 async function notifySavedPlaceChange(venueId: string, venueName: string, change: string): Promise<void> {
-  const savers = await db.collectionGroup('savedVenues').where('venueId', '==', venueId).limit(400).get();
-  await sendNotifications(savers.docs
-    .map((saved) => saved.ref.parent.parent?.id)
-    .filter((id): id is string => Boolean(id))
-    .map((recipientId) => ({
-      recipientId,
-      type: 'saved-place-changed' as const,
-      eventKey: `${venueId}:${change}`,
-      params: { place: venueName, text: change },
-      targetId: venueId,
-    })));
+  try {
+    const savers = await db.collectionGroup('savedVenues').where('venueId', '==', venueId).limit(400).get();
+    await sendNotifications(savers.docs
+      .map((saved) => saved.ref.parent.parent?.id)
+      .filter((id): id is string => Boolean(id))
+      .map((recipientId) => ({
+        recipientId,
+        type: 'saved-place-changed' as const,
+        eventKey: `${venueId}:${change}`,
+        params: { place: venueName, text: change },
+        targetId: venueId,
+      })));
+  } catch (error) {
+    console.warn(`Unable to notify users about the venue change for ${venueId}.`, error);
+  }
 }
 
 export const getAdminOverview = onCall(callableOptions, async (request) => {
