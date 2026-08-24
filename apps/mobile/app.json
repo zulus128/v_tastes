@@ -10,7 +10,7 @@
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
       "associatedDomains": [
-        "applinks:tastes.app"
+        "applinks:tastesapp.com"
       ],
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
@@ -37,7 +37,7 @@
           ],
           "data": [
             {
-              "host": "tastes.app",
+              "host": "tastesapp.com",
               "pathPrefix": "/reviews",
               "scheme": "https"
             }

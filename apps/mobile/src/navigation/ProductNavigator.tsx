@@ -81,7 +81,7 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ['tastes://', 'https://tastes.app'],
+  prefixes: ['tastes://', 'https://tastesapp.com'],
   async getInitialURL() {
     return (
       consumePendingDeepLink() ?? (await Linking.getInitialURL()) ?? consumeInitialPushDeepLink()

@@ -154,7 +154,7 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
   async function shareRecap(channel: string) {
     if (!recap) return;
     if (channel === 'Copy link') {
-      await Clipboard.setStringAsync(`https://tastes.app/recap/${recap.month.toLowerCase()}`);
+      await Clipboard.setStringAsync(`https://tastesapp.com/recap/${recap.month.toLowerCase()}`);
       Alert.alert('Link copied');
       return;
     }

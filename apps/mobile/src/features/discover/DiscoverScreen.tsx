@@ -466,7 +466,7 @@ function TrendingFeed({
                   setReactionCounts((counts) => ({ ...counts, [review.id]: result.data.reactionCount }));
                   setReactedReviews((current) => { const next = new Set(current); if (result.data.active) next.add(review.id); else next.delete(review.id); return next; });
                 }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
-                onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastes.app/reviews/${review.id}` })}
+                onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}` })}
                 onOpen={() => onOpenPlace(review.venueId)}
                 place={review.venueName}
                 rating={review.rating.toFixed(1)}

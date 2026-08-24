@@ -398,11 +398,11 @@ export function PostSignupOnboardingFlow({
   }
 
   async function shareInvite() {
-    await Share.share({ message: 'Join me on Tastes: https://tastes.app/invite' });
+    await Share.share({ message: 'Join me on Tastes: https://tastesapp.com/invite' });
   }
 
   async function textInvite(phoneNumber?: string | null) {
-    const message = encodeURIComponent('Join me on Tastes: https://tastes.app/invite');
+    const message = encodeURIComponent('Join me on Tastes: https://tastesapp.com/invite');
     const separator = Platform.OS === 'ios' ? '&' : '?';
     await Linking.openURL(`sms:${phoneNumber ?? ''}${separator}body=${message}`);
   }

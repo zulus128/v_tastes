@@ -415,7 +415,7 @@ export function ProfileSettingsSheet({
             start={{ x: 0.5, y: 0 }}
             style={styles.inviteRing}
           >
-            <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastes.app' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
+            <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastesapp.com' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
               <InviteUsersIcon height={Math.round(24 * settingsScale)} width={Math.round(24 * settingsScale)} />
               <Text style={styles.inviteText}>Invite a Friend</Text>
             </Pressable>
