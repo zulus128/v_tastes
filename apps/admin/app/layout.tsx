@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   title: 'Tastes Admin',
   description: 'Moderation and venue operations for Tastes',
   icons: {
-    icon: '/tastes-favicon.png',
-    shortcut: '/tastes-favicon.png',
-    apple: '/tastes-favicon.png',
+    icon: '/tastes-favicon.ico?v=4',
+    shortcut: '/tastes-favicon.ico?v=4',
+    apple: '/tastes-favicon.png?v=4',
   },
 };
 
