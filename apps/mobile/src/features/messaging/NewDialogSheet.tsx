@@ -69,7 +69,7 @@ export function NewDialogSheet({
             <Text style={styles.title}>New Dialog</Text>
             <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
           </View>
-          <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
+          <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
           <Pressable onPress={() => { onClose(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
             <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
           </Pressable>
@@ -81,7 +81,8 @@ export function NewDialogSheet({
             <FlatList
               data={filtered}
               keyExtractor={(item) => item.userId}
-              ListEmptyComponent={<Text style={styles.empty}>Mutual followers will appear here.</Text>}
+              keyboardShouldPersistTaps="always"
+              ListEmptyComponent={<Text style={styles.empty}>{query ? 'No matching contacts.' : 'Mutual followers will appear here.'}</Text>}
               renderItem={({ item }) => (
                 <Pressable disabled={openingId !== null} onPress={() => void openConversation(item)} style={({ pressed }) => [styles.person, pressed && styles.personPressed]}>
                   {item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View>}

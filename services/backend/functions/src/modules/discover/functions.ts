@@ -289,7 +289,26 @@ export const getVenues = onCall(callableOptions, async (request) => {
     venuesQuery = venuesQuery.startAfter(cursor.value, cursor.id);
   }
 
-  const snapshot = await venuesQuery.limit(input.limit + 1).get();
+  let snapshot: FirebaseFirestore.QuerySnapshot;
+  try {
+    snapshot = await venuesQuery.limit(input.limit + 1).get();
+  } catch (error) {
+    // Category filtering used to fail on environments where the compound
+    // index had not propagated yet. Keep the Places tab usable while the
+    // index catches up; the normal indexed query remains the fast path.
+    if (!input.category || cursor) throw error;
+    const fallbackSnapshot = await db.collection('venues')
+      .where('status', '==', 'active')
+      .where('category', '==', input.category)
+      .limit(Math.max(input.limit, 100))
+      .get();
+    const fallbackDocs = [...fallbackSnapshot.docs]
+      .sort((left, right) => Number(right.get('rating') ?? 0) - Number(left.get('rating') ?? 0));
+    return {
+      items: fallbackDocs.slice(0, input.limit).map(toVenue),
+      nextCursor: null,
+    };
+  }
   const pageDocs = snapshot.docs.slice(0, input.limit) as QueryDocumentSnapshot[];
   const last = pageDocs.at(-1);
 

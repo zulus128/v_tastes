@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Animated,
   Alert,
   Easing,
@@ -550,6 +551,7 @@ function PlacesMap({
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetExpandedRef = useRef(false);
   const [sort, setSort] = useState<PlaceSort>('best-match');
@@ -628,6 +630,13 @@ function PlacesMap({
       return venue && followedIds.has(review.authorId) ? [{ review, venue }] : [];
     })
     : [];
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') setMapInstanceKey((key) => key + 1);
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     const listener = sheetHeight.addListener(({ value }) => {
@@ -799,6 +808,7 @@ function PlacesMap({
   return (
     <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
       <MapView
+        key={mapInstanceKey}
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
         initialRegion={region}
         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
