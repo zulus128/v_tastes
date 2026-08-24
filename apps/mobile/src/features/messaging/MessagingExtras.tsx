@@ -571,8 +571,8 @@ function Empty({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
-    newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
-    newGroupHeader: { backgroundColor: colors.canvas },
+    newGroupScreen: { flex: 1, backgroundColor: colors.surface },
+    newGroupHeader: { backgroundColor: colors.surface },
     patternBody: { flex: 1 },
     header: {
       height: safeTop + 62,
@@ -721,8 +721,8 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       gap: 7,
       alignItems: 'center',
       borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      backgroundColor: colors.canvas,
+      borderBottomColor: colors.hairline,
+      backgroundColor: colors.surface,
     },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarFallback: {
@@ -753,12 +753,12 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       justifyContent: 'center',
     },
     checkActive: {
-      borderWidth: 0,
+      borderWidth: 1.5,
       borderColor: colors.primary,
       backgroundColor: colors.primary,
     },
     checkText: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '600' },
-    createFooter: { paddingTop: 12, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.canvas },
+    createFooter: { paddingTop: 12, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, backgroundColor: colors.surface },
     createGroup: { height: 58, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     details: { paddingBottom: 40 },

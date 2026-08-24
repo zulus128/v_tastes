@@ -258,7 +258,7 @@ function OverviewView({ data }: { data: Overview }) {
       <PeriodPanel eyebrow="CONTENT" title="Reviews posted" counts={data.newReviews} unit="reviews posted" />
       <section className="panel focus-panel">
         <p className="eyebrow">TODAY’S FOCUS</p>
-        <h2>{data.pendingReports ? `${data.pendingReports} reports are waiting` : 'The moderation queue is clear'}</h2>
+        <h2>{data.pendingReports ? `${data.pendingReports} ${data.pendingReports === 1 ? 'report is' : 'reports are'} waiting` : 'The moderation queue is clear'}</h2>
         <p className="muted">Review flagged content first, then check pending venues and recent account actions.</p>
       </section>
     </div>
@@ -269,7 +269,7 @@ function OverviewView({ data }: { data: Overview }) {
   </>;
 }
 
-function ReportsView({ reports, run }: { reports: ReportItem[]; run: RunAdmin }) {
+function ReportsView({ reports, run, query }: { reports: ReportItem[]; run: RunAdmin; query: string }) {
   const [selected, setSelected] = useState<{ report: ReportItem; action: 'edit' | 'delete' } | null>(null);
   const [text, setText] = useState('');
   async function submit(event: FormEvent) {
@@ -287,8 +287,13 @@ function ReportsView({ reports, run }: { reports: ReportItem[]; run: RunAdmin })
     if (!saved) return;
     setSelected(null);
   }
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleReports = normalizedQuery
+    ? reports.filter((report) => [report.reason, report.details, report.reporterName, report.targetType, report.targetId, report.contentPreview].some((value) => value.toLowerCase().includes(normalizedQuery)))
+    : reports;
   if (!reports.length) return <Empty title="No pending reports" text="New content reports will appear here." />;
-  return <><div className="report-grid">{reports.map((report) => <article className="report-card" key={report.id}>
+  if (!visibleReports.length) return <Empty title="No matching reports" text="Try a different search term." />;
+  return <><div className="report-grid">{visibleReports.map((report) => <article className="report-card" key={report.id}>
     <div className="report-top"><span className="status-pill warning">{report.reason}</span><time>{formatDate(report.createdAt)}</time></div>
     <section className="report-content">
       <p className="report-field-label">Reported content</p>
@@ -665,7 +670,7 @@ export function AdminApp() {
       {notice && <button className="notice" onClick={() => setNotice('')}>{notice}<span>×</span></button>}
       <div className={busy ? 'view busy' : 'view'}>
         {view === 'overview' && <OverviewView data={overview}/>}
-        {view === 'reports' && <ReportsView reports={reports} run={run}/>}
+        {view === 'reports' && <ReportsView reports={reports} query={query} run={run}/>}
         {view === 'venues' && <VenuesView venues={venues} isAdmin={role === 'admin'} refresh={async () => { await refresh('venues', query); }} run={run}/>}
         {view === 'users' && <UsersView users={users} run={run}/>}
       </div>
