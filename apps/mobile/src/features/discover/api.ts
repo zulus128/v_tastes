@@ -117,10 +117,29 @@ export function useToggleFollow(userId: string) {
     mutationFn: async ({ targetUserId, following }: { targetUserId: string; following: boolean }) => (
       following ? api.unfollowUser({ targetUserId }) : api.followUser({ targetUserId })
     ),
+    onMutate: async ({ targetUserId, following }) => {
+      await queryClient.cancelQueries({ queryKey: ['discover'] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ['discover'] });
+      const nextFollowing = !following;
+      const update = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(update);
+        if (!value || typeof value !== 'object') return value;
+        const record = value as Record<string, unknown>;
+        const next = Object.fromEntries(Object.entries(record).map(([key, entry]) => [key, update(entry)]));
+        if (record.userId === targetUserId) next.following = nextFollowing;
+        return next;
+      };
+      for (const [queryKey, data] of snapshots) queryClient.setQueryData(queryKey, update(data));
+      return { snapshots };
+    },
+    onError: (_error, _variables, context) => {
+      for (const [queryKey, data] of context?.snapshots ?? []) queryClient.setQueryData(queryKey, data);
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: discoverFeedQueryKey(userId) }),
         queryClient.invalidateQueries({ queryKey: discoverPeopleQueryKey(userId) }),
+        queryClient.invalidateQueries({ queryKey: ['discover', 'people-search', userId] }),
       ]);
     },
   });

@@ -3,6 +3,7 @@ import type { FeedItem, Venue } from '@tastes/contracts';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -40,8 +41,9 @@ import mapTrendingIcon from '../../../assets/profile/map-trending.png';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import Svg, { Path } from 'react-native-svg';
 import { FavouritesPane } from '../favourites/FavouritesPane';
+import { useToggleFollow } from '../discover/api';
 import { matchesPlaceFilters } from '../discover/placeFilters';
-import { storage } from '../../infrastructure/firebase';
+import { firestore, storage } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -162,6 +164,7 @@ export function ProfileScreen({
   const actionDangerColor = colors.background === '#080808' ? '#D32620' : '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
+  const followMutation = useToggleFollow(currentUserId);
   const { loading, profile } = useProfile(targetUserId, fallbackName);
   const profileReviews = useProfileReviews(targetUserId);
   const [activeTab, setActiveTab] = useState<ProfileTab>('reviews');
@@ -253,6 +256,13 @@ export function ProfileScreen({
   }
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
+  useEffect(() => {
+    if (own) return undefined;
+    return onSnapshot(
+      doc(firestore, 'users', currentUserId, 'following', targetUserId),
+      (snapshot) => setFollowing(snapshot.exists()),
+    );
+  }, [currentUserId, own, targetUserId]);
   useFocusEffect(useMemo(() => () => {
     if (!own) return undefined;
     let active = true;
@@ -335,8 +345,7 @@ export function ProfileScreen({
     if (followPending) return;
     setFollowPending(true);
     try {
-      if (following) await api.unfollowUser({ targetUserId });
-      else await api.followUser({ targetUserId });
+      await followMutation.mutateAsync({ targetUserId, following });
       setFollowing(!following);
     } catch (error) {
       Alert.alert('Could not update follow', apiErrorMessage(error));
