@@ -33,7 +33,7 @@ import MapLocateIcon from '../../../assets/discover/map-locate.svg';
 import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
 import SortIcon from '../../../assets/place/sort.svg';
-import CheckIcon from '../../../assets/place/check.svg';
+import CheckIcon from '../../../assets/activities/check.svg';
 import PeopleSearchIcon from '../../../assets/discover/search.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
