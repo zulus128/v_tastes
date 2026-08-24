@@ -187,7 +187,7 @@ function Login() {
     <main className="login-shell">
       <div className="login-glow" />
       <form className="login-card" onSubmit={submit}>
-        <div className="brand brand-large"><span className="brand-mark">T</span><span>Tastes</span></div>
+        <div className="brand brand-large"><img className="brand-icon" src="/icon.png" alt="" /><span>Tastes</span></div>
         <p className="eyebrow">STAFF PORTAL</p>
         <h1>Welcome back</h1>
         <p className="muted">Sign in with your administrator account.</p>
@@ -657,11 +657,11 @@ export function AdminApp() {
   const titles = useMemo(() => ({ overview: ['Overview', 'A quick view of platform health.'], reports: ['Moderation', 'Review and resolve reported content.'], venues: ['Venues', 'Maintain place data and discovery flags.'], users: ['Users', 'Search accounts and manage access.'] }), []);
   if (checking) return <div className="loading-screen"><span className="spinner" /></div>;
   if (!user) return <Login />;
-  if (!role) return <main className="access-denied"><div className="brand brand-large"><span className="brand-mark">T</span><span>Tastes</span></div><h1>Access restricted</h1><p>This account does not have an admin or moderator role.</p><button className="button primary" onClick={() => signOut(getFirebaseAuth())}>Sign out</button></main>;
+  if (!role) return <main className="access-denied"><div className="brand brand-large"><img className="brand-icon" src="/icon.png" alt="" /><span>Tastes</span></div><h1>Access restricted</h1><p>This account does not have an admin or moderator role.</p><button className="button primary" onClick={() => signOut(getFirebaseAuth())}>Sign out</button></main>;
 
   return <div className="app-shell">
     <aside>
-      <div className="brand"><span className="brand-mark">T</span><span>Tastes</span><em>Admin</em></div>
+      <div className="brand"><img className="brand-icon" src="/icon.png" alt="" /><span>Tastes</span><em>Admin</em></div>
       <nav>{(['overview', 'reports', 'venues', 'users'] as View[]).map((item) => <button key={item} className={view === item ? 'active' : ''} onClick={() => { setQuery(''); setView(item); }}><Icon name={item}/>{item === 'overview' ? 'Overview' : item === 'reports' ? 'Moderation' : item[0]?.toUpperCase() + item.slice(1)}{item === 'reports' && overview.pendingReports > 0 && <b>{overview.pendingReports}</b>}</button>)}</nav>
       <div className="staff-card"><div className="avatar">{(user.email?.[0] ?? 'A').toUpperCase()}</div><div><strong>{user.email?.split('@')[0]}</strong><span>{role}</span></div><button aria-label="Sign out" onClick={() => signOut(getFirebaseAuth())}><Icon name="logout"/></button></div>
     </aside>

@@ -27,7 +27,7 @@ button { color: inherit; }
 .login-card { width: min(100%, 420px); position: relative; padding: 40px; border: 1px solid var(--line); border-radius: 22px; background: rgba(21,22,25,.92); box-shadow: 0 25px 80px rgba(0,0,0,.4); }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 750; letter-spacing: -.3px; }
 .brand-large { font-size: 22px; margin-bottom: 34px; }
-.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--red); color: white; font-family: Georgia, serif; font-size: 21px; box-shadow: 0 7px 22px rgba(214,60,54,.3); }
+.brand-icon { width: 32px; height: 32px; border-radius: 10px; object-fit: cover; box-shadow: 0 7px 22px rgba(214,60,54,.3); }
 .brand em { margin-left: 2px; color: var(--muted); font-size: 11px; font-weight: 600; font-style: normal; padding: 4px 7px; border: 1px solid var(--line); border-radius: 6px; }
 .eyebrow { margin: 0 0 7px; color: var(--red); font-size: 10px; line-height: 1; letter-spacing: 1.7px; font-weight: 750; }
 h1, h2, p { margin-top: 0; }
