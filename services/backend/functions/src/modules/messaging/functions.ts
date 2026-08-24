@@ -247,25 +247,35 @@ export const getMessages = onCall(callableOptions, async (request) => {
   const snapshot = await query.limit(input.limit + 1).get();
   const pageDocuments = snapshot.docs.slice(0, input.limit);
   const last = pageDocuments.at(-1);
+  const senderIds = conversation.get('kind') === 'group'
+    ? [...new Set(pageDocuments.map((document) => String(document.get('senderId') ?? '')).filter(Boolean))]
+    : [];
+  const senderProfiles = senderIds.length
+    ? new Map((await db.getAll(...senderIds.map((id) => db.collection('users').doc(id)))).map((profile) => [profile.id, profile]))
+    : new Map();
 
   return {
-    items: pageDocuments.map((document) => ({
-      id: document.id,
-      conversationId: input.conversationId,
-      senderId: String(document.get('senderId')),
-      senderDisplayName: document.get('senderDisplayName')
-        ? String(document.get('senderDisplayName'))
-        : null,
-      senderPhotoUrl: document.get('senderPhotoUrl')
-        ? String(document.get('senderPhotoUrl'))
-        : null,
-      recipientId: String(document.get('recipientId')),
-      recipientIds: Array.isArray(document.get('recipientIds'))
-        ? document.get('recipientIds').filter((value: unknown): value is string => typeof value === 'string')
-        : [String(document.get('recipientId'))].filter(Boolean),
-      text: String(document.get('text')),
-      createdAt: timestampToIso(document.get('createdAt')),
-    })),
+    items: pageDocuments.map((document) => {
+      const senderId = String(document.get('senderId'));
+      const senderProfile = senderProfiles.get(senderId);
+      return {
+        id: document.id,
+        conversationId: input.conversationId,
+        senderId,
+        senderDisplayName: document.get('senderDisplayName')
+          ? String(document.get('senderDisplayName'))
+          : senderProfile?.get('displayName') ? String(senderProfile.get('displayName')) : null,
+        senderPhotoUrl: document.get('senderPhotoUrl')
+          ? String(document.get('senderPhotoUrl'))
+          : senderProfile?.get('photoUrl') ? String(senderProfile.get('photoUrl')) : null,
+        recipientId: String(document.get('recipientId')),
+        recipientIds: Array.isArray(document.get('recipientIds'))
+          ? document.get('recipientIds').filter((value: unknown): value is string => typeof value === 'string')
+          : [String(document.get('recipientId'))].filter(Boolean),
+        text: String(document.get('text')),
+        createdAt: timestampToIso(document.get('createdAt')),
+      };
+    }),
     nextCursor: snapshot.size > input.limit && last
       ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
       : null,

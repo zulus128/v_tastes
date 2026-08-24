@@ -28,6 +28,7 @@ import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
+import { useProfile } from '../profile/api';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
 
 function messageTime(iso: string): string {
@@ -39,13 +40,15 @@ function MessageBubble({
   mine,
   read,
   sender,
+  showAvatar,
   showSender,
   styles,
 }: {
   item: ChatMessage;
   mine: boolean;
   read: boolean;
-  sender?: ConversationParticipant;
+  sender?: Pick<ConversationParticipant, 'displayName' | 'photoUrl'>;
+  showAvatar: boolean;
   showSender: boolean;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -59,8 +62,8 @@ function MessageBubble({
   );
   return (
     <View style={[styles.messageRow, mine ? styles.mineRow : styles.theirRow]}>
-      {showSender ? (
-        <View style={styles.groupMessage}>
+      {showAvatar ? (
+        <View style={[styles.groupMessage, mine && styles.mineGroupMessage]}>
           {senderPhotoUrl ? (
             <Image source={{ uri: senderPhotoUrl }} style={styles.messageAvatar} />
           ) : (
@@ -68,8 +71,8 @@ function MessageBubble({
               <Text style={styles.messageAvatarInitial}>{senderName.slice(0, 1).toUpperCase()}</Text>
             </View>
           )}
-          <View style={styles.groupMessageContent}>
-            <Text numberOfLines={1} style={styles.senderName}>{senderName}</Text>
+          <View style={[styles.groupMessageContent, mine && styles.mineGroupMessageContent]}>
+            {showSender ? <Text numberOfLines={1} style={[styles.senderName, mine && styles.mineSenderName]}>{senderName}</Text> : null}
             {bubble}
           </View>
         </View>
@@ -160,6 +163,7 @@ export function ChatScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
   const api = useTastesApi();
+  const { profile: currentUserProfile } = useProfile(userId, 'You');
   const realtimeMessages = useConversationMessages(conversationId, userId);
   const messageHistory = useInfiniteQuery({
     queryKey: ['messages', conversationId, 'history'],
@@ -196,6 +200,9 @@ export function ChatScreen({
     ...(someoneTyping ? [{ kind: 'typing' } as const] : []),
     ...messageItems.map((message) => ({ kind: 'message' as const, message })),
   ], [messageItems, someoneTyping]);
+  const ownSender = currentUserProfile
+    ? { displayName: currentUserProfile.displayName, photoUrl: currentUserProfile.photoUrl }
+    : { displayName: 'You', photoUrl: null };
 
   useEffect(() => subscribeConversationDetails(
     conversationId,
@@ -377,16 +384,23 @@ export function ChatScreen({
             }}
             onEndReachedThreshold={0.5}
             windowSize={9}
-            renderItem={({ item }) => item.kind === 'typing'
-              ? <TypingIndicator styles={styles} />
-              : <MessageBubble
+            renderItem={({ item, index }) => {
+              if (item.kind === 'typing') return <TypingIndicator styles={styles} />;
+              const olderItem = listItems[index + 1];
+              const startsSenderGroup = olderItem?.kind !== 'message'
+                || olderItem.message.senderId !== item.message.senderId;
+              return (
+                <MessageBubble
                   item={item.message}
                   mine={item.message.senderId === userId}
                   read={item.message.senderId === userId && item.message.id === lastMessageId && readByCount > 0}
-                  sender={groupMembers.get(item.message.senderId)}
-                  showSender={Boolean(groupTitle) && item.message.senderId !== userId}
+                  sender={item.message.senderId === userId ? ownSender : groupMembers.get(item.message.senderId)}
+                  showAvatar={Boolean(groupTitle)}
+                  showSender={Boolean(groupTitle) && startsSenderGroup}
                   styles={styles}
-                />}
+                />
+              );
+            }}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -445,8 +459,11 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     mineRow: { alignItems: 'flex-end' },
     theirRow: { alignItems: 'flex-start' },
     groupMessage: { maxWidth: '88%', flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
+    mineGroupMessage: { flexDirection: 'row-reverse' },
     groupMessageContent: { flexShrink: 1, alignItems: 'flex-start' },
+    mineGroupMessageContent: { alignItems: 'flex-end' },
     senderName: { maxWidth: '100%', marginLeft: 10, marginBottom: 3, color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+    mineSenderName: { marginLeft: 0, marginRight: 10, textAlign: 'right' },
     messageAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.skeleton },
     messageAvatarFallback: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     messageAvatarInitial: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },

@@ -111,7 +111,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     try {
       const result = await api.getSessionStatus();
       if (result.data.profileExists) {
-        void syncPushNotifications(api).catch((error) => {
+        void syncPushNotifications(api, {
+          requestPermission: result.data.onboardingComplete,
+        }).catch((error) => {
           captureException(error, { source: 'push', operation: 'registerPushToken' });
         });
       }

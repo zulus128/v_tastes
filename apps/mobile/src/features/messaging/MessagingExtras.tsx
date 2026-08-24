@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import SearchIcon from '../../../assets/discover/search.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
@@ -215,7 +216,7 @@ export function NewGroupScreen({
       </View>
       <View style={styles.searchRow}>
         <View style={[styles.search, styles.newGroupSearch]}>
-          <Text style={styles.searchGlyph}>⌕</Text>
+          <SearchIcon color={colors.textSecondary} height={24} style={styles.searchIcon} width={24} />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search people"
@@ -571,7 +572,7 @@ function Empty({
 function createStyles(colors: ThemeColors, safeTop: number) {
   return StyleSheet.create({
     screen: { flex: 1 },
-    newGroupScreen: { flex: 1, backgroundColor: colors.surface },
+    newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupHeader: { backgroundColor: colors.surface },
     patternBody: { flex: 1 },
     header: {
@@ -695,6 +696,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       backgroundColor: colors.surfaceRaised,
     },
     newGroupSearch: { backgroundColor: colors.surface },
+    searchIcon: { marginRight: 8 },
     searchGlyph: { marginRight: 8, color: colors.textSecondary, fontSize: 21 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16 },
     detailsSearch: { marginHorizontal: 16, marginBottom: 4 },
@@ -722,7 +724,7 @@ function createStyles(colors: ThemeColors, safeTop: number) {
       alignItems: 'center',
       borderBottomWidth: 1,
       borderBottomColor: colors.hairline,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.canvas,
     },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarFallback: {
