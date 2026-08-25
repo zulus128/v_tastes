@@ -2,7 +2,7 @@ import { renderNotificationCopy } from '@tastes/contracts';
 import type { TastesApi } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 const STORED_TOKEN_KEY = 'tastes:expo-push-token';
@@ -11,14 +11,26 @@ function supportsRemotePushNotifications(): boolean {
   return Platform.OS === 'android' || (Platform.OS === 'ios' && Constants.isDevice);
 }
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type ExpoNotifications = typeof import('expo-notifications');
+
+let notificationsModule: ExpoNotifications | null = null;
+
+function getNotifications(): ExpoNotifications | null {
+  if (!supportsRemotePushNotifications()) return null;
+  if (notificationsModule) return notificationsModule;
+
+  const loadedModule = require('expo-notifications') as ExpoNotifications;
+  loadedModule.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  notificationsModule = loadedModule;
+  return loadedModule;
+}
 
 /** Turns the catalog target of a push payload into an in-app route. */
 export function deepLinkForTarget(targetType: string, targetId: string): string {
@@ -47,7 +59,7 @@ export function deepLinkForTarget(targetType: string, targetId: string): string 
   }
 }
 
-function deepLinkFromResponse(response: Notifications.NotificationResponse | null): string | null {
+function deepLinkFromResponse(response: NotificationResponse | null): string | null {
   const data = response?.notification.request.content.data;
   if (!data) return null;
   if (data.type === 'message' && typeof data.conversationId === 'string' && data.conversationId.length > 0) {
@@ -58,12 +70,16 @@ function deepLinkFromResponse(response: Notifications.NotificationResponse | nul
 }
 
 export function consumeInitialPushDeepLink(): string | null {
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
   const url = deepLinkFromResponse(Notifications.getLastNotificationResponse());
   if (url) Notifications.clearLastNotificationResponse();
   return url;
 }
 
 export function subscribeToPushDeepLinks(listener: (url: string) => void): () => void {
+  const Notifications = getNotifications();
+  if (!Notifications) return () => undefined;
   const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
     const url = deepLinkFromResponse(response);
     if (url) listener(url);
@@ -82,6 +98,8 @@ function easProjectId(): string {
 
 async function configureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'Messages',
     importance: Notifications.AndroidImportance.HIGH,
@@ -101,7 +119,8 @@ export async function syncPushNotifications(
   api: TastesApi,
   options: { requestPermission?: boolean } = {},
 ): Promise<string | null> {
-  if (!supportsRemotePushNotifications()) return null;
+  const Notifications = getNotifications();
+  if (!Notifications) return null;
   const platform = Platform.OS;
   if (platform !== 'android' && platform !== 'ios') return null;
   await configureAndroidChannel();
@@ -138,7 +157,8 @@ const DRAFT_REMINDER_DELAY_SECONDS = 24 * 60 * 60;
  * for 24 hours after the draft was last touched.
  */
 export async function scheduleDraftReminder(placeName: string): Promise<void> {
-  if (!supportsRemotePushNotifications()) return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
   await cancelDraftReminder();
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) return;
@@ -161,6 +181,7 @@ export async function scheduleDraftReminder(placeName: string): Promise<void> {
 export async function cancelDraftReminder(): Promise<void> {
   const identifier = await AsyncStorage.getItem(DRAFT_REMINDER_KEY);
   if (!identifier) return;
-  await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+  const Notifications = getNotifications();
+  await Notifications?.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
   await AsyncStorage.removeItem(DRAFT_REMINDER_KEY);
 }
