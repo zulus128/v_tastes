@@ -539,10 +539,10 @@ export function ProfileScreen({
               fallbackImageUrl={venueImages[review.venueId]}
               item={review}
               onComments={() => onOpenComments(review.id)}
-              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}` })}
+              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
               onReact={() => void reactToProfileReview(review.id, 'profile-reaction')}
               reacted={profileReactions[review.id] ?? review.reacted}
-              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}` })}
+              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
               profile={profile}
             /></View>}
           showsVerticalScrollIndicator={false}
@@ -601,10 +601,10 @@ export function ProfileScreen({
               fallbackImageUrl={venueImages[review.venueId]}
               item={review}
               onComments={() => onOpenComments(review.id)}
-              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}` })}
+              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
               onReact={() => void reactToProfileReview(review.id, 'profile-map-reaction')}
               reacted={profileReactions[review.id] ?? review.reacted}
-              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}` })}
+              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
               profile={profile}
             /></View>)}
           </View>
@@ -641,8 +641,8 @@ export function ProfileScreen({
         onBack={onBack}
         onSettings={onSettings}
         onShare={() => void Share.share({
-          message: `See ${profile.displayName} on Tastes: https://tastesapp.com/profile/${targetUserId}`,
-          url: `https://tastesapp.com/profile/${targetUserId}`,
+          message: `See ${profile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
+          url: `https://tastesapp.com/users/${targetUserId}`,
         })}
         own={own}
         profile={profile}

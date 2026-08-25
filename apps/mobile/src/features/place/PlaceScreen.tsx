@@ -137,7 +137,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
         onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetchingNextPage) void reviews.fetchNextPage(); }}
         onEndReachedThreshold={0.5}
         windowSize={7}
-        renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}` })} reactingId={reactingId} styles={styles} />}
+        renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}/comments` })} reactingId={reactingId} styles={styles} />}
         showsVerticalScrollIndicator={false}
       />}
       <Pressable onPress={onWriteReview} style={styles.reviewButton}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>

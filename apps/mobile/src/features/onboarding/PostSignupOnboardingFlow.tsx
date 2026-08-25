@@ -92,6 +92,19 @@ interface PostSignupOnboardingFlowProps {
   onComplete: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
 }
 
+function suggestedUsername(displayName: string | null | undefined, email: string | null | undefined): string {
+  const normalize = (value: string): string => value
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9._]+/g, '.')
+    .replace(/[._]{2,}/g, '.')
+    .replace(/^[._]+|[._]+$/g, '')
+    .slice(0, 40);
+
+  return normalize(displayName ?? '')
+    || normalize(email?.split('@')[0] ?? '')
+    || 'tastesuser';
+}
+
 function isUnauthenticated(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const { code, message } = error as { code?: unknown; message?: unknown };
@@ -211,8 +224,8 @@ export function PostSignupOnboardingFlow({
   const api = useMemo(() => createTastesApi(functions), []);
   const [screen, setScreen] = useState<Screen>('profile');
   const [history, setHistory] = useState<Screen[]>([]);
-  const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState(() => auth.currentUser?.displayName?.trim() ?? '');
+  const [username, setUsername] = useState(() => suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
   const [city, setCity] = useState('London');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
   const [photoUri, setPhotoUri] = useState<string | null>(null);

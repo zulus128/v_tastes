@@ -40,6 +40,16 @@
               "host": "tastesapp.com",
               "pathPrefix": "/reviews",
               "scheme": "https"
+            },
+            {
+              "host": "tastesapp.com",
+              "pathPrefix": "/users",
+              "scheme": "https"
+            },
+            {
+              "host": "tastesapp.com",
+              "pathPrefix": "/recap",
+              "scheme": "https"
             }
           ]
         }

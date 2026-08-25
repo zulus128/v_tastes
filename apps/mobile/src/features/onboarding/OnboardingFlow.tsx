@@ -3,7 +3,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
-import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithCustomToken } from 'firebase/auth';
+import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithCustomToken, updateProfile } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -132,7 +132,14 @@ export function OnboardingFlow() {
         requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
       });
       if (!result.identityToken) throw new Error('Apple did not return an identity token.');
-      await signInWithCredential(auth, new OAuthProvider('apple.com').credential({ idToken: result.identityToken }));
+      const credentialUser = await signInWithCredential(auth, new OAuthProvider('apple.com').credential({ idToken: result.identityToken }));
+      const providerName = [result.fullName?.givenName, result.fullName?.familyName]
+        .filter((part): part is string => Boolean(part?.trim()))
+        .join(' ')
+        .trim();
+      if (providerName && !credentialUser.user.displayName) {
+        await updateProfile(credentialUser.user, { displayName: providerName });
+      }
     } catch (error) {
       if ((error as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Apple sign-in failed', error instanceof Error ? error.message : 'Please try again.');
