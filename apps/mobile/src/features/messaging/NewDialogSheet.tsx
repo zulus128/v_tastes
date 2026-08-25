@@ -111,12 +111,17 @@ export function NewDialogSheet({
     return () => { active = false; };
   }, [api, visible]);
 
+  function closeSheet() {
+    Keyboard.dismiss();
+    onClose();
+  }
+
   async function openConversation(candidate: ActivityCandidate) {
     if (openingId) return;
     setOpeningId(candidate.userId);
     try {
       const result = await api.createConversation({ targetUserId: candidate.userId });
-      onClose();
+      closeSheet();
       onOpenConversation(result.data.id);
     } catch (error) {
       Alert.alert('Could not start dialog', apiErrorMessage(error));
@@ -133,8 +138,8 @@ export function NewDialogSheet({
   ));
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <Pressable onPress={onClose} style={styles.backdrop}>
+    <Modal animationType="slide" onRequestClose={closeSheet} transparent visible={visible}>
+      <Pressable onPress={closeSheet} style={styles.backdrop}>
         <AnimatedPressable
           onPress={(event) => event.stopPropagation()}
           style={[
@@ -148,9 +153,9 @@ export function NewDialogSheet({
         >
             <View style={styles.header}>
               <Text style={styles.title}>New Dialog</Text>
-              <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
+              <Pressable accessibilityLabel="Close" onPress={closeSheet} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
             </View>
-            <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
+            <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
             <Animated.View
               accessibilityElementsHidden={actionsHidden}
               importantForAccessibility={actionsHidden ? 'no-hide-descendants' : 'auto'}
@@ -167,10 +172,10 @@ export function NewDialogSheet({
                 },
               ]}
             >
-              <Pressable onPress={() => { onClose(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
+              <Pressable onPress={() => { closeSheet(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
                 <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
               </Pressable>
-              <Pressable onPress={() => { onClose(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
+              <Pressable onPress={() => { closeSheet(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
                 <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
               </Pressable>
             </Animated.View>
