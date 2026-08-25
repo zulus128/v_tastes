@@ -552,6 +552,8 @@ function PlacesMap({
   const [layersOpen, setLayersOpen] = useState(false);
   const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
+  const appStateRef = useRef(AppState.currentState);
+  const mapResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetExpandedRef = useRef(false);
   const [sort, setSort] = useState<PlaceSort>('best-match');
@@ -633,9 +635,27 @@ function PlacesMap({
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') setMapInstanceKey((key) => key + 1);
+      const resumed = appStateRef.current !== 'active' && nextState === 'active';
+      appStateRef.current = nextState;
+
+      if (mapResumeTimerRef.current) {
+        clearTimeout(mapResumeTimerRef.current);
+        mapResumeTimerRef.current = null;
+      }
+      if (!resumed) return;
+
+      // iOS reports `active` before the window and software keyboard have
+      // finished restoring their frames. Remounting MapKit immediately can
+      // permanently leave its native view at that transient height.
+      mapResumeTimerRef.current = setTimeout(() => {
+        mapResumeTimerRef.current = null;
+        setMapInstanceKey((key) => key + 1);
+      }, Platform.OS === 'ios' ? 350 : 100);
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      if (mapResumeTimerRef.current) clearTimeout(mapResumeTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
