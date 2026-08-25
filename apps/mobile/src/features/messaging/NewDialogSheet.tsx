@@ -50,61 +50,41 @@ export function NewDialogSheet({
       easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: false as const,
     });
-    const animateSheet = (nextKeyboardTop: number | null, duration = 280) => {
+    const animateLayout = (nextKeyboardTop: number | null, actionsVisible: boolean, duration = 280) => {
       keyboardTop.current = nextKeyboardTop;
       const availableHeight = nextKeyboardTop ?? windowHeight;
       const nextHeight = Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO);
       const nextBottom = nextKeyboardTop === null ? 0 : Math.max(0, windowHeight - nextKeyboardTop);
+      actionsVisibility.stopAnimation();
       sheetHeight.stopAnimation();
       sheetBottom.stopAnimation();
+      setActionsHidden(!actionsVisible);
       Animated.parallel([
         Animated.timing(sheetHeight, { ...animationConfig(duration), toValue: nextHeight }),
         Animated.timing(sheetBottom, { ...animationConfig(duration), toValue: nextBottom }),
-      ]).start();
-    };
-    const animateActions = (visible: boolean, duration = 280) => {
-      actionsVisibility.stopAnimation();
-      setActionsHidden(!visible);
-      Animated.timing(actionsVisibility, {
-        duration,
-        easing: Easing.bezier(0.22, 1, 0.36, 1),
-        toValue: visible ? 1 : 0,
-        useNativeDriver: false,
-      }).start();
-    };
-    const animateExpandedSheet = (duration = 280) => {
-      keyboardTop.current = null;
-      actionsVisibility.stopAnimation();
-      sheetHeight.stopAnimation();
-      sheetBottom.stopAnimation();
-      setActionsHidden(false);
-      Animated.parallel([
-        Animated.timing(sheetHeight, {
+        Animated.timing(actionsVisibility, {
           ...animationConfig(duration),
-          toValue: windowHeight * SHEET_HEIGHT_RATIO,
+          toValue: actionsVisible ? 1 : 0,
         }),
-        Animated.timing(sheetBottom, { ...animationConfig(duration), toValue: 0 }),
-        Animated.timing(actionsVisibility, { ...animationConfig(duration), toValue: 1 }),
       ]).start();
     };
     const willShowSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (event) => animateSheet(event.endCoordinates.screenY, event.duration || 280),
-    );
-    const showSubscription = Keyboard.addListener(
-      'keyboardDidShow',
       (event) => {
         const resultsHeight = event.endCoordinates.screenY * SHEET_HEIGHT_RATIO - FIXED_CONTENT_HEIGHT;
-        animateActions(resultsHeight >= MIN_RESULTS_HEIGHT, 280);
+        animateLayout(
+          event.endCoordinates.screenY,
+          resultsHeight >= MIN_RESULTS_HEIGHT,
+          event.duration || 280,
+        );
       },
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (event) => animateExpandedSheet(event.duration || 280),
+      (event) => animateLayout(null, true, event.duration || 280),
     );
     return () => {
       willShowSubscription.remove();
-      showSubscription.remove();
       hideSubscription.remove();
     };
   }, [actionsVisibility, sheetBottom, sheetHeight, windowHeight]);
