@@ -55,7 +55,7 @@ function MessageBubble({
   const senderName = item.senderDisplayName ?? sender?.displayName ?? 'Tastes user';
   const senderPhotoUrl = item.senderPhotoUrl ?? sender?.photoUrl ?? null;
   const bubble = (
-    <View style={[styles.bubble, mine ? styles.mineBubble : styles.theirBubble]}>
+    <View style={[styles.bubble, showAvatar && styles.groupBubble, mine ? styles.mineBubble : styles.theirBubble]}>
       <Text style={[styles.messageText, mine && styles.mineText]}>{item.text}</Text>
       <Text style={[styles.messageTime, mine && styles.mineTime]}>{messageTime(item.createdAt)}</Text>
     </View>
@@ -458,9 +458,9 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     messageRow: { width: '100%', marginVertical: 3 },
     mineRow: { alignItems: 'flex-end' },
     theirRow: { alignItems: 'flex-start' },
-    groupMessage: { maxWidth: '88%', flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
+    groupMessage: { width: '88%', flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
     mineGroupMessage: { flexDirection: 'row-reverse' },
-    groupMessageContent: { flexShrink: 1, alignItems: 'flex-start' },
+    groupMessageContent: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
     mineGroupMessageContent: { alignItems: 'flex-end' },
     senderName: { maxWidth: '100%', marginLeft: 10, marginBottom: 3, color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
     mineSenderName: { marginLeft: 0, marginRight: 10, textAlign: 'right' },
@@ -468,11 +468,12 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     messageAvatarFallback: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     messageAvatarInitial: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
     bubble: { maxWidth: '82%', minWidth: 72, paddingLeft: 13, paddingRight: 16, paddingTop: 9, paddingBottom: 6, borderRadius: 19 },
+    groupBubble: { maxWidth: '100%' },
     mineBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
     theirBubble: { backgroundColor: colors.surfaceRaised, borderBottomLeftRadius: 5 },
     typingBubble: { height: 38, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 19, borderBottomLeftRadius: 5, backgroundColor: colors.surfaceRaised },
     typingDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.textMuted },
-    messageText: { flexShrink: 1, color: colors.text, fontSize: 16, lineHeight: 21 },
+    messageText: { color: colors.text, fontSize: 16, lineHeight: 21 },
     mineText: { color: colors.onPrimary },
     messageTime: { color: colors.textMuted, marginTop: 3, fontSize: 10, textAlign: 'right' },
     mineTime: { color: 'rgba(255,255,255,0.70)' },
