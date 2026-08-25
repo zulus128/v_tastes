@@ -1,7 +1,7 @@
 import type { ActivityCandidate } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -28,6 +28,31 @@ export function NewDialogSheet({
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const actionsVisibility = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animateActions = (visible: boolean, duration = 220) => {
+      setKeyboardVisible(!visible);
+      Animated.timing(actionsVisibility, {
+        duration,
+        toValue: visible ? 1 : 0,
+        useNativeDriver: false,
+      }).start();
+    };
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => animateActions(false, event.duration || 220),
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      (event) => animateActions(true, event.duration || 220),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [actionsVisibility]);
 
   useEffect(() => {
     if (!visible) return;
@@ -71,12 +96,26 @@ export function NewDialogSheet({
               <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
             </View>
             <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
-            <Pressable onPress={() => { onClose(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
-              <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
-            </Pressable>
-            <Pressable onPress={() => { onClose(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
-              <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
-            </Pressable>
+            <Animated.View
+              accessibilityElementsHidden={keyboardVisible}
+              importantForAccessibility={keyboardVisible ? 'no-hide-descendants' : 'auto'}
+              pointerEvents={keyboardVisible ? 'none' : 'auto'}
+              style={[
+                styles.actions,
+                {
+                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 124] }),
+                  opacity: actionsVisibility,
+                  transform: [{ translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+                },
+              ]}
+            >
+              <Pressable onPress={() => { onClose(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
+                <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
+              </Pressable>
+              <Pressable onPress={() => { onClose(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
+                <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
+              </Pressable>
+            </Animated.View>
             <Text style={styles.section}>COMMUNICATE OFTEN</Text>
             {loading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
               <FlatList
@@ -117,6 +156,7 @@ function createStyles(colors: ThemeColors) {
     sheet: { height: '80%', paddingHorizontal: 16, borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
     searchBox: { height: 40, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, marginRight: 8, fontSize: 21 }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    actions: { overflow: 'hidden' },
     action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
     section: { color: colors.textMuted, marginTop: 25, marginBottom: 10, fontSize: 12 }, loader: { marginTop: 35 }, empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
     results: { flex: 1 },
