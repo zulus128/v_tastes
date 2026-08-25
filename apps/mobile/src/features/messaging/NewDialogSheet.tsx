@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
+import SearchIcon from '../../../assets/profile/search.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 
@@ -37,7 +38,9 @@ export function NewDialogSheet({
   const [search, setSearch] = useState('');
   const [actionsHidden, setActionsHidden] = useState(false);
   const actionsVisibility = useRef(new Animated.Value(1)).current;
+  const closing = useRef(false);
   const keyboardTop = useRef<number | null>(null);
+  const searchInputRef = useRef<TextInput | null>(null);
   const sheetBottom = useRef(new Animated.Value(0)).current;
   const sheetHeight = useRef(new Animated.Value(windowHeight * SHEET_HEIGHT_RATIO)).current;
 
@@ -123,9 +126,37 @@ export function NewDialogSheet({
     return () => { active = false; };
   }, [api, visible]);
 
-  function closeSheet() {
-    Keyboard.dismiss();
-    onClose();
+  async function dismissKeyboard(): Promise<void> {
+    if (!Keyboard.isVisible()) {
+      searchInputRef.current?.blur();
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        subscription.remove();
+        resolve();
+      };
+      const subscription = Keyboard.addListener('keyboardDidHide', finish);
+      const timeout = setTimeout(finish, 450);
+      searchInputRef.current?.blur();
+      Keyboard.dismiss();
+    });
+  }
+
+  async function closeSheet(afterClose?: () => void): Promise<void> {
+    if (closing.current) return;
+    closing.current = true;
+    try {
+      await dismissKeyboard();
+      onClose();
+      afterClose?.();
+    } finally {
+      closing.current = false;
+    }
   }
 
   function resetSheetAfterDismiss() {
@@ -144,7 +175,7 @@ export function NewDialogSheet({
     setOpeningId(candidate.userId);
     try {
       const result = await api.createConversation({ targetUserId: candidate.userId });
-      closeSheet();
+      await closeSheet();
       onOpenConversation(result.data.id);
     } catch (error) {
       Alert.alert('Could not start dialog', apiErrorMessage(error));
@@ -161,8 +192,8 @@ export function NewDialogSheet({
   ));
 
   return (
-    <Modal animationType="slide" onDismiss={resetSheetAfterDismiss} onRequestClose={closeSheet} transparent visible={visible}>
-      <Pressable onPress={closeSheet} style={styles.backdrop}>
+    <Modal animationType="slide" onDismiss={resetSheetAfterDismiss} onRequestClose={() => void closeSheet()} transparent visible={visible}>
+      <Pressable onPress={() => void closeSheet()} style={styles.backdrop}>
         <AnimatedPressable
           onPress={(event) => event.stopPropagation()}
           style={[
@@ -176,9 +207,9 @@ export function NewDialogSheet({
         >
             <View style={styles.header}>
               <Text style={styles.title}>New Dialog</Text>
-              <Pressable accessibilityLabel="Close" onPress={closeSheet} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
+              <Pressable accessibilityLabel="Close" onPress={() => void closeSheet()} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
             </View>
-            <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
+            <View style={styles.searchBox}><SearchIcon color={colors.text} height={24} width={24} /><TextInput ref={searchInputRef} autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
             <Animated.View
               accessibilityElementsHidden={actionsHidden}
               importantForAccessibility={actionsHidden ? 'no-hide-descendants' : 'auto'}
@@ -195,10 +226,10 @@ export function NewDialogSheet({
                 },
               ]}
             >
-              <Pressable onPress={() => { closeSheet(); onNewGroup(); }} style={[styles.action, styles.groupAction]}>
+              <Pressable onPress={() => void closeSheet(onNewGroup)} style={[styles.action, styles.groupAction]}>
                 <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
               </Pressable>
-              <Pressable onPress={() => { closeSheet(); onNewActivity(); }} style={[styles.action, styles.activityAction]}>
+              <Pressable onPress={() => void closeSheet(onNewActivity)} style={[styles.action, styles.activityAction]}>
                 <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
               </Pressable>
             </Animated.View>
@@ -239,7 +270,7 @@ function createStyles(colors: ThemeColors) {
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
     sheet: { paddingHorizontal: 16, overflow: 'hidden', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
-    searchBox: { height: 40, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, marginRight: 8, fontSize: 21 }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    searchBox: { height: 40, paddingLeft: 10, paddingRight: 8, borderRadius: 22, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
     actions: { overflow: 'hidden' },
     action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
     section: { color: colors.textMuted, marginTop: 25, marginBottom: 10, fontSize: 12 }, loader: { marginTop: 35 }, empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
