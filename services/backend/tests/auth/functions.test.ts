@@ -579,6 +579,38 @@ describe('authenticated session and paginated reads', () => {
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
   }, 15_000);
 
+  it('only labels a follow notification as follow-back for a consistent mutual relationship', async () => {
+    const actor = await authenticatedUser();
+    const target = await authenticatedUser();
+    const db = getFirestore();
+    const actorRef = db.collection('users').doc(actor.uid);
+    const targetRef = db.collection('users').doc(target.uid);
+    await Promise.all([
+      actorRef.set({ displayName: 'Actor', followerCount: 0, followingCount: 0, status: 'active' }),
+      targetRef.set({ displayName: 'Target', followerCount: 0, followingCount: 0, status: 'active' }),
+    ]);
+
+    // A stale half of the mirrored relationship must not produce a factually
+    // incorrect mutual-follow notification.
+    await targetRef.collection('following').doc(actor.uid).set({ userId: actor.uid });
+    await callFunction('followUser', { targetUserId: target.uid }, actor.token);
+
+    const oneWayNotification = (await targetRef.collection('notifications').get()).docs[0];
+    expect(oneWayNotification?.get('type')).toBe('follow-new');
+    expect(oneWayNotification?.get('title')).toBe('Actor started following you');
+
+    await callFunction('unfollowUser', { targetUserId: target.uid }, actor.token);
+    await targetRef.collection('notifications').get().then(async (snapshot) => {
+      await Promise.all(snapshot.docs.map((notification) => notification.ref.delete()));
+    });
+    await actorRef.collection('followers').doc(target.uid).set({ userId: target.uid });
+    await callFunction('followUser', { targetUserId: target.uid }, actor.token);
+
+    const mutualNotification = (await targetRef.collection('notifications').get()).docs[0];
+    expect(mutualNotification?.get('type')).toBe('follow-back');
+    expect(mutualNotification?.get('title')).toBe('Actor followed you back');
+  }, 15_000);
+
   it('returns stable, non-overlapping cursors for feed, comments, and leaderboard', async () => {
     const { token } = await authenticatedUser();
     const db = getFirestore();

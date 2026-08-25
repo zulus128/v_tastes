@@ -96,11 +96,12 @@ export const followUser = onCall(callableOptions, async (request) => {
   const followerRef = targetRef.collection('followers').doc(uid);
 
   return db.runTransaction(async (transaction) => {
-    const [user, target, following, targetFollowsUser] = await Promise.all([
+    const [user, target, following, targetFollowsUser, userIsFollowedByTarget] = await Promise.all([
       transaction.get(userRef),
       transaction.get(targetRef),
       transaction.get(followingRef),
       transaction.get(targetRef.collection('following').doc(uid)),
+      transaction.get(userRef.collection('followers').doc(input.targetUserId)),
     ]);
     if (!user.exists || user.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
@@ -119,10 +120,11 @@ export const followUser = onCall(callableOptions, async (request) => {
     transaction.create(followerRef, { userId: uid, createdAt: now });
     transaction.update(userRef, { followingCount: FieldValue.increment(1), updatedAt: now });
     transaction.update(targetRef, { followerCount: FieldValue.increment(1), updatedAt: now });
+    const mutualFollow = targetFollowsUser.exists && userIsFollowedByTarget.exists;
     queueNotification(transaction, {
       recipientId: input.targetUserId,
-      type: targetFollowsUser.exists ? 'follow-back' : 'follow-new',
-      eventKey: `${uid}:${targetFollowsUser.exists ? 'follow-back' : 'follow-new'}`,
+      type: mutualFollow ? 'follow-back' : 'follow-new',
+      eventKey: `${uid}:${mutualFollow ? 'follow-back' : 'follow-new'}`,
       actorId: uid,
       actorName: String(user.get('displayName') ?? 'Someone'),
       targetId: uid,
