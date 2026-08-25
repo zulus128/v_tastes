@@ -642,6 +642,18 @@ function PlacesMap({
         clearTimeout(mapResumeTimerRef.current);
         mapResumeTimerRef.current = null;
       }
+      if (nextState !== 'active') {
+        // iOS does not reliably emit keyboardWillHide while the device is
+        // locking. Reset our keyboard-driven layout before the app is
+        // suspended so the map container can measure at its full height.
+        Keyboard.dismiss();
+        keyboardVisibleRef.current = false;
+        keyboardAdjustedRef.current = false;
+        keyboardTransitionRef.current = false;
+        sheetKeyboardTranslate.stopAnimation();
+        sheetKeyboardTranslate.setValue(0);
+        return;
+      }
       if (!resumed) return;
 
       // iOS reports `active` before the window and software keyboard have
@@ -656,7 +668,7 @@ function PlacesMap({
       subscription.remove();
       if (mapResumeTimerRef.current) clearTimeout(mapResumeTimerRef.current);
     };
-  }, []);
+  }, [sheetKeyboardTranslate]);
 
   useEffect(() => {
     const listener = sheetHeight.addListener(({ value }) => {
