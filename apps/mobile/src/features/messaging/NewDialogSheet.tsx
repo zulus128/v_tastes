@@ -69,6 +69,21 @@ export function NewDialogSheet({
         useNativeDriver: false,
       }).start();
     };
+    const animateExpandedSheet = (duration = 280) => {
+      keyboardTop.current = null;
+      actionsVisibility.stopAnimation();
+      sheetHeight.stopAnimation();
+      sheetBottom.stopAnimation();
+      setActionsHidden(false);
+      Animated.parallel([
+        Animated.timing(sheetHeight, {
+          ...animationConfig(duration),
+          toValue: windowHeight * SHEET_HEIGHT_RATIO,
+        }),
+        Animated.timing(sheetBottom, { ...animationConfig(duration), toValue: 0 }),
+        Animated.timing(actionsVisibility, { ...animationConfig(duration), toValue: 1 }),
+      ]).start();
+    };
     const willShowSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => animateSheet(event.endCoordinates.screenY, event.duration || 280),
@@ -82,10 +97,7 @@ export function NewDialogSheet({
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (event) => {
-        animateSheet(null, event.duration || 280);
-        animateActions(true, event.duration || 280);
-      },
+      (event) => animateExpandedSheet(event.duration || 280),
     );
     return () => {
       willShowSubscription.remove();
@@ -116,6 +128,17 @@ export function NewDialogSheet({
     onClose();
   }
 
+  function resetSheetAfterDismiss() {
+    actionsVisibility.stopAnimation();
+    sheetHeight.stopAnimation();
+    sheetBottom.stopAnimation();
+    keyboardTop.current = null;
+    actionsVisibility.setValue(1);
+    sheetHeight.setValue(windowHeight * SHEET_HEIGHT_RATIO);
+    sheetBottom.setValue(0);
+    setActionsHidden(false);
+  }
+
   async function openConversation(candidate: ActivityCandidate) {
     if (openingId) return;
     setOpeningId(candidate.userId);
@@ -138,7 +161,7 @@ export function NewDialogSheet({
   ));
 
   return (
-    <Modal animationType="slide" onRequestClose={closeSheet} transparent visible={visible}>
+    <Modal animationType="slide" onDismiss={resetSheetAfterDismiss} onRequestClose={closeSheet} transparent visible={visible}>
       <Pressable onPress={closeSheet} style={styles.backdrop}>
         <AnimatedPressable
           onPress={(event) => event.stopPropagation()}
