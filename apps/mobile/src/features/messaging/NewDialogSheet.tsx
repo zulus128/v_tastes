@@ -1,7 +1,7 @@
 import type { ActivityCandidate } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -11,6 +11,7 @@ const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
 const FIXED_CONTENT_HEIGHT = 298;
 const MIN_RESULTS_HEIGHT = 92;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function NewDialogSheet({
   onClose,
@@ -27,6 +28,7 @@ export function NewDialogSheet({
 }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
@@ -35,8 +37,28 @@ export function NewDialogSheet({
   const [search, setSearch] = useState('');
   const [actionsHidden, setActionsHidden] = useState(false);
   const actionsVisibility = useRef(new Animated.Value(1)).current;
+  const keyboardTop = useRef<number | null>(null);
+  const sheetBottom = useRef(new Animated.Value(0)).current;
+  const sheetHeight = useRef(new Animated.Value(windowHeight * SHEET_HEIGHT_RATIO)).current;
 
   useEffect(() => {
+    const animationConfig = (duration: number) => ({
+      duration,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+      useNativeDriver: false as const,
+    });
+    const animateSheet = (nextKeyboardTop: number | null, duration = 280) => {
+      keyboardTop.current = nextKeyboardTop;
+      const availableHeight = nextKeyboardTop ?? windowHeight;
+      const nextHeight = Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO);
+      const nextBottom = nextKeyboardTop === null ? 0 : Math.max(0, windowHeight - nextKeyboardTop);
+      sheetHeight.stopAnimation();
+      sheetBottom.stopAnimation();
+      Animated.parallel([
+        Animated.timing(sheetHeight, { ...animationConfig(duration), toValue: nextHeight }),
+        Animated.timing(sheetBottom, { ...animationConfig(duration), toValue: nextBottom }),
+      ]).start();
+    };
     const animateActions = (visible: boolean, duration = 280) => {
       actionsVisibility.stopAnimation();
       setActionsHidden(!visible);
@@ -47,6 +69,10 @@ export function NewDialogSheet({
         useNativeDriver: false,
       }).start();
     };
+    const willShowSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => animateSheet(event.endCoordinates.screenY, event.duration || 280),
+    );
     const showSubscription = Keyboard.addListener(
       'keyboardDidShow',
       (event) => {
@@ -56,13 +82,23 @@ export function NewDialogSheet({
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (event) => animateActions(true, event.duration || 280),
+      (event) => {
+        animateSheet(null, event.duration || 280);
+        animateActions(true, event.duration || 280);
+      },
     );
     return () => {
+      willShowSubscription.remove();
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [actionsVisibility]);
+  }, [actionsVisibility, sheetBottom, sheetHeight, windowHeight]);
+
+  useEffect(() => {
+    const availableHeight = keyboardTop.current ?? windowHeight;
+    sheetHeight.setValue(Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO));
+    sheetBottom.setValue(keyboardTop.current === null ? 0 : Math.max(0, windowHeight - keyboardTop.current));
+  }, [sheetBottom, sheetHeight, windowHeight]);
 
   useEffect(() => {
     if (!visible) return;
@@ -98,9 +134,18 @@ export function NewDialogSheet({
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
-        <Pressable onPress={onClose} style={styles.backdrop}>
-          <Pressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <Pressable onPress={onClose} style={styles.backdrop}>
+        <AnimatedPressable
+          onPress={(event) => event.stopPropagation()}
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              marginBottom: sheetBottom,
+              paddingBottom: Math.max(insets.bottom, 20),
+            },
+          ]}
+        >
             <View style={styles.header}>
               <Text style={styles.title}>New Dialog</Text>
               <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
@@ -147,9 +192,8 @@ export function NewDialogSheet({
                 style={styles.results}
               />
             )}
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+        </AnimatedPressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -164,9 +208,8 @@ function BellIcon({ color }: { color: string }) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    keyboardAvoider: { flex: 1 },
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
-    sheet: { height: '80%', paddingHorizontal: 16, borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
+    sheet: { paddingHorizontal: 16, overflow: 'hidden', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
     searchBox: { height: 40, paddingHorizontal: 11, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchGlyph: { color: colors.textSecondary, marginRight: 8, fontSize: 21 }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
     actions: { overflow: 'hidden' },
