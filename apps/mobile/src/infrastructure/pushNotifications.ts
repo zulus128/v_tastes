@@ -7,6 +7,10 @@ import { Platform } from 'react-native';
 
 const STORED_TOKEN_KEY = 'tastes:expo-push-token';
 
+function supportsRemotePushNotifications(): boolean {
+  return Platform.OS === 'android' || (Platform.OS === 'ios' && Constants.isDevice);
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -97,7 +101,9 @@ export async function syncPushNotifications(
   api: TastesApi,
   options: { requestPermission?: boolean } = {},
 ): Promise<string | null> {
-  if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
+  if (!supportsRemotePushNotifications()) return null;
+  const platform = Platform.OS;
+  if (platform !== 'android' && platform !== 'ios') return null;
   await configureAndroidChannel();
 
   let permission = await Notifications.getPermissionsAsync();
@@ -111,7 +117,7 @@ export async function syncPushNotifications(
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId: easProjectId() })).data;
   const previousToken = await AsyncStorage.getItem(STORED_TOKEN_KEY);
-  await api.registerPushToken({ token, platform: Platform.OS });
+  await api.registerPushToken({ token, platform });
   await AsyncStorage.setItem(STORED_TOKEN_KEY, token);
 
   if (previousToken && previousToken !== token) {
@@ -132,7 +138,7 @@ const DRAFT_REMINDER_DELAY_SECONDS = 24 * 60 * 60;
  * for 24 hours after the draft was last touched.
  */
 export async function scheduleDraftReminder(placeName: string): Promise<void> {
-  if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+  if (!supportsRemotePushNotifications()) return;
   await cancelDraftReminder();
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) return;
