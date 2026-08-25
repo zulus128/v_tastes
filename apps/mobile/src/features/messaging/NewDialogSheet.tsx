@@ -1,11 +1,16 @@
 import type { ActivityCandidate } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+
+const ACTIONS_HEIGHT = 124;
+const SHEET_HEIGHT_RATIO = 0.8;
+const FIXED_CONTENT_HEIGHT = 298;
+const MIN_RESULTS_HEIGHT = 92;
 
 export function NewDialogSheet({
   onClose,
@@ -28,25 +33,30 @@ export function NewDialogSheet({
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [actionsHidden, setActionsHidden] = useState(false);
   const actionsVisibility = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const animateActions = (visible: boolean, duration = 220) => {
-      setKeyboardVisible(!visible);
+    const animateActions = (visible: boolean, duration = 280) => {
+      actionsVisibility.stopAnimation();
+      setActionsHidden(!visible);
       Animated.timing(actionsVisibility, {
         duration,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
         toValue: visible ? 1 : 0,
         useNativeDriver: false,
       }).start();
     };
     const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (event) => animateActions(false, event.duration || 220),
+      'keyboardDidShow',
+      (event) => {
+        const resultsHeight = event.endCoordinates.screenY * SHEET_HEIGHT_RATIO - FIXED_CONTENT_HEIGHT;
+        animateActions(resultsHeight >= MIN_RESULTS_HEIGHT, 280);
+      },
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (event) => animateActions(true, event.duration || 220),
+      (event) => animateActions(true, event.duration || 280),
     );
     return () => {
       showSubscription.remove();
@@ -97,15 +107,18 @@ export function NewDialogSheet({
             </View>
             <View style={styles.searchBox}><Text style={styles.searchGlyph}>⌕</Text><TextInput autoCapitalize="none" autoCorrect={false} blurOnSubmit={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} /></View>
             <Animated.View
-              accessibilityElementsHidden={keyboardVisible}
-              importantForAccessibility={keyboardVisible ? 'no-hide-descendants' : 'auto'}
-              pointerEvents={keyboardVisible ? 'none' : 'auto'}
+              accessibilityElementsHidden={actionsHidden}
+              importantForAccessibility={actionsHidden ? 'no-hide-descendants' : 'auto'}
+              pointerEvents={actionsHidden ? 'none' : 'auto'}
               style={[
                 styles.actions,
                 {
-                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 124] }),
+                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, ACTIONS_HEIGHT] }),
                   opacity: actionsVisibility,
-                  transform: [{ translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+                  transform: [
+                    { translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-72, 0] }) },
+                    { scale: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
+                  ],
                 },
               ]}
             >
