@@ -68,7 +68,12 @@ export function useDiscoverVenues(userId: string, filter: DiscoverVenueFilter = 
     queryKey: discoverVenuesQueryKey(userId, filter),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => (
-      await api.getVenues({ ...filter, cursor: pageParam, limit: 20 })
+      await api.getVenues({
+        ...(filter.category ? { category: filter.category } : {}),
+        ...(filter.tag ? { tag: filter.tag } : {}),
+        cursor: pageParam,
+        limit: 20,
+      })
     ).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
