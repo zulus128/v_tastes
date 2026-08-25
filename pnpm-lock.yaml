@@ -41,8 +41,8 @@ importers:
         specifier: ^13.6.0
         version: 13.10.0
       firebase-tools:
-        specifier: ^15.23.0
-        version: 15.23.0(@types/node@26.1.1)
+        specifier: ^15.28.1
+        version: 15.28.1(@types/node@26.1.1)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -240,8 +240,8 @@ importers:
         specifier: ^13.6.0
         version: 13.10.0
       firebase-functions:
-        specifier: ^7.0.1
-        version: 7.2.5(firebase-admin@13.10.0)
+        specifier: ^6.6.0
+        version: 6.6.0(firebase-admin@13.10.0)
       google-auth-library:
         specifier: ^10.9.0
         version: 10.9.0
@@ -3964,25 +3964,15 @@ packages:
     resolution: {integrity: sha512-rbuCrJvYRwqBqvbccMS8fj/x2zsaMisdf5RQbRzQzr14Rbq9r2UlpuBHqWAwrO6c9dIRF56xF/xoepXsD5yDuQ==}
     engines: {node: '>=18'}
 
-  firebase-functions@7.2.5:
-    resolution: {integrity: sha512-K+pP0AknluAguLRbD96hibyXbnOgwnvd4hkExWdGrxnNCLoj8LBFj08uvJYxyvhsCgYzQumrUaHBW4lsXKSiRg==}
-    engines: {node: '>=18.0.0'}
+  firebase-functions@6.6.0:
+    resolution: {integrity: sha512-wwfo6JF+N7HUExVs5gUFgkgVGHDEog9O+qtouh7IuJWk8TBQ+KwXEgRiXbatSj7EbTu3/yYnHuzh3XExbfF6wQ==}
+    engines: {node: '>=14.10.0'}
     hasBin: true
     peerDependencies:
-      '@apollo/server': ^5.2.0
-      '@as-integrations/express4': ^1.1.2
       firebase-admin: ^11.10.0 || ^12.0.0 || ^13.0.0
-      graphql: ^16.12.0
-    peerDependenciesMeta:
-      '@apollo/server':
-        optional: true
-      '@as-integrations/express4':
-        optional: true
-      graphql:
-        optional: true
 
-  firebase-tools@15.23.0:
-    resolution: {integrity: sha512-YIu1w84GiJAoQfCDBvrK77Qnu19sh00YufGvrWLc9kus9p8j5NkFOGfSpIAiEHu5VliTZUqBhqDwA/i7fuN0GQ==}
+  firebase-tools@15.28.1:
+    resolution: {integrity: sha512-5qbKmO0Am0++a335zzUe9/TFdM/dn6jGNKVp2JUcHwDrOK+5wU0LT/fGX+8rjQM8AwfzPp+eMowWX1uDGI+aQg==}
     engines: {node: '>=20.0.0 || >=22.0.0 || >=24.0.0'}
     hasBin: true
 
@@ -8343,7 +8333,7 @@ snapshots:
   '@grpc/grpc-js@1.9.16':
     dependencies:
       '@grpc/proto-loader': 0.7.15
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@grpc/proto-loader@0.7.15':
     dependencies:
@@ -9273,7 +9263,7 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/caseless@0.12.5':
     optional: true
@@ -9285,11 +9275,11 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/cors@2.8.19':
     dependencies:
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/deep-eql@4.0.2': {}
 
@@ -9297,7 +9287,7 @@ snapshots:
 
   '@types/express-serve-static-core@4.19.9':
     dependencies:
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
       '@types/qs': 6.15.1
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -9328,7 +9318,7 @@ snapshots:
   '@types/jsonwebtoken@9.0.10':
     dependencies:
       '@types/ms': 2.1.0
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/long@4.0.2':
     optional: true
@@ -9344,6 +9334,7 @@ snapshots:
   '@types/node@26.1.1':
     dependencies:
       undici-types: 8.3.0
+    optional: true
 
   '@types/qs@6.15.1': {}
 
@@ -9360,7 +9351,7 @@ snapshots:
   '@types/request@2.48.13':
     dependencies:
       '@types/caseless': 0.12.5
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
       '@types/tough-cookie': 4.0.5
       form-data: 2.5.6
     optional: true
@@ -9368,16 +9359,16 @@ snapshots:
   '@types/send@0.17.6':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/send@1.2.1':
     dependencies:
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
 
   '@types/serve-static@1.15.10':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
       '@types/send': 0.17.6
 
   '@types/tough-cookie@4.0.5':
@@ -11137,7 +11128,7 @@ snapshots:
       - encoding
       - supports-color
 
-  firebase-functions@7.2.5(firebase-admin@13.10.0):
+  firebase-functions@6.6.0(firebase-admin@13.10.0):
     dependencies:
       '@types/cors': 2.8.19
       '@types/express': 4.17.25
@@ -11148,7 +11139,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  firebase-tools@15.23.0(@types/node@26.1.1):
+  firebase-tools@15.28.1(@types/node@26.1.1):
     dependencies:
       '@apphosting/common': 0.0.8
       '@electric-sql/pglite': 0.3.16
@@ -11217,7 +11208,7 @@ snapshots:
       update-notifier-cjs: 5.1.7
       winston: 3.19.0
       winston-transport: 4.9.0
-      ws: 7.5.12
+      ws: 8.21.1
       yaml: 2.9.0
       zod: 4.4.3
     transitivePeerDependencies:
@@ -12891,7 +12882,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 26.1.1
+      '@types/node': 24.13.3
       long: 5.3.2
 
   proxy-addr@2.0.7:
@@ -13801,7 +13792,8 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici-types@8.3.0: {}
+  undici-types@8.3.0:
+    optional: true
 
   undici@6.27.0: {}
 

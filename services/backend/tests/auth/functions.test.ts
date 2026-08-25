@@ -583,28 +583,33 @@ describe('authenticated session and paginated reads', () => {
     const actor = await authenticatedUser();
     const target = await authenticatedUser();
     const db = getFirestore();
-    const actorRef = db.collection('users').doc(actor.uid);
-    const targetRef = db.collection('users').doc(target.uid);
     await Promise.all([
-      actorRef.set({ displayName: 'Actor', followerCount: 0, followingCount: 0, status: 'active' }),
-      targetRef.set({ displayName: 'Target', followerCount: 0, followingCount: 0, status: 'active' }),
+      callFunction('createUserProfile', {
+        displayName: 'Actor', username: 'notification.actor', city: 'Istanbul',
+      }, actor.token),
+      callFunction('createUserProfile', {
+        displayName: 'Target', username: 'notification.target', city: 'Istanbul',
+      }, target.token),
     ]);
+    const actorRef = (await db.collection('users').where('username', '==', 'notification.actor').get()).docs[0]?.ref;
+    const targetRef = (await db.collection('users').where('username', '==', 'notification.target').get()).docs[0]?.ref;
+    if (!actorRef || !targetRef) throw new Error('Expected both follow-notification profiles to exist.');
 
     // A stale half of the mirrored relationship must not produce a factually
     // incorrect mutual-follow notification.
-    await targetRef.collection('following').doc(actor.uid).set({ userId: actor.uid });
-    await callFunction('followUser', { targetUserId: target.uid }, actor.token);
+    await targetRef.collection('following').doc(actorRef.id).set({ userId: actorRef.id });
+    await callFunction('followUser', { targetUserId: targetRef.id }, actor.token);
 
     const oneWayNotification = (await targetRef.collection('notifications').get()).docs[0];
     expect(oneWayNotification?.get('type')).toBe('follow-new');
     expect(oneWayNotification?.get('title')).toBe('Actor started following you');
 
-    await callFunction('unfollowUser', { targetUserId: target.uid }, actor.token);
+    await callFunction('unfollowUser', { targetUserId: targetRef.id }, actor.token);
     await targetRef.collection('notifications').get().then(async (snapshot) => {
       await Promise.all(snapshot.docs.map((notification) => notification.ref.delete()));
     });
-    await actorRef.collection('followers').doc(target.uid).set({ userId: target.uid });
-    await callFunction('followUser', { targetUserId: target.uid }, actor.token);
+    await actorRef.collection('followers').doc(targetRef.id).set({ userId: targetRef.id });
+    await callFunction('followUser', { targetUserId: targetRef.id }, actor.token);
 
     const mutualNotification = (await targetRef.collection('notifications').get()).docs[0];
     expect(mutualNotification?.get('type')).toBe('follow-back');
