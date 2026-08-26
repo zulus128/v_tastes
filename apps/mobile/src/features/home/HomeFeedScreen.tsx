@@ -285,7 +285,7 @@ function FeedCard({
             <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
               <View style={styles.heartIcon}>
                 {isReactionActive
-                  ? <HeartBoldIcon height={14.3462} width={16.6667} />
+                  ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} />
                   : <HeartIcon color={colors.text} height={15.5978} width={17.9167} />}
               </View>
               <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>

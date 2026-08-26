@@ -35,6 +35,10 @@ import MapRatingPin from '../../../assets/discover/map-rating-pin.svg';
 import MapTuneIcon from '../../../assets/discover/map-tune.svg';
 import SortIcon from '../../../assets/place/sort.svg';
 import CheckIcon from '../../../assets/activities/check.svg';
+import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
+import HeartIcon from '../../../assets/comments/heart-outline.svg';
+import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import PeopleSearchIcon from '../../../assets/discover/search.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
@@ -1504,9 +1508,17 @@ function ReviewCard({
         </View>
         <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
         <View style={styles.reviewFooter}>
-          <Pressable onPress={(event) => { event.stopPropagation(); onReact(); }}><Text style={[styles.reviewAction, reacted && { color: colors.primary }]}>♥ {reactionCount}</Text></Pressable>
-          <Pressable onPress={(event) => { event.stopPropagation(); onComments(); }}><Text style={styles.reviewAction}>◯ {commentCount}</Text></Pressable>
-          <Pressable onPress={(event) => { event.stopPropagation(); onShare(); }}><Text style={styles.reviewAction}>↗</Text></Pressable>
+          <Pressable accessibilityLabel="Like review" onPress={(event) => { event.stopPropagation(); onReact(); }} style={styles.reviewActionIconRow}>
+            {reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} /> : <HeartIcon color={colors.textSecondary} height={15.5978} width={17.9167} />}
+            <Text style={styles.reviewAction}>{reactionCount}</Text>
+          </Pressable>
+          <Pressable accessibilityLabel="Open comments" onPress={(event) => { event.stopPropagation(); onComments(); }} style={styles.reviewActionIconRow}>
+            <ChatIcon color={colors.textSecondary} height={20} width={20} />
+            <Text style={styles.reviewAction}>{commentCount}</Text>
+          </Pressable>
+          <Pressable accessibilityLabel="Share review" onPress={(event) => { event.stopPropagation(); onShare(); }} style={styles.reviewActionIconRow}>
+            <ShareIcon color={colors.textSecondary} height={20} width={20} />
+          </Pressable>
           <Text style={styles.reviewTime}>{time}</Text>
         </View>
       </View>
@@ -1911,6 +1923,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   reviewPlace: { color: colors.textSecondary, fontSize: 10, lineHeight: 12 },
   reviewText: { color: colors.text, fontSize: 12, lineHeight: 16 },
   reviewFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  reviewActionIconRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   reviewAction: { color: colors.textSecondary, fontSize: 12 },
   reviewTime: { marginLeft: 'auto', color: colors.textSecondary, fontSize: 11 },
   reviewerCard: { height: 181, marginHorizontal: 16, padding: 16, borderWidth: 1, borderColor: colors.primary, borderRadius: 17 },
