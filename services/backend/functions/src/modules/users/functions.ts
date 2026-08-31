@@ -21,6 +21,8 @@ import { userSearchTokens } from './search';
 
 const CURRENT_ONBOARDING_VERSION = 1;
 const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
+// Raise this alongside an iOS release when older builds need to be nudged to update.
+const MINIMUM_SUPPORTED_IOS_BUILD = 43;
 
 export const getSessionStatus = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -35,6 +37,7 @@ export const getSessionStatus = onCall(callableOptions, async (request) => {
     profileExists: profile.exists,
     onboardingVersion,
     onboardingComplete: profile.exists && onboardingVersion >= CURRENT_ONBOARDING_VERSION,
+    minimumSupportedIosBuild: MINIMUM_SUPPORTED_IOS_BUILD,
   };
 });
 

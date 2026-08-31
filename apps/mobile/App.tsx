@@ -1,8 +1,9 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import * as Application from 'expo-application';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
@@ -18,7 +19,7 @@ SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
 
 function AppGate() {
-  const { state, completeOnboarding, logout, refresh } = useSession();
+  const { state, completeOnboarding, logout, minimumSupportedIosBuild, refresh } = useSession();
   const { colors, isDark } = useAppTheme();
   const splashHidden = useRef(false);
 
@@ -33,6 +34,21 @@ function AppGate() {
     const subscription = Linking.addEventListener('url', ({ url }) => rememberPendingDeepLink(url));
     return () => subscription.remove();
   }, [state.status]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || state.status === 'booting' || minimumSupportedIosBuild <= 0) return;
+    const installedBuild = Number(Application.nativeBuildVersion ?? 0);
+    if (!Number.isFinite(installedBuild) || installedBuild >= minimumSupportedIosBuild) return;
+
+    Alert.alert(
+      'Update available',
+      'A newer version of Tastes is available. Update for the latest fixes and improvements.',
+      [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Update', onPress: () => void Linking.openURL('https://apps.apple.com/app/id6796403021') },
+      ],
+    );
+  }, [minimumSupportedIosBuild, state.status]);
 
   if (state.status === 'booting') return null;
 

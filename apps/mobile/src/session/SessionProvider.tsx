@@ -36,6 +36,7 @@ export type SessionState =
 interface SessionContextValue {
   state: SessionState;
   api: TastesApi;
+  minimumSupportedIosBuild: number;
   refresh: () => Promise<void>;
   completeOnboarding: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
   logout: () => Promise<void>;
@@ -46,11 +47,13 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<SessionState>({ status: 'booting', user: null });
+  const [minimumSupportedIosBuild, setMinimumSupportedIosBuild] = useState(0);
 
   const clearLocalSession = useCallback(async () => {
     queryClient.clear();
     await queryPersister.removeClient();
     await signOut(auth);
+    setMinimumSupportedIosBuild(0);
     setState({ status: 'anonymous', user: null });
   }, []);
 
@@ -110,6 +113,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const loadStatus = useCallback(async (user: User) => {
     try {
       const result = await api.getSessionStatus();
+      setMinimumSupportedIosBuild(Math.max(0, Number(result.data.minimumSupportedIosBuild ?? 0)));
       if (result.data.profileExists) {
         void syncPushNotifications(api, {
           requestPermission: result.data.onboardingComplete,
@@ -142,6 +146,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (!user) {
       queryClient.clear();
       void queryPersister.removeClient();
+      setMinimumSupportedIosBuild(0);
       setState({ status: 'anonymous', user: null });
       return;
     }
@@ -161,8 +166,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [api]);
 
   const value = useMemo(
-    () => ({ state, api, refresh, completeOnboarding, logout, deleteAccount }),
-    [api, completeOnboarding, deleteAccount, logout, refresh, state],
+    () => ({ state, api, minimumSupportedIosBuild, refresh, completeOnboarding, logout, deleteAccount }),
+    [api, completeOnboarding, deleteAccount, logout, minimumSupportedIosBuild, refresh, state],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

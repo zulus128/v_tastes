@@ -624,6 +624,7 @@ export interface SessionStatus {
   profileExists: boolean;
   onboardingVersion: number;
   onboardingComplete: boolean;
+  minimumSupportedIosBuild: number;
 }
 
 export interface FollowResult {
