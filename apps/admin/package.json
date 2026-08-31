@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test": "pnpm test:unit && pnpm test:integration",
+    "test:unit": "vitest run tests/firebase.test.ts",
+    "test:integration": "vitest run tests/admin-app.integration.tsx",
+    "test:e2e": "pnpm --filter @tastes/functions build && node ../../scripts/run-firebase.mjs emulators:exec --config ../../firebase.test.json --project demo-tastes-e2e --only auth,firestore,functions \"playwright test\"",
     "dev": "next dev --port 3001",
+    "start": "serve out --listen 3001",
     "build": "next build",
     "typecheck": "tsc --noEmit"
   },
@@ -14,9 +19,16 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.10.1",
     "@types/react": "~19.2.2",
     "@types/react-dom": "^19.2.3",
-    "typescript": "~6.0.3"
+    "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.0.1",
+    "serve": "^14.2.6",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   }
 }

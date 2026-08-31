@@ -24,8 +24,10 @@
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm test:unit && pnpm test:rules && pnpm test:auth",
-    "test:unit": "vitest run --exclude 'services/backend/tests/rules/**' --exclude 'services/backend/tests/auth/**'",
+    "test": "pnpm test:unit && pnpm test:frontend:integration && pnpm test:rules && pnpm test:auth",
+    "test:unit": "vitest run --exclude 'services/backend/tests/rules/**' --exclude 'services/backend/tests/auth/**' --exclude 'apps/**/e2e/**'",
+    "test:frontend:integration": "pnpm --filter @tastes/mobile test:integration && pnpm --filter @tastes/admin test:integration",
+    "test:e2e": "pnpm --filter @tastes/admin test:e2e",
     "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore,storage \"vitest run services/backend/tests/rules\"",
     "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run services/backend/tests/auth\""
   },

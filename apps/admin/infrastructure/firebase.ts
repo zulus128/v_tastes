@@ -1,9 +1,16 @@
 'use client';
 
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
+
+let authEmulatorConnected = false;
+let functionsEmulatorConnected = false;
+
+function usesFirebaseEmulators() {
+  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true';
+}
 
 function getFirebaseApp() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'tastes-934e6';
@@ -18,7 +25,13 @@ function getFirebaseApp() {
 }
 
 export function getFirebaseAuth() {
-  return getAuth(getFirebaseApp());
+  const auth = getAuth(getFirebaseApp());
+  if (usesFirebaseEmulators() && !authEmulatorConnected) {
+    const host = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST ?? '127.0.0.1:9101';
+    connectAuthEmulator(auth, `http://${host}`, { disableWarnings: true });
+    authEmulatorConnected = true;
+  }
+  return auth;
 }
 
 export function getFirebaseStorage() {
@@ -27,6 +40,13 @@ export function getFirebaseStorage() {
 
 export async function callAdmin<Input, Output>(name: string, input: Input): Promise<Output> {
   const functions = getFunctions(getFirebaseApp(), 'europe-west1');
+  if (usesFirebaseEmulators() && !functionsEmulatorConnected) {
+    const [host, port = '5002'] = (
+      process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_HOST ?? '127.0.0.1:5002'
+    ).split(':');
+    connectFunctionsEmulator(functions, host || '127.0.0.1', Number(port));
+    functionsEmulatorConnected = true;
+  }
   const response = await httpsCallable<Input, Output>(functions, name)(input);
   return response.data;
 }

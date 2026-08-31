@@ -2,6 +2,7 @@ import { renderNotificationCopy } from '@tastes/contracts';
 import type { TastesApi } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import type * as ExpoNotificationsModule from 'expo-notifications';
 import type { NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -11,7 +12,7 @@ function supportsRemotePushNotifications(): boolean {
   return Platform.OS === 'android' || (Platform.OS === 'ios' && Constants.isDevice);
 }
 
-type ExpoNotifications = typeof import('expo-notifications');
+type ExpoNotifications = typeof ExpoNotificationsModule;
 
 let notificationsModule: ExpoNotifications | null = null;
 
@@ -19,6 +20,8 @@ function getNotifications(): ExpoNotifications | null {
   if (!supportsRemotePushNotifications()) return null;
   if (notificationsModule) return notificationsModule;
 
+  // The native module must stay lazy: simulators and unsupported targets do not provide it.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const loadedModule = require('expo-notifications') as ExpoNotifications;
   loadedModule.setNotificationHandler({
     handleNotification: async () => ({
