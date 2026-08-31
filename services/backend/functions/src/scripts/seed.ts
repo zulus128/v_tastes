@@ -541,7 +541,7 @@ async function main() {
       rating: 4.5,
       text: "The hand-cut tagliolini is unreal — go on a Tuesday for the chef's special.",
       reactionCount: 94,
-      commentCount: 8,
+      commentCount: 3,
       hoursAgo: 2,
     },
     {
@@ -551,7 +551,7 @@ async function main() {
       rating: 4,
       text: "Tucked-away matcha spot with the smoothest pull I've had in months.",
       reactionCount: 67,
-      commentCount: 5,
+      commentCount: 0,
       hoursAgo: 4,
     },
     {
@@ -561,7 +561,7 @@ async function main() {
       rating: 5,
       text: 'Sixteen folds, perfect every time. Order the pork and crab together.',
       reactionCount: 128,
-      commentCount: 14,
+      commentCount: 0,
       hoursAgo: 6,
     },
     {
@@ -571,7 +571,7 @@ async function main() {
       rating: 4.8,
       text: 'The omakase is worth it. Sit at the counter and let the chef choose.',
       reactionCount: 156,
-      commentCount: 21,
+      commentCount: 1,
       hoursAgo: 12,
     },
     {
@@ -581,7 +581,7 @@ async function main() {
       rating: 4.6,
       text: 'Birria tacos, crispy edges, rich consommé. One of my favorite quick dinners.',
       reactionCount: 82,
-      commentCount: 9,
+      commentCount: 0,
       hoursAgo: 20,
     },
     {
@@ -591,7 +591,7 @@ async function main() {
       rating: 4.2,
       text: 'A reliable brunch spot with great filter coffee and plenty of room.',
       reactionCount: 38,
-      commentCount: 3,
+      commentCount: 0,
       hoursAgo: 30,
     },
   ];
@@ -694,7 +694,9 @@ async function main() {
             dishReviews,
             status: 'published',
             reactionCount: index % 37,
-            commentCount: index % 9,
+            // These fixtures create review images only; they do not create
+            // comment documents, so the denormalized counter must remain zero.
+            commentCount: 0,
             source: 'stress-image-scroll',
             createdAt: Timestamp.fromMillis(Date.now() - index * 1_000),
             updatedAt: FieldValue.serverTimestamp(),
@@ -745,7 +747,9 @@ async function main() {
         }] : [],
         status: 'published',
         reactionCount: 8 + index * 3,
-        commentCount: index === 0 ? 2 : index % 2,
+        // Only the first personal review receives the two comment fixtures
+        // written below.
+        commentCount: index === 0 ? 2 : 0,
         source: 'seed',
         createdAt: Timestamp.fromMillis(Date.now() - review.hoursAgo * 60 * 60 * 1_000),
         updatedAt: FieldValue.serverTimestamp(),
@@ -911,7 +915,8 @@ async function main() {
       }
       await writer.close();
     }
-    await stressReviewRef.set({ commentCount: 2 + stressScrollCount }, { merge: true });
+    const baseCommentCount = commentSeeds.filter((comment) => comment.reviewId === 'discover-review-gemini').length;
+    await stressReviewRef.set({ commentCount: baseCommentCount + stressScrollCount }, { merge: true });
   }
 
   const commentReactionSeeds: Array<[reviewId: string, commentId: string, userId: string]> = [

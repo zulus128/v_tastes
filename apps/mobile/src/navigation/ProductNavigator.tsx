@@ -325,7 +325,14 @@ export function ProductNavigator({ user }: { user: User }) {
         </RootStack.Screen>
         <RootStack.Screen name="Comments">
           {({ navigation, route }) => (
-            <PaginatedCommentsScreen commentId={route.params.commentId} reviewId={route.params.reviewId} onBack={navigation.goBack} />
+            <PaginatedCommentsScreen
+              commentId={route.params.commentId}
+              onBack={() => {
+                if (navigation.canGoBack()) navigation.goBack();
+                else navigation.navigate('MainTabs', { screen: 'Home' });
+              }}
+              reviewId={route.params.reviewId}
+            />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="Recap">
