@@ -107,6 +107,71 @@ beforeEach(async () => {
   ]);
 });
 
+async function createSocialFixture() {
+  const first = await authenticatedUser();
+  const second = await authenticatedUser();
+  const db = getFirestore();
+  await callFunction(
+    'createUserProfile',
+    {
+      displayName: 'Review Author',
+      username: 'review.author',
+      city: 'Istanbul',
+    },
+    first.token,
+  );
+  await callFunction(
+    'createUserProfile',
+    {
+      displayName: 'Reader',
+      username: 'review.reader',
+      city: 'Istanbul',
+    },
+    second.token,
+  );
+  const author = (
+    await db.collection('users').where('username', '==', 'review.author').limit(1).get()
+  ).docs[0];
+  const reader = (
+    await db.collection('users').where('username', '==', 'review.reader').limit(1).get()
+  ).docs[0];
+  if (!author || !reader) throw new Error('Expected both profiles to exist.');
+
+  return { first, second, db, author, reader };
+}
+
+async function createReviewFixture() {
+  const fixture = await createSocialFixture();
+  await fixture.db.collection('venues').doc('demo-cafe').set({
+    name: 'Demo Cafe',
+    city: 'Istanbul',
+    status: 'active',
+  });
+  await callFunction('followUser', { targetUserId: fixture.author.id }, fixture.second.token);
+  const reviewCommand = {
+    idempotencyKey: 'review-command-0001',
+    venueId: 'demo-cafe',
+    rating: 5,
+    text: 'Exactly once',
+    tags: ['casual', 'date-night'],
+    dishReviews: [
+      {
+        id: 'dish-command-0001',
+        title: 'Soup dumplings',
+        rating: 4.5,
+        photoPath: `review-images/${fixture.author.id}/review-command-0001/dish-command-0001`,
+      },
+    ],
+  };
+  const firstReview = await callFunction<{ id: string }>(
+    'createReview',
+    reviewCommand,
+    fixture.first.token,
+  );
+
+  return { ...fixture, reviewCommand, firstReview };
+}
+
 describe('mobile observability endpoint', () => {
   it('requires Firebase authentication', async () => {
     const response = await postTelemetry({ kind: 'event', event: 'app_opened' });
@@ -378,41 +443,8 @@ describe('authenticated session and paginated reads', () => {
     expect((await userRef.collection('notifications').get()).empty).toBe(true);
   }, 15_000);
 
-  it('writes social edges and applies XP and idempotency exactly once', async () => {
-    const first = await authenticatedUser();
-    const second = await authenticatedUser();
-    const db = getFirestore();
-    await callFunction(
-      'createUserProfile',
-      {
-        displayName: 'Review Author',
-        username: 'review.author',
-        city: 'Istanbul',
-      },
-      first.token,
-    );
-    await callFunction(
-      'createUserProfile',
-      {
-        displayName: 'Reader',
-        username: 'review.reader',
-        city: 'Istanbul',
-      },
-      second.token,
-    );
-    const author = (
-      await db.collection('users').where('username', '==', 'review.author').limit(1).get()
-    ).docs[0];
-    const reader = (
-      await db.collection('users').where('username', '==', 'review.reader').limit(1).get()
-    ).docs[0];
-    if (!author || !reader) throw new Error('Expected both profiles to exist.');
-    await db.collection('venues').doc('demo-cafe').set({
-      name: 'Demo Cafe',
-      city: 'Istanbul',
-      status: 'active',
-    });
-
+  it('writes and removes mirrored social edges', async () => {
+    const { first, second, author, reader } = await createSocialFixture();
     expect(await callFunction('followUser', { targetUserId: author.id }, second.token)).toEqual({
       following: true,
     });
@@ -424,27 +456,15 @@ describe('authenticated session and paginated reads', () => {
     expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
     expect((await author.ref.collection('followers').doc(reader.id).get()).exists).toBe(false);
     await callFunction('followUser', { targetUserId: author.id }, second.token);
+    expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({
+      following: false,
+    });
+    expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
+  }, 15_000);
 
-    const reviewCommand = {
-      idempotencyKey: 'review-command-0001',
-      venueId: 'demo-cafe',
-      rating: 5,
-      text: 'Exactly once',
-      tags: ['casual', 'date-night'],
-      dishReviews: [
-        {
-          id: 'dish-command-0001',
-          title: 'Soup dumplings',
-          rating: 4.5,
-          photoPath: `review-images/${author.id}/review-command-0001/dish-command-0001`,
-        },
-      ],
-    };
-    const firstReview = await callFunction<{ id: string }>(
-      'createReview',
-      reviewCommand,
-      first.token,
-    );
+  it('creates reviews idempotently and exposes them in the friends feed', async () => {
+    const { first, second, db, author, reviewCommand, firstReview } =
+      await createReviewFixture();
     const replayedReview = await callFunction<{ id: string }>(
       'createReview',
       reviewCommand,
@@ -466,6 +486,12 @@ describe('authenticated session and paginated reads', () => {
       tags: ['casual', 'date-night'],
       dishReviews: reviewCommand.dishReviews,
     });
+
+  }, 15_000);
+
+  it('handles comment threads, reports, reactions, and cascade deletion', async () => {
+    const { first, second, db, reader, reviewCommand, firstReview } =
+      await createReviewFixture();
 
     const commentCommand = {
       idempotencyKey: 'comment-command-001',
@@ -540,7 +566,10 @@ describe('authenticated session and paginated reads', () => {
     expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(0);
     expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(firstComment.id).get()).get('status')).toBe('deleted');
     expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(reply.id).get()).get('status')).toBe('deleted');
+  }, 15_000);
 
+  it('applies review rewards, XP, and reactions exactly once', async () => {
+    const { first, second, db, author, firstReview } = await createReviewFixture();
     await db
       .collection('reviews')
       .doc(firstReview.id)
@@ -573,11 +602,6 @@ describe('authenticated session and paginated reads', () => {
       reactionCount: 1,
     });
     expect((await author.ref.get()).get('xp')).toBe(55);
-
-    expect(await callFunction('unfollowUser', { targetUserId: author.id }, second.token)).toEqual({
-      following: false,
-    });
-    expect((await reader.ref.collection('following').doc(author.id).get()).exists).toBe(false);
   }, 15_000);
 
   it('only labels a follow notification as follow-back for a consistent mutual relationship', async () => {
