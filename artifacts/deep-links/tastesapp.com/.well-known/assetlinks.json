@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.vkassin.tastes",
+      "sha256_cert_fingerprints": [
+        "A4:88:49:B8:BC:CB:AD:60:68:2D:7D:06:BC:80:91:B7:71:1B:BC:DD:3D:2C:02:54:EE:A9:B1:B9:3E:C0:16:57"
+      ]
+    }
+  }
+]

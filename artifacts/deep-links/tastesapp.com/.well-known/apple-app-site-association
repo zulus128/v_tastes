@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "7TTF49AXF6.com.vkassin.tastes",
+        "paths": [
+          "/reviews/*",
+          "/users/*",
+          "/recap/*"
+        ]
+      }
+    ]
+  }
+}
