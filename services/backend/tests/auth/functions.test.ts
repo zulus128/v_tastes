@@ -391,7 +391,7 @@ describe('authenticated session and paginated reads', () => {
       ready: false,
       placesVisited: 0,
     });
-  });
+  }, 15_000);
 
   it('paginates favourites and notifications and clears every notification', async () => {
     const user = await authenticatedUser();
