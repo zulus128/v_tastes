@@ -6,7 +6,6 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -38,6 +37,7 @@ import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {

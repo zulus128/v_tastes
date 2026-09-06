@@ -1,12 +1,13 @@
 import type { FeedItem } from '@tastes/contracts';
 import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../../ui/responsive';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';

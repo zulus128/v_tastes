@@ -6,7 +6,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +26,7 @@ import restaurantImage from '../../../assets/discover/restaurant.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { useDiscoverVenues } from '../discover/api';
 import { useFavourites } from '../favourites/api';

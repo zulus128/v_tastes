@@ -20,7 +20,6 @@ import {
   Text,
   TextInput,
   View,
-  Modal,
   type ImageSourcePropType,
 } from 'react-native';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
@@ -69,6 +68,7 @@ import {
 } from '../favourites/FavouritesPane';
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';

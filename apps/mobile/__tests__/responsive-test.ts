@@ -1,4 +1,9 @@
-import { DESIGN_VIEWPORT, responsiveMetrics, scaleNamedStyles } from '../src/ui/responsive';
+import {
+  DESIGN_VIEWPORT,
+  responsiveMetrics,
+  responsiveViewport,
+  scaleNamedStyles,
+} from '../src/ui/responsive';
 
 describe('responsive layout metrics', () => {
   it('keeps the Figma viewport at a 1:1 scale', () => {
@@ -9,9 +14,17 @@ describe('responsive layout metrics', () => {
     expect(responsiveMetrics(375, 667).scale).toBeCloseTo(375 / DESIGN_VIEWPORT.width);
   });
 
-  it('caps oversized and undersized viewports', () => {
-    expect(responsiveMetrics(768, 1024).scale).toBe(1.12);
+  it('fits tablets by height and caps oversized and undersized viewports', () => {
+    expect(responsiveMetrics(768, 1024).scale).toBeCloseTo(1024 / DESIGN_VIEWPORT.height);
+    expect(responsiveMetrics(1600, 2200).scale).toBe(1.6);
     expect(responsiveMetrics(280, 653).scale).toBe(0.82);
+  });
+
+  it('keeps phones full-screen and centers a proportional canvas on tablets', () => {
+    expect(responsiveViewport(402, 874)).toEqual({ width: 402, height: 874 });
+    const tablet = responsiveViewport(1032, 1376);
+    expect(tablet.height).toBe(1376);
+    expect(tablet.width).toBeCloseTo(DESIGN_VIEWPORT.width * (1376 / DESIGN_VIEWPORT.height));
   });
 });
 
@@ -38,4 +51,3 @@ describe('scaleNamedStyles', () => {
     expect(result.pill.borderRadius).toBe(999);
   });
 });
-

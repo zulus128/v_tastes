@@ -9,7 +9,6 @@ import {
   Alert,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -53,6 +52,7 @@ import ShareGlyph from '../../../assets/recap/story/share.svg';
 import starsBackground from '../../../assets/recap/story/stars-background.png';
 import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';

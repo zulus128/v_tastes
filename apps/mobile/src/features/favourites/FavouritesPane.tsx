@@ -7,7 +7,6 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   PanResponder,
   Pressable,
@@ -27,6 +26,7 @@ import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { matchesPlaceFilters } from '../discover/placeFilters';
 import {

@@ -11,7 +11,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -20,7 +19,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -72,7 +70,8 @@ import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics } from '../../ui/responsive';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 
 type Screen =
   | 'profile'
@@ -212,7 +211,7 @@ export function PostSignupOnboardingFlow({
   onComplete,
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
-  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const { height: viewportHeight, width: viewportWidth } = useResponsiveViewport();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));

@@ -6,7 +6,6 @@ import {
   Alert,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   Text,
   View,
@@ -19,6 +18,7 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { firestore } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 
 type Member = {

@@ -2,7 +2,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import * as Application from 'expo-application';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef } from 'react';
+import { type PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
@@ -13,11 +13,22 @@ import { ProductNavigator } from './src/navigation/ProductNavigator';
 import { rememberPendingDeepLink } from './src/navigation/pendingDeepLink';
 import { SessionProvider, useSession } from './src/session/SessionProvider';
 import { ThemeProvider, useAppTheme } from './src/ui/ThemeProvider';
-import { responsiveStyleSheet } from './src/ui/responsive';
+import { responsiveStyleSheet, useResponsiveViewport } from './src/ui/responsive';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
+
+function ResponsiveAppFrame({ children }: PropsWithChildren) {
+  const { colors } = useAppTheme();
+  const { height, width } = useResponsiveViewport();
+
+  return (
+    <View style={[styles.viewport, { backgroundColor: colors.background }]}>
+      <View style={[styles.appFrame, { height, width }]}>{children}</View>
+    </View>
+  );
+}
 
 function AppGate() {
   const { state, completeOnboarding, logout, minimumSupportedIosBuild, refresh } = useSession();
@@ -96,21 +107,25 @@ function AppGate() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppErrorBoundary>
-        <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{ maxAge: 24 * 60 * 60_000, persister: queryPersister }}
-        >
-          <SessionProvider>
-            <AppGate />
-          </SessionProvider>
-        </PersistQueryClientProvider>
-      </AppErrorBoundary>
+      <ResponsiveAppFrame>
+        <AppErrorBoundary>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{ maxAge: 24 * 60 * 60_000, persister: queryPersister }}
+          >
+            <SessionProvider>
+              <AppGate />
+            </SessionProvider>
+          </PersistQueryClientProvider>
+        </AppErrorBoundary>
+      </ResponsiveAppFrame>
     </ThemeProvider>
   );
 }
 
 const styles = responsiveStyleSheet({
+  viewport: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  appFrame: { overflow: 'hidden' },
   root: { flex: 1 },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, backgroundColor: '#161616' },
   errorTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },

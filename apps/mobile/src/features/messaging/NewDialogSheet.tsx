@@ -1,13 +1,14 @@
 import type { ActivityCandidate } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import SearchIcon from '../../../assets/profile/search.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -30,7 +31,7 @@ export function NewDialogSheet({
 }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useResponsiveViewport();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);

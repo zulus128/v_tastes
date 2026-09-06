@@ -5,7 +5,6 @@ import {
   FlatList,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -24,6 +23,7 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { UserAvatar } from '../profile/avatar';
 import { useLeaderboard } from './api';

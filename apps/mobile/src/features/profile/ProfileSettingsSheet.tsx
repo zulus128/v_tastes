@@ -21,7 +21,6 @@ import {
   Dimensions,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -43,6 +42,7 @@ import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';

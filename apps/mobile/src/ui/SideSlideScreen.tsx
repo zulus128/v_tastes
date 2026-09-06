@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef, type PropsWithChildren } from 'react';
-import { Animated, Dimensions, Modal } from 'react-native';
+import { Animated, Dimensions } from 'react-native';
+import { ResponsiveModal as Modal } from './ResponsiveModal';
 import { responsiveStyleSheet } from './responsive';
 
 export interface SideSlideScreenHandle {

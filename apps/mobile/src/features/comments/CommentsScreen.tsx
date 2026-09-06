@@ -10,7 +10,6 @@ import {
   Image,
   KeyboardAvoidingView,
   type LayoutChangeEvent,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -33,6 +32,7 @@ import SendIcon from '../../../assets/ai/send.svg';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';

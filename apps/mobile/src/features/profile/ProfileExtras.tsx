@@ -5,7 +5,6 @@ import {
   Alert,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,6 +30,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import rewardPattern from '../../../assets/onboarding/pattern.png';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 

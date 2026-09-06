@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -34,6 +33,7 @@ import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 
 type AiTurn = {

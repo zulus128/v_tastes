@@ -12,7 +12,6 @@ import {
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -45,6 +44,7 @@ import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { cancelDraftReminder, scheduleDraftReminder } from '../../infrastructure/pushNotifications';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';

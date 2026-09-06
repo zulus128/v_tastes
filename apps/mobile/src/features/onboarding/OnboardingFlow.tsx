@@ -19,7 +19,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import apple from '../../../assets/onboarding/apple.png';
@@ -29,7 +28,7 @@ import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
@@ -59,7 +58,7 @@ function displayPhone(country: Country, digits: string): string {
 
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
-  const { height, width } = useWindowDimensions();
+  const { height, width } = useResponsiveViewport();
   const compact = height <= 700 || width <= 340;
   return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
@@ -297,14 +296,17 @@ function EntryScreen() {
 
 function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; onApple: () => void; onGoogle: () => void; onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
-  const { height, width } = useWindowDimensions();
+  const { height, width } = useResponsiveViewport();
+  const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
-  const panelHeight = compact ? 390 : 414;
+  const panelHeight = responsiveValue(compact ? 390 : 414, layoutScale);
   const heroHeight = height - panelHeight;
-  const heroOverflow = 48;
-  const heroScale = Math.min(1, heroHeight / 387);
-  const pinTop = (top: number) => top * heroScale - (1 - heroScale) * 34 - heroOverflow / 2;
+  const heroOverflow = responsiveValue(48, layoutScale);
+  const heroScale = Math.min(1, heroHeight / responsiveValue(387, layoutScale));
+  const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
+    - (1 - heroScale) * responsiveValue(34, layoutScale)
+    - heroOverflow / 2;
   const pinPositions = [
     { left: width * 0.17, top: pinTop(109) },
     { left: width * 0.70, top: pinTop(121) },
@@ -332,10 +334,10 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
         >
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
-              <TastesLogo width={compact ? 80 : 98} />
+              <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
               <View style={styles.consentCopy}>
                 <Text style={styles.consentTitle}>Discover the best places!</Text>
-                <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>
+                <Text numberOfLines={2} style={styles.consentSubtitle}>
                   Rate dishes and restaurants to get personalized{`\n`}recommendations
                 </Text>
                 <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
