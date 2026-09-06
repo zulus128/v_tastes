@@ -18,6 +18,7 @@ import notificationIcon from '../../../assets/onboarding/permission-notification
 import patternDark from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { unreadNotificationCountQueryKey } from './api';
 
 type NotificationTab = 'activity' | 'badges';
@@ -299,7 +300,7 @@ export function NotificationsScreen({
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, isDark: boolean) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     header: {
       zIndex: 2,

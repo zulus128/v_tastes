@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import { firestore } from '../../infrastructure/firebase';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 type Member = {
   id: string;
@@ -171,7 +172,7 @@ export function ActivityDetailsScreen({
 }
 
 function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     hero: { height: 366, backgroundColor: colors.background },
     heroImage: { width: '100%', height: '100%' },

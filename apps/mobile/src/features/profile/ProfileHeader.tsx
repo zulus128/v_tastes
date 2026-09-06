@@ -13,6 +13,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
@@ -163,7 +164,7 @@ export function ProfileTopBar({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   hero: { width: '100%', zIndex: 1, alignSelf: 'stretch', paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   heroPattern: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   topBar: {
@@ -209,7 +210,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   badgeLabel: { width: 72, marginTop: 4, color: colors.text, fontSize: 10, lineHeight: 10, fontWeight: '400', letterSpacing: -0.12, textAlign: 'center' },
 });
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   stat: { width: 90, alignItems: 'center', justifyContent: 'center' },
   statValue: { fontSize: 18, fontWeight: '600' },
   statLabel: { marginTop: 2, fontSize: 13 },

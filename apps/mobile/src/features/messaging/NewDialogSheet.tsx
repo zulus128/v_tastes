@@ -7,6 +7,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import SearchIcon from '../../../assets/profile/search.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -246,7 +247,7 @@ function BellIcon({ color }: { color: string }) {
 }
 
 function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
     sheet: { paddingHorizontal: 16, overflow: 'hidden', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },

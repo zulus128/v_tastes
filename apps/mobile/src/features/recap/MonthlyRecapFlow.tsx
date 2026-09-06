@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   Image,
   ImageBackground,
   Modal,
@@ -55,6 +54,7 @@ import starsBackground from '../../../assets/recap/story/stars-background.png';
 import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 
 type RecapStep =
@@ -717,8 +717,7 @@ function CloseConfirmation({
 }
 
 const createStyles = (_colors: ThemeColors, isDark: boolean) => {
-  const layoutScale = Math.min(1, Dimensions.get('window').height / 875);
-  const s = (value: number) => Math.round(value * layoutScale);
+  const s = (value: number) => value;
   const text = isDark ? '#FFFFFF' : '#080808';
   const secondaryText = isDark ? '#AAB2C5' : '#677083';
   const subtleText = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(8,8,8,0.6)';
@@ -728,7 +727,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   const cardBorder = isDark ? 'rgba(255,255,255,0.1)' : '#E4E4E4';
   const cardSurface = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.78)';
 
-  return StyleSheet.create({
+  return responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: isDark ? '#080808' : '#F2EFEA' },
   pattern: { opacity: isDark ? 0.18 : 0.04 },
   starsPattern: { opacity: isDark ? 0.18 : 0.25 },
@@ -757,7 +756,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   letterTile: { width: 31, height: 47, borderRadius: 6, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   letterTilePink: { backgroundColor: '#FF9EB1' },
   letterTileText: { color: '#080808', fontSize: 26, fontWeight: '700' },
-  introCollage: { position: 'absolute', top: layoutScale < 1 ? s(320) : 294, left: 0, right: 0, height: s(420) },
+  introCollage: { position: 'absolute', top: 294, left: 0, right: 0, height: s(420) },
   tiltedPhoto: { position: 'absolute', borderRadius: 8 },
   tiltedPhotoImage: { width: '100%', height: '100%', borderRadius: 8 },
   introPhotoLeft: { left: 22, top: s(80), width: s(120), height: s(120), transform: [{ rotate: '8deg' }] },

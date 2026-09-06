@@ -69,6 +69,7 @@ import {
 } from '../favourites/FavouritesPane';
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { matchesPlaceFilters } from './placeFilters';
@@ -1827,7 +1828,7 @@ function ProfileSuggestion({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: colors.canvas },
   mapDiscoverScreen: { backgroundColor: colors.canvas },
   aiFab: { position: 'absolute', right: 16, bottom: 18, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },

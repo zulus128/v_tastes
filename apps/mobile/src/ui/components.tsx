@@ -4,13 +4,13 @@ import {
   Image,
   ImageBackground,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type ViewStyle,
 } from 'react-native';
 import { theme } from './theme';
 import { useAppTheme } from './ThemeProvider';
+import { responsiveStyleSheet } from './responsive';
 import pattern from '../../assets/onboarding/pattern-screen.png';
 import homeFeedPattern from '../../assets/figma-backgrounds/home-feed-pattern.png';
 
@@ -123,7 +123,7 @@ export function ListFooter({ loading }: { loading: boolean }) {
     : <View style={styles.footer} />;
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   screen: { flex: 1 },
   homeFeedPattern: {
     position: 'absolute',

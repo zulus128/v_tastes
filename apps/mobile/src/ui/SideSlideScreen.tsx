@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef, type PropsWithChildren } from 'react';
-import { Animated, Dimensions, Modal, StyleSheet } from 'react-native';
+import { Animated, Dimensions, Modal } from 'react-native';
+import { responsiveStyleSheet } from './responsive';
 
 export interface SideSlideScreenHandle {
   close: (afterClose?: () => void) => void;
@@ -76,4 +77,4 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
   );
 });
 
-const styles = StyleSheet.create({ screen: { flex: 1 } });
+const styles = responsiveStyleSheet({ screen: { flex: 1 } });

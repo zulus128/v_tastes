@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 const CUISINES = [
   'Italian 🇮🇹',
@@ -173,7 +174,7 @@ function ChipSection({
 function createStyles(_colors: ThemeColors, safeTop: number, safeBottom: number) {
   const accent = '#B82F29';
   const border = '#45474B';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: '#161616' },
     header: { height: safeTop + 58, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
     backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

@@ -72,6 +72,7 @@ import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
+import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics } from '../../ui/responsive';
 
 type Screen =
   | 'profile'
@@ -212,14 +213,11 @@ export function PostSignupOnboardingFlow({
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
-  const collageWidth = Math.max(0, Math.min(402, viewportWidth));
-  const collageScale = collageWidth / 402;
-  const collageHeight = 288 * collageScale;
+  const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));
+  const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
-  const dishGap = usesCompactDishLayout ? 5 : 8;
-  const dishPanelHeight = viewportHeight - (usesCompactDishLayout ? 205 : 212) - (usesCompactDishLayout ? 105 : 110);
-  const dishPillHeight = Math.max(30, Math.min(45, Math.floor((dishPanelHeight - 8 - dishGap * (dishes.length - 1)) / dishes.length)));
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useMemo(() => createTastesApi(functions), []);
   const [screen, setScreen] = useState<Screen>('profile');
@@ -506,16 +504,14 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
-      <View
-        style={[
-          styles.pillsPanel,
-          usesCompactDishLayout && styles.pillsPanelCompact,
-          styles.pills,
-          { gap: dishGap },
-        ]}
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={styles.pills}
+        showsVerticalScrollIndicator={false}
+        style={[styles.pillsPanel, usesCompactDishLayout && styles.pillsPanelCompact]}
       >
-        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, { height: dishPillHeight }, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
-      </View>
+        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
+      </ScrollView>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
     </PatternScreen>;
@@ -686,7 +682,7 @@ export function PostSignupOnboardingFlow({
   </LinearGradient>;
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   skip: { position: 'absolute', top: 58, right: 16, zIndex: 3, padding: 8 },
   skipText: { color: colors.textMuted, fontSize: 14 },
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },

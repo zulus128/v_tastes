@@ -34,6 +34,7 @@ import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 type AiTurn = {
   id: string;
@@ -90,7 +91,7 @@ function AiMark({ color }: { color?: string } = {}) {
   );
 }
 
-const markStyles = StyleSheet.create({
+const markStyles = responsiveStyleSheet({
   container: { width: 20, height: 18 },
   pink: { position: 'absolute', top: 6, left: 4 },
   outline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
@@ -767,7 +768,7 @@ function HistoryModal({
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     backgroundDim: {
       position: 'absolute',

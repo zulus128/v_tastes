@@ -11,7 +11,6 @@ import {
   ImageBackground,
   PanResponder,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -21,6 +20,7 @@ import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-patt
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
@@ -283,7 +283,7 @@ export function ConversationsScreen({
 }
 
 function createStyles(colors: ThemeColors, safeTop: number) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
     header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },

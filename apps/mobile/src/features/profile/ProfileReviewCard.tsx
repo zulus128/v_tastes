@@ -6,6 +6,7 @@ import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
@@ -185,7 +186,7 @@ export function ProfileReviewCard({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   reviewCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   reviewHeader: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 23, borderTopRightRadius: 23, position: 'relative' },
   reviewAvatar: { width: 40, height: 40, borderRadius: 20 },
@@ -228,7 +229,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   photoModalRating: { padding: 16, color: '#D33B35', fontSize: 18, fontWeight: '700' },
 });
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   dishImage: { width: 150, height: 150 },
   dishImageLarge: { width: '100%', aspectRatio: 1 },
   dishImagePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#222222' },

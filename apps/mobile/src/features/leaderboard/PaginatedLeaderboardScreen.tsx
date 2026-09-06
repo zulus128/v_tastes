@@ -24,6 +24,7 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { UserAvatar } from '../profile/avatar';
 import { useLeaderboard } from './api';
 
@@ -356,7 +357,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
   );
 }
 
-const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: colors.canvas },
   pattern: { opacity: 0.16 },
   patternLight: { opacity: 0.07 },

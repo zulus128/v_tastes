@@ -12,7 +12,6 @@ import {
   PanResponder,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -28,6 +27,7 @@ import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { matchesPlaceFilters } from '../discover/placeFilters';
 import {
   useCreateFolder,
@@ -573,7 +573,7 @@ function FolderActionSheet({
 
 function createStyles(colors: ThemeColors) {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     pane: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
     searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
     searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },

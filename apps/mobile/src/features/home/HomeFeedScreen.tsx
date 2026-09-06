@@ -38,6 +38,7 @@ import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
@@ -798,7 +799,7 @@ export function HomeFeedScreen({
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   header: { height: 157, paddingTop: 54, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
   headerTop: { height: 44, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -876,12 +877,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '400', lineHeight: 14, letterSpacing: -0.23 },
 });
 
-const stylesStatic = StyleSheet.create({
+const stylesStatic = responsiveStyleSheet({
   dishPhoto: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
   dishPhotoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
 });
 
-const overlayStyles = StyleSheet.create({
+const overlayStyles = responsiveStyleSheet({
   scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { gap: 8 },
   sheetGroup: { overflow: 'hidden', borderRadius: 16, backgroundColor: '#272727' },

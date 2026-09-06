@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import FriendsEmptyIcon from '../../../assets/figma-icons/home-empty-friends.svg';
 import LocalEmptyIcon from '../../../assets/figma-icons/home-empty-local.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 type FeedScope = 'friends' | 'local';
 
@@ -107,7 +108,7 @@ export function HomeFeedLoadingState() {
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   centeredState: {
     flex: 1,
     alignItems: 'center',

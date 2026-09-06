@@ -9,6 +9,7 @@ import flagSwitzerland from '../../../assets/onboarding/flag-switzerland.png';
 import flagUae from '../../../assets/onboarding/flag-uae.png';
 import flagUk from '../../../assets/onboarding/flag-uk.png';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 export const cities = [
   [flagMonaco, 'Monaco', 'Monaco'],
@@ -62,7 +63,7 @@ export function CityPicker({ onSelect, topPadding = 126 }: { onSelect: (name: st
 }
 
 function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     listPage: { flex: 1, paddingHorizontal: 16, paddingBottom: 90 },
     listTitle: { marginBottom: 14, color: colors.text, fontSize: 23, lineHeight: 28, fontWeight: '700' },
     search: { height: 44, paddingHorizontal: 14, borderRadius: 10, color: colors.text, fontSize: 14, backgroundColor: colors.surfaceRaised },

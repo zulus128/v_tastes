@@ -27,6 +27,7 @@ import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useProfile } from '../profile/api';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
@@ -439,7 +440,7 @@ export function ChatScreen({
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
     header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },

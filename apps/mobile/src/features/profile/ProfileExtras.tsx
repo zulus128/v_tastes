@@ -31,6 +31,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import rewardPattern from '../../../assets/onboarding/pattern.png';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 
 export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
@@ -338,7 +339,7 @@ function Setting({ disabled = false, label, onChange, styles, value }: { disable
 }
 
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     header: { height: safeTop + 60, paddingTop: safeTop, backgroundColor: colors.background, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
     peopleHeader: { height: safeTop + 106 },

@@ -45,6 +45,7 @@ import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { cancelDraftReminder, scheduleDraftReminder } from '../../infrastructure/pushNotifications';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -983,8 +984,8 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
   );
 }
 
-const sectionStyles = StyleSheet.create({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
-const ratingStyles = StyleSheet.create({
+const sectionStyles = responsiveStyleSheet({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
+const ratingStyles = responsiveStyleSheet({
   wrap: { height: 198, position: 'relative', alignItems: 'center' },
   value: { position: 'absolute', top: 18, zIndex: 3, color: '#B82F29', fontSize: 34, lineHeight: 40, fontWeight: '500' },
   stars: { position: 'absolute', top: 61, zIndex: 4, flexDirection: 'row', gap: 4 },
@@ -1002,7 +1003,7 @@ const ratingStyles = StyleSheet.create({
   tick: { width: 12, height: 2, borderRadius: 1 },
 });
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: isDark ? colors.background : colors.canvas },
   patternImage: { opacity: isDark ? 1 : 0.06, resizeMode: 'repeat', tintColor: '#161616' },
   content: { flexGrow: 1 },
@@ -1047,7 +1048,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   postText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });
 
-const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
+const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '91%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
@@ -1071,7 +1072,7 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
   more: { height: 54, alignItems: 'center', justifyContent: 'center' }, moreText: { color: colors.primary, fontWeight: '600' },
 });
 
-const createDishStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createDishStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? colors.border : '#45474B', backgroundColor: isDark ? colors.canvas : colors.surface },
@@ -1085,7 +1086,7 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.cr
   save: { flex: 1, height: isDark ? 52 : 40, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' }, saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 }, saveIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 }, disabled: { opacity: 0.5 },
 });
 
-const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
+const createConfirmationStyles = (colors: ThemeColors) => responsiveStyleSheet({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { paddingTop: 32, paddingHorizontal: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, alignItems: 'center', backgroundColor: colors.surfaceRaised },
   handle: { position: 'absolute', top: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
@@ -1099,7 +1100,7 @@ const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
   dangerText: { color: '#D94D45', fontSize: 16, fontWeight: '500' },
 });
 
-const createSuccessStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createSuccessStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: isDark ? '#161616' : colors.canvas },
   pattern: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', opacity: isDark ? 1 : 0.06, resizeMode: 'cover', tintColor: isDark ? undefined : '#161616' },
   glow: { position: 'absolute', left: '50%', top: '50%', width: 553, height: 552, marginLeft: -276.5, marginTop: -283 },

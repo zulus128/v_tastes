@@ -25,6 +25,7 @@ import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
@@ -570,7 +571,7 @@ function Empty({
 }
 
 function createStyles(colors: ThemeColors, safeTop: number) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupHeader: { backgroundColor: colors.surface },

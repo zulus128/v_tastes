@@ -1,10 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import NightIcon from '../../../assets/create-review/tag-night.svg';
 import type { DishReviewDraft } from '../create-review/api';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
 
@@ -100,7 +101,7 @@ export function ProfileDraftCard({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   card: { gap: 16, paddingBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   header: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.surfaceRaised },
   avatar: { width: 40, height: 40, borderRadius: 20 },

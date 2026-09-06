@@ -27,6 +27,7 @@ import restaurantImage from '../../../assets/discover/restaurant.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useDiscoverVenues } from '../discover/api';
 import { useFavourites } from '../favourites/api';
 
@@ -309,7 +310,7 @@ function TimeSelector({ onClose, onSelect, styles, value, visible }: { onClose: 
 }
 
 function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     navigation: { minHeight: 102, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 12, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
     navButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

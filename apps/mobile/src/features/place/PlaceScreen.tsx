@@ -24,6 +24,7 @@ import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -286,7 +287,7 @@ function Sort({ close, select, selected, styles, visible }: { close: () => void;
   </Pressable></Pressable></Modal>;
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: colors.canvas }, hero: { height: 365, overflow: 'hidden' }, heroImage: { height: 365, resizeMode: 'cover' }, topShade: { position: 'absolute', zIndex: 1, top: 0, right: 0, left: 0, height: 150 }, bottomShade: { position: 'absolute', zIndex: 1, right: 0, bottom: 0, left: 0, height: 135 },
   navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(33,33,33,0.64)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 40, lineHeight: 40, marginTop: -4 }, photoDots: { position: 'absolute', zIndex: 2, bottom: 28, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }, photoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' }, photoDotActive: { backgroundColor: '#fff' }, photoCount: { position: 'absolute', zIndex: 2, right: 18, bottom: 18, borderRadius: 13, backgroundColor: 'rgba(66,66,66,0.72)', paddingHorizontal: 11, paddingVertical: 6 }, photoCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   content: { paddingHorizontal: 16, paddingBottom: 95 }, reviewsContent: { paddingBottom: 0 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, compoundChip: { height: 33, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, backgroundColor: colors.background }, chipDivider: { width: StyleSheet.hairlineWidth, height: 18, marginHorizontal: 8, backgroundColor: colors.border }, chipText: { color: colors.text, fontSize: 11, fontWeight: '600' }, chipSecondary: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' }, chip: { height: 33, color: colors.text, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, fontSize: 11, fontWeight: '600' },

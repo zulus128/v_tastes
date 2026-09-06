@@ -18,6 +18,7 @@ import patternLight from '../../../assets/figma-backgrounds/home-feed-pattern.pn
 import { onboardingTheme as theme } from './theme';
 import { useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift } from '../../ui/components';
+import { responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
 
 export function PatternScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { colors, isDark } = useAppTheme();
@@ -79,6 +80,7 @@ export function PrimaryButton({
   style?: StyleProp<ViewStyle>;
 }) {
   const { colors, isDark } = useAppTheme();
+  const { scale } = useResponsiveMetrics();
   // Figma stacks a white-to-pink gradient stroke on top of the button's base
   // flat #4C1816 stroke only in the decorated variant; the plain variant (and
   // every dark-theme instance) keeps the flat stroke with no gradient.
@@ -100,13 +102,13 @@ export function PrimaryButton({
           pressed && styles.pressed,
         ]}
       >
-        {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={[styles.primaryContent, { gap: contentGap }]}>{icon ? <Image source={icon} style={{ width: iconSize, height: iconSize }} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
+        {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={[styles.primaryContent, { gap: responsiveValue(contentGap, scale) }]}>{icon ? <Image source={icon} style={{ width: responsiveValue(iconSize, scale), height: responsiveValue(iconSize, scale) }} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
       </Pressable>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   screen: { flex: 1 },
   pattern: { flex: 1 },
   darkPatternBoost: {

@@ -29,6 +29,7 @@ import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
@@ -536,7 +537,7 @@ function OtpScreen(props: {
   );
 }
 
-const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleSheet({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },

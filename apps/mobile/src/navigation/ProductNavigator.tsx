@@ -17,7 +17,7 @@ import {
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { DiscoverPerson } from '@tastes/contracts';
 import type { User } from 'firebase/auth';
-import { Alert, Linking, StyleSheet, View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import { useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
@@ -48,6 +48,7 @@ import {
 import { useSession } from '../session/SessionProvider';
 import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../ui/responsive';
 import { consumePendingDeepLink } from './pendingDeepLink';
 
 export type RootStackParamList = {
@@ -508,7 +509,7 @@ export function ProductNavigator({ user }: { user: User }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   tabLabel: { fontSize: 12, marginTop: 1 },
   tabBar: { height: 70, paddingTop: 8, paddingBottom: 5, borderTopWidth: 0 },
   tabIcon: {

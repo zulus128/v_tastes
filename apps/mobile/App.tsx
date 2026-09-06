@@ -3,7 +3,7 @@ import * as Application from 'expo-application';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef } from 'react';
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
@@ -13,6 +13,7 @@ import { ProductNavigator } from './src/navigation/ProductNavigator';
 import { rememberPendingDeepLink } from './src/navigation/pendingDeepLink';
 import { SessionProvider, useSession } from './src/session/SessionProvider';
 import { ThemeProvider, useAppTheme } from './src/ui/ThemeProvider';
+import { responsiveStyleSheet } from './src/ui/responsive';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
@@ -109,7 +110,7 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   root: { flex: 1 },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, backgroundColor: '#161616' },
   errorTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },

@@ -8,7 +8,6 @@ import {
   ImageBackground,
   Modal,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type ImageSourcePropType,
@@ -20,6 +19,7 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { firestore } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 type Member = {
   id: string;
@@ -272,7 +272,7 @@ export function ActivityInviteModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   overlay: { flex: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { width: '100%', maxWidth: 370, minHeight: 540, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, borderWidth: 1, borderColor: '#45474B', borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#080808' },
   patternImage: { opacity: 0.18, resizeMode: 'repeat' },

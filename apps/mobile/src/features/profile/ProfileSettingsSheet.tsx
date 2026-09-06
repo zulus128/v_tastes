@@ -29,7 +29,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +43,7 @@ import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
@@ -81,8 +81,7 @@ export function ProfileSettingsSheet({
   const api = useTastesApi();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
-  const settingsScale = settingsLayoutScale(screenHeight, insets.top, insets.bottom);
+  const settingsScale = 1;
   const styles = useMemo(
     () => createStyles(colors, insets.top, insets.bottom, isDark, settingsScale),
     [colors, insets.bottom, insets.top, isDark, settingsScale],
@@ -542,16 +541,10 @@ function NotificationSetting({ disabled = false, label, onChange, styles, value 
   return <View style={[styles.notificationRow, disabled && styles.notificationDisabled]}><Text style={styles.notificationLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} style={styles.notificationSwitch} thumbColor="#FFFFFF" trackColor={{ false: '#5A5B60', true: '#C8322D' }} value={value} /></View>;
 }
 
-function settingsLayoutScale(screenHeight: number, safeTop: number, safeBottom: number) {
-  const baseLayoutHeight = 770;
-  const availableHeight = screenHeight - safeTop - Math.max(24, safeBottom) - 48;
-  return Math.max(0.6, Math.min(1, availableHeight / baseLayoutHeight));
-}
-
 function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, isDark: boolean, settingsScale: number) {
   const s = (value: number) => Math.round(value * settingsScale);
   const actionBottom = Math.max(24, safeBottom);
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     patternImage: { opacity: isDark ? 1 : 0.08 },
     darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },

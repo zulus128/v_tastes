@@ -33,6 +33,7 @@ import SendIcon from '../../../assets/ai/send.svg';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 
@@ -330,7 +331,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   keyboardAvoiding: { flex: 1 },
   header: { height: 102, paddingTop: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background },
   back: { width: 52, height: 48, alignItems: 'center', justifyContent: 'center' },

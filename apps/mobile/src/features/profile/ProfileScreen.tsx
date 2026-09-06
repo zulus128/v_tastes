@@ -48,6 +48,7 @@ import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
@@ -685,7 +686,7 @@ export function ProfileScreen({
 
 const createStyles = (colors: ThemeColors) => {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
   screen: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 102, paddingBottom: 24 },
@@ -752,6 +753,6 @@ const createStyles = (colors: ThemeColors) => {
   });
 };
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   mapFilterCafeIcon: { width: 14, height: 14 },
 });

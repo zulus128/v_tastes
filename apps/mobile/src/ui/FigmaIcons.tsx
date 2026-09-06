@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import { responsiveStyleSheet } from './responsive';
 import type { SvgProps } from 'react-native-svg';
 import CreateVector from '../../assets/figma-icons/create.svg';
 import DialogOutlineDetail from '../../assets/figma-icons/dialog-outline-detail.svg';
@@ -91,7 +92,7 @@ export function TastesLogo({ width = 72 }: { width?: number } = {}) {
   return <Logo color={colors.text} width={width} height={width * (36.1319 / 72)} />;
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   layer: { position: 'absolute' },
   icon: { width: 20, height: 20 },
   headerIcon: { width: 24, height: 24 },
