@@ -213,8 +213,7 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
     );
     return { targetMissing: false };
   });
-  if (result.targetMissing) throw new HttpsError('not-found', 'The invitation target is no longer available.');
-  return { id: input.requestId };
+  return { id: input.requestId, dismissed: result.targetMissing };
 });
 
 export const createGroup = onCall(callableOptions, async (request) => {

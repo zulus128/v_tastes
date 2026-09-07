@@ -114,7 +114,7 @@ export function useResponsiveMetrics() {
   // comes from stable physical screen dimensions.
   useWindowDimensions();
   const { width, height } = Dimensions.get('screen');
-  return responsiveMetrics(width, height);
+  return { ...responsiveMetrics(width, height), scale: stableAvailableScale() };
 }
 
 /**
@@ -134,11 +134,10 @@ export function responsiveViewport(width: number, height: number) {
 export function useResponsiveViewport() {
   const { width, height } = useWindowDimensions();
   const screen = Dimensions.get('screen');
-  const stableMetrics = responsiveMetrics(screen.width, screen.height);
   if (Math.min(screen.width, screen.height) < TABLET_MIN_EDGE) return { height, width };
   return {
-    height: Math.min(height, DESIGN_VIEWPORT.height * stableMetrics.scale),
-    width: Math.min(width, DESIGN_VIEWPORT.width * stableMetrics.scale),
+    height: Math.min(height, DESIGN_VIEWPORT.height * stableAvailableScale()),
+    width: Math.min(width, DESIGN_VIEWPORT.width * stableAvailableScale()),
   };
 }
 
@@ -149,8 +148,7 @@ export function responsiveValue(value: number, scale: number) {
 
 /** Scales numeric component props (most often SVG width/height) like styles. */
 export function responsiveSize(value: number) {
-  const { width, height } = Dimensions.get('screen');
-  return responsiveValue(value, responsiveMetrics(width, height).scale);
+  return responsiveValue(value, stableAvailableScale());
 }
 
 function scaleOffset(value: unknown, scale: number) {
@@ -200,19 +198,26 @@ export function scaleNamedStyles<T extends NamedStyles>(styles: T, scale: number
 
 type ResponsiveScaleResolver = () => number;
 
-const stableScreenScale: ResponsiveScaleResolver = () => {
+const stableAvailableScale: ResponsiveScaleResolver = () => {
   // Android may resize `window` while its keyboard is open. Styles must use
   // the same physical metrics as responsiveSize/useResponsiveMetrics so only
   // the available viewport changes, never the control scale mid-edit.
-  const { width, height } = Dimensions.get('screen');
-  return responsiveMetrics(width, height).scale;
+  const screen = Dimensions.get('screen');
+  const window = Dimensions.get('window');
+  // Android's resize-style keyboard changes window height but not its width.
+  // Cap the stable physical-screen scale by the current window width so a
+  // tablet/foldable split window never receives oversized tablet controls.
+  return Math.min(
+    responsiveMetrics(screen.width, screen.height).scale,
+    responsiveMetrics(window.width, screen.height).scale,
+  );
 };
 
 /**
  * Drop-in replacement for StyleSheet.create. Existing screens keep authoring in
  * 402pt Figma units while the generated native styles adapt to the device width.
  */
-export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveScale: ResponsiveScaleResolver = stableScreenScale): T {
+export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveScale: ResponsiveScaleResolver = stableAvailableScale): T {
   // Keep the style object live instead of freezing a one-time StyleSheet ID.
   // `useWindowDimensions` causes the owning screen to render again when a
   // window is resized; resolving the scale when the named style is read keeps

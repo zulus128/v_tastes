@@ -1,6 +1,6 @@
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { normalizeUsername, usernameReference } from '../shared/user-data';
+import { normalizeUsername, usernameClaimId } from '../shared/user-data';
 
 if (getApps().length === 0) initializeApp({ credential: applicationDefault() });
 
@@ -36,30 +36,31 @@ async function main(): Promise<void> {
     process.stdout.write('Dry run only. Re-run with --apply to migrate PII and create username claims.\n');
     return;
   }
-  // A profile can require up to four writes. Keep batches below Firestore's
-  // 500-operation cap even for fully populated legacy profiles.
-  for (let offset = 0; offset < profiles.docs.length; offset += 100) {
-    const batch = db.batch();
-    for (const profile of profiles.docs.slice(offset, offset + 100)) {
+  for (const scannedProfile of profiles.docs) {
+    // The initial scan is only for validation/progress. Re-read each profile
+    // in a transaction so a concurrent username change cannot overwrite a
+    // newer claim with stale snapshot data.
+    await db.runTransaction(async (transaction) => {
+      const profile = await transaction.get(scannedProfile.ref);
+      if (!profile.exists) return;
       const email = profile.get('email') ?? null;
       const phoneNumber = profile.get('phoneNumber') ?? null;
       if (email || phoneNumber) {
-        batch.set(db.collection('_userPrivate').doc(profile.id), {
+        transaction.set(db.collection('_userPrivate').doc(profile.id), {
           uid: profile.id, email, phoneNumber, updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
-        batch.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
+        transaction.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
       }
-      const username = profile.get('username')
-        ? normalizeUsername(String(profile.get('username')))
-        : null;
-      if (username) {
-        batch.set(usernameReference(username), {
-          uid: profile.id, username, updatedAt: FieldValue.serverTimestamp(),
-        });
-        if (profile.get('username') !== username) batch.update(profile.ref, { username });
-      }
-    }
-    await batch.commit();
+      const username = profile.get('username') ? normalizeUsername(String(profile.get('username'))) : null;
+      if (!username) return;
+      const claimRef = db.collection('_usernames').doc(usernameClaimId(username));
+      const claim = await transaction.get(claimRef);
+      // A live profile mutation owns a conflicting claim. Never replace it;
+      // the migration can be safely re-run for this legacy profile later.
+      if (claim.exists && claim.get('uid') !== profile.id) return;
+      transaction.set(claimRef, { uid: profile.id, username, updatedAt: FieldValue.serverTimestamp() });
+      if (profile.get('username') !== username) transaction.update(profile.ref, { username });
+    });
   }
   process.stdout.write(`Migrated ${profiles.size} profiles.\n`);
 }

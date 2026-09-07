@@ -756,7 +756,7 @@ const createStyles = (colors: ThemeColors) => {
   editInput: { minHeight: 120, marginTop: 16, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 16, color: colors.text, backgroundColor: colors.canvas, textAlignVertical: 'top' },
   editSave: { height: 50, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 25, backgroundColor: colors.primary },
   editSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  wishlistPane: { minHeight: 720 },
+  wishlistPane: {},
   });
 };
 

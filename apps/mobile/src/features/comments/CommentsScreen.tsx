@@ -202,6 +202,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
   const [extraReplies, setExtraReplies] = useState<Record<string, { items: Comment[]; nextCursor: string | null | undefined }>>({});
   const [deepLinkedItems, setDeepLinkedItems] = useState<Comment[]>([]);
+  const [deepLinkRevision, setDeepLinkRevision] = useState(0);
   const [loadingReplyIds, setLoadingReplyIds] = useState<Set<string>>(new Set());
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
@@ -237,7 +238,12 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
       .then((response) => { if (active) setDeepLinkedItems(response.data.items); })
       .catch(() => { if (active) setDeepLinkedItems([]); });
     return () => { active = false; };
-  }, [api, commentId, reviewId]);
+  }, [api, commentId, deepLinkRevision, reviewId]);
+
+  function refreshDeepLinkContext() {
+    setExtraReplies({});
+    setDeepLinkRevision((revision) => revision + 1);
+  }
 
   async function loadMoreReplies(parentCommentId: string) {
     if (loadingReplyIds.has(parentCommentId)) return;
@@ -361,8 +367,8 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
               const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
               return <View style={styles.thread}>
-                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={item.replyCount > 0 ? { loaded: replies.length, total: item.replyCount, hidden, loading: loadingReplyIds.has(item.id), onLoadMore: replies.length < item.replyCount && extraReplies[item.id]?.nextCursor !== null ? () => void loadMoreReplies(item.id) : undefined, onToggle: toggleReplies } : undefined} />
-                {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
+                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError, onSuccess: refreshDeepLinkContext }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError, onSuccess: refreshDeepLinkContext })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={item.replyCount > 0 ? { loaded: replies.length, total: item.replyCount, hidden, loading: loadingReplyIds.has(item.id), onLoadMore: replies.length < item.replyCount && extraReplies[item.id]?.nextCursor !== null ? () => void loadMoreReplies(item.id) : undefined, onToggle: toggleReplies } : undefined} />
+                {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError, onSuccess: refreshDeepLinkContext }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError, onSuccess: refreshDeepLinkContext })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
                   const nextOffset = event.nativeEvent.layout.y;
                   setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });
                 }} />) : null}

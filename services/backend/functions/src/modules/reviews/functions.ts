@@ -502,6 +502,9 @@ export const processReviewEffects = onDocumentCreated({
       reviewId: event.params.reviewId,
       status: 'processing',
       leaseExpiresAt: Timestamp.fromMillis(Date.now() + 5 * 60_000),
+      // TTL retains the completed marker long enough to deduplicate delayed
+      // Eventarc deliveries without growing this internal collection forever.
+      expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60_000),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     return true;

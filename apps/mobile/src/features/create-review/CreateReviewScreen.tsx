@@ -1,7 +1,6 @@
 import type { ReviewTag, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -873,12 +872,9 @@ function DishEditor({
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], mediaTypes: ['images'], quality: 0.8 })
       : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], mediaTypes: ['images'], quality: 0.8 });
     if (!result.canceled) {
-      const optimized = await manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { height: 1080, width: 1080 } }],
-        { compress: 0.75, format: SaveFormat.JPEG },
-      );
-      setDraft({ ...draft, photoUri: optimized.uri });
+      // Normalize at the upload boundary so restored drafts and newly chosen
+      // images take exactly one lossy resize/encode pass.
+      setDraft({ ...draft, photoUri: result.assets[0].uri });
     }
   }
 

@@ -569,7 +569,9 @@ function FolderActionSheet({
 function createStyles(colors: ThemeColors) {
   const isDark = colors.background === '#080808';
   return responsiveStyleSheet({
-    pane: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
+    // This pane is also rendered inside ProfileScreen's outer ScrollView.
+    // Let its cards participate in that scroll view's measured content height.
+    pane: { backgroundColor: colors.canvas },
     searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
     searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
