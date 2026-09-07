@@ -489,8 +489,16 @@ export const processReviewEffects = onDocumentCreated({
   const authorId = String(review.get('authorId') ?? '');
   if (!authorId) return;
   const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
-  const claimed = await db.runTransaction(async (transaction) => {
-    const effect = await transaction.get(effectRef);
+  const claim = await db.runTransaction(async (transaction) => {
+    const [effect, currentReview] = await Promise.all([
+      transaction.get(effectRef),
+      transaction.get(review.ref),
+    ]);
+    // The create-event snapshot remains published after a delete/moderation
+    // update. Check the current document in the lease transaction, so that a
+    // concurrent status change retries this transaction rather than sending
+    // notifications for content which is no longer visible.
+    if (!currentReview.exists || currentReview.get('status') !== 'published') return { claimed: false, review: null };
     if (effect.get('status') === 'complete') return false;
     // A duplicate delivery retries while a live worker owns the lease. If the
     // worker died, a later delivery can reclaim it after the short lease.
@@ -507,22 +515,23 @@ export const processReviewEffects = onDocumentCreated({
       expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60_000),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
-    return true;
+    return { claimed: true, review: currentReview };
   });
-  if (!claimed) return;
+  if (claim === false || !claim.claimed || !claim.review) return;
+  const activeReview = claim.review;
   const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
-  const storedXpBefore = Number(review.get('xpBefore'));
+  const storedXpBefore = Number(activeReview.get('xpBefore'));
   const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
-  const storedXpAfter = Number(review.get('xpAfter'));
+  const storedXpAfter = Number(activeReview.get('xpAfter'));
   const nextXp = Number.isFinite(storedXpAfter) ? Math.max(0, storedXpAfter) : xp;
   const completedEffects = (await effectRef.get()).get('completedEffects') as Record<string, unknown> | undefined ?? {};
   const effects: Array<[string, () => Promise<void>]> = [
-    ['photoUrls', () => attachDishPhotoUrls(review)],
-    ['announcement', () => announceReview(event.params.reviewId, authorId, String(review.get('authorDisplayName') ?? 'Someone'), {
-      id: String(review.get('venueId') ?? ''),
-      name: String(review.get('venueName') ?? 'a place'),
-      city: String(review.get('venueCity') ?? ''),
-      reviewCount: review.get('wasFirstVenueReview') === true ? 0 : 1,
+    ['photoUrls', () => attachDishPhotoUrls(activeReview)],
+    ['announcement', () => announceReview(event.params.reviewId, authorId, String(activeReview.get('authorDisplayName') ?? 'Someone'), {
+      id: String(activeReview.get('venueId') ?? ''),
+      name: String(activeReview.get('venueName') ?? 'a place'),
+      city: String(activeReview.get('venueCity') ?? ''),
+      reviewCount: activeReview.get('wasFirstVenueReview') === true ? 0 : 1,
     })],
     ['levelNotification', () => notifyLevelChange(authorId, previousXp, nextXp)],
     ['rewardNotifications', () => syncRewardNotifications(authorId)],

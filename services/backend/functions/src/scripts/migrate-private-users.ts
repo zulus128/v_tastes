@@ -45,19 +45,21 @@ async function main(): Promise<void> {
       if (!profile.exists) return;
       const email = profile.get('email') ?? null;
       const phoneNumber = profile.get('phoneNumber') ?? null;
+      const username = profile.get('username') ? normalizeUsername(String(profile.get('username'))) : null;
+      const claimRef = username ? db.collection('_usernames').doc(usernameClaimId(username)) : null;
+      // Firestore transactions require every read to finish before the first
+      // write. Read the claim now, even when the profile also has PII to move.
+      const claim = claimRef ? await transaction.get(claimRef) : null;
       if (email || phoneNumber) {
         transaction.set(db.collection('_userPrivate').doc(profile.id), {
           uid: profile.id, email, phoneNumber, updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
         transaction.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
       }
-      const username = profile.get('username') ? normalizeUsername(String(profile.get('username'))) : null;
-      if (!username) return;
-      const claimRef = db.collection('_usernames').doc(usernameClaimId(username));
-      const claim = await transaction.get(claimRef);
+      if (!username || !claimRef) return;
       // A live profile mutation owns a conflicting claim. Never replace it;
       // the migration can be safely re-run for this legacy profile later.
-      if (claim.exists && claim.get('uid') !== profile.id) return;
+      if (claim?.exists && claim.get('uid') !== profile.id) return;
       transaction.set(claimRef, { uid: profile.id, username, updatedAt: FieldValue.serverTimestamp() });
       if (profile.get('username') !== username) transaction.update(profile.ref, { username });
     });
