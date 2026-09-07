@@ -921,7 +921,10 @@ const overlayStyles = responsiveStyleSheet({
   dishReviewTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
   dishReviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   dishReviewCloseText: { color: '#FFFFFF', fontSize: 30, fontWeight: '300', lineHeight: 30 },
-  dishReviewPhoto: { width: '100%', aspectRatio: 1, maxHeight: 434, paddingHorizontal: 16, position: 'relative' },
+  // The review photo is a square and should use the full sheet width. A fixed
+  // maxHeight made React Native constrain the width as well on Mac/iPad,
+  // leaving a large empty column beside the image.
+  dishReviewPhoto: { width: '100%', aspectRatio: 1, paddingHorizontal: 16, position: 'relative' },
   dishReviewArrows: { position: 'absolute', top: '50%', left: 21, right: 21, flexDirection: 'row', justifyContent: 'space-between' },
   dishReviewArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,22,22,0.45)' },
   dishReviewArrowText: { color: '#FFFFFF', fontSize: 34, fontWeight: '300', lineHeight: 30 },
