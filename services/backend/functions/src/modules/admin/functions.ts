@@ -115,15 +115,26 @@ async function invalidateRewardProgress(userId: string): Promise<void> {
 }
 
 async function invalidateVenueRewardProgress(venueId: string): Promise<void> {
-  const reviews = await db.collection('reviews')
-    .where('venueId', '==', venueId)
-    .where('status', '==', 'published')
-    .limit(200)
-    .get();
-  const authorIds = [...new Set(reviews.docs.map((review) => String(review.get('authorId') ?? '')).filter(Boolean))];
-  for (let offset = 0; offset < authorIds.length; offset += 400) {
+  const authorIds = new Set<string>();
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  do {
+    let reviewsQuery = db.collection('reviews')
+      .where('venueId', '==', venueId)
+      .where('status', '==', 'published')
+      .orderBy('__name__')
+      .limit(400);
+    if (cursor) reviewsQuery = reviewsQuery.startAfter(cursor);
+    const reviews = await reviewsQuery.get();
+    reviews.docs.forEach((review) => {
+      const authorId = String(review.get('authorId') ?? '');
+      if (authorId) authorIds.add(authorId);
+    });
+    cursor = reviews.docs.at(-1);
+  } while (cursor);
+  const uniqueAuthors = [...authorIds];
+  for (let offset = 0; offset < uniqueAuthors.length; offset += 400) {
     const batch = db.batch();
-    authorIds.slice(offset, offset + 400).forEach((authorId) => batch.set(db.collection('users').doc(authorId), {
+    uniqueAuthors.slice(offset, offset + 400).forEach((authorId) => batch.set(db.collection('users').doc(authorId), {
       rewardProgressDirty: true,
       rewardProgressVersion: FieldValue.increment(1),
     }, { merge: true }));

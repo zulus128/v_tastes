@@ -219,6 +219,12 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
     repliesByParent.set(item.parentCommentId!, replies);
   });
 
+  // These pages live outside React Query only while this screen is mounted.
+  // A refetch after a reaction or deletion must drop stale reply copies.
+  useEffect(() => {
+    setExtraReplies({});
+  }, [query.dataUpdatedAt]);
+
   async function loadMoreReplies(parentCommentId: string) {
     if (loadingReplyIds.has(parentCommentId)) return;
     setLoadingReplyIds((current) => new Set(current).add(parentCommentId));
@@ -335,7 +341,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             renderItem={({ item }) => {
               const previewReplies = repliesByParent.get(item.id) ?? [];
               const additionalReplies = extraReplies[item.id]?.items ?? [];
-              const replies = [...new Map([...previewReplies, ...additionalReplies].map((reply) => [reply.id, reply])).values()]
+              const replies = [...new Map([...additionalReplies, ...previewReplies].map((reply) => [reply.id, reply])).values()]
                 .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
               const hidden = hiddenReplies.has(item.id);
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));

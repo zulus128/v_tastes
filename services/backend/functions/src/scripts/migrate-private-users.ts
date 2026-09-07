@@ -35,9 +35,11 @@ async function main(): Promise<void> {
     process.stdout.write('Dry run only. Re-run with --apply to migrate PII and create username claims.\n');
     return;
   }
-  for (let offset = 0; offset < profiles.docs.length; offset += 200) {
+  // A profile can require up to four writes. Keep batches below Firestore's
+  // 500-operation cap even for fully populated legacy profiles.
+  for (let offset = 0; offset < profiles.docs.length; offset += 100) {
     const batch = db.batch();
-    for (const profile of profiles.docs.slice(offset, offset + 200)) {
+    for (const profile of profiles.docs.slice(offset, offset + 100)) {
       const email = profile.get('email') ?? null;
       const phoneNumber = profile.get('phoneNumber') ?? null;
       if (email || phoneNumber) {

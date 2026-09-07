@@ -185,10 +185,18 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
     const nextUsernameRef = nextUsername ? usernameReference(nextUsername) : null;
     const previousUsernameRef = previousUsername ? usernameReference(previousUsername) : null;
     const usernameClaim = nextUsernameRef ? await transaction.get(nextUsernameRef) : null;
+    // During the one-time claim migration, legacy profiles may not yet have a
+    // `_usernames` record. Keep the public-field check until it is complete.
+    const legacyUsernameOwners = nextUsername
+      ? await transaction.get(db.collection('users').where('username', '==', nextUsername).limit(2))
+      : null;
     const previousUsernameClaim = previousUsernameRef && previousUsernameRef.path !== nextUsernameRef?.path
       ? await transaction.get(previousUsernameRef)
       : null;
     if (usernameClaim?.exists && usernameClaim.get('uid') !== uid) {
+      throw new HttpsError('already-exists', 'This username is already taken.', { reason: 'username-taken' });
+    }
+    if (legacyUsernameOwners?.docs.some((document) => document.id !== uid)) {
       throw new HttpsError('already-exists', 'This username is already taken.', { reason: 'username-taken' });
     }
     const now = FieldValue.serverTimestamp();

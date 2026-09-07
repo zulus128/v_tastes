@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -159,32 +158,21 @@ export function FavouritesPane({
         <EmptyState folderName={selectedFolder?.name} query={normalizedQuery} styles={styles} />
       ) : null}
       {favourites.isSuccess && places.length > 0 ? (
-        <FlatList
-          contentContainerStyle={styles.placeList}
-          data={places}
-          initialNumToRender={8}
-          keyExtractor={(place) => place.venueId}
-          ListFooterComponent={favourites.isFetchingNextPage
-            ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} />
-            : null}
-          maxToRenderPerBatch={8}
-          nestedScrollEnabled
-          onEndReached={() => {
-            if (favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
-          renderItem={({ item: place, index }) => (
+        <View style={styles.placeList}>
+          {places.map((place, index) => (
             <FavouriteCard
               index={index}
+              key={place.venueId}
               onOpen={() => onOpenPlace(place.venueId)}
               onUnsave={() => unsaveVenue.mutate(place.venueId)}
               place={place}
               styles={styles}
             />
-          )}
-          showsVerticalScrollIndicator={false}
-          windowSize={7}
-        />
+          ))}
+          {favourites.hasNextPage ? <Pressable disabled={favourites.isFetchingNextPage} onPress={() => void favourites.fetchNextPage()} style={styles.loadMoreButton}>
+            <Text style={styles.loadMoreText}>{favourites.isFetchingNextPage ? 'Loading…' : 'Load more'}</Text>
+          </Pressable> : null}
+        </View>
       ) : null}
 
       <FolderNameSheet
@@ -592,7 +580,8 @@ function createStyles(colors: ThemeColors) {
     folderChipText: { color: isDark ? colors.textMuted : '#677083', fontSize: 12 },
     folderChipTextActive: { color: '#FFFFFF' },
     placeList: { paddingBottom: 32 },
-    pageLoader: { paddingVertical: 20 },
+    loadMoreButton: { alignSelf: 'center', paddingVertical: 20 },
+    loadMoreText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
     placeCard: { minHeight: 188, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
     cardImageWrap: { width: 122, height: 122, borderRadius: 12, overflow: 'hidden' },
     cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },

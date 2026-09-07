@@ -400,7 +400,24 @@ async function attachDishPhotoUrls(
     }
   }));
   if (enriched.some((dish, index) => dish !== dishes[index])) {
-    await review.ref.update({ dishReviews: enriched, updatedAt: FieldValue.serverTimestamp() });
+    const resolvedUrlByPath = new Map(enriched.flatMap((dish) =>
+      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    // The trigger can run while its author edits the review. Re-read in a
+    // transaction and add URLs only to matching, still-current photo paths.
+    await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(review.ref);
+      if (!current.exists) return;
+      const currentDishes = Array.isArray(current.get('dishReviews'))
+        ? current.get('dishReviews') as StoredDishReview[]
+        : [];
+      const merged = currentDishes.map((dish) => {
+        const photoUrl = typeof dish.photoPath === 'string' ? resolvedUrlByPath.get(dish.photoPath) : undefined;
+        return photoUrl && typeof dish.photoUrl !== 'string' ? { ...dish, photoUrl } : dish;
+      });
+      if (merged.some((dish, index) => dish !== currentDishes[index])) {
+        transaction.update(review.ref, { dishReviews: merged, updatedAt: FieldValue.serverTimestamp() });
+      }
+    });
   }
 }
 
@@ -682,9 +699,10 @@ export const reactToContent = onCall(callableOptions, async (request) => {
     if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
     else transaction.delete(reactionRef);
     transaction.update(contentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    const authorXp = Math.max(0, Number(author?.get('xp') ?? 0));
     if (authorRef && author?.exists) {
       addXp(transaction, authorRef, active ? 5 : -5, {
-        xp: Number(author.get('xp') ?? 0),
+        xp: authorXp,
         monthlyXp: Number(author.get('monthlyXp') ?? 0),
       });
     }
@@ -711,6 +729,16 @@ export const reactToContent = onCall(callableOptions, async (request) => {
           eventKey: `${input.reviewId}:${reactionCount}`,
           params: { place: venueName, count: reactionCount },
           targetId: input.reviewId,
+        });
+      }
+      if (levelForXp(authorXp + 5) > levelForXp(authorXp)) {
+        const level = levelForXp(authorXp + 5);
+        queueNotification(transaction, {
+          recipientId: String(content.get('authorId') ?? ''),
+          type: 'level-up',
+          eventKey: `level-${level}`,
+          params: { level },
+          targetId: String(level),
         });
       }
     }

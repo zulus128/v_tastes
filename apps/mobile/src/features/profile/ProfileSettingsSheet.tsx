@@ -18,7 +18,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   Image,
   ImageBackground,
   Pressable,
@@ -43,7 +42,7 @@ import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideS
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
@@ -82,6 +81,7 @@ export function ProfileSettingsSheet({
   const visualAudit = useIsVisualAudit();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useResponsiveViewport();
   const settingsScale = 1;
   const styles = useMemo(
     () => createStyles(colors, isDark, settingsScale),
@@ -104,10 +104,10 @@ export function ProfileSettingsSheet({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  const appearanceTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const appearanceTranslateX = useRef(new Animated.Value(viewportWidth)).current;
   const appearanceClosing = useRef(false);
   const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notificationTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const notificationTranslateX = useRef(new Animated.Value(viewportWidth)).current;
   const notificationClosing = useRef(false);
   const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
@@ -124,9 +124,9 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = null;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
-    appearanceTranslateX.setValue(Dimensions.get('window').width);
-    notificationTranslateX.setValue(Dimensions.get('window').width);
-  }, [appearanceTranslateX, notificationTranslateX, visible]);
+    appearanceTranslateX.setValue(viewportWidth);
+    notificationTranslateX.setValue(viewportWidth);
+  }, [appearanceTranslateX, notificationTranslateX, viewportWidth, visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -270,7 +270,7 @@ export function ProfileSettingsSheet({
     appearanceCloseTimer.current = null;
     appearanceTranslateX.stopAnimation();
     setAppearanceOpen(true);
-    appearanceTranslateX.setValue(Dimensions.get('window').width);
+    appearanceTranslateX.setValue(viewportWidth);
     Animated.timing(appearanceTranslateX, {
       duration: 280,
       toValue: 0,
@@ -291,7 +291,7 @@ export function ProfileSettingsSheet({
     appearanceCloseTimer.current = setTimeout(finish, 300);
     Animated.timing(appearanceTranslateX, {
       duration: 240,
-      toValue: Dimensions.get('window').width,
+      toValue: viewportWidth,
       useNativeDriver: true,
     }).start(finish);
   }
@@ -302,7 +302,7 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = null;
     notificationTranslateX.stopAnimation();
     setNotificationsOpen(true);
-    notificationTranslateX.setValue(Dimensions.get('window').width);
+    notificationTranslateX.setValue(viewportWidth);
     Animated.timing(notificationTranslateX, {
       duration: 280,
       toValue: 0,
@@ -335,7 +335,7 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = setTimeout(finish, 300);
     Animated.timing(notificationTranslateX, {
       duration: 240,
-      toValue: Dimensions.get('window').width,
+      toValue: viewportWidth,
       useNativeDriver: true,
     }).start(finish);
   }
