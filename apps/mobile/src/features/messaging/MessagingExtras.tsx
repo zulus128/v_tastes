@@ -180,7 +180,7 @@ export function NewGroupScreen({
     };
   }, [api, normalizedQuery]);
   const filtered = normalizedQuery.length >= 2
-    ? searchResults
+    ? searchResults.filter((result) => people.some((candidate) => candidate.userId === result.userId))
     : people.filter(
         (person) =>
           !normalizedQuery ||
@@ -358,7 +358,9 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     }
   };
   const pendingMembers = group.pendingMembers ?? [];
-  const available = (normalizedMemberQuery.length >= 2 ? searchResults : candidates).filter(
+  const available = (normalizedMemberQuery.length >= 2
+    ? searchResults.filter((result) => candidates.some((candidate) => candidate.userId === result.userId))
+    : candidates).filter(
     (candidate) =>
       !group.members.some((member) => member.userId === candidate.userId)
       && !pendingMembers.some((member) => member.userId === candidate.userId),

@@ -424,7 +424,7 @@ describe('authenticated session and paginated reads', () => {
     await expect(callFunction('createUserProfile', {
       displayName: 'Second User', username: 'unique.name', city: 'Istanbul',
     }, second.token)).rejects.toBeTruthy();
-    const usernameClaim = await db.collection('_usernames').doc('unique.name').get();
+    const usernameClaim = await db.collection('_usernames').doc('handle:unique.name').get();
     const firstUid = String(usernameClaim.get('uid'));
     const firstRef = db.collection('users').doc(firstUid);
     await firstRef.update({ status: 'banned' });

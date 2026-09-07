@@ -25,7 +25,7 @@ import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-patt
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
@@ -164,6 +164,7 @@ export function ChatScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const { profile: currentUserProfile } = useProfile(userId, 'You');
   const realtimeMessages = useConversationMessages(conversationId, userId);
   const messageHistory = useInfiniteQuery({
@@ -230,7 +231,8 @@ export function ChatScreen({
       }
     },
     setConversationError,
-  ), [api, conversationId, userId]);
+    visualAudit,
+  ), [api, conversationId, userId, visualAudit]);
 
   useEffect(() => {
     if (!groupTitle) {

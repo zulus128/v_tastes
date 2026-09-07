@@ -200,8 +200,11 @@ export function scaleNamedStyles<T extends NamedStyles>(styles: T, scale: number
 
 type ResponsiveScaleResolver = () => number;
 
-const windowScale: ResponsiveScaleResolver = () => {
-  const { width, height } = Dimensions.get('window');
+const stableScreenScale: ResponsiveScaleResolver = () => {
+  // Android may resize `window` while its keyboard is open. Styles must use
+  // the same physical metrics as responsiveSize/useResponsiveMetrics so only
+  // the available viewport changes, never the control scale mid-edit.
+  const { width, height } = Dimensions.get('screen');
   return responsiveMetrics(width, height).scale;
 };
 
@@ -209,12 +212,13 @@ const windowScale: ResponsiveScaleResolver = () => {
  * Drop-in replacement for StyleSheet.create. Existing screens keep authoring in
  * 402pt Figma units while the generated native styles adapt to the device width.
  */
-export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveScale: ResponsiveScaleResolver = windowScale): T {
+export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveScale: ResponsiveScaleResolver = stableScreenScale): T {
   // Keep the style object live instead of freezing a one-time StyleSheet ID.
   // `useWindowDimensions` causes the owning screen to render again when a
   // window is resized; resolving the scale when the named style is read keeps
-  // those rerenders in sync with the frame dimensions (Expo web/iPad split
-  // view) without requiring every screen to recreate its styles manually.
+  // those rerenders in sync with the stable device frame without requiring
+  // every screen to recreate its styles manually. responsiveViewport handles
+  // the separately-changing usable window in split-view and keyboard states.
   let cachedScale: number | null = null;
   const cache = new Map<PropertyKey, unknown>();
   return new Proxy(styles as object, {

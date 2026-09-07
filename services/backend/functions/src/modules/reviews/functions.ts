@@ -438,7 +438,9 @@ async function attachDishPhotoUrls(
 ): Promise<void> {
   // The auth/function test contour deliberately does not start Storage. Never let it
   // fall through to a real bucket when Application Default Credentials are present.
-  if (isFirebaseEmulator() && !process.env.STORAGE_EMULATOR_HOST) return;
+  if (isFirebaseEmulator()
+    && !process.env.FIREBASE_STORAGE_EMULATOR_HOST
+    && !process.env.STORAGE_EMULATOR_HOST) return;
   const dishes = Array.isArray(review.get('dishReviews'))
     ? review.get('dishReviews') as StoredDishReview[]
     : [];
@@ -510,26 +512,31 @@ export const processReviewEffects = onDocumentCreated({
   const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
   const storedXpAfter = Number(review.get('xpAfter'));
   const nextXp = Number.isFinite(storedXpAfter) ? Math.max(0, storedXpAfter) : xp;
-  const effects = [
-    attachDishPhotoUrls(review),
-    announceReview(event.params.reviewId, authorId, String(review.get('authorDisplayName') ?? 'Someone'), {
+  const completedEffects = (await effectRef.get()).get('completedEffects') as Record<string, unknown> | undefined ?? {};
+  const effects: Array<[string, () => Promise<void>]> = [
+    ['photoUrls', () => attachDishPhotoUrls(review)],
+    ['announcement', () => announceReview(event.params.reviewId, authorId, String(review.get('authorDisplayName') ?? 'Someone'), {
       id: String(review.get('venueId') ?? ''),
       name: String(review.get('venueName') ?? 'a place'),
       city: String(review.get('venueCity') ?? ''),
       reviewCount: review.get('wasFirstVenueReview') === true ? 0 : 1,
-    }),
-    notifyLevelChange(authorId, previousXp, nextXp),
-    syncRewardNotifications(authorId),
+    })],
+    ['levelNotification', () => notifyLevelChange(authorId, previousXp, nextXp)],
+    ['rewardNotifications', () => syncRewardNotifications(authorId)],
   ];
-  const results = await Promise.allSettled(effects);
-  const failures: unknown[] = [];
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(`Review effect ${index} failed for ${event.params.reviewId}.`, result.reason);
-      failures.push(result.reason);
+  for (const [name, run] of effects) {
+    if (completedEffects[name] === true) continue;
+    try {
+      await run();
+      // Store progress immediately after each completed side effect. A retry
+      // after a later failure resumes from here instead of re-delivering the
+      // earlier notification fan-out.
+      await effectRef.set({ [`completedEffects.${name}`]: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    } catch (error) {
+      console.warn(`Review effect ${name} failed for ${event.params.reviewId}.`, error);
+      throw error;
     }
-  });
-  if (failures.length > 0) throw new AggregateError(failures, `Review effects failed for ${event.params.reviewId}.`);
+  }
   await effectRef.set({ status: 'complete', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 });
 
