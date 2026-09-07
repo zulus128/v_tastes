@@ -10,6 +10,7 @@ import { sendNotification, sendNotifications } from '../../shared/notifications'
 import { callableOptions } from '../../shared/options';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { privateUserReference } from '../../shared/user-data';
 
 type StaffRole = 'admin' | 'moderator';
 
@@ -349,28 +350,34 @@ export const searchUsers = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(searchInputSchema, request.data);
   const query = input.query.toLowerCase();
-  let profiles;
+  let profileDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   if (!query) {
-    profiles = await db.collection('users').orderBy('createdAt', 'desc').limit(50).get();
+    profileDocs = (await db.collection('users').orderBy('createdAt', 'desc').limit(50).get()).docs;
   } else {
-    const candidates = await db.collection('users').limit(1_000).get();
-    profiles = {
-      docs: candidates.docs.filter((profile) => [
+    const [candidates, privateCandidates] = await Promise.all([
+      db.collection('users').limit(1_000).get(),
+      db.collection('_userPrivate').limit(1_000).get(),
+    ]);
+    const privateMatches = new Set(privateCandidates.docs.filter((profile) => [
+      String(profile.get('email') ?? ''),
+      String(profile.get('phoneNumber') ?? ''),
+    ].some((value) => value.toLowerCase().includes(query))).map((profile) => profile.id));
+    profileDocs = candidates.docs.filter((profile) => privateMatches.has(profile.id) || [
         profile.id,
         String(profile.get('username') ?? ''),
         String(profile.get('displayName') ?? ''),
-        String(profile.get('email') ?? ''),
-        String(profile.get('phoneNumber') ?? ''),
-      ].some((value) => value.toLowerCase().includes(query))).slice(0, 50),
-    };
+      ].some((value) => value.toLowerCase().includes(query))).slice(0, 50);
   }
-
-  return profiles.docs.map((profile) => ({
+  const privateProfiles = profileDocs.length > 0
+    ? await db.getAll(...profileDocs.map((profile) => privateUserReference(profile.id)))
+    : [];
+  const privateById = new Map(privateProfiles.map((profile) => [profile.id, profile]));
+  return profileDocs.map((profile) => ({
     id: profile.id,
     displayName: String(profile.get('displayName') ?? 'Tastes user'),
     username: profile.get('username') ? String(profile.get('username')) : null,
-    email: profile.get('email') ? String(profile.get('email')) : null,
-    phoneNumber: profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
+    email: privateById.get(profile.id)?.get('email') ? String(privateById.get(profile.id)?.get('email')) : null,
+    phoneNumber: privateById.get(profile.id)?.get('phoneNumber') ? String(privateById.get(profile.id)?.get('phoneNumber')) : null,
     status: String(profile.get('status') ?? 'active'),
     createdAt: timestampToIso(profile.get('createdAt')),
   }));
@@ -380,8 +387,9 @@ export const getUserHistory = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(z.object({ userId: idSchema }), request.data);
   const userReference = db.collection('users').doc(input.userId);
-  const [profile, reviews, reports, actions] = await Promise.all([
+  const [profile, privateProfile, reviews, reports, actions] = await Promise.all([
     userReference.get(),
+    privateUserReference(input.userId).get(),
     db.collection('reviews').where('authorId', '==', input.userId).limit(25).get(),
     db.collection('reports').where('reporterId', '==', input.userId).limit(25).get(),
     db.collection('_adminAudit').where('subjectId', '==', input.userId).limit(25).get(),
@@ -394,8 +402,8 @@ export const getUserHistory = onCall(callableOptions, async (request) => {
       id: profile.id,
       displayName: String(profile.get('displayName') ?? 'Tastes user'),
       username: profile.get('username') ? String(profile.get('username')) : null,
-      email: profile.get('email') ? String(profile.get('email')) : null,
-      phoneNumber: profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
+      email: privateProfile.get('email') ? String(privateProfile.get('email')) : null,
+      phoneNumber: privateProfile.get('phoneNumber') ? String(privateProfile.get('phoneNumber')) : null,
       status: String(profile.get('status') ?? 'active'),
       createdAt: timestampToIso(profile.get('createdAt')),
       moderationReason: profile.get('moderationReason') ? String(profile.get('moderationReason')) : null,

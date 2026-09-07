@@ -205,11 +205,19 @@ export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveSc
   // window is resized; resolving the scale when the named style is read keeps
   // those rerenders in sync with the frame dimensions (Expo web/iPad split
   // view) without requiring every screen to recreate its styles manually.
+  let cachedScale: number | null = null;
+  const cache = new Map<PropertyKey, unknown>();
   return new Proxy(styles as object, {
     get(target, property, receiver) {
       const style = Reflect.get(target, property, receiver);
       if (!style || typeof style !== 'object' || Array.isArray(style)) return style;
-      return scaleStyle(style as NamedStyle, resolveScale());
+      const scale = resolveScale();
+      if (scale !== cachedScale) {
+        cache.clear();
+        cachedScale = scale;
+      }
+      if (!cache.has(property)) cache.set(property, scaleStyle(style as NamedStyle, scale));
+      return cache.get(property);
     },
   }) as T;
 }

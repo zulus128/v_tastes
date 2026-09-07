@@ -17,6 +17,7 @@ import { contactInviteId } from '../social/functions';
 import { callableOptions } from '../../shared/options';
 import { decodeCursor, encodeCursor } from '../../shared/pagination';
 import { parseInput } from '../../shared/validation';
+import { normalizeUsername, privateUserReference, usernameReference } from '../../shared/user-data';
 import { userSearchTokens } from './search';
 
 const CURRENT_ONBOARDING_VERSION = 1;
@@ -173,17 +174,31 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(userRef);
+    if (existing.exists && ['suspended', 'banned', 'deleted'].includes(String(existing.get('status')))) {
+      throw new HttpsError('permission-denied', 'This account cannot recreate its profile.');
+    }
+    const previousUsername = existing.get('username') ? String(existing.get('username')) : null;
+    const nextUsername = input.username ? normalizeUsername(input.username) : previousUsername;
+    const nextUsernameRef = nextUsername ? usernameReference(nextUsername) : null;
+    const previousUsernameRef = previousUsername ? usernameReference(previousUsername) : null;
+    const usernameClaim = nextUsernameRef ? await transaction.get(nextUsernameRef) : null;
+    const previousUsernameClaim = previousUsernameRef && previousUsernameRef.path !== nextUsernameRef?.path
+      ? await transaction.get(previousUsernameRef)
+      : null;
+    if (usernameClaim?.exists && usernameClaim.get('uid') !== uid) {
+      throw new HttpsError('already-exists', 'This username is already taken.', { reason: 'username-taken' });
+    }
     const now = FieldValue.serverTimestamp();
 
     transaction.set(
       userRef,
       {
         uid,
-        email: authUser.email?.toLocaleLowerCase() ?? null,
-        phoneNumber: authUser.phoneNumber ?? null,
+        email: FieldValue.delete(),
+        phoneNumber: FieldValue.delete(),
         displayName: input.displayName,
-        username: input.username ?? existing.get('username') ?? null,
-        searchTokens: userSearchTokens(input.displayName, input.username ?? existing.get('username') ?? null),
+        username: nextUsername,
+        searchTokens: userSearchTokens(input.displayName, nextUsername),
         city: input.city ?? existing.get('city') ?? null,
         bio: input.bio ?? '',
         photoPath: input.photoPath ?? existing.get('photoPath') ?? null,
@@ -199,6 +214,19 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
       },
       { merge: true },
     );
+    transaction.set(privateUserReference(uid), {
+      uid,
+      email: authUser.email?.toLocaleLowerCase() ?? null,
+      phoneNumber: authUser.phoneNumber ?? null,
+      updatedAt: now,
+      ...(!existing.exists ? { createdAt: now } : {}),
+    }, { merge: true });
+    if (nextUsernameRef) {
+      transaction.set(nextUsernameRef, { uid, username: nextUsername, updatedAt: now });
+    }
+    if (previousUsernameRef && previousUsernameClaim?.get('uid') === uid) {
+      transaction.delete(previousUsernameRef);
+    }
   });
 
   await notifyContactInviters(uid, input.displayName, [
@@ -274,29 +302,43 @@ export const updateProfileSettings = onCall(callableOptions, async (request) => 
   const uid = requireUserId(request);
   const input = parseInput(updateProfileSettingsInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
-  const [user, venue] = await Promise.all([
-    userRef.get(),
-    input.favoriteVenueId ? db.collection('venues').doc(input.favoriteVenueId).get() : Promise.resolve(null),
-  ]);
-  if (!user.exists || user.get('status') !== 'active') {
-    throw new HttpsError('failed-precondition', 'An active user profile is required.');
-  }
+  const venue = input.favoriteVenueId ? await db.collection('venues').doc(input.favoriteVenueId).get() : null;
   if (venue && (!venue.exists || venue.get('status') !== 'active')) {
     throw new HttpsError('not-found', 'The selected favourite place was not found.');
   }
-  await userRef.update({
-    ...(input.displayName ? { displayName: input.displayName } : {}),
-    ...(input.username ? { username: input.username } : {}),
-    ...((input.displayName || input.username) ? {
-      searchTokens: userSearchTokens(
-        input.displayName ?? String(user.get('displayName') ?? ''),
-        input.username ?? (user.get('username') ? String(user.get('username')) : null),
-      ),
-    } : {}),
-    ...(input.city ? { city: input.city } : {}),
-    ...(input.favoriteDish ? { 'tastePreferences.favoriteDish': input.favoriteDish } : {}),
-    ...(input.favoriteVenueId ? { 'tastePreferences.favoriteVenueId': input.favoriteVenueId } : {}),
-    updatedAt: FieldValue.serverTimestamp(),
+  await db.runTransaction(async (transaction) => {
+    const user = await transaction.get(userRef);
+    if (!user.exists || user.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    const previousUsername = user.get('username') ? String(user.get('username')) : null;
+    const nextUsername = input.username ? normalizeUsername(input.username) : previousUsername;
+    const nextUsernameRef = nextUsername ? usernameReference(nextUsername) : null;
+    const previousUsernameRef = previousUsername ? usernameReference(previousUsername) : null;
+    const usernameClaim = nextUsernameRef ? await transaction.get(nextUsernameRef) : null;
+    const previousUsernameClaim = previousUsernameRef && previousUsernameRef.path !== nextUsernameRef?.path
+      ? await transaction.get(previousUsernameRef)
+      : null;
+    if (usernameClaim?.exists && usernameClaim.get('uid') !== uid) {
+      throw new HttpsError('already-exists', 'This username is already taken.', { reason: 'username-taken' });
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.update(userRef, {
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+      ...(input.username ? { username: nextUsername } : {}),
+      ...((input.displayName || input.username) ? {
+        searchTokens: userSearchTokens(
+          input.displayName ?? String(user.get('displayName') ?? ''),
+          nextUsername,
+        ),
+      } : {}),
+      ...(input.city ? { city: input.city } : {}),
+      ...(input.favoriteDish ? { 'tastePreferences.favoriteDish': input.favoriteDish } : {}),
+      ...(input.favoriteVenueId ? { 'tastePreferences.favoriteVenueId': input.favoriteVenueId } : {}),
+      updatedAt: now,
+    });
+    if (nextUsernameRef) transaction.set(nextUsernameRef, { uid, username: nextUsername, updatedAt: now });
+    if (previousUsernameRef && previousUsernameClaim?.get('uid') === uid) transaction.delete(previousUsernameRef);
   });
   return { id: uid };
 });

@@ -28,6 +28,10 @@ function rateLimitId(phoneNumber: string): string {
   return createHash('sha256').update(`phone:${phoneNumber}`).digest('hex');
 }
 
+function scopedRateLimitId(scope: string, value: string): string {
+  return createHash('sha256').update(`${scope}:${value}`).digest('hex');
+}
+
 async function callFunction<T>(name: string, data: unknown, token?: string): Promise<T> {
   const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
     method: 'POST',
@@ -308,6 +312,19 @@ describe('phone OTP callables', () => {
     );
   });
 
+  it('keeps four-digit codes but caps verification attempts per phone number', async () => {
+    const phoneNumber = uniquePhone();
+    const challenge = await requestOtp(phoneNumber);
+    expect(challenge.localCode).toHaveLength(4);
+    await getFirestore().collection('_otpRateLimits')
+      .doc(scopedRateLimitId('phone-verify', phoneNumber))
+      .set({ count: 10, windowStartedAt: Timestamp.now() });
+    await expectReason(callFunction('verifyPhoneOtp', {
+      challengeId: challenge.challengeId,
+      code: challenge.localCode,
+    }), 'rate-limit-reached');
+  });
+
   it('serializes concurrent checks so they cannot bypass the attempt counter', async () => {
     const challenge = await requestOtp(uniquePhone());
     const results = await Promise.allSettled(
@@ -383,6 +400,10 @@ describe('authenticated session and paginated reads', () => {
       .where('username', '==', 'demo.user')
       .limit(1)
       .get();
+    expect(profile.docs[0]?.get('email')).toBeUndefined();
+    expect(profile.docs[0]?.get('phoneNumber')).toBeUndefined();
+    expect((await getFirestore().collection('_userPrivate').doc(profile.docs[0]!.id).get()).get('phoneNumber'))
+      .toBeTruthy();
     expect(profile.docs[0]?.get('tastePreferences')).toEqual({
       favoriteDish: 'Sushi',
       favoriteVenueId: 'morimoto',
@@ -391,6 +412,27 @@ describe('authenticated session and paginated reads', () => {
       ready: false,
       placesVisited: 0,
     });
+  }, 15_000);
+
+  it('keeps usernames unique and does not reactivate blocked profiles', async () => {
+    const first = await authenticatedUser();
+    const second = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction('createUserProfile', {
+      displayName: 'First User', username: 'Unique.Name', city: 'Istanbul',
+    }, first.token);
+    await expect(callFunction('createUserProfile', {
+      displayName: 'Second User', username: 'unique.name', city: 'Istanbul',
+    }, second.token)).rejects.toBeTruthy();
+    const usernameClaim = await db.collection('_usernames').doc('unique.name').get();
+    const firstUid = String(usernameClaim.get('uid'));
+    const firstRef = db.collection('users').doc(firstUid);
+    await firstRef.update({ status: 'banned' });
+    await expect(callFunction('createUserProfile', {
+      displayName: 'First User', username: 'another.name', city: 'Istanbul',
+    }, first.token)).rejects.toBeTruthy();
+    expect((await firstRef.get()).get('status')).toBe('banned');
+    expect(usernameClaim.get('uid')).toBe(firstUid);
   }, 15_000);
 
   it('paginates favourites and notifications and clears every notification', async () => {
@@ -490,7 +532,7 @@ describe('authenticated session and paginated reads', () => {
   }, 15_000);
 
   it('handles comment threads, reports, reactions, and cascade deletion', async () => {
-    const { first, second, db, reader, reviewCommand, firstReview } =
+    const { first, second, db, author, reader, reviewCommand, firstReview } =
       await createReviewFixture();
 
     const commentCommand = {
@@ -522,6 +564,12 @@ describe('authenticated session and paginated reads', () => {
       active: true,
       reactionCount: 1,
     });
+    await author.ref.update({ status: 'banned' });
+    await expect(callFunction('reactToComment', {
+      ...commentReaction,
+      idempotencyKey: 'comment-reaction-command-002',
+    }, first.token)).rejects.toBeTruthy();
+    await author.ref.update({ status: 'active' });
     expect(await callFunction('reactToComment', commentReaction, first.token)).toEqual({
       active: true,
       reactionCount: 1,
@@ -601,6 +649,15 @@ describe('authenticated session and paginated reads', () => {
       active: true,
       reactionCount: 1,
     });
+    expect((await author.ref.get()).get('xp')).toBe(55);
+    expect(await callFunction('reactToContent', {
+      idempotencyKey: 'reaction-command-02', targetType: 'review',
+      reviewId: firstReview.id, reaction: 'like',
+    }, second.token)).toMatchObject({ active: false, reactionCount: 0 });
+    expect((await author.ref.get()).get('xp')).toBe(50);
+    expect(await callFunction('reactToReview', {
+      ...reactionCommand, idempotencyKey: 'reaction-command-03',
+    }, second.token)).toMatchObject({ active: true, reactionCount: 1 });
     expect((await author.ref.get()).get('xp')).toBe(55);
   }, 15_000);
 
@@ -1185,6 +1242,17 @@ describe('Milestone 2 completion callables', () => {
     }, owner.token);
     expect(imported.matches.map((match) => match.userId)).toContain(firstUid);
 
+    await expectReason(callFunction('createGroup', {
+      name: 'Blocked arbitrary group', memberIds: [firstUid],
+    }, owner.token), 'mutual-follow-required');
+
+    await Promise.all([
+      callFunction('followUser', { targetUserId: firstUid }, owner.token),
+      callFunction('followUser', { targetUserId: ownerUid }, firstFriend.token),
+      callFunction('followUser', { targetUserId: secondUid }, owner.token),
+      callFunction('followUser', { targetUserId: ownerUid }, secondFriend.token),
+    ]);
+
     const group = await callFunction<{ id: string }>('createGroup', {
       name: 'M2 Food Friends', memberIds: [firstUid, secondUid],
     }, owner.token);
@@ -1205,6 +1273,10 @@ describe('Milestone 2 completion callables', () => {
     expect((await db.collection('conversations').doc(group.id).collection('messages').doc(message.id).get()).exists)
       .toBe(true);
     await callFunction('respondToRequest', { requestId, response: 'accepted' }, firstFriend.token);
+    await expectReason(
+      callFunction('respondToRequest', { requestId, response: 'accepted' }, firstFriend.token),
+      'request-already-answered',
+    );
 
     await callFunction('setTypingStatus', { conversationId: group.id, typing: true }, firstFriend.token);
     expect((await db.collection('conversations').doc(group.id).get()).get(`typing.${firstUid}`)).toBeTruthy();

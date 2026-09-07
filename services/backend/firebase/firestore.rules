@@ -29,6 +29,15 @@ service cloud.firestore {
       }
     }
 
+    // Authentication identifiers and account-contact data are server-only.
+    match /_userPrivate/{uid} {
+      allow read, write: if false;
+    }
+
+    match /_usernames/{username} {
+      allow read, write: if false;
+    }
+
     match /venues/{venueId} {
       allow read: if signedIn() && (resource.data.status == 'active' || isStaff());
       allow write: if false;

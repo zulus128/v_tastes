@@ -40,6 +40,7 @@ import {
 } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { normalizeUsername, usernameReference } from '../../shared/user-data';
 
 export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -238,14 +239,12 @@ function commentPreview(text: string): string {
 
 /** Resolves the `@username` handles inside a comment to the accounts they belong to. */
 async function mentionedUserIds(text: string): Promise<string[]> {
-  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].map((match) => match[1]))].slice(0, 10);
+  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].flatMap((match) => (
+    match[1] ? [normalizeUsername(match[1])] : []
+  )))].slice(0, 10);
   if (usernames.length === 0) return [];
-  const profiles = await Promise.all(usernames.map((username) => db
-    .collection('users')
-    .where('username', '==', username)
-    .limit(1)
-    .get()));
-  return [...new Set(profiles.flatMap((profile) => profile.docs.map((document) => document.id)))];
+  const claims = await db.getAll(...usernames.map(usernameReference));
+  return [...new Set(claims.flatMap((claim) => claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : []))];
 }
 
 /** Everyone who should hear about a freshly published review. */
@@ -542,13 +541,23 @@ export const reactToContent = onCall(callableOptions, async (request) => {
     if (content.get('authorId') === uid) {
       throw new HttpsError('failed-precondition', 'You cannot react to your own content.');
     }
-    await enforceRateLimit(transaction, uid, 'react-content', 120, 60_000);
+    const authorRef = input.targetType === 'review'
+      ? db.collection('users').doc(String(content.get('authorId')))
+      : null;
+    const author = authorRef ? await transaction.get(authorRef) : null;
+    await enforceRateLimit(transaction, uid, input.targetType === 'review' ? 'react-review' : 'react-content', 120, 60_000);
     const currentCount = Math.max(0, Number(content.get('reactionCount') ?? 0));
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
     if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
     else transaction.delete(reactionRef);
     transaction.update(contentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    if (authorRef && author?.exists) {
+      addXp(transaction, authorRef, active ? 5 : -5, {
+        xp: Number(author.get('xp') ?? 0),
+        monthlyXp: Number(author.get('monthlyXp') ?? 0),
+      });
+    }
     transaction.create(idempotencyRef, {
       active,
       reactionCount,
@@ -733,11 +742,15 @@ export const reactToComment = onCall(callableOptions, async (request) => {
   const reactionRef = commentRef.collection('reactions').doc(uid);
   const idempotencyRef = db.collection('_idempotency').doc(idempotentDocumentId(uid, `comment-reaction:${input.commentId}`, input.idempotencyKey));
   return db.runTransaction(async (transaction) => {
-    const [comment, reaction, idempotency] = await Promise.all([
-      transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
+    const [profile, comment, reaction, idempotency] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)), transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
     ]);
+    if (!profile.exists || profile.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
     if (idempotency.exists) return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount')) };
     if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+    await enforceRateLimit(transaction, uid, 'react-comment', 120, 60_000);
     const currentCount = Number(comment.get('reactionCount') ?? 0);
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));

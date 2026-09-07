@@ -27,6 +27,7 @@ import { notificationPreferences, sendNotification, sendNotifications } from '..
 import { computeRewards, levelForXp } from '../../shared/rewards';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { enforceRateLimit } from '../../shared/mutations';
 
 
 export const listNotifications = onCall(
@@ -158,80 +159,55 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(requestInputSchema, request.data);
   const ref = db.collection('users').doc(uid).collection('requests').doc(input.requestId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
-  const now = FieldValue.serverTimestamp();
-  await ref.update({ status: input.response, respondedAt: now });
-  if (input.response === 'accepted' && snap.get('kind') === 'group') {
-    const groupId = String(snap.get('targetId'));
-    const groupRef = db.collection('groups').doc(groupId);
-    const conversationRef = db.collection('conversations').doc(groupId);
-    await db.runTransaction(async (transaction) => {
-      const [group, conversation] = await Promise.all([
-        transaction.get(groupRef),
-        transaction.get(conversationRef),
-      ]);
-      if (!group.exists || !conversation.exists) return;
-      transaction.update(groupRef, {
-        memberIds: FieldValue.arrayUnion(uid),
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
+    if (snap.get('status') !== 'pending') {
+      throw new HttpsError('failed-precondition', 'This request has already been answered.', {
+        reason: 'request-already-answered',
+      });
+    }
+    const kind = String(snap.get('kind'));
+    const targetId = String(snap.get('targetId'));
+    const targetRef = kind === 'group'
+      ? db.collection('groups').doc(targetId)
+      : db.collection('activities').doc(targetId);
+    const conversationRef = db.collection('conversations').doc(targetId);
+    const [target, conversation] = await Promise.all([
+      transaction.get(targetRef),
+      transaction.get(conversationRef),
+    ]);
+    if (!target.exists || !conversation.exists || target.get('status') !== 'active' || conversation.get('status') !== 'active') {
+      throw new HttpsError('not-found', 'The invitation target is no longer available.');
+    }
+    const invitationStatus = conversation.get(`invitationStatuses.${uid}`);
+    if (invitationStatus !== 'pending') {
+      throw new HttpsError('failed-precondition', 'This invitation is no longer pending.', {
+        reason: 'invitation-not-pending',
+      });
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.update(ref, { status: input.response, respondedAt: now });
+    if (kind === 'group') {
+      transaction.update(targetRef, {
+        memberIds: input.response === 'accepted' ? FieldValue.arrayUnion(uid) : FieldValue.arrayRemove(uid),
         invitedMemberIds: FieldValue.arrayRemove(uid),
         updatedAt: now,
       });
-      transaction.update(
-        conversationRef,
-        'participantIds', FieldValue.arrayUnion(uid),
-        new FieldPath('invitationStatuses', uid), 'accepted',
-        new FieldPath('unreadCounts', uid), 0,
+    } else {
+      transaction.update(targetRef,
+        new FieldPath('invitationStatuses', uid), input.response,
+        'participantIds', input.response === 'accepted' ? FieldValue.arrayUnion(uid) : FieldValue.arrayRemove(uid),
         'updatedAt', now,
       );
-    });
-  } else if (input.response === 'declined' && snap.get('kind') === 'group') {
-    const groupId = String(snap.get('targetId'));
-    await Promise.all([
-      db.collection('groups').doc(groupId).set({ invitedMemberIds: FieldValue.arrayRemove(uid), updatedAt: now }, { merge: true }),
-      db.collection('conversations').doc(groupId).update(
-        new FieldPath('invitationStatuses', uid), 'declined',
-        'participantIds', FieldValue.arrayRemove(uid),
-        'updatedAt', now,
-      ),
-    ]);
-  }
-  if (snap.get('kind') === 'activity') {
-    const activityId = String(snap.get('targetId'));
-    const activityRef = db.collection('activities').doc(activityId);
-    const conversationRef = db.collection('conversations').doc(activityId);
-    await db.runTransaction(async (transaction) => {
-      const [activity, conversation] = await Promise.all([
-        transaction.get(activityRef),
-        transaction.get(conversationRef),
-      ]);
-      if (!activity.exists || !conversation.exists) return;
-      transaction.update(
-        activityRef,
-        new FieldPath('invitationStatuses', uid),
-        input.response,
-        'updatedAt',
-        now,
-      );
-      transaction.update(
-        conversationRef,
-        new FieldPath('invitationStatuses', uid),
-        input.response,
-        'updatedAt',
-        now,
-      );
-      if (input.response === 'declined') {
-        transaction.update(activityRef, 'participantIds', FieldValue.arrayRemove(uid));
-        transaction.update(
-          conversationRef,
-          'participantIds',
-          FieldValue.arrayRemove(uid),
-          new FieldPath('unreadCounts', uid),
-          FieldValue.delete(),
-        );
-      }
-    });
-  }
+    }
+    transaction.update(conversationRef,
+      new FieldPath('invitationStatuses', uid), input.response,
+      'participantIds', input.response === 'accepted' ? FieldValue.arrayUnion(uid) : FieldValue.arrayRemove(uid),
+      new FieldPath('unreadCounts', uid), input.response === 'accepted' ? 0 : FieldValue.delete(),
+      'updatedAt', now,
+    );
+  });
   return { id: input.requestId };
 });
 
@@ -239,65 +215,62 @@ export const createGroup = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createGroupInputSchema, request.data);
   const ref = db.collection('groups').doc();
-  const memberIds = [...new Set([uid, ...input.memberIds])];
-  const profiles = await db.getAll(...memberIds.map((id) => db.collection('users').doc(id)));
-  if (profiles.some((profile) => !profile.exists || profile.get('status') !== 'active')) {
-    throw new HttpsError('not-found', 'One of the selected group members was not found.');
-  }
-  const now = FieldValue.serverTimestamp();
-  const invitationStatuses = Object.fromEntries(memberIds.map((id) => [id, id === uid ? 'accepted' : 'pending']));
-  const batch = db.batch();
-  batch.create(ref, {
-    name: input.name,
-    adminId: uid,
-    memberIds: [uid],
-    invitedMemberIds: memberIds.filter((id) => id !== uid),
-    conversationId: ref.id,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-  });
-  batch.create(db.collection('conversations').doc(ref.id), {
-    kind: 'group',
-    groupId: ref.id,
-    title: input.name,
-    organizerId: uid,
-    participantIds: [uid],
-    invitationStatuses,
-    unreadCounts: { [uid]: 0 },
-    lastReadAt: {},
-    lastReadMessageIds: {},
-    typing: {},
-    lastMessage: {
-      id: `${ref.id}-created`,
-      senderId: uid,
-      text: 'Group created',
-      createdAt: now,
-    },
-    messageCount: 0,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-  });
-  for (const memberId of memberIds.filter((id) => id !== uid)) {
-    batch.set(db.collection('users').doc(memberId).collection('requests').doc(`group-${ref.id}`), {
-      kind: 'group',
-      title: input.name,
-      body: `${String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Someone')} invited you to a group.`,
-      senderName: String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Tastes user'),
-      senderId: uid,
-      targetId: ref.id,
-      status: 'pending',
-      createdAt: now,
+  const invitedIds = [...new Set(input.memberIds)].filter((id) => id !== uid);
+  let ownerName = 'Tastes user';
+  await db.runTransaction(async (transaction) => {
+    const userRef = db.collection('users').doc(uid);
+    const [owner, ...memberData] = await Promise.all([
+      transaction.get(userRef),
+      ...invitedIds.flatMap((memberId) => [
+        transaction.get(db.collection('users').doc(memberId)),
+        transaction.get(userRef.collection('following').doc(memberId)),
+        transaction.get(db.collection('users').doc(memberId).collection('following').doc(uid)),
+      ]),
+    ]);
+    if (!owner.exists || owner.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    ownerName = String(owner.get('displayName') ?? 'Tastes user');
+    for (let index = 0; index < invitedIds.length; index += 1) {
+      const profile = memberData[index * 3];
+      const forward = memberData[index * 3 + 1];
+      const reverse = memberData[index * 3 + 2];
+      if (!profile?.exists || profile.get('status') !== 'active') {
+        throw new HttpsError('not-found', 'One of the selected group members was not found.');
+      }
+      if (!forward?.exists || !reverse?.exists) {
+        throw new HttpsError('permission-denied', 'Groups can only include mutual followers.', {
+          reason: 'mutual-follow-required',
+        });
+      }
+    }
+    await enforceRateLimit(transaction, uid, 'create-group', 10, 60 * 60_000);
+    const now = FieldValue.serverTimestamp();
+    const invitationStatuses = { [uid]: 'accepted', ...Object.fromEntries(invitedIds.map((id) => [id, 'pending'])) };
+    transaction.create(ref, {
+      name: input.name, adminId: uid, memberIds: [uid], invitedMemberIds: invitedIds,
+      conversationId: ref.id, status: 'active', createdAt: now, updatedAt: now,
     });
-  }
-  await batch.commit();
-  await sendNotifications(memberIds.filter((id) => id !== uid).map((memberId) => ({
+    transaction.create(db.collection('conversations').doc(ref.id), {
+      kind: 'group', groupId: ref.id, title: input.name, organizerId: uid,
+      participantIds: [uid], invitationStatuses, unreadCounts: { [uid]: 0 },
+      lastReadAt: {}, lastReadMessageIds: {}, typing: {},
+      lastMessage: { id: `${ref.id}-created`, senderId: uid, text: 'Group created', createdAt: now },
+      messageCount: 0, status: 'active', createdAt: now, updatedAt: now,
+    });
+    for (const memberId of invitedIds) {
+      transaction.set(db.collection('users').doc(memberId).collection('requests').doc(`group-${ref.id}`), {
+        kind: 'group', title: input.name, body: `${ownerName} invited you to a group.`,
+        senderName: ownerName, senderId: uid, targetId: ref.id, status: 'pending', createdAt: now,
+      });
+    }
+  });
+  await sendNotifications(invitedIds.map((memberId) => ({
     recipientId: memberId,
     type: 'group-added' as const,
     eventKey: ref.id,
     actorId: uid,
-    actorName: String(profiles.find((profile) => profile.id === uid)?.get('displayName') ?? 'Someone'),
+    actorName: ownerName,
     params: { group: input.name },
     targetId: ref.id,
   })));
@@ -338,50 +311,63 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(updateGroupMembersInputSchema, request.data);
   const ref = db.collection('groups').doc(input.groupId);
-  const group = await ref.get();
-  if (!group.exists || group.get('adminId') !== uid)
-    throw new HttpsError('permission-denied', 'Only the group admin can edit members.');
-  const previousIds = Array.isArray(group.get('memberIds')) ? group.get('memberIds') as string[] : [uid];
-  const selectedIds = [...new Set([uid, ...input.memberIds])];
-  const retainedIds = selectedIds.filter((id) => previousIds.includes(id));
-  const invitedIds = selectedIds.filter((id) => !previousIds.includes(id));
-  const profiles = invitedIds.length > 0
-    ? await db.getAll(...invitedIds.map((id) => db.collection('users').doc(id)))
-    : [];
-  if (profiles.some((profile) => !profile.exists || profile.get('status') !== 'active')) {
-    throw new HttpsError('not-found', 'One of the selected group members was not found.');
-  }
-  const owner = await db.collection('users').doc(uid).get();
-  const now = FieldValue.serverTimestamp();
-  const batch = db.batch();
-  batch.update(ref, {
-    memberIds: retainedIds,
-    ...(invitedIds.length > 0 ? { invitedMemberIds: FieldValue.arrayUnion(...invitedIds) } : {}),
-    updatedAt: now,
-  });
-  const conversationRef = db.collection('conversations').doc(ref.id);
-  batch.update(conversationRef, { participantIds: retainedIds, updatedAt: now });
-  for (const invitedId of invitedIds) {
-    batch.update(conversationRef, new FieldPath('invitationStatuses', invitedId), 'pending');
-    batch.set(db.collection('users').doc(invitedId).collection('requests').doc(`group-${ref.id}`), {
-      kind: 'group',
-      title: String(group.get('name') ?? 'Group'),
-      body: `${String(owner.get('displayName') ?? 'Someone')} invited you to a group.`,
-      senderName: String(owner.get('displayName') ?? 'Tastes user'),
-      senderId: uid,
-      targetId: ref.id,
-      status: 'pending',
-      createdAt: now,
+  let invitedIds: string[] = [];
+  let ownerName = 'Tastes user';
+  let groupName = 'Group';
+  await db.runTransaction(async (transaction) => {
+    const ownerRef = db.collection('users').doc(uid);
+    const [group, owner] = await Promise.all([transaction.get(ref), transaction.get(ownerRef)]);
+    if (!group.exists || group.get('status') !== 'active' || group.get('adminId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the active group admin can edit members.');
+    }
+    if (!owner.exists || owner.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    ownerName = String(owner.get('displayName') ?? 'Tastes user');
+    groupName = String(group.get('name') ?? 'Group');
+    const previousIds = Array.isArray(group.get('memberIds')) ? group.get('memberIds') as string[] : [uid];
+    const selectedIds = [...new Set([uid, ...input.memberIds])];
+    const retainedIds = selectedIds.filter((id) => previousIds.includes(id));
+    invitedIds = selectedIds.filter((id) => !previousIds.includes(id));
+    const memberData = await Promise.all(invitedIds.flatMap((memberId) => [
+      transaction.get(db.collection('users').doc(memberId)),
+      transaction.get(ownerRef.collection('following').doc(memberId)),
+      transaction.get(db.collection('users').doc(memberId).collection('following').doc(uid)),
+    ]));
+    for (let index = 0; index < invitedIds.length; index += 1) {
+      if (!memberData[index * 3]?.exists || memberData[index * 3]?.get('status') !== 'active') {
+        throw new HttpsError('not-found', 'One of the selected group members was not found.');
+      }
+      if (!memberData[index * 3 + 1]?.exists || !memberData[index * 3 + 2]?.exists) {
+        throw new HttpsError('permission-denied', 'Groups can only include mutual followers.', {
+          reason: 'mutual-follow-required',
+        });
+      }
+    }
+    await enforceRateLimit(transaction, uid, 'update-group-members', 20, 60 * 60_000);
+    const now = FieldValue.serverTimestamp();
+    transaction.update(ref, {
+      memberIds: retainedIds,
+      ...(invitedIds.length > 0 ? { invitedMemberIds: FieldValue.arrayUnion(...invitedIds) } : {}),
+      updatedAt: now,
     });
-  }
-  await batch.commit();
+    const conversationRef = db.collection('conversations').doc(ref.id);
+    transaction.update(conversationRef, { participantIds: retainedIds, updatedAt: now });
+    for (const invitedId of invitedIds) {
+      transaction.update(conversationRef, new FieldPath('invitationStatuses', invitedId), 'pending');
+      transaction.set(db.collection('users').doc(invitedId).collection('requests').doc(`group-${ref.id}`), {
+        kind: 'group', title: groupName, body: `${ownerName} invited you to a group.`,
+        senderName: ownerName, senderId: uid, targetId: ref.id, status: 'pending', createdAt: now,
+      });
+    }
+  });
   await sendNotifications(invitedIds.map((invitedId) => ({
     recipientId: invitedId,
     type: 'group-added' as const,
     eventKey: ref.id,
     actorId: uid,
-    actorName: String(owner.get('displayName') ?? 'Someone'),
-    params: { group: String(group.get('name') ?? 'Group') },
+    actorName: ownerName,
+    params: { group: groupName },
     targetId: ref.id,
   })));
   return { id: ref.id };
