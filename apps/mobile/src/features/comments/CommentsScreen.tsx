@@ -136,7 +136,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
   </View>;
 }
 
-function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { loaded: number; total: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
+function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { loaded: number; total: number; hidden: boolean; loading?: boolean; onLoadMore?: () => void; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -161,12 +161,17 @@ function CommentRow({ item, nested = false, highlighted = false, onDelete, onRea
           </Pressable>
           <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.action}>Reply</Text></Pressable>
           {repliesToggle ? (
-            <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
-              <Text style={styles.action}>{repliesToggle.hidden
-                ? `Show latest replies (${repliesToggle.loaded}${repliesToggle.total > repliesToggle.loaded ? ` of ${repliesToggle.total}` : ''})`
-                : 'Hide replies'}</Text>
-              <CaretDownIcon color={colors.textSecondary} height={responsiveSize(14)} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={responsiveSize(14)} />
-            </Pressable>
+            <>
+              <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
+                <Text style={styles.action}>{repliesToggle.hidden
+                  ? `Show latest replies (${repliesToggle.loaded}${repliesToggle.total > repliesToggle.loaded ? ` of ${repliesToggle.total}` : ''})`
+                  : 'Hide replies'}</Text>
+                <CaretDownIcon color={colors.textSecondary} height={responsiveSize(14)} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={responsiveSize(14)} />
+              </Pressable>
+              {!repliesToggle.hidden && repliesToggle.onLoadMore ? <Pressable disabled={repliesToggle.loading} onPress={repliesToggle.onLoadMore} style={styles.actionIconRow}>
+                <Text style={styles.action}>{repliesToggle.loading ? 'Loading replies…' : `Show ${repliesToggle.total - repliesToggle.loaded} more replies`}</Text>
+              </Pressable> : null}
+            </>
           ) : null}
         </View>
       </View>
@@ -195,6 +200,8 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const [reportSent, setReportSent] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
+  const [extraReplies, setExtraReplies] = useState<Record<string, { items: Comment[]; nextCursor: string | null | undefined }>>({});
+  const [loadingReplyIds, setLoadingReplyIds] = useState<Set<string>>(new Set());
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
   const listRef = useRef<FlatList<Comment> | null>(null);
@@ -211,6 +218,38 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
     replies.push(item);
     repliesByParent.set(item.parentCommentId!, replies);
   });
+
+  async function loadMoreReplies(parentCommentId: string) {
+    if (loadingReplyIds.has(parentCommentId)) return;
+    setLoadingReplyIds((current) => new Set(current).add(parentCommentId));
+    try {
+      const response = await api.getCommentReplies({
+        reviewId,
+        parentCommentId,
+        cursor: extraReplies[parentCommentId]?.nextCursor ?? null,
+        limit: 20,
+      });
+      setExtraReplies((current) => {
+        const previous = current[parentCommentId]?.items ?? [];
+        const byId = new Map([...previous, ...response.data.items].map((item) => [item.id, item]));
+        return {
+          ...current,
+          [parentCommentId]: {
+            items: [...byId.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+            nextCursor: response.data.nextCursor,
+          },
+        };
+      });
+    } catch (error) {
+      Alert.alert('Could not load replies', apiErrorMessage(error));
+    } finally {
+      setLoadingReplyIds((current) => {
+        const next = new Set(current);
+        next.delete(parentCommentId);
+        return next;
+      });
+    }
+  }
   const targetRootIndex = commentId
     ? rootItems.findIndex((item) => item.id === commentId || items.some((candidate) => candidate.id === commentId && candidate.parentCommentId === item.id))
     : -1;
@@ -294,12 +333,15 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             windowSize={7}
             refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
             renderItem={({ item }) => {
-              const replies = repliesByParent.get(item.id) ?? [];
+              const previewReplies = repliesByParent.get(item.id) ?? [];
+              const additionalReplies = extraReplies[item.id]?.items ?? [];
+              const replies = [...new Map([...previewReplies, ...additionalReplies].map((reply) => [reply.id, reply])).values()]
+                .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
               const hidden = hiddenReplies.has(item.id);
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
               const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
               return <View style={styles.thread}>
-                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { loaded: replies.length, total: item.replyCount, hidden, onToggle: toggleReplies } : undefined} />
+                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={item.replyCount > 0 ? { loaded: replies.length, total: item.replyCount, hidden, loading: loadingReplyIds.has(item.id), onLoadMore: replies.length < item.replyCount && extraReplies[item.id]?.nextCursor !== null ? () => void loadMoreReplies(item.id) : undefined, onToggle: toggleReplies } : undefined} />
                 {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
                   const nextOffset = event.nativeEvent.layout.y;
                   setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });

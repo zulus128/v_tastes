@@ -518,6 +518,7 @@ describe('authenticated session and paginated reads', () => {
     expect(reviewDocument.get('tags')).toEqual(['casual', 'date-night']);
     expect(reviewDocument.get('dishNames')).toEqual(['Soup dumplings']);
     expect(reviewDocument.get('dishReviews')).toEqual(reviewCommand.dishReviews);
+    expect(reviewDocument.get('xpBefore')).toBe(0);
     expect((await db.collection('venues').doc('demo-cafe').get()).get('reviewCount')).toBe(1);
     expect((await author.ref.get()).get('reviewCount')).toBe(1);
     const friendsFeed = await callFunction<{
@@ -597,6 +598,19 @@ describe('authenticated session and paginated reads', () => {
     expect(thread.items).toHaveLength(4);
     expect(thread.items.map((comment) => comment.id)).not.toContain(reply.id);
     expect(new Set(thread.items.slice(1).map((comment) => comment.id))).toEqual(new Set(newerReplies));
+    const replyPage = await callFunction<{
+      items: Array<{ id: string; parentCommentId: string | null }>;
+      nextCursor: string | null;
+    }>('getCommentReplies', { reviewId: firstReview.id, parentCommentId: firstComment.id, limit: 2 }, second.token);
+    expect(replyPage.items).toHaveLength(2);
+    expect(replyPage.items.every((comment) => comment.parentCommentId === firstComment.id)).toBe(true);
+    expect(replyPage.nextCursor).not.toBeNull();
+    const olderReplyPage = await callFunction<{ items: Array<{ id: string }> }>(
+      'getCommentReplies',
+      { reviewId: firstReview.id, parentCommentId: firstComment.id, limit: 2, cursor: replyPage.nextCursor },
+      second.token,
+    );
+    expect(new Set([...replyPage.items, ...olderReplyPage.items].map((comment) => comment.id)).size).toBe(4);
 
     const report = await callFunction<{ id: string }>(
       'reportComment',

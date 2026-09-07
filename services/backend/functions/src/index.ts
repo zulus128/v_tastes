@@ -66,6 +66,7 @@ export {
   editReview,
   setReviewPinned,
   getComments,
+  getCommentReplies,
   getFeed,
   getFeed as getFriendFeed,
   hideReview,

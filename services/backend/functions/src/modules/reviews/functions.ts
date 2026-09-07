@@ -6,6 +6,7 @@ import {
   editReviewInputSchema,
   setReviewPinnedInputSchema,
   getCommentsInputSchema,
+  getCommentRepliesInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
   reactToReviewInputSchema,
@@ -231,6 +232,66 @@ export const getComments = onCall(callableOptions, async (request) => {
   };
 });
 
+/** Fetches a bounded, independently paginated reply thread. */
+export const getCommentReplies = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(getCommentRepliesInputSchema, request.data);
+  const cursor = decodeCursor(input.cursor);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const [review, parent] = await Promise.all([
+    reviewRef.get(),
+    reviewRef.collection('comments').doc(input.parentCommentId).get(),
+  ]);
+  if (!review.exists || review.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The review was not found.');
+  }
+  if (!parent.exists || parent.get('status') !== 'published' || parent.get('parentCommentId') !== null) {
+    throw new HttpsError('not-found', 'The parent comment was not found.');
+  }
+
+  let repliesQuery = reviewRef.collection('comments')
+    .where('status', '==', 'published')
+    .where('parentCommentId', '==', input.parentCommentId)
+    .orderBy('createdAt', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc');
+  if (cursor) repliesQuery = repliesQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+  const snapshot = await repliesQuery.limit(input.limit + 1).get();
+  const documents = snapshot.docs.slice(0, input.limit);
+  const last = documents.at(-1);
+  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const [reactionDocuments, authorDocuments] = await Promise.all([
+    documents.length > 0
+      ? db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid)))
+      : Promise.resolve([]),
+    authorIds.length > 0
+      ? db.getAll(...authorIds.map((id) => db.collection('users').doc(id)))
+      : Promise.resolve([]),
+  ]);
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const authorPhotoById = new Map(authorDocuments.map((document) => [
+    document.id,
+    document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null,
+  ]));
+  return {
+    items: documents.map((document) => ({
+      id: document.id,
+      reviewId: input.reviewId,
+      authorId: String(document.get('authorId')),
+      authorDisplayName: String(document.get('authorDisplayName')),
+      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      parentCommentId: input.parentCommentId,
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      replyCount: Number(document.get('replyCount') ?? 0),
+      reacted: reactedIds.has(document.id),
+      text: String(document.get('text')),
+      createdAt: timestampToIso(document.get('createdAt')),
+    })),
+    nextCursor: snapshot.size > input.limit && last
+      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
+      : null,
+  };
+});
+
 /** Like counts that are worth telling the author about. */
 const REVIEW_LIKE_MILESTONES = [10, 50, 100];
 const MENTION_PATTERN = /@([a-zA-Z0-9._]{2,40})/g;
@@ -357,7 +418,9 @@ export const processReviewEffects = onDocumentCreated({
   const authorId = String(review.get('authorId') ?? '');
   if (!authorId) return;
   const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
-  await Promise.all([
+  const storedXpBefore = Number(review.get('xpBefore'));
+  const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
+  const effects = [
     attachDishPhotoUrls(review),
     announceReview(event.params.reviewId, authorId, String(review.get('authorDisplayName') ?? 'Someone'), {
       id: String(review.get('venueId') ?? ''),
@@ -365,9 +428,13 @@ export const processReviewEffects = onDocumentCreated({
       city: String(review.get('venueCity') ?? ''),
       reviewCount: review.get('wasFirstVenueReview') === true ? 0 : 1,
     }),
-    notifyLevelChange(authorId, Math.max(0, xp - 50), xp),
+    notifyLevelChange(authorId, previousXp, xp),
     syncRewardNotifications(authorId),
-  ]);
+  ];
+  const results = await Promise.allSettled(effects);
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') console.warn(`Review effect ${index} failed for ${event.params.reviewId}.`, result.reason);
+  });
 });
 
 export const createReview = onCall(callableOptions, async (request) => {
@@ -402,6 +469,7 @@ export const createReview = onCall(callableOptions, async (request) => {
     await enforceRateLimit(transaction, uid, 'create-review', 10, 60 * 60_000);
     const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
     const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
+    const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
     transaction.create(reviewRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
@@ -418,6 +486,7 @@ export const createReview = onCall(callableOptions, async (request) => {
       commentCount: 0,
       reactionCount: 0,
       wasFirstVenueReview: reviewCount === 0,
+      xpBefore,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -427,7 +496,7 @@ export const createReview = onCall(callableOptions, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
     addXp(transaction, userRef, 50, {
-      xp: Number(user.get('xp') ?? 0),
+      xp: xpBefore,
       monthlyXp: Number(user.get('monthlyXp') ?? 0),
     });
     transaction.update(userRef, {
@@ -463,13 +532,20 @@ export const editReview = onCall(callableOptions, async (request) => {
     const average = Math.max(0, Number(venue.get('rating') ?? 0));
     const oldRating = Number(review.get('rating') ?? 0);
     const now = FieldValue.serverTimestamp();
+    const previousDishes = Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') as StoredDishReview[] : [];
+    const photoUrlByPath = new Map(previousDishes.flatMap((dish) =>
+      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    const dishReviews = input.dishReviews.map((dish) => ({
+      ...dish,
+      ...(photoUrlByPath.get(dish.photoPath) ? { photoUrl: photoUrlByPath.get(dish.photoPath) } : {}),
+    }));
     transaction.update(reviewRef, {
       rating: input.rating,
       text: input.text,
       tags: input.tags,
       tag: input.tags[0] ?? null,
-      dishReviews: input.dishReviews,
-      dishNames: input.dishReviews.map((dish) => dish.title),
+      dishReviews,
+      dishNames: dishReviews.map((dish) => dish.title),
       updatedAt: now,
     });
     transaction.update(venueRef, {
@@ -478,6 +554,11 @@ export const editReview = onCall(callableOptions, async (request) => {
     });
     transaction.update(db.collection('users').doc(uid), { rewardProgressDirty: true });
   });
+  try {
+    await attachDishPhotoUrls(await reviewRef.get());
+  } catch (error) {
+    console.warn(`Unable to resolve review photos after editing ${input.reviewId}.`, error);
+  }
   return { id: input.reviewId };
 });
 
