@@ -51,6 +51,10 @@ function visualAuditData(operation: string): unknown {
       return { hero: null, topReviewer: null, trending: [], newSpots: [], mostReviewed: [], forYou: [], hiddenGems: [], popularReviews: [] };
     case 'getDiscoverPeople':
       return { trending: [], new: [], suggested: [] };
+    case 'searchPeople':
+      return [];
+    case 'searchVenues':
+      return { items: [], externalResultsAvailable: false };
     case 'getFeed':
     case 'getFriendFeed':
     case 'getVenues':

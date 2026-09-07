@@ -59,25 +59,28 @@ function ConversationRow({
       : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
   const translateX = useMemo(() => new Animated.Value(0), []);
+  const deleteActionWidth = responsiveSize(82);
+  const deleteThreshold = responsiveSize(64);
+  const swipeStartThreshold = responsiveSize(8);
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+      gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy)
     ),
     onPanResponderMove: (_, gesture) => {
-      translateX.setValue(Math.max(-82, Math.min(0, gesture.dx)));
+      translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx)));
     },
     onPanResponderRelease: (_, gesture) => {
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
       }).start(() => {
-        if (gesture.dx < -64 && !deleting) onDelete();
+        if (gesture.dx < -deleteThreshold && !deleting) onDelete();
       });
     },
     onPanResponderTerminate: () => {
       Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
     },
-  }), [deleting, onDelete, translateX]);
+  }), [deleteActionWidth, deleteThreshold, deleting, onDelete, swipeStartThreshold, translateX]);
   return (
     <View style={styles.swipeRow}>
       <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>

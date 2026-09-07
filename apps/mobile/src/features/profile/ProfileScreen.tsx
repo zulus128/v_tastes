@@ -566,7 +566,12 @@ export function ProfileScreen({
               <MapView
                 initialRegion={mapRegion}
                 key={mapKey}
-                mapPadding={{ top: 68, right: 12, bottom: 122, left: 12 }}
+                mapPadding={{
+                  top: responsiveSize(68),
+                  right: responsiveSize(12),
+                  bottom: responsiveSize(122),
+                  left: responsiveSize(12),
+                }}
                 mapType={Platform.OS === 'android' ? 'none' : 'standard'}
                 pitchEnabled={false}
                 rotateEnabled={false}
