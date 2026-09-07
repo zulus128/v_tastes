@@ -16,6 +16,7 @@ import {
 } from '@react-navigation/native-stack';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { DiscoverPerson } from '@tastes/contracts';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { Alert, Linking, View } from 'react-native';
 import { useMemo, useState } from 'react';
@@ -124,6 +125,7 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 function tabOptions(
   colors: ThemeColors,
+  isDark: boolean,
   { route }: { route: { name: keyof MainTabParamList } },
 ): BottomTabNavigationOptions {
   const create = route.name === 'Create';
@@ -138,11 +140,16 @@ function tabOptions(
     tabBarItemStyle: create ? styles.createTabItem : undefined,
     tabBarIcon: ({ focused }) =>
       create ? (
-        <View style={[styles.createIconBorder, { backgroundColor: colors.background }]}>
+        <LinearGradient
+          colors={isDark ? ['#080808', '#4B1816'] : ['#FFFFFF', '#FFD1D0']}
+          end={{ x: 0.5, y: 1 }}
+          start={{ x: 0.5, y: 0 }}
+          style={styles.createIconBorder}
+        >
           <View style={[styles.createIcon, { backgroundColor: colors.primary }]}>
             <CreateTabGlyph />
           </View>
-        </View>
+        </LinearGradient>
       ) : (
         <View style={styles.tabIcon}>
           <TabBarGlyph
@@ -165,7 +172,7 @@ function MainTabs({
   user: User;
   rootNavigation: RootNavigation;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -184,7 +191,7 @@ function MainTabs({
     <>
       <Tabs.Navigator
         initialRouteName={initialTab ?? 'Home'}
-        screenOptions={(props) => tabOptions(colors, props)}
+        screenOptions={(props) => tabOptions(colors, isDark, props)}
         backBehavior="history"
         safeAreaInsets={{ bottom: 0 }}
       >
