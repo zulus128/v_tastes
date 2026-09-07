@@ -1,5 +1,6 @@
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { normalizeUsername, usernameReference } from '../shared/user-data';
 
 if (getApps().length === 0) initializeApp({ credential: applicationDefault() });
 
@@ -49,10 +50,10 @@ async function main(): Promise<void> {
         batch.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
       }
       const username = profile.get('username')
-        ? String(profile.get('username')).trim().toLocaleLowerCase('en-US')
+        ? normalizeUsername(String(profile.get('username')))
         : null;
       if (username) {
-        batch.set(db.collection('_usernames').doc(username), {
+        batch.set(usernameReference(username), {
           uid: profile.id, username, updatedAt: FieldValue.serverTimestamp(),
         });
         if (profile.get('username') !== username) batch.update(profile.ref, { username });

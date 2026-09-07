@@ -159,7 +159,7 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(requestInputSchema, request.data);
   const ref = db.collection('users').doc(uid).collection('requests').doc(input.requestId);
-  await db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new HttpsError('not-found', 'Request not found.');
     if (snap.get('status') !== 'pending') {
@@ -178,7 +178,11 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
       transaction.get(conversationRef),
     ]);
     if (!target.exists || !conversation.exists || target.get('status') !== 'active' || conversation.get('status') !== 'active') {
-      throw new HttpsError('not-found', 'The invitation target is no longer available.');
+      // Do not leave a permanently actionable card when an admin removed the
+      // group/activity or its conversation. Return after committing the state
+      // transition so a refresh no longer presents this request.
+      transaction.update(ref, { status: 'declined', respondedAt: FieldValue.serverTimestamp() });
+      return { targetMissing: true };
     }
     const invitationStatus = conversation.get(`invitationStatuses.${uid}`);
     if (invitationStatus !== 'pending') {
@@ -207,7 +211,9 @@ export const respondToRequest = onCall(callableOptions, async (request) => {
       new FieldPath('unreadCounts', uid), input.response === 'accepted' ? 0 : FieldValue.delete(),
       'updatedAt', now,
     );
+    return { targetMissing: false };
   });
+  if (result.targetMissing) throw new HttpsError('not-found', 'The invitation target is no longer available.');
   return { id: input.requestId };
 });
 

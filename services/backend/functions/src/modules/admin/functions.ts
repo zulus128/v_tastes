@@ -408,6 +408,8 @@ export const searchUsers = onCall(callableOptions, async (request) => {
         profile.id,
         String(profile.get('username') ?? ''),
         String(profile.get('displayName') ?? ''),
+        String(profile.get('email') ?? ''),
+        String(profile.get('phoneNumber') ?? ''),
       ].some((value) => value.toLowerCase().includes(query))).slice(0, 50);
   }
   const privateProfiles = profileDocs.length > 0
@@ -418,8 +420,12 @@ export const searchUsers = onCall(callableOptions, async (request) => {
     id: profile.id,
     displayName: String(profile.get('displayName') ?? 'Tastes user'),
     username: profile.get('username') ? String(profile.get('username')) : null,
-    email: privateById.get(profile.id)?.get('email') ? String(privateById.get(profile.id)?.get('email')) : null,
-    phoneNumber: privateById.get(profile.id)?.get('phoneNumber') ? String(privateById.get(profile.id)?.get('phoneNumber')) : null,
+    email: privateById.get(profile.id)?.get('email')
+      ? String(privateById.get(profile.id)?.get('email'))
+      : profile.get('email') ? String(profile.get('email')) : null,
+    phoneNumber: privateById.get(profile.id)?.get('phoneNumber')
+      ? String(privateById.get(profile.id)?.get('phoneNumber'))
+      : profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
     status: String(profile.get('status') ?? 'active'),
     createdAt: timestampToIso(profile.get('createdAt')),
   }));
@@ -444,8 +450,10 @@ export const getUserHistory = onCall(callableOptions, async (request) => {
       id: profile.id,
       displayName: String(profile.get('displayName') ?? 'Tastes user'),
       username: profile.get('username') ? String(profile.get('username')) : null,
-      email: privateProfile.get('email') ? String(privateProfile.get('email')) : null,
-      phoneNumber: privateProfile.get('phoneNumber') ? String(privateProfile.get('phoneNumber')) : null,
+      email: privateProfile.get('email') ? String(privateProfile.get('email'))
+        : profile.get('email') ? String(profile.get('email')) : null,
+      phoneNumber: privateProfile.get('phoneNumber') ? String(privateProfile.get('phoneNumber'))
+        : profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
       status: String(profile.get('status') ?? 'active'),
       createdAt: timestampToIso(profile.get('createdAt')),
       moderationReason: profile.get('moderationReason') ? String(profile.get('moderationReason')) : null,
@@ -712,6 +720,9 @@ export const mergeVenues = onCall(callableOptions, async (request) => {
     source.update({ status: 'merged', mergedInto: target.id, reviewCount: 0, updatedAt: FieldValue.serverTimestamp(), updatedBy: actorId }),
     movedReviews > 0 ? target.update({ reviewCount: FieldValue.increment(movedReviews), updatedAt: FieldValue.serverTimestamp() }) : Promise.resolve(),
   ]);
+  // Authors of the moved reviews now contribute to the target venue's reward
+  // progress. Mark their materialized reward state stale before returning.
+  if (movedReviews > 0) await invalidateVenueRewardProgress(target.id);
   await audit(actorId, 'merge-venues', source.id, { targetVenueId: target.id, movedReviews });
   return { id: source.id, targetVenueId: target.id, movedReviews };
 });

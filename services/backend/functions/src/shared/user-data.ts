@@ -6,7 +6,10 @@ export function normalizeUsername(username: string): string {
 }
 
 export function usernameReference(username: string): DocumentReference {
-  return db.collection('_usernames').doc(normalizeUsername(username));
+  // A username itself must never become a Firestore document ID: `.` and `..`
+  // are reserved path segments. The stable prefix also leaves room for future
+  // claim metadata without changing the public handle format.
+  return db.collection('_usernames').doc(`handle:${normalizeUsername(username)}`);
 }
 
 export function privateUserReference(uid: string): DocumentReference {

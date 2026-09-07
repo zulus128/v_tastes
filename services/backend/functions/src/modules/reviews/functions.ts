@@ -349,7 +349,20 @@ async function mentionedUserIds(text: string): Promise<string[]> {
   )))].slice(0, 10);
   if (usernames.length === 0) return [];
   const claims = await db.getAll(...usernames.map(usernameReference));
-  return [...new Set(claims.flatMap((claim) => claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : []))];
+  const claimedUserIds = claims.flatMap((claim) => claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : []);
+  const unresolvedUsernames = usernames.filter((_, index) => !claims[index]?.exists);
+  if (unresolvedUsernames.length === 0) return [...new Set(claimedUserIds)];
+
+  // Username claims are populated by a rolling migration. searchTokens was
+  // already normalized on old profiles, so it is a bounded, case-insensitive
+  // bridge for mentions until every account has a claim document.
+  const legacyMatches = await Promise.all(unresolvedUsernames.map(async (username) => {
+    const profiles = await db.collection('users').where('searchTokens', 'array-contains', `p:${username}`).limit(2).get();
+    return profiles.docs.flatMap((profile) => (
+      normalizeUsername(String(profile.get('username') ?? '')) === username ? [profile.id] : []
+    ));
+  }));
+  return [...new Set([...claimedUserIds, ...legacyMatches.flat()])];
 }
 
 /** Everyone who should hear about a freshly published review. */
