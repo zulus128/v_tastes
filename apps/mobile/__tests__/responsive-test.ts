@@ -16,6 +16,7 @@ describe('responsive layout metrics', () => {
 
   it('fits tablets by height and caps oversized and undersized viewports', () => {
     expect(responsiveMetrics(768, 1024).scale).toBeCloseTo(1024 / DESIGN_VIEWPORT.height);
+    expect(responsiveMetrics(1024, 600).scale).toBeCloseTo(600 / DESIGN_VIEWPORT.height);
     expect(responsiveMetrics(1600, 2200).scale).toBe(1.6);
     expect(responsiveMetrics(280, 653).scale).toBe(0.82);
   });
@@ -25,6 +26,9 @@ describe('responsive layout metrics', () => {
     const tablet = responsiveViewport(1032, 1376);
     expect(tablet.height).toBe(1376);
     expect(tablet.width).toBeCloseTo(DESIGN_VIEWPORT.width * (1376 / DESIGN_VIEWPORT.height));
+    const shortLandscapeTablet = responsiveViewport(1024, 600);
+    expect(shortLandscapeTablet.height).toBe(600);
+    expect(shortLandscapeTablet.width).toBeCloseTo(DESIGN_VIEWPORT.width * (600 / DESIGN_VIEWPORT.height));
   });
 });
 

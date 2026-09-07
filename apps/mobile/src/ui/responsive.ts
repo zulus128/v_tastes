@@ -14,6 +14,7 @@ export const DESIGN_VIEWPORT = {
 } as const;
 
 const MIN_LAYOUT_SCALE = 0.82;
+const MIN_TABLET_LAYOUT_SCALE = 0.68;
 const MAX_PHONE_LAYOUT_SCALE = 1.12;
 const MAX_TABLET_LAYOUT_SCALE = 1.6;
 const TABLET_MIN_EDGE = 600;
@@ -96,7 +97,7 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
   const scale = shortEdge >= TABLET_MIN_EDGE
     ? clamp(
       Math.min(width / DESIGN_VIEWPORT.width, height / DESIGN_VIEWPORT.height),
-      1,
+      MIN_TABLET_LAYOUT_SCALE,
       MAX_TABLET_LAYOUT_SCALE,
     )
     : clamp(shortEdge / DESIGN_VIEWPORT.width, MIN_LAYOUT_SCALE, MAX_PHONE_LAYOUT_SCALE);

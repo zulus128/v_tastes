@@ -578,19 +578,26 @@ function RatingCurve({
                 ? <RatingScale height={responsiveSize(15.1808)} width={scaleWidth} />
                 : <RatingScaleLight height={responsiveSize(15.1808)} width={scaleWidth} />}
               {value >= 1 ? (
-                <Svg height={responsiveSize(15.1808)} pointerEvents="none" style={ratingStyles.linearProgress} width={scaleWidth}>
+                <Svg
+                  height={responsiveSize(15.1808)}
+                  pointerEvents="none"
+                  preserveAspectRatio="none"
+                  style={ratingStyles.linearProgress}
+                  viewBox="0 0 359.903 15.1808"
+                  width={scaleWidth}
+                >
                   <Line
                     stroke={accent}
                     strokeLinecap="round"
                     strokeWidth={4}
-                    x1={4 * markerScale}
-                    x2={(dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4) * markerScale}
+                    x1={4}
+                    x2={dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4}
                     y1={8}
                     y2={8}
                   />
                   {dishRatingMarkers.filter((marker) => marker.value <= value).map((marker) => Number.isInteger(marker.value) ? (
                     <Circle
-                      cx={marker.x * markerScale}
+                      cx={marker.x}
                       cy={7.59038}
                       fill="#FFFFFF"
                       key={marker.value}
@@ -604,8 +611,8 @@ function RatingCurve({
                       stroke={accent}
                       strokeLinecap="round"
                       strokeWidth={2}
-                      x1={marker.x * markerScale}
-                      x2={marker.x * markerScale}
+                      x1={marker.x}
+                      x2={marker.x}
                       y1={2}
                       y2={13.3857}
                     />

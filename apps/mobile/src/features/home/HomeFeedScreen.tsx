@@ -627,7 +627,7 @@ export function HomeFeedScreen({
           >
             <StatsGlyph />
           </Pressable>
-          <TastesLogo />
+          <TastesLogo width={responsiveSize(72)} />
           <Pressable
             accessibilityLabel={unreadNotificationCount > 0 ? `Open notifications, ${unreadNotificationCount} unread` : 'Open notifications'}
             onPress={onOpenNotifications}

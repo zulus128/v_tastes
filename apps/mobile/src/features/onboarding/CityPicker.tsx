@@ -9,7 +9,7 @@ import flagSwitzerland from '../../../assets/onboarding/flag-switzerland.png';
 import flagUae from '../../../assets/onboarding/flag-uae.png';
 import flagUk from '../../../assets/onboarding/flag-uk.png';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 export const cities = [
   [flagMonaco, 'Monaco', 'Monaco'],
@@ -46,7 +46,7 @@ export function CityPicker({ onSelect, topPadding = 126 }: { onSelect: (name: st
   const filtered = cities.filter((item) => item[1].toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
-    <View style={[styles.listPage, { paddingTop: topPadding }]}>
+    <View style={[styles.listPage, { paddingTop: responsiveSize(topPadding) }]}>
       <Text style={styles.listTitle}>Select city</Text>
       <TextInput autoFocus onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
       <ScrollView keyboardShouldPersistTaps="handled">

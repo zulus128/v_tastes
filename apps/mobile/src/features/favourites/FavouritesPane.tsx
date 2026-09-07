@@ -450,15 +450,18 @@ function FolderSelectionRow({
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
+  const deleteActionWidth = responsiveSize(60);
+  const deleteThreshold = responsiveSize(36);
+  const swipeStartThreshold = responsiveSize(8);
   const translateX = useMemo(() => new Animated.Value(0), []);
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Boolean(onDelete) && gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-    onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(-60, Math.min(0, gesture.dx))),
+    onMoveShouldSetPanResponder: (_, gesture) => Boolean(onDelete) && gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx))),
     onPanResponderRelease: (_, gesture) => {
-      Animated.spring(translateX, { toValue: gesture.dx < -36 ? -60 : 0, useNativeDriver: true }).start();
+      Animated.spring(translateX, { toValue: gesture.dx < -deleteThreshold ? -deleteActionWidth : 0, useNativeDriver: true }).start();
     },
     onPanResponderTerminate: () => Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(),
-  }), [onDelete, translateX]);
+  }), [deleteActionWidth, deleteThreshold, onDelete, swipeStartThreshold, translateX]);
   return (
     <View style={styles.selectionSwipe}>
       {onDelete ? <Pressable accessibilityLabel={`Delete ${label}`} onPress={onDelete} style={styles.selectionDeleteAction}><Image source={trashIcon} style={styles.selectionDelete} /></Pressable> : null}
