@@ -45,6 +45,66 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
+function visualAuditData(operation: string): unknown {
+  switch (operation) {
+    case 'getDiscoverFeed':
+      return { hero: null, topReviewer: null, trending: [], newSpots: [], mostReviewed: [], forYou: [], hiddenGems: [], popularReviews: [] };
+    case 'getDiscoverPeople':
+      return { trending: [], new: [], suggested: [] };
+    case 'getFeed':
+    case 'getFriendFeed':
+    case 'getVenues':
+    case 'getPlaceReviews':
+    case 'listConversations':
+    case 'getMessages':
+    case 'listNotifications':
+      return { items: [], nextCursor: null };
+    case 'getPlace':
+    case 'getVenue':
+      return {
+        venue: {
+          id: 'visual-audit-venue',
+          name: 'Gemini',
+          address: '38 Beauchamp Place',
+          city: 'London',
+          category: 'Restaurant',
+          imageUrl: null,
+          priceLevel: 2,
+          rating: 4.8,
+          reviewCount: 24,
+          distanceKm: 1.2,
+        },
+        chips: [],
+        photoUrls: [],
+        photoCount: 0,
+        openingHours: [],
+      };
+    case 'getProfileExtras':
+      return { notificationPreferences: { enabled: true, push: true, email: false, sms: false, categories: {} } };
+    case 'getGroup':
+      return { id: 'visual-audit-group', name: 'Tastes group', members: [] };
+    case 'listRequests':
+    case 'listActivityCandidates':
+      return [];
+    case 'getFavourites':
+      return { folders: [], places: [], nextCursor: null };
+    case 'getMonthlyRecap':
+      return { ready: false };
+    default:
+      return { id: 'visual-audit-id', active: false, reactionCount: 0 };
+  }
+}
+
+function createVisualAuditApi(api: TastesApi): TastesApi {
+  return new Proxy(api, {
+    get(target, property, receiver) {
+      const operation = Reflect.get(target, property, receiver);
+      if (typeof operation !== 'function') return operation;
+      return async () => ({ data: visualAuditData(String(property)) });
+    },
+  });
+}
+
 export function SessionProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<SessionState>({ status: 'booting', user: null });
   const [minimumSupportedIosBuild, setMinimumSupportedIosBuild] = useState(0);
@@ -179,13 +239,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
  */
 export function SessionStateOverrideProvider({
   children,
+  visualAudit = false,
   user,
-}: PropsWithChildren<{ user: User }>) {
+}: PropsWithChildren<{ user: User; visualAudit?: boolean }>) {
   const session = useSession();
+  const api = useMemo(() => visualAudit ? createVisualAuditApi(session.api) : session.api, [session.api, visualAudit]);
   const value = useMemo<SessionContextValue>(() => ({
     ...session,
+    api,
     state: { status: 'authenticated', user },
-  }), [session, user]);
+  }), [api, session, user]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

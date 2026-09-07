@@ -32,6 +32,10 @@ export function NewDialogSheet({
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useResponsiveViewport();
+  const actionsHeight = responsiveSize(ACTIONS_HEIGHT);
+  const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
+  const minResultsHeight = responsiveSize(MIN_RESULTS_HEIGHT);
+  const actionsTranslateY = responsiveSize(72);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
@@ -73,10 +77,10 @@ export function NewDialogSheet({
     const willShowSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
-        const resultsHeight = event.endCoordinates.screenY * SHEET_HEIGHT_RATIO - FIXED_CONTENT_HEIGHT;
+        const resultsHeight = event.endCoordinates.screenY * SHEET_HEIGHT_RATIO - fixedContentHeight;
         animateLayout(
           event.endCoordinates.screenY,
-          resultsHeight >= MIN_RESULTS_HEIGHT,
+          resultsHeight >= minResultsHeight,
           event.duration || 280,
         );
       },
@@ -89,7 +93,7 @@ export function NewDialogSheet({
       willShowSubscription.remove();
       hideSubscription.remove();
     };
-  }, [actionsVisibility, sheetBottom, sheetHeight, windowHeight]);
+  }, [actionsVisibility, actionsTranslateY, fixedContentHeight, minResultsHeight, sheetBottom, sheetHeight, windowHeight]);
 
   useEffect(() => {
     const availableHeight = keyboardTop.current ?? windowHeight;
@@ -199,10 +203,10 @@ export function NewDialogSheet({
               style={[
                 styles.actions,
                 {
-                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, ACTIONS_HEIGHT] }),
+                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, actionsHeight] }),
                   opacity: actionsVisibility,
                   transform: [
-                    { translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-72, 0] }) },
+                    { translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-actionsTranslateY, 0] }) },
                     { scale: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
                   ],
                 },

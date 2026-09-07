@@ -374,7 +374,12 @@ export function ProfileSettingsSheet({
           <View style={styles.headerButton} />
         </View>
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-          <View style={styles.content}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.contentScroll}
+              contentContainerStyle={styles.content}
+            >
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
               <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
               {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
@@ -402,7 +407,7 @@ export function ProfileSettingsSheet({
                 <Text style={styles.deleteAccount}>Delete account</Text>
               </Pressable>
             </View>
-          </View>
+            </ScrollView>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
           <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
@@ -546,6 +551,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
   const actionBottom = Math.max(24, safeBottom);
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
+    contentScroll: { flex: 1 },
     patternImage: { opacity: isDark ? 1 : 0.08 },
     darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },
     header: { zIndex: 2, height: safeTop + 48, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
@@ -553,7 +559,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     backIcon: { width: 24, height: 24, tintColor: colors.text },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
     loader: { flex: 1 },
-    content: { flex: 1, paddingHorizontal: 16, paddingTop: s(24), paddingBottom: actionBottom + s(70), alignItems: 'center' },
+    content: { paddingHorizontal: 16, paddingTop: s(24), paddingBottom: actionBottom + s(70), alignItems: 'center' },
     avatar: { width: s(120), height: s(120), borderRadius: s(60), backgroundColor: colors.canvas },
     photoUploading: { opacity: 0.55 },
     photoLoader: { position: 'absolute', inset: 0 },

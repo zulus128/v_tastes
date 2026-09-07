@@ -551,6 +551,7 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const discoverHeaderHeight = responsiveSize(DISCOVER_HEADER_HEIGHT);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -773,8 +774,8 @@ function PlacesMap({
 
   function handleMapLayout(height: number) {
     const availableHeight = Math.max(0, height - 8);
-    const expanded = Math.max(0, availableHeight - DISCOVER_HEADER_HEIGHT);
-    const collapsed = Math.min(expanded, Math.max(330, Math.round(height * 0.53)));
+    const expanded = Math.max(0, availableHeight - discoverHeaderHeight);
+    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(height * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
       sheetBounds.current = { collapsed, expanded };

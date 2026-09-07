@@ -183,7 +183,7 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
 
   if (group === 'recap' && (recapSteps.includes(name as RecapStep) || name === 'close')) {
     return (
-      <SessionStateOverrideProvider user={visualAuditUser}>
+      <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
         <MonthlyRecapFlow
           key={auditCase}
           initialConfirmingClose={name === 'close'}
@@ -203,7 +203,7 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
       : root ? { root } : undefined;
     if (visualAuditRoute) {
       return (
-        <SessionStateOverrideProvider user={visualAuditUser}>
+        <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
           <ProductNavigator user={visualAuditUser} visualAuditRoute={visualAuditRoute} />
         </SessionStateOverrideProvider>
       );

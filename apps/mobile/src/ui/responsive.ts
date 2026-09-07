@@ -1,7 +1,6 @@
 import {
   Dimensions,
   PixelRatio,
-  StyleSheet,
   useWindowDimensions,
   type ImageStyle,
   type TextStyle,
@@ -188,11 +187,28 @@ export function scaleNamedStyles<T extends NamedStyles>(styles: T, scale: number
   ) as T;
 }
 
+type ResponsiveScaleResolver = () => number;
+
+const windowScale: ResponsiveScaleResolver = () => {
+  const { width, height } = Dimensions.get('window');
+  return responsiveMetrics(width, height).scale;
+};
+
 /**
  * Drop-in replacement for StyleSheet.create. Existing screens keep authoring in
  * 402pt Figma units while the generated native styles adapt to the device width.
  */
-export function responsiveStyleSheet<T extends NamedStyles>(styles: T): T {
-  const { width, height } = Dimensions.get('window');
-  return StyleSheet.create(scaleNamedStyles(styles, responsiveMetrics(width, height).scale)) as T;
+export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveScale: ResponsiveScaleResolver = windowScale): T {
+  // Keep the style object live instead of freezing a one-time StyleSheet ID.
+  // `useWindowDimensions` causes the owning screen to render again when a
+  // window is resized; resolving the scale when the named style is read keeps
+  // those rerenders in sync with the frame dimensions (Expo web/iPad split
+  // view) without requiring every screen to recreate its styles manually.
+  return new Proxy(styles as object, {
+    get(target, property, receiver) {
+      const style = Reflect.get(target, property, receiver);
+      if (!style || typeof style !== 'object' || Array.isArray(style)) return style;
+      return scaleStyle(style as NamedStyle, resolveScale());
+    },
+  }) as T;
 }

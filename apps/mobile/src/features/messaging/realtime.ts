@@ -126,6 +126,10 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
   const profileCache = useRef(new Map<string, ConversationParticipant>());
 
   useEffect(() => {
+    if (userId === 'visual-audit-user') {
+      setState({ data: [], error: null, loading: false });
+      return undefined;
+    }
     let active = true;
     const inboxQuery = query(
       collection(firestore, 'conversations'),
@@ -171,6 +175,10 @@ export function useUnreadConversationCount(userId: string): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (userId === 'visual-audit-user') {
+      setCount(0);
+      return undefined;
+    }
     const inboxQuery = query(
       collection(firestore, 'conversations'),
       where('participantIds', 'array-contains', userId),
@@ -204,6 +212,10 @@ export function useConversationMessages(
   });
 
   useEffect(() => {
+    if (userId === 'visual-audit-user') {
+      setState({ data: [], error: null, loading: false });
+      return undefined;
+    }
     const messagesQuery = query(
       collection(firestore, 'conversations', conversationId, 'messages'),
       orderBy('createdAt', 'desc'),
@@ -247,6 +259,20 @@ export function subscribeConversationDetails(
   listener: (details: ConversationDetails) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
+  if (userId === 'visual-audit-user') {
+    listener({
+      activityId: null,
+      imageUrl: null,
+      kind: 'direct',
+      lastMessageId: null,
+      participant: null,
+      readByCount: 0,
+      someoneTyping: false,
+      title: 'Conversation',
+      unreadCount: 0,
+    });
+    return () => undefined;
+  }
   let profileUnsubscribe: Unsubscribe | undefined;
   const conversationUnsubscribe = onSnapshot(
     doc(firestore, 'conversations', conversationId),

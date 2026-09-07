@@ -65,42 +65,63 @@ export function ActivityDetailsScreen({
   const [details, setDetails] = useState<ActivityDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => onSnapshot(doc(firestore, 'activities', activityId), (snapshot) => {
-    if (!snapshot.exists()) {
-      setError('This activity is no longer available.');
-      return;
-    }
-    const data = snapshot.data();
-    const participantIds = Array.isArray(data.participantIds)
-      ? data.participantIds.filter((value): value is string => typeof value === 'string')
-      : [];
-    const venueId = String(data.venueId ?? '');
-    void Promise.all([
-      getDoc(doc(firestore, 'venues', venueId)),
-      ...participantIds.map((participantId) => getDoc(doc(firestore, 'users', participantId))),
-    ]).then(([venueSnapshot, ...profiles]) => {
-      const venue = venueSnapshot.data();
-      const startsAt = data.startsAt && typeof data.startsAt.toDate === 'function'
-        ? data.startsAt.toDate() as Date
-        : new Date(String(data.startsAt ?? 0));
+  useEffect(() => {
+    if (activityId === 'visual-audit-activity') {
       setDetails({
-        organizerId: String(data.organizerId ?? ''),
-        startsAt,
+        organizerId: 'visual-audit-user',
+        startsAt: new Date('2026-09-20T19:00:00Z'),
         venue: {
-          address: typeof venue?.address === 'string' ? venue.address : '',
-          category: typeof venue?.category === 'string' ? venue.category : 'Restaurant',
-          city: typeof venue?.city === 'string' ? venue.city : '',
-          imageUrl: typeof venue?.imageUrl === 'string' ? venue.imageUrl : null,
-          name: typeof venue?.name === 'string' ? venue.name : String(data.venueName ?? 'Activity'),
-          priceLevel: Math.max(0, Number(venue?.priceLevel ?? 0)),
-          rating: Math.max(0, Number(venue?.rating ?? 0)),
-          reviewCount: Math.max(0, Number(venue?.reviewCount ?? 0)),
+          address: '38 Beauchamp Place',
+          category: 'Restaurant',
+          city: 'London',
+          imageUrl: null,
+          name: 'Gemini',
+          priceLevel: 2,
+          rating: 4.8,
+          reviewCount: 24,
         },
-        members: participantIds.map((id, index) => memberFromData(id, profiles[index]?.data())),
+        members: [],
       });
       setError(null);
-    }).catch(() => setError('Could not load activity details.'));
-  }, () => setError('Could not load activity details.')), [activityId]);
+      return undefined;
+    }
+    return onSnapshot(doc(firestore, 'activities', activityId), (snapshot) => {
+      if (!snapshot.exists()) {
+        setError('This activity is no longer available.');
+        return;
+      }
+      const data = snapshot.data();
+      const participantIds = Array.isArray(data.participantIds)
+        ? data.participantIds.filter((value): value is string => typeof value === 'string')
+        : [];
+      const venueId = String(data.venueId ?? '');
+      void Promise.all([
+        getDoc(doc(firestore, 'venues', venueId)),
+        ...participantIds.map((participantId) => getDoc(doc(firestore, 'users', participantId))),
+      ]).then(([venueSnapshot, ...profiles]) => {
+        const venue = venueSnapshot.data();
+        const startsAt = data.startsAt && typeof data.startsAt.toDate === 'function'
+          ? data.startsAt.toDate() as Date
+          : new Date(String(data.startsAt ?? 0));
+        setDetails({
+          organizerId: String(data.organizerId ?? ''),
+          startsAt,
+          venue: {
+            address: typeof venue?.address === 'string' ? venue.address : '',
+            category: typeof venue?.category === 'string' ? venue.category : 'Restaurant',
+            city: typeof venue?.city === 'string' ? venue.city : '',
+            imageUrl: typeof venue?.imageUrl === 'string' ? venue.imageUrl : null,
+            name: typeof venue?.name === 'string' ? venue.name : String(data.venueName ?? 'Activity'),
+            priceLevel: Math.max(0, Number(venue?.priceLevel ?? 0)),
+            rating: Math.max(0, Number(venue?.rating ?? 0)),
+            reviewCount: Math.max(0, Number(venue?.reviewCount ?? 0)),
+          },
+          members: participantIds.map((id, index) => memberFromData(id, profiles[index]?.data())),
+        });
+        setError(null);
+      }).catch(() => setError('Could not load activity details.'));
+    }, () => setError('Could not load activity details.'));
+  }, [activityId]);
 
   if (!details) {
     return (

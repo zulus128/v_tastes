@@ -103,6 +103,14 @@ function AppGate() {
           onAuthenticationRequired={logout}
           onComplete={completeOnboarding}
         />
+        <UpdatePrompt
+          onClose={() => setUpdatePromptVisible(false)}
+          onUpdate={() => {
+            setUpdatePromptVisible(false);
+            void Linking.openURL('https://apps.apple.com/app/id6796403021');
+          }}
+          visible={updatePromptVisible}
+        />
       </View>
     );
   }

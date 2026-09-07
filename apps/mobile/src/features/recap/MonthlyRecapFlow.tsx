@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   ImageBackground,
   Pressable,
@@ -54,7 +55,7 @@ import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { DESIGN_VIEWPORT, responsiveMetrics, responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 
 export type RecapStep =
@@ -917,5 +918,14 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   keepButton: { alignSelf: 'stretch', height: 50, marginTop: 18, borderRadius: 25, backgroundColor: '#B82F29', alignItems: 'center', justifyContent: 'center' },
   keepLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     leaveLabel: { marginTop: 16, color: secondaryText, fontSize: 16 },
-  });
+  }, recapScale);
 };
+
+function recapScale() {
+  const { width, height } = Dimensions.get('window');
+  const widthScale = responsiveMetrics(width, height).scale;
+  // Story screens use absolute Figma coordinates and have no natural scroll
+  // container. Keep the complete story inside short phone viewports while
+  // still using the available width on large phones and tablets.
+  return Math.max(0.68, Math.min(widthScale, height / DESIGN_VIEWPORT.height));
+}

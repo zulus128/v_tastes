@@ -79,14 +79,27 @@ export function useProfile(userId: string, fallbackName: string) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => onSnapshot(
-    doc(firestore, 'users', userId),
-    (snapshot) => {
-      setProfile(snapshot.exists() ? profileFromDocument(snapshot.data(), fallbackName) : null);
+  useEffect(() => {
+    if (userId === 'visual-audit-user') {
+      setProfile(profileFromDocument({
+        city: 'London',
+        displayName: fallbackName,
+        favoriteCuisines: ['Italian', 'Japanese'],
+        favoriteDish: 'Pizza',
+        username: 'alexmorgan',
+      }, fallbackName));
       setLoading(false);
-    },
-    () => setLoading(false),
-  ), [fallbackName, userId]);
+      return undefined;
+    }
+    return onSnapshot(
+      doc(firestore, 'users', userId),
+      (snapshot) => {
+        setProfile(snapshot.exists() ? profileFromDocument(snapshot.data(), fallbackName) : null);
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+  }, [fallbackName, userId]);
 
   return { loading, profile };
 }
@@ -114,6 +127,12 @@ export function useProfileReviews(userId: string) {
     lastDocument.current = null;
     setReviews([]);
     setLoading(true);
+    if (userId === 'visual-audit-user') {
+      setLoading(false);
+      setError(null);
+      setHasMore(false);
+      return undefined;
+    }
     return onSnapshot(
       baseQuery(),
     (snapshot) => {
