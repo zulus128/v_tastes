@@ -4,7 +4,13 @@ import {
   type TastesApiError,
 } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CompleteOnboardingInput } from '@tastes/contracts';
+import {
+  defaultNotificationPreferences,
+  type CompleteOnboardingInput,
+  type PlaceDetails,
+  type ProfileExtrasResult,
+  type TastesGroup,
+} from '@tastes/contracts';
 import type { User } from 'firebase/auth';
 import { deleteUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -74,21 +80,49 @@ function visualAuditData(operation: string): unknown {
           address: '38 Beauchamp Place',
           city: 'London',
           category: 'Restaurant',
-          imageUrl: null,
+          status: 'active',
           priceLevel: 2,
           rating: 4.8,
           reviewCount: 24,
           distanceKm: 1.2,
         },
+        phone: '+44 20 7589 2020',
+        website: 'https://example.com',
         chips: [],
         photoUrls: [],
         photoCount: 0,
         openingHours: [],
-      };
+        popularDishes: [
+          { name: 'Salmon nigiri', rating: 4.9 },
+          { name: 'Spicy tuna roll', rating: 4.7 },
+        ],
+      } satisfies PlaceDetails;
     case 'getProfileExtras':
-      return { notificationPreferences: { enabled: true, push: true, email: false, sms: false, categories: {} } };
+      return {
+        followers: [],
+        following: [],
+        level: 3,
+        xp: 240,
+        rewards: [],
+        notificationPreferences: defaultNotificationPreferences,
+      } satisfies ProfileExtrasResult;
     case 'getGroup':
-      return { id: 'visual-audit-group', name: 'Tastes group', members: [] };
+      return {
+        id: 'visual-audit-group',
+        name: 'Tastes group',
+        adminId: 'visual-audit-user',
+        members: [{
+          userId: 'visual-audit-user',
+          displayName: 'Alex Morgan',
+          username: 'alex.morgan',
+          photoUrl: null,
+          admin: true,
+        }],
+        pendingMembers: [],
+        createdAt: '2026-09-01T12:00:00.000Z',
+      } satisfies TastesGroup;
+    case 'importContacts':
+      return { matches: [] };
     case 'listRequests':
     case 'listActivityCandidates':
       return [];

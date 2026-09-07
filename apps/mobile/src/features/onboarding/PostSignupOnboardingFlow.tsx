@@ -1,5 +1,5 @@
 import { createUserProfileInputSchema, type CompleteOnboardingInput } from '@tastes/contracts';
-import { apiErrorMessage, createTastesApi } from '@tastes/firebase-client';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -64,8 +64,9 @@ import styleDark from '../../../assets/onboarding/style-dark.png';
 import styleLight from '../../../assets/onboarding/style-light.png';
 import styleSelected from '../../../assets/onboarding/style-selected.png';
 import styleUnselected from '../../../assets/onboarding/style-unselected.png';
-import { auth, functions, storage } from '../../infrastructure/firebase';
+import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
+import { useTastesApi } from '../../session/SessionProvider';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
@@ -222,7 +223,7 @@ export function PostSignupOnboardingFlow({
   const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
-  const api = useMemo(() => createTastesApi(functions), []);
+  const api = useTastesApi();
   const [screen, setScreen] = useState<PostSignupScreen>(initialScreen ?? 'profile');
   const [history, setHistory] = useState<PostSignupScreen[]>([]);
   const [displayName, setDisplayName] = useState(() => visualAudit ? 'Alex Morgan' : auth.currentUser?.displayName?.trim() ?? '');
@@ -306,7 +307,7 @@ export function PostSignupOnboardingFlow({
     setBusy(true);
     try {
       let photoPath: string | undefined;
-      if (photoUri && auth.currentUser) {
+      if (!visualAudit && photoUri && auth.currentUser) {
         photoPath = `profile-images/${auth.currentUser.uid}/avatar.jpg`;
         const response = await fetch(photoUri);
         const blob = await response.blob();

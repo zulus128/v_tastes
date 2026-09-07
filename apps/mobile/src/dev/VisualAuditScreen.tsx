@@ -171,13 +171,15 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
 
   if (group === 'post-signup' && postSignupScreens.includes(name as PostSignupScreen)) {
     return (
-      <PostSignupOnboardingFlow
-        key={auditCase}
-        initialScreen={name as PostSignupScreen}
-        onAuthenticationRequired={async () => undefined}
-        onComplete={async () => undefined}
-        visualAudit
-      />
+      <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
+        <PostSignupOnboardingFlow
+          key={auditCase}
+          initialScreen={name as PostSignupScreen}
+          onAuthenticationRequired={async () => undefined}
+          onComplete={async () => undefined}
+          visualAudit
+        />
+      </SessionStateOverrideProvider>
     );
   }
 
