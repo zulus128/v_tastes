@@ -55,7 +55,7 @@ import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { DESIGN_VIEWPORT, responsiveMetrics, responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { DESIGN_VIEWPORT, responsiveMetrics, responsiveStyleSheet, responsiveValue } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 
 export type RecapStep =
@@ -255,8 +255,8 @@ function CloseButton({ color, onPress }: { color?: string; onPress: () => void }
       onPress={onPress}
       style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
     >
-      <CloseCircle color={color ?? colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
-      <CloseX color={color ?? colors.text} height={responsiveSize(7)} style={styles.closeX} width={responsiveSize(7)} />
+      <CloseCircle color={color ?? colors.text} height={recapSize(24)} width={recapSize(24)} />
+      <CloseX color={color ?? colors.text} height={recapSize(7)} style={styles.closeX} width={recapSize(7)} />
     </Pressable>
   );
 }
@@ -320,7 +320,7 @@ function IntroScreen({ onNext }: { onNext: () => void }) {
             </View>
           ))}
         </View>
-        <TastesMouth height={responsiveSize(57)} width={responsiveSize(230)} />
+        <TastesMouth height={recapSize(57)} width={recapSize(230)} />
       </View>
       <View style={styles.introCollage}>
         <TiltedPhoto source={recapFood} style={styles.introPhotoLeft} rating="2.5" />
@@ -628,7 +628,7 @@ function ShareCard({ onShare, recap, user }: { onShare: (channel: string) => voi
       <Image source={isDark ? shareRays : shareRaysLight} resizeMode="cover" style={styles.shareRays} />
       <View style={styles.shareIdentity}>
         <Image source={profileSource} style={styles.profileAvatar} />
-        <TastesLogo width={responsiveSize(110)} />
+        <TastesLogo width={recapSize(110)} />
       </View>
       <Text style={styles.recapTitle}>Monthly Recap</Text>
       <View style={styles.metrics}>
@@ -706,7 +706,7 @@ function RecapButton({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
-      {shareIcon ? <ShareGlyph height={responsiveSize(20)} width={responsiveSize(20)} /> : null}
+      {shareIcon ? <ShareGlyph height={recapSize(20)} width={recapSize(20)} /> : null}
       {leading ? <Text style={styles.ctaLeading}>{leading}</Text> : null}
       <Text style={styles.ctaLabel}>{label}</Text>
       {showArrow ? <Image source={arrowIcon} resizeMode="contain" style={styles.arrow} /> : null}
@@ -928,4 +928,8 @@ function recapScale() {
   // container. Keep the complete story inside short phone viewports while
   // still using the available width on large phones and tablets.
   return Math.max(0.68, Math.min(widthScale, height / DESIGN_VIEWPORT.height));
+}
+
+function recapSize(value: number) {
+  return responsiveValue(value, recapScale());
 }

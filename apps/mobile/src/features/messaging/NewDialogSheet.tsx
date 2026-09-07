@@ -1,7 +1,7 @@
 import type { ActivityCandidate } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import SearchIcon from '../../../assets/profile/search.svg';
@@ -32,6 +32,7 @@ export function NewDialogSheet({
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useResponsiveViewport();
+  const { height: physicalWindowHeight } = useWindowDimensions();
   const actionsHeight = responsiveSize(ACTIONS_HEIGHT);
   const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
   const minResultsHeight = responsiveSize(MIN_RESULTS_HEIGHT);
@@ -77,9 +78,11 @@ export function NewDialogSheet({
     const willShowSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
-        const resultsHeight = event.endCoordinates.screenY * SHEET_HEIGHT_RATIO - fixedContentHeight;
+        const frameTop = Math.max(0, (physicalWindowHeight - windowHeight) / 2);
+        const nextKeyboardTop = Math.max(0, Math.min(windowHeight, event.endCoordinates.screenY - frameTop));
+        const resultsHeight = nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight;
         animateLayout(
-          event.endCoordinates.screenY,
+          nextKeyboardTop,
           resultsHeight >= minResultsHeight,
           event.duration || 280,
         );
@@ -93,7 +96,7 @@ export function NewDialogSheet({
       willShowSubscription.remove();
       hideSubscription.remove();
     };
-  }, [actionsVisibility, actionsTranslateY, fixedContentHeight, minResultsHeight, sheetBottom, sheetHeight, windowHeight]);
+  }, [actionsVisibility, actionsTranslateY, fixedContentHeight, minResultsHeight, physicalWindowHeight, sheetBottom, sheetHeight, windowHeight]);
 
   useEffect(() => {
     const availableHeight = keyboardTop.current ?? windowHeight;
