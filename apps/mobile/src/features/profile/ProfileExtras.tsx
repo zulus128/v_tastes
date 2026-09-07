@@ -91,7 +91,7 @@ export function ProfileExtras({
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [enabled, setEnabled] = useState(true);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
@@ -171,7 +171,7 @@ export function ProfileExtras({
   return (
     <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
-        <View style={[styles.header, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
+        <View style={[styles.header, { height: responsiveSize(screen === 'followers' || screen === 'following' ? 106 : 60) + insets.top, paddingTop: insets.top }, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
           <View style={styles.headerTitleRow}>
             <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
               <BackIcon color={colors.text} height={responsiveSize(16)} width={responsiveSize(9)} />
@@ -200,7 +200,7 @@ export function ProfileExtras({
         </View>
 
         {screen === 'followers' || screen === 'following' ? (
-          <ScrollView contentContainerStyle={styles.peopleList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[styles.peopleList, { paddingBottom: Math.max(responsiveSize(30), insets.bottom) }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {!data ? <ActivityIndicator color={colors.primary} style={styles.peopleLoading} /> : visibleConnections.map((person) => (
               <View key={person.userId} style={styles.person}>
                 <Pressable
@@ -238,15 +238,17 @@ export function ProfileExtras({
           <RewardsList
             data={data}
             onPress={(reward) => reward.completed ? setAchievementReward(reward) : setDetailReward(reward)}
+            safeBottom={insets.bottom}
             styles={styles}
           />
         )}
 
-        <RewardDetailsModal onClose={() => setDetailReward(null)} reward={detailReward} styles={styles} />
+        <RewardDetailsModal onClose={() => setDetailReward(null)} reward={detailReward} safeBottom={insets.bottom} styles={styles} />
         <AchievementModal
           onClose={() => setAchievementReward(null)}
           onViewAll={() => setAchievementReward(null)}
           reward={achievementReward}
+          safeBottom={insets.bottom}
           styles={styles}
         />
       </View>
@@ -254,9 +256,9 @@ export function ProfileExtras({
   );
 }
 
-function RewardsList({ data, onPress, styles }: { data: ProfileExtrasResult | null; onPress: (reward: RewardView) => void; styles: ReturnType<typeof createStyles> }) {
+function RewardsList({ data, onPress, safeBottom, styles }: { data: ProfileExtrasResult | null; onPress: (reward: RewardView) => void; safeBottom: number; styles: ReturnType<typeof createStyles> }) {
   return (
-    <ScrollView contentContainerStyle={styles.rewards} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.rewards, { paddingBottom: Math.max(responsiveSize(30), safeBottom) }]} showsVerticalScrollIndicator={false}>
       <View style={styles.levelTag}>
         <Text style={styles.levelPrefix}>Current level:</Text>
         <Text style={styles.levelName}>{(data?.level ?? 1) <= 1 ? 'Newbie' : `Level ${data?.level}`}</Text>
@@ -278,12 +280,12 @@ function RewardsList({ data, onPress, styles }: { data: ProfileExtrasResult | nu
   );
 }
 
-function RewardDetailsModal({ onClose, reward, styles }: { onClose: () => void; reward: RewardView | null; styles: ReturnType<typeof createStyles> }) {
+function RewardDetailsModal({ onClose, reward, safeBottom, styles }: { onClose: () => void; reward: RewardView | null; safeBottom: number; styles: ReturnType<typeof createStyles> }) {
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={reward !== null}>
       <View style={styles.modalRoot}>
         <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={styles.detailSheet}>
+        <View style={[styles.detailSheet, { height: responsiveSize(450) + safeBottom, paddingBottom: Math.max(responsiveSize(30), safeBottom) }]}>
           <SheetHeader onClose={onClose} styles={styles}>Reward details</SheetHeader>
           <View style={styles.detailContent}>
             <Image source={reward?.detailImage} style={styles.detailImage} />
@@ -297,12 +299,12 @@ function RewardDetailsModal({ onClose, reward, styles }: { onClose: () => void; 
   );
 }
 
-function AchievementModal({ onClose, onViewAll, reward, styles }: { onClose: () => void; onViewAll: () => void; reward: RewardView | null; styles: ReturnType<typeof createStyles> }) {
+function AchievementModal({ onClose, onViewAll, reward, safeBottom, styles }: { onClose: () => void; onViewAll: () => void; reward: RewardView | null; safeBottom: number; styles: ReturnType<typeof createStyles> }) {
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={reward !== null}>
       <View style={styles.modalRoot}>
         <Pressable onPress={onClose} style={styles.scrim} />
-        <ImageBackground imageStyle={styles.achievementPatternImage} source={rewardPattern} style={styles.achievementSheet}>
+        <ImageBackground imageStyle={styles.achievementPatternImage} source={rewardPattern} style={[styles.achievementSheet, { paddingBottom: Math.max(responsiveSize(30), safeBottom) }]}>
           <SheetHeader onClose={onClose} styles={styles}>Achievement unlocked !</SheetHeader>
           <View style={styles.achievementBody}>
             <View style={styles.achievementCard}>
@@ -338,18 +340,18 @@ function Setting({ disabled = false, label, onChange, styles, value }: { disable
   return <View style={[styles.setting, disabled && styles.disabledSetting]}><Text style={styles.settingLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} thumbColor="#FFFFFF" trackColor={{ false: '#353535', true: '#B82F29' }} value={value} /></View>;
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
+function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
-    header: { height: safeTop + 60, paddingTop: safeTop, backgroundColor: colors.background, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
-    peopleHeader: { height: safeTop + 106 },
+    header: { height: 60, paddingTop: 0, backgroundColor: colors.background, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+    peopleHeader: { height: 106 },
     headerTitleRow: { height: 60, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center' },
     headerButton: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
     searchField: { height: 39, marginHorizontal: 16, marginBottom: 12, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: colors.surfaceRaised },
     searchInput: { flex: 1, height: 39, padding: 0, color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
     voiceButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-    peopleList: { paddingBottom: Math.max(30, safeBottom) },
+    peopleList: { paddingBottom: 30 },
     peopleLoading: { marginTop: 32 },
     person: { height: 76, paddingHorizontal: 16, flexDirection: 'row', gap: 7, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
     personLink: { flex: 1, height: '100%', flexDirection: 'row', gap: 7, alignItems: 'center' },
@@ -365,7 +367,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     setting: { height: 60, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
     disabledSetting: { opacity: 0.45 },
     settingLabel: { flex: 1, color: colors.text, fontSize: 15 },
-    rewards: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(30, safeBottom) },
+    rewards: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 30 },
     levelTag: { height: 38, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 100, backgroundColor: 'rgba(184,47,41,0.10)' },
     levelPrefix: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.41 },
     levelName: { color: '#B82F29', fontSize: 16, fontWeight: '600', letterSpacing: -0.23 },
@@ -379,7 +381,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     pressed: { opacity: 0.7 },
     modalRoot: { flex: 1, justifyContent: 'flex-end' },
     scrim: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
-    detailSheet: { height: 450 + safeBottom, paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+    detailSheet: { height: 450, paddingBottom: 30, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
     sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sheetTitle: { color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
     closeIcon: { width: 30, height: 30 },
@@ -389,7 +391,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     progressCurrent: { color: '#B82F29' },
     detailName: { color: colors.text, fontSize: 16, lineHeight: 20, fontWeight: '600', letterSpacing: -0.24 },
     detailCopy: { maxWidth: 370, color: colors.textSecondary, fontSize: 14, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
-    achievementSheet: { paddingBottom: Math.max(30, safeBottom), borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.surface },
+    achievementSheet: { paddingBottom: 30, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.surface },
     achievementPatternImage: { opacity: 0.18, resizeMode: 'repeat' },
     achievementBody: { paddingHorizontal: 16, gap: 24, alignItems: 'center' },
     achievementCard: { width: '100%', height: 132, padding: 24, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.background },

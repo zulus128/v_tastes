@@ -12,7 +12,7 @@ export function ResponsiveModal({ children, transparent, ...props }: ModalProps)
       <View
         style={[
           styles.viewport,
-          { backgroundColor: transparent ? 'rgba(0,0,0,0.35)' : colors.background },
+          { backgroundColor: transparent ? 'transparent' : colors.background },
         ]}
       >
         <View style={[styles.frame, { height, width }]}>{children}</View>

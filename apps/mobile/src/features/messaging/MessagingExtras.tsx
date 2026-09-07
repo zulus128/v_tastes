@@ -32,7 +32,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -65,6 +65,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
         action={requests.length ? 'Delete all' : undefined}
         onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
         onBack={onBack}
+        safeTop={insets.top}
         styles={styles}
         title="Requests"
       />
@@ -127,7 +128,7 @@ export function NewGroupScreen({
 }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
@@ -200,6 +201,7 @@ export function NewGroupScreen({
     <View style={styles.newGroupScreen}>
       <Header
         onBack={onBack}
+        safeTop={insets.top}
         style={styles.newGroupHeader}
         styles={styles}
         title="New group"
@@ -291,7 +293,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   const currentUserId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [group, setGroup] = useState<TastesGroup | null>(null);
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [memberQuery, setMemberQuery] = useState('');
@@ -339,7 +341,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   if (!group)
     return (
       <Screen style={styles.screen}>
-        <Header onBack={onBack} styles={styles} title="Group details" />
+        <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       </Screen>
     );
@@ -363,7 +365,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   );
   return (
     <Screen style={styles.screen}>
-      <Header onBack={onBack} styles={styles} title="Group details" />
+      <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
       <ScrollView contentContainerStyle={styles.details}>
         <View style={styles.groupAvatarLarge}>
           <Text style={styles.groupAvatarLargeText}>
@@ -505,6 +507,7 @@ function Header({
   actionDisabled,
   onAction,
   onBack,
+  safeTop,
   style,
   styles,
   title,
@@ -513,12 +516,13 @@ function Header({
   actionDisabled?: boolean;
   onAction?: () => void;
   onBack: () => void;
+  safeTop: number;
   style?: StyleProp<ViewStyle>;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
   return (
-    <View style={[styles.header, style]}>
+    <View style={[styles.header, { height: responsiveSize(62) + safeTop, paddingTop: safeTop }, style]}>
       <Pressable onPress={onBack} style={styles.headerButton}>
         <Text style={styles.back}>‹</Text>
       </Pressable>
@@ -570,15 +574,15 @@ function Empty({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
+function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
     newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupHeader: { backgroundColor: colors.surface },
     patternBody: { flex: 1 },
     header: {
-      height: safeTop + 62,
-      paddingTop: safeTop,
+      height: 62,
+      paddingTop: 0,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',

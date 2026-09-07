@@ -24,7 +24,7 @@ import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { UserAvatar } from '../profile/avatar';
 import { useLeaderboard } from './api';
 
@@ -111,16 +111,18 @@ function LeaderboardHeader({
   onBack,
   onInfo,
   onAudience,
+  safeTop,
   styles,
 }: {
   audience: 'friends' | 'local';
   onBack: () => void;
   onInfo: () => void;
   onAudience: (audience: 'friends' | 'local') => void;
+  safeTop: number;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: safeTop }]}>
       <View style={styles.titleRow}>
         <Pressable
           accessibilityLabel="Back"
@@ -156,15 +158,17 @@ function LeaderboardHeader({
 function CurrentUserBar({
   current,
   preceding,
+  safeBottom,
   styles,
 }: {
   current: LeaderboardEntry;
   preceding?: LeaderboardEntry;
+  safeBottom: number;
   styles: ReturnType<typeof createStyles>;
 }) {
   const xpToNext = preceding ? Math.max(0, preceding.xp - current.xp) : 0;
   return (
-    <View style={styles.currentUser}>
+    <View style={[styles.currentUser, { minHeight: responsiveSize(76) + safeBottom, paddingBottom: responsiveSize(10) + safeBottom }]}>
       <Text style={styles.currentRank}>{current.rank}</Text>
       <UserAvatar displayName={current.displayName} photoUrl={current.photoUrl} style={styles.rowAvatar} />
       <View style={styles.rowIdentity}>
@@ -179,10 +183,12 @@ function CurrentUserBar({
 
 function HowXpSheet({
   onClose,
+  safeBottom,
   styles,
   visible,
 }: {
   onClose: () => void;
+  safeBottom: number;
   styles: ReturnType<typeof createStyles>;
   visible: boolean;
 }) {
@@ -196,7 +202,7 @@ function HowXpSheet({
 
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.scrim}>
+      <View style={[styles.scrim, { paddingBottom: responsiveSize(16) + safeBottom }]}>
         <View style={styles.sheet}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>How to earn XP</Text>
@@ -245,9 +251,9 @@ function LeaderboardLoadingState({ styles }: { styles: ReturnType<typeof createS
   );
 }
 
-function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; onEditProfile: () => void; styles: ReturnType<typeof createStyles> }) {
+function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, safeTop, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; onEditProfile: () => void; safeTop: number; styles: ReturnType<typeof createStyles> }) {
   return (
-    <View style={styles.emptyState}>
+    <View style={[styles.emptyState, { top: responsiveSize(246) + safeTop }]}>
       <Image source={emptyFriendsIcon} resizeMode="contain" style={styles.emptyIcon} />
       <Text style={styles.emptyTitle}>{audience === 'friends' ? 'No friends ranked yet' : 'No local rankings yet'}</Text>
       <Text style={styles.emptyCopy}>{audience === 'friends' ? "Add friends to see who's topping the Tastes charts this week." : 'Set your city in your profile to join the local leaderboard.'}</Text>
@@ -265,7 +271,7 @@ function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, styles }
 export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile }: { onAddFriends: () => void; onBack: () => void; onEditProfile: () => void }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const currentUserId = useAuthenticatedUserId();
   const [period, setPeriod] = useState<Period>('month');
   const [audience, setAudience] = useState<'friends' | 'local'>('friends');
@@ -288,7 +294,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
       style={styles.screen}
     >
       <PatternBackgroundLift />
-      <LeaderboardHeader audience={audience} onAudience={setAudience} onBack={onBack} onInfo={() => setShowXp(true)} styles={styles} />
+      <LeaderboardHeader audience={audience} onAudience={setAudience} onBack={onBack} onInfo={() => setShowXp(true)} safeTop={insets.top} styles={styles} />
       {!query.isPending && items.length > 0 ? (
         <View style={styles.periodArea}>
           <View style={styles.periodSwitch}>
@@ -312,7 +318,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
           </Pressable>
         </View>
       ) : items.length === 0 ? (
-        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} onEditProfile={onEditProfile} styles={styles} />
+        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} onEditProfile={onEditProfile} safeTop={insets.top} styles={styles} />
       ) : (
         <>
           <View style={styles.podium}>
@@ -342,28 +348,29 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
             showsVerticalScrollIndicator={false}
             style={styles.rankingList}
           />
-          {query.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
+          {query.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={[styles.pageLoader, { bottom: responsiveSize(92) + insets.bottom }]} /> : null}
           {current ? (
             <CurrentUserBar
               current={current}
               preceding={preceding}
+              safeBottom={insets.bottom}
               styles={styles}
             />
           ) : null}
         </>
       )}
-      <HowXpSheet onClose={() => setShowXp(false)} styles={styles} visible={showXp} />
+      <HowXpSheet onClose={() => setShowXp(false)} safeBottom={insets.bottom} styles={styles} visible={showXp} />
     </ImageBackground>
   );
 }
 
-const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) => responsiveStyleSheet({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: colors.canvas },
   pattern: { opacity: 0.16 },
   patternLight: { opacity: 0.07 },
   header: {
     zIndex: 3,
-    paddingTop: safeTop,
+    paddingTop: 0,
     paddingBottom: 12,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -441,10 +448,10 @@ const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) 
   movementUp: { color: '#4DBF73', fontSize: 11 },
   movementDown: { color: '#D33A32', fontSize: 11 },
   currentUser: {
-    minHeight: 76 + safeBottom,
+    minHeight: 76,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 10 + safeBottom,
+    paddingBottom: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
     backgroundColor: '#C8322D',
@@ -479,7 +486,7 @@ const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) 
   skeletonLineShort: { width: 70, height: 10, borderRadius: 5, backgroundColor: colors.skeletonMuted },
   emptyState: {
     position: 'absolute',
-    top: safeTop + 246,
+    top: 246,
     left: 31,
     right: 31,
     alignItems: 'center',
@@ -495,8 +502,8 @@ const createStyles = (colors: ThemeColors, safeTop: number, safeBottom: number) 
   stateCopy: { color: colors.textMuted, fontSize: 15, lineHeight: 20, textAlign: 'center' },
   retry: { marginTop: 4, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: colors.primary },
   retryText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
-  pageLoader: { position: 'absolute', right: 16, bottom: 92 + safeBottom },
-  scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 + safeBottom, backgroundColor: 'rgba(0,0,0,0.55)' },
+  pageLoader: { position: 'absolute', right: 16, bottom: 92 },
+  scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { height: 446, borderRadius: 22, backgroundColor: '#242426', paddingHorizontal: 24, paddingTop: 28 },
   sheetHandle: { position: 'absolute', top: 10, left: '50%', marginLeft: -17, width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   sheetTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },

@@ -630,7 +630,7 @@ export function ProfileScreen({
           </View>
           <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>
             {MAP_FILTERS.map((item) => (
-              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: item.width }]}>
+              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: responsiveSize(item.width) }]}>
                 <View style={[styles.mapFilterIcon, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}><MapFilterGlyph value={item.value} /></View>
                 <Text style={[styles.mapFilterText, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}>{item.label}</Text>
               </Pressable>

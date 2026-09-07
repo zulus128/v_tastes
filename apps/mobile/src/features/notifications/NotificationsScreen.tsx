@@ -84,7 +84,7 @@ export function NotificationsScreen({
   const queryClient = useQueryClient();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top, isDark), [colors, insets.top, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
   const [tab, setTab] = useState<NotificationTab>('activity');
@@ -240,7 +240,7 @@ export function NotificationsScreen({
   const hasClearableItems = items.length > 0;
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
           <Pressable accessibilityLabel="Back" hitSlop={10} onPress={onBack} style={styles.backButton}>
             <Image source={backIcon} style={styles.backIcon} />
@@ -299,12 +299,12 @@ export function NotificationsScreen({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, isDark: boolean) {
+function createStyles(colors: ThemeColors, isDark: boolean) {
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     header: {
       zIndex: 2,
-      paddingTop: safeTop,
+      paddingTop: 0,
       paddingHorizontal: 16,
       paddingBottom: 12,
       borderBottomLeftRadius: 24,

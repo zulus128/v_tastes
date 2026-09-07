@@ -131,7 +131,7 @@ export function ConversationsScreen({
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
@@ -201,7 +201,7 @@ export function ConversationsScreen({
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
           <View style={styles.headerButton} />
           <Text style={styles.title}>Dialog</Text>
@@ -282,11 +282,11 @@ export function ConversationsScreen({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
+function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
-    header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
+    header: { paddingTop: 0, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

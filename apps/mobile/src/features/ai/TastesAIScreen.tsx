@@ -109,10 +109,7 @@ export function TastesAIScreen({
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => createStyles(colors, insets.top, insets.bottom),
-    [colors, insets.bottom, insets.top],
-  );
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [text, setText] = useState('');
   const [conversation, setConversation] = useState<AiConversation | null>(null);
   const [history, setHistory] = useState<AiConversation[]>([]);
@@ -249,7 +246,7 @@ export function TastesAIScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.screen}
       >
-        <View style={styles.header}>
+          <View style={[styles.header, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
           <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.headerAction}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
@@ -354,7 +351,7 @@ export function TastesAIScreen({
         )}
 
         {toast ? (
-          <View style={styles.toast}>
+          <View style={[styles.toast, { bottom: responsiveSize(82) + insets.bottom }]}>
             <Text style={styles.toastText}>✓ {toast}</Text>
           </View>
         ) : null}
@@ -382,7 +379,7 @@ export function TastesAIScreen({
             </View>
           </View>
         ) : null}
-        <View style={styles.composer}>
+        <View style={[styles.composer, { minHeight: responsiveSize(isDark ? 64 : 55) + insets.bottom, paddingBottom: Math.max(responsiveSize(10), insets.bottom) }]}>
           <TextInput
             editable={!asking}
             maxLength={500}
@@ -631,6 +628,7 @@ function HistoryModal({
   styles: ReturnType<typeof createStyles>;
   visible: boolean;
 }) {
+  const insets = useSafeAreaInsets();
   const [clearConfirm, setClearConfirm] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   return (
@@ -645,8 +643,8 @@ function HistoryModal({
         <View pointerEvents="none" style={styles.historyGlow}>
           <Image source={bottomGlow} style={styles.historyGlowImage} />
         </View>
-        <View pointerEvents="none" style={styles.historyPanel} />
-        <View style={styles.historyHeader}>
+        <View pointerEvents="none" style={[styles.historyPanel, { top: responsiveSize(66) + insets.top }]} />
+        <View style={[styles.historyHeader, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
           <Pressable accessibilityLabel="Back" onPress={onClose} style={styles.historyButton}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
@@ -689,7 +687,7 @@ function HistoryModal({
               <Text style={styles.newChatText}>New chat</Text>
             </Pressable>
             <Text style={styles.historySectionTitle}>RECENT</Text>
-            <ScrollView contentContainerStyle={styles.historyList}>
+            <ScrollView contentContainerStyle={[styles.historyList, { paddingBottom: responsiveSize(24) + insets.bottom }]}>
               {history.map((item, index) => {
                 const firstTurn = item.turns[0];
                 const latestTurn = item.turns[item.turns.length - 1];
@@ -766,7 +764,7 @@ function HistoryModal({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
+function createStyles(colors: ThemeColors) {
   const isDark = colors.background === '#080808';
   return responsiveStyleSheet({
     screen: { flex: 1 },
@@ -788,8 +786,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     },
     bottomGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
     header: {
-      height: safeTop + 66,
-      paddingTop: safeTop + 6,
+      height: 66,
+      paddingTop: 6,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',
@@ -1157,10 +1155,10 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       textAlign: 'center',
     },
     composer: {
-      minHeight: (isDark ? 64 : 55) + safeBottom,
+      minHeight: isDark ? 64 : 55,
       paddingHorizontal: 16,
       paddingTop: isDark ? 10 : 16,
-      paddingBottom: Math.max(10, safeBottom),
+      paddingBottom: 10,
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
@@ -1192,7 +1190,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       position: 'absolute',
       left: 90,
       right: 90,
-      bottom: 82 + safeBottom,
+      bottom: 82,
       padding: 12,
       borderRadius: 21,
       alignItems: 'center',
@@ -1219,7 +1217,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     historyGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
     historyPanel: {
       position: 'absolute',
-      top: safeTop + 66,
+      top: 66,
       right: 0,
       bottom: 0,
       left: 0,
@@ -1228,8 +1226,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       backgroundColor: isDark ? 'rgba(8,8,8,0.24)' : colors.canvas,
     },
     historyHeader: {
-      height: safeTop + 66,
-      paddingTop: safeTop + 6,
+      height: 66,
+      paddingTop: 6,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',
@@ -1318,7 +1316,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       marginTop: 25,
       marginLeft: 0,
     },
-    historyList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 + safeBottom },
+    historyList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
     historyRow: {
       minHeight: 66,
       paddingVertical: 14,

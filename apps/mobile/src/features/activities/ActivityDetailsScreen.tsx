@@ -66,7 +66,7 @@ export function ActivityDetailsScreen({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activityId === 'visual-audit-activity') {
+    if (__DEV__ && activityId === 'visual-audit-activity') {
       setDetails({
         organizerId: 'visual-audit-user',
         startsAt: new Date('2026-09-20T19:00:00Z'),

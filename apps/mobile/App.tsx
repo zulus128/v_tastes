@@ -22,14 +22,12 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
 
-function ResponsiveAppFrame({ children }: PropsWithChildren) {
+function ResponsiveAppFrame({ children, height, width }: PropsWithChildren<{ height: number; width: number }>) {
   const { colors } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
-  const viewportKey = `${Math.round(width)}:${Math.round(height)}`;
 
   return (
     <View style={[styles.viewport, { backgroundColor: colors.background }]}>
-      <View key={viewportKey} style={[styles.appFrame, { height, width }]}>{children}</View>
+      <View style={[styles.appFrame, { height, width }]}>{children}</View>
     </View>
   );
 }
@@ -159,9 +157,10 @@ function UpdatePrompt({ onClose, onUpdate, visible }: { onClose: () => void; onU
 }
 
 export default function App() {
+  const { height, width } = useResponsiveViewport();
   return (
     <ThemeProvider>
-      <ResponsiveAppFrame>
+      <ResponsiveAppFrame height={height} width={width}>
         <AppErrorBoundary>
           <PersistQueryClientProvider
             client={queryClient}
