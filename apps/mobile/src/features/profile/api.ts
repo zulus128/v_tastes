@@ -80,7 +80,7 @@ export function useProfile(userId: string, fallbackName: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (userId === 'visual-audit-user') {
+    if (__DEV__ && userId === 'visual-audit-user') {
       setProfile(profileFromDocument({
         city: 'London',
         displayName: fallbackName,
@@ -127,7 +127,7 @@ export function useProfileReviews(userId: string) {
     lastDocument.current = null;
     setReviews([]);
     setLoading(true);
-    if (userId === 'visual-audit-user') {
+    if (__DEV__ && userId === 'visual-audit-user') {
       setLoading(false);
       setError(null);
       setHasMore(false);

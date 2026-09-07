@@ -19,13 +19,15 @@ type Vector = ComponentType<SvgProps>;
 function Layer({
   component: Component,
   color,
+  size,
   style,
 }: {
   component: Vector;
   color: string;
+  size: number;
   style: object;
 }) {
-  return <Component color={color} style={[styles.layer, style]} />;
+  return <Component color={color} height={responsiveSize(size)} style={[styles.layer, style]} width={responsiveSize(size)} />;
 }
 
 // Each tab keeps a single glyph in both states — filled feed for Home,
@@ -36,7 +38,7 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Home') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={HomeBold} style={styles.homeBold} />
+        <Layer color={color} component={HomeBold} size={20} style={styles.homeBold} />
       </View>
     );
   }
@@ -44,7 +46,7 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Discover') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={DiscoverOutline} style={styles.discoverOutline} />
+        <Layer color={color} component={DiscoverOutline} size={20} style={styles.discoverOutline} />
       </View>
     );
   }
@@ -52,15 +54,15 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Dialog') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={DialogOutlineMain} style={styles.dialogOutlineMain} />
-        <Layer color={color} component={DialogOutlineDetail} style={styles.dialogOutlineDetail} />
+        <Layer color={color} component={DialogOutlineMain} size={20} style={styles.dialogOutlineMain} />
+        <Layer color={color} component={DialogOutlineDetail} size={20} style={styles.dialogOutlineDetail} />
       </View>
     );
   }
 
   return (
     <View style={styles.icon}>
-      <Layer color={color} component={ProfileOutline} style={styles.profileOutline} />
+      <Layer color={color} component={ProfileOutline} size={20} style={styles.profileOutline} />
     </View>
   );
 }
@@ -68,7 +70,7 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
 export function CreateTabGlyph() {
   return (
     <View style={styles.createIcon}>
-      <Layer color="#FFFFFF" component={CreateVector} style={styles.createVector} />
+      <Layer color="#FFFFFF" component={CreateVector} size={24} style={styles.createVector} />
     </View>
   );
 }
@@ -82,7 +84,7 @@ export function NotificationsGlyph() {
   const { colors } = useAppTheme();
   return (
     <View style={styles.headerIcon}>
-      <Layer color={colors.text} component={Notifications} style={styles.notifications} />
+      <Layer color={colors.text} component={Notifications} size={24} style={styles.notifications} />
     </View>
   );
 }

@@ -380,7 +380,7 @@ export function ProfileSettingsSheet({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               style={styles.contentScroll}
-              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) + responsiveSize(70) }]}
+              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) + responsiveSize(118) }]}
             >
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
               <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />

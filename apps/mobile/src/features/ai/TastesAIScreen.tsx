@@ -31,7 +31,7 @@ import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
@@ -107,6 +107,8 @@ export function TastesAIScreen({
   userId: string;
 }) {
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
+  const historyKey = visualAudit ? `${HISTORY_KEY}:visual-audit` : HISTORY_KEY;
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -127,7 +129,7 @@ export function TastesAIScreen({
   const [lastPrompt, setLastPrompt] = useState('');
 
   useEffect(() => {
-    void AsyncStorage.getItem(HISTORY_KEY)
+    void AsyncStorage.getItem(historyKey)
       .then((raw) => {
         if (!raw) return;
         try {
@@ -143,7 +145,7 @@ export function TastesAIScreen({
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, []);
+  }, [historyKey]);
 
   function showToast(message: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -199,7 +201,7 @@ export function TastesAIScreen({
         ...history.filter((item) => item.id !== nextConversation.id),
       ].slice(0, 30);
       setHistory(nextHistory);
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
+      await AsyncStorage.setItem(historyKey, JSON.stringify(nextHistory));
     } catch (error) {
       if (currentRequest !== requestId.current) return;
       const code = (error as { code?: string }).code ?? '';
@@ -210,7 +212,7 @@ export function TastesAIScreen({
   }
 
   async function clearHistory() {
-    await AsyncStorage.removeItem(HISTORY_KEY);
+    await AsyncStorage.removeItem(historyKey);
     setHistory([]);
     setConversation(null);
   }
@@ -218,7 +220,7 @@ export function TastesAIScreen({
     const next = history.filter((item) => item.id !== id);
     setHistory(next);
     if (conversation?.id === id) setConversation(null);
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(historyKey, JSON.stringify(next));
   }
   async function enableLocation() {
     const permission = await Location.requestForegroundPermissionsAsync();

@@ -361,7 +361,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
               <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
               <View style={styles.consentCopy}>
                 <Text style={styles.consentTitle}>Discover the best places!</Text>
-                <Text numberOfLines={2} style={styles.consentSubtitle}>
+                <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>
                   Rate dishes and restaurants to get personalized{`\n`}recommendations
                 </Text>
                 <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
