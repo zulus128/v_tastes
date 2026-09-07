@@ -109,7 +109,11 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
 }
 
 export function useResponsiveMetrics() {
-  const { width, height } = useWindowDimensions();
+  // `window` height shrinks on Android while the resize-style keyboard is open.
+  // Use it only as a subscription to orientation/window changes; scale itself
+  // comes from stable physical screen dimensions.
+  useWindowDimensions();
+  const { width, height } = Dimensions.get('screen');
   return responsiveMetrics(width, height);
 }
 
@@ -129,7 +133,13 @@ export function responsiveViewport(width: number, height: number) {
 
 export function useResponsiveViewport() {
   const { width, height } = useWindowDimensions();
-  return responsiveViewport(width, height);
+  const screen = Dimensions.get('screen');
+  const stableMetrics = responsiveMetrics(screen.width, screen.height);
+  if (Math.min(screen.width, screen.height) < TABLET_MIN_EDGE) return { height, width };
+  return {
+    height: Math.min(height, DESIGN_VIEWPORT.height * stableMetrics.scale),
+    width: Math.min(width, DESIGN_VIEWPORT.width * stableMetrics.scale),
+  };
 }
 
 export function responsiveValue(value: number, scale: number) {
@@ -139,7 +149,7 @@ export function responsiveValue(value: number, scale: number) {
 
 /** Scales numeric component props (most often SVG width/height) like styles. */
 export function responsiveSize(value: number) {
-  const { width, height } = Dimensions.get('window');
+  const { width, height } = Dimensions.get('screen');
   return responsiveValue(value, responsiveMetrics(width, height).scale);
 }
 

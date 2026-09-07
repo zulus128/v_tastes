@@ -201,6 +201,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
   const [extraReplies, setExtraReplies] = useState<Record<string, { items: Comment[]; nextCursor: string | null | undefined }>>({});
+  const [deepLinkedItems, setDeepLinkedItems] = useState<Comment[]>([]);
   const [loadingReplyIds, setLoadingReplyIds] = useState<Set<string>>(new Set());
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
@@ -209,7 +210,8 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const mutation = useAddComment(reviewId);
   const reaction = useReactToComment(reviewId);
   const deletion = useDeleteComment(reviewId);
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const pageItems = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = [...new Map([...deepLinkedItems, ...pageItems].map((item) => [item.id, item])).values()];
   const review = query.data?.pages[0]?.review;
   const rootItems = items.filter((item) => !item.parentCommentId);
   const repliesByParent = new Map<string, Comment[]>();
@@ -224,6 +226,18 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   useEffect(() => {
     setExtraReplies({});
   }, [query.dataUpdatedAt]);
+
+  useEffect(() => {
+    if (!commentId) {
+      setDeepLinkedItems([]);
+      return undefined;
+    }
+    let active = true;
+    void api.getCommentContext({ reviewId, commentId })
+      .then((response) => { if (active) setDeepLinkedItems(response.data.items); })
+      .catch(() => { if (active) setDeepLinkedItems([]); });
+    return () => { active = false; };
+  }, [api, commentId, reviewId]);
 
   async function loadMoreReplies(parentCommentId: string) {
     if (loadingReplyIds.has(parentCommentId)) return;

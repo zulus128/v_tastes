@@ -7,6 +7,7 @@ import {
   setReviewPinnedInputSchema,
   getCommentsInputSchema,
   getCommentRepliesInputSchema,
+  getCommentContextInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
   reactToReviewInputSchema,
@@ -292,6 +293,46 @@ export const getCommentReplies = onCall(callableOptions, async (request) => {
   };
 });
 
+/** Resolves the root and target comment behind an unchanged deep-link URL. */
+export const getCommentContext = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(getCommentContextInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const targetRef = reviewRef.collection('comments').doc(input.commentId);
+  const [review, target] = await Promise.all([reviewRef.get(), targetRef.get()]);
+  if (!review.exists || review.get('status') !== 'published' || !target.exists || target.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The comment was not found.');
+  }
+  const rootRef = target.get('parentCommentId')
+    ? reviewRef.collection('comments').doc(String(target.get('parentCommentId')))
+    : targetRef;
+  const root = rootRef.path === targetRef.path ? target : await rootRef.get();
+  if (!root.exists || root.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+  const documents = root.id === target.id ? [root] : [root, target];
+  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const [reactionDocuments, authorDocuments] = await Promise.all([
+    db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid))),
+    db.getAll(...authorIds.map((id) => db.collection('users').doc(id))),
+  ]);
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const authorPhotoById = new Map(authorDocuments.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]));
+  return {
+    items: documents.map((document) => ({
+      id: document.id,
+      reviewId: input.reviewId,
+      authorId: String(document.get('authorId')),
+      authorDisplayName: String(document.get('authorDisplayName')),
+      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      replyCount: Number(document.get('replyCount') ?? 0),
+      reacted: reactedIds.has(document.id),
+      text: String(document.get('text')),
+      createdAt: timestampToIso(document.get('createdAt')),
+    })),
+  };
+});
+
 /** Like counts that are worth telling the author about. */
 const REVIEW_LIKE_MILESTONES = [10, 50, 100];
 const MENTION_PATTERN = /@([a-zA-Z0-9._]{2,40})/g;
@@ -426,21 +467,31 @@ export const processReviewEffects = onDocumentCreated({
   document: 'reviews/{reviewId}',
   database: firestoreDatabaseId,
   region: 'europe-west1',
-  // Notification documents are idempotent, but retrying their timestamp refresh would
-  // redeliver push notifications. A later review mutation also repairs reward progress.
-  retry: false,
+  retry: true,
 }, async (event) => {
   const review = event.data;
   if (!review?.exists || review.get('status') !== 'published') return;
+  const authorId = String(review.get('authorId') ?? '');
+  if (!authorId) return;
   const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
   const claimed = await db.runTransaction(async (transaction) => {
-    if ((await transaction.get(effectRef)).exists) return false;
-    transaction.create(effectRef, { reviewId: event.params.reviewId, createdAt: FieldValue.serverTimestamp() });
+    const effect = await transaction.get(effectRef);
+    if (effect.get('status') === 'complete') return false;
+    // A duplicate delivery retries while a live worker owns the lease. If the
+    // worker died, a later delivery can reclaim it after the short lease.
+    const leaseExpiresAt = effect.get('leaseExpiresAt') as Timestamp | undefined;
+    if (effect.exists && leaseExpiresAt instanceof Timestamp && leaseExpiresAt.toMillis() > Date.now()) {
+      throw new Error(`Review effect ${event.id} is already processing.`);
+    }
+    transaction.set(effectRef, {
+      reviewId: event.params.reviewId,
+      status: 'processing',
+      leaseExpiresAt: Timestamp.fromMillis(Date.now() + 5 * 60_000),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
     return true;
   });
   if (!claimed) return;
-  const authorId = String(review.get('authorId') ?? '');
-  if (!authorId) return;
   const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
   const storedXpBefore = Number(review.get('xpBefore'));
   const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
@@ -458,9 +509,15 @@ export const processReviewEffects = onDocumentCreated({
     syncRewardNotifications(authorId),
   ];
   const results = await Promise.allSettled(effects);
+  const failures: unknown[] = [];
   results.forEach((result, index) => {
-    if (result.status === 'rejected') console.warn(`Review effect ${index} failed for ${event.params.reviewId}.`, result.reason);
+    if (result.status === 'rejected') {
+      console.warn(`Review effect ${index} failed for ${event.params.reviewId}.`, result.reason);
+      failures.push(result.reason);
+    }
   });
+  if (failures.length > 0) throw new AggregateError(failures, `Review effects failed for ${event.params.reviewId}.`);
+  await effectRef.set({ status: 'complete', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 });
 
 export const createReview = onCall(callableOptions, async (request) => {

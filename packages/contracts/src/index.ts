@@ -306,6 +306,11 @@ export const getCommentRepliesInputSchema = pageInputSchema.extend({
   parentCommentId: z.string().min(1).max(128),
 });
 
+export const getCommentContextInputSchema = z.object({
+  reviewId: z.string().min(1),
+  commentId: z.string().min(1).max(128),
+});
+
 export const getFavouritesInputSchema = pageInputSchema;
 export const listNotificationsInputSchema = pageInputSchema;
 
@@ -491,6 +496,7 @@ export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
 export type GetCommentRepliesInput = z.infer<typeof getCommentRepliesInputSchema>;
+export type GetCommentContextInput = z.infer<typeof getCommentContextInputSchema>;
 export type ListNotificationsInput = z.infer<typeof listNotificationsInputSchema>;
 export type ListConversationsInput = z.infer<typeof listConversationsInputSchema>;
 export type GetMessagesInput = z.infer<typeof getMessagesInputSchema>;

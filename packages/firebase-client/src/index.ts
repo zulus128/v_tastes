@@ -28,6 +28,7 @@ import type {
   RemoveFollowerInput,
   GetCommentsInput,
   GetCommentRepliesInput,
+  GetCommentContextInput,
   GetFeedInput,
   GetLeaderboardInput,
   GetMessagesInput,
@@ -133,6 +134,7 @@ export const callableOperationNames = [
   'setReviewPinned',
   'getComments',
   'getCommentReplies',
+  'getCommentContext',
   'addComment',
   'reactToComment',
   'deleteComment',
@@ -356,6 +358,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<GetCommentsInput, CommentsPage>('getComments', input),
     getCommentReplies: (input: GetCommentRepliesInput) =>
       invoke<GetCommentRepliesInput, Page<Comment>>('getCommentReplies', input),
+    getCommentContext: (input: GetCommentContextInput) =>
+      invoke<GetCommentContextInput, { items: Comment[] }>('getCommentContext', input),
     addComment: (input: AddCommentInput) =>
       invoke<AddCommentInput, IdResult>('addComment', input),
     reactToComment: (input: ReactToCommentInput) =>

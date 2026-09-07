@@ -67,6 +67,7 @@ export {
   setReviewPinned,
   getComments,
   getCommentReplies,
+  getCommentContext,
   getFeed,
   getFeed as getFriendFeed,
   hideReview,
