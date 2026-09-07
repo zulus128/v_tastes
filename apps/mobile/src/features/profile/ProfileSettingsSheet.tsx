@@ -402,12 +402,12 @@ export function ProfileSettingsSheet({
                 <Text style={styles.deleteAccount}>Delete account</Text>
               </Pressable>
             </View>
-            <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
-              Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
-            </Text>
           </View>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
+          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
+            Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
+          </Text>
           <LinearGradient
             colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
             end={{ x: 0.5, y: 1 }}
@@ -562,7 +562,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     accountActions: { width: '100%', marginTop: s(32), gap: s(16), alignItems: 'center' },
     logout: { color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
     deleteAccount: { color: colors.danger, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
-    version: { marginTop: s(20), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
+    version: { marginBottom: s(8), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
     row: { width: '100%', height: s(50), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
     rowLabel: { flex: 1, color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41 },
     rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
