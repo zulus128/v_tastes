@@ -33,7 +33,7 @@ import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/component
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 
@@ -121,7 +121,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><RatingStars rating={review.rating} styles={styles} /></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
       {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
-      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={20} width={20} /></Pressable></View>
+      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
     </View>
     <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
@@ -155,14 +155,14 @@ function CommentRow({ item, nested = false, highlighted = false, onDelete, onRea
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>
           <Pressable onPress={onReact} style={styles.reactionAction}>
-            <HeartIcon color={item.reacted ? colors.primary : colors.text} height={20} width={20} />
+            <HeartIcon color={item.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
             {item.reactionCount ? <Text style={styles.reactionCount}>{item.reactionCount}</Text> : null}
           </Pressable>
-          <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={20} width={20} /><Text style={styles.action}>Reply</Text></Pressable>
+          <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.action}>Reply</Text></Pressable>
           {repliesToggle ? (
             <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
               <Text style={styles.action}>{repliesToggle.hidden ? `Show replies (${repliesToggle.count})` : 'Hide replies'}</Text>
-              <CaretDownIcon color={colors.textSecondary} height={14} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={14} />
+              <CaretDownIcon color={colors.textSecondary} height={responsiveSize(14)} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={responsiveSize(14)} />
             </Pressable>
           ) : null}
         </View>
@@ -321,7 +321,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             value={text}
           />
           <Pressable accessibilityLabel="Send comment" disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
-            <SendIcon height={20} width={20} />
+            <SendIcon height={responsiveSize(20)} width={responsiveSize(20)} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>

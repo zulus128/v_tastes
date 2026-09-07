@@ -5,7 +5,7 @@ import NightIcon from '../../../assets/create-review/tag-night.svg';
 import type { DishReviewDraft } from '../create-review/api';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
 
@@ -62,7 +62,7 @@ export function ProfileDraftCard({
           <RatingStars rating={draft.rating} styles={styles} />
         </View>
         <View style={styles.draftTag}>
-          <NightIcon color="#FFFFFF" height={12} width={12} />
+          <NightIcon color="#FFFFFF" height={responsiveSize(12)} width={responsiveSize(12)} />
           <Text style={styles.draftTagText}>Draft</Text>
         </View>
       </View>

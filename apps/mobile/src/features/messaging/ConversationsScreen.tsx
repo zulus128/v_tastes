@@ -20,7 +20,7 @@ import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-patt
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
@@ -252,7 +252,7 @@ export function ConversationsScreen({
                 </Text>
               </View>
             )}
-            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
+            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(20) }} /> : null}
             onEndReached={() => {
               if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
             }}

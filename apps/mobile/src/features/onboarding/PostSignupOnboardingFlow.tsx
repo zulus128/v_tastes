@@ -73,7 +73,7 @@ import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 
-type Screen =
+export type PostSignupScreen =
   | 'profile'
   | 'city'
   | 'dish'
@@ -88,8 +88,10 @@ type Screen =
   | 'ready';
 
 interface PostSignupOnboardingFlowProps {
+  initialScreen?: PostSignupScreen;
   onAuthenticationRequired: () => Promise<void>;
   onComplete: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
+  visualAudit?: boolean;
 }
 
 function suggestedUsername(displayName: string | null | undefined, email: string | null | undefined): string {
@@ -207,8 +209,10 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
 }
 
 export function PostSignupOnboardingFlow({
+  initialScreen,
   onAuthenticationRequired,
   onComplete,
+  visualAudit = false,
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
   const { height: viewportHeight, width: viewportWidth } = useResponsiveViewport();
@@ -219,10 +223,10 @@ export function PostSignupOnboardingFlow({
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useMemo(() => createTastesApi(functions), []);
-  const [screen, setScreen] = useState<Screen>('profile');
-  const [history, setHistory] = useState<Screen[]>([]);
-  const [displayName, setDisplayName] = useState(() => auth.currentUser?.displayName?.trim() ?? '');
-  const [username, setUsername] = useState(() => suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
+  const [screen, setScreen] = useState<PostSignupScreen>(initialScreen ?? 'profile');
+  const [history, setHistory] = useState<PostSignupScreen[]>([]);
+  const [displayName, setDisplayName] = useState(() => visualAudit ? 'Alex Morgan' : auth.currentUser?.displayName?.trim() ?? '');
+  const [username, setUsername] = useState(() => visualAudit ? 'alex.morgan' : suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
   const [city, setCity] = useState('London');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -234,10 +238,18 @@ export function PostSignupOnboardingFlow({
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
-  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>([]);
+  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>(() => visualAudit ? [
+    { id: 'gemini', name: 'Gemini', address: '38 Beauchamp Place, London', image: placeGeminiPopular, rating: '4.8', reviews: '243 reviews', popular: true, category: 'Restaurant', price: '$$$', distance: '0.4 km' },
+    { id: 'wasabi', name: 'Wasabi', address: '19 Kensington High St, London', image: placeWasabi, rating: '4.6', reviews: '187 reviews', popular: true, category: 'Japanese', price: '$$', distance: '0.7 km' },
+    { id: 'terrace', name: 'The Terrace', address: '11 Motcomb Street, London', image: placeGemini, rating: '4.5', reviews: '128 reviews', popular: false, category: 'Cafe', price: '$$', distance: '1.1 km' },
+  ] : []);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
-  const [contacts, setContacts] = useState<ContactCandidate[]>([]);
+  const [contacts, setContacts] = useState<ContactCandidate[]>(() => visualAudit ? [
+    { id: 'contact-1', name: 'Maya Thompson', handle: '@mayat', phoneNumber: null, invited: false, userId: 'maya', following: false },
+    { id: 'contact-2', name: 'Oliver Smith', handle: '@olivers', phoneNumber: null, invited: true, userId: 'oliver', following: true },
+    { id: 'contact-3', name: 'Sofia Rossi', handle: '+44 7700 900123', phoneNumber: '+447700900123', invited: false },
+  ] : []);
   const [busy, setBusy] = useState(false);
 
   function togglePlaceFilter(label: string) {
@@ -249,7 +261,7 @@ export function PostSignupOnboardingFlow({
     });
   }
 
-  function navigate(next: Screen) {
+  function navigate(next: PostSignupScreen) {
     setHistory((items) => [...items, screen]);
     setScreen(next);
   }

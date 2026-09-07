@@ -31,7 +31,7 @@ import rewardPattern from '../../../assets/onboarding/pattern.png';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 
 export type ProfileExtra = 'followers' | 'following' | 'rewards' | 'rewardDetails' | 'notifications' | 'achievement' | null;
@@ -174,14 +174,14 @@ export function ProfileExtras({
         <View style={[styles.header, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
           <View style={styles.headerTitleRow}>
             <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
-              <BackIcon color={colors.text} height={16} width={9} />
+              <BackIcon color={colors.text} height={responsiveSize(16)} width={responsiveSize(9)} />
             </Pressable>
             <Text style={styles.title}>{title}</Text>
             <View style={styles.headerButton} />
           </View>
           {screen === 'followers' || screen === 'following' ? (
             <View style={styles.searchField}>
-              <SearchIcon color={colors.text} height={24} width={24} />
+              <SearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
               <TextInput
                 accessibilityLabel={`Search ${title.toLocaleLowerCase()}`}
                 autoCapitalize="none"
@@ -193,7 +193,7 @@ export function ProfileExtras({
                 value={peopleSearch}
               />
               <Pressable accessibilityLabel="Voice search" hitSlop={8} style={styles.voiceButton}>
-                <VoiceIcon color={colors.text} height={24} width={24} />
+                <VoiceIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
               </Pressable>
             </View>
           ) : null}
@@ -221,7 +221,7 @@ export function ProfileExtras({
                     onPress={() => confirmRemoveFollower(person.userId, person.displayName)}
                     style={styles.removeFollower}
                   >
-                    {removingFollowerId === person.userId ? <ActivityIndicator color={colors.text} size="small" /> : <TrashIcon color={colors.text} height={25} width={24} />}
+                    {removingFollowerId === person.userId ? <ActivityIndicator color={colors.text} size="small" /> : <TrashIcon color={colors.text} height={responsiveSize(25)} width={responsiveSize(24)} />}
                   </Pressable>
                 ) : null}
               </View>

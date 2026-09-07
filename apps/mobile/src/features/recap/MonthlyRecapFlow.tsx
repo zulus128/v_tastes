@@ -54,10 +54,10 @@ import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 
-type RecapStep =
+export type RecapStep =
   | 'loading'
   | 'lowData'
   | 'intro'
@@ -74,9 +74,35 @@ type RecapStep =
   | 'share';
 
 type MonthlyRecapFlowProps = {
+  initialConfirmingClose?: boolean;
+  initialStep?: RecapStep;
   mode?: 'ready' | 'lowData';
   onClose: () => void;
   user?: User;
+};
+
+const visualAuditRecap: MonthlyRecapResult = {
+  month: 'August',
+  previousMonth: 'July',
+  ready: true,
+  placesVisited: 15,
+  previousPlacesVisited: 11,
+  areasExplored: 3,
+  previousAreasExplored: 2,
+  reviewsWritten: 9,
+  previousReviewsWritten: 11,
+  followersGained: 132,
+  favoriteArea: 'Belgravia',
+  topPlaces: [
+    { venueId: 'gemini', name: 'Gemini', address: '38 Beauchamp Place', rating: 4.8, imageUrl: null, area: 'Belgravia' },
+    { venueId: 'terrace', name: 'The Terrace', address: '11 Motcomb Street', rating: 4.7, imageUrl: null, area: 'Mayfair' },
+    { venueId: 'garden', name: 'The Garden', address: '9 Pavilion Road', rating: 4.6, imageUrl: null, area: 'Chelsea' },
+  ],
+  topDishes: [
+    { name: 'Grilled Salmon with Lemon', rating: 5, imageUrl: null },
+    { name: 'Sushi Roll', rating: 4.6, imageUrl: null },
+    { name: 'Tiramisu', rating: 4.2, imageUrl: null },
+  ],
 };
 
 type Place = {
@@ -109,20 +135,21 @@ const progressByStep: Partial<Record<RecapStep, number>> = {
   comparison: 7,
 };
 
-export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
+export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const [step, setStep] = useState<RecapStep>('loading');
-  const [confirmingClose, setConfirmingClose] = useState(false);
+  const [step, setStep] = useState<RecapStep>(initialStep ?? 'loading');
+  const [confirmingClose, setConfirmingClose] = useState(initialConfirmingClose);
   const [placeGuess, setPlaceGuess] = useState<number | null>(null);
   const [areaGuess, setAreaGuess] = useState<string | null>(null);
   const [ratingGuess, setRatingGuess] = useState(1);
-  const [recap, setRecap] = useState<MonthlyRecapResult | null>(null);
+  const [recap, setRecap] = useState<MonthlyRecapResult | null>(initialStep ? visualAuditRecap : null);
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    if (initialStep) return undefined;
     let active = true;
     setLoadError(false);
     void api.getMonthlyRecap().then((response) => {
@@ -131,7 +158,7 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
       if (active) setLoadError(true);
     });
     return () => { active = false; };
-  }, [api, loadAttempt]);
+  }, [api, initialStep, loadAttempt]);
 
   useEffect(() => {
     if (step !== 'loading' || !recap) return;
@@ -227,8 +254,8 @@ function CloseButton({ color, onPress }: { color?: string; onPress: () => void }
       onPress={onPress}
       style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
     >
-      <CloseCircle color={color ?? colors.text} height={24} width={24} />
-      <CloseX color={color ?? colors.text} height={7} style={styles.closeX} width={7} />
+      <CloseCircle color={color ?? colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
+      <CloseX color={color ?? colors.text} height={responsiveSize(7)} style={styles.closeX} width={responsiveSize(7)} />
     </Pressable>
   );
 }
@@ -292,7 +319,7 @@ function IntroScreen({ onNext }: { onNext: () => void }) {
             </View>
           ))}
         </View>
-        <TastesMouth height={57} width={230} />
+        <TastesMouth height={responsiveSize(57)} width={responsiveSize(230)} />
       </View>
       <View style={styles.introCollage}>
         <TiltedPhoto source={recapFood} style={styles.introPhotoLeft} rating="2.5" />
@@ -600,7 +627,7 @@ function ShareCard({ onShare, recap, user }: { onShare: (channel: string) => voi
       <Image source={isDark ? shareRays : shareRaysLight} resizeMode="cover" style={styles.shareRays} />
       <View style={styles.shareIdentity}>
         <Image source={profileSource} style={styles.profileAvatar} />
-        <TastesLogo width={110} />
+        <TastesLogo width={responsiveSize(110)} />
       </View>
       <Text style={styles.recapTitle}>Monthly Recap</Text>
       <View style={styles.metrics}>
@@ -678,7 +705,7 @@ function RecapButton({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
-      {shareIcon ? <ShareGlyph height={20} width={20} /> : null}
+      {shareIcon ? <ShareGlyph height={responsiveSize(20)} width={responsiveSize(20)} /> : null}
       {leading ? <Text style={styles.ctaLeading}>{leading}</Text> : null}
       <Text style={styles.ctaLabel}>{label}</Text>
       {showArrow ? <Image source={arrowIcon} resizeMode="contain" style={styles.arrow} /> : null}

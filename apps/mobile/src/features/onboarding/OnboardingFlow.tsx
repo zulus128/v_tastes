@@ -28,13 +28,13 @@ import pattern from '../../../assets/onboarding/pattern.png';
 import { auth, functions } from '../../infrastructure/firebase';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
 
-type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
+export type OnboardingScreen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
 type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked' | 'failure' | 'sign-in-failed';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -63,9 +63,9 @@ function useOnboardingStyles() {
   return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingScreen } = {}) {
   const api = useMemo(() => createTastesApi(functions), []);
-  const [screen, setScreen] = useState<Screen>('entry');
+  const [screen, setScreen] = useState<OnboardingScreen>(initialScreen ?? 'entry');
   const [country, setCountry] = useState(defaultCountry);
   const [countrySearch, setCountrySearch] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -89,9 +89,10 @@ export function OnboardingFlow() {
   });
 
   useEffect(() => {
+    if (initialScreen) return undefined;
     const timeout = setTimeout(() => setScreen('consent'), 1_250);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [initialScreen]);
 
   useEffect(() => {
     if (!challenge) return undefined;
@@ -288,7 +289,7 @@ function EntryScreen() {
         imageStyle={{ opacity: isDark ? 0.04 : 0.05, tintColor: isDark ? '#FFFFFF' : '#000000' }}
         style={styles.centered}
       >
-        <TastesLogo width={189} />
+        <TastesLogo width={responsiveSize(189)} />
       </ImageBackground>
     </LinearGradient>
   );

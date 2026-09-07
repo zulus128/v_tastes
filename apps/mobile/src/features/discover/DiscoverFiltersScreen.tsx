@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 const CUISINES = [
   'Italian 🇮🇹',
@@ -32,7 +32,7 @@ function initialValue(values: string[], prefix: string) {
 
 function BackIcon() {
   return (
-    <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+    <Svg fill="none" height={responsiveSize(24)} viewBox="0 0 24 24" width={responsiveSize(24)}>
       <Path d="M16 19 9 12l7-7" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
     </Svg>
   );
@@ -40,7 +40,7 @@ function BackIcon() {
 
 function CheckIcon() {
   return (
-    <Svg fill="none" height={18} viewBox="0 0 20 15" width={20}>
+    <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 20 15" width={responsiveSize(20)}>
       <Path d="M19.55.44a1.5 1.5 0 0 1 0 2.12L8.307 13.804a1.6 1.6 0 0 1-2.263 0L.458 8.219A1.5 1.5 0 1 1 2.58 6.098l4.596 4.596L17.428.44a1.5 1.5 0 0 1 2.122 0Z" fill="#FFFFFF" />
     </Svg>
   );

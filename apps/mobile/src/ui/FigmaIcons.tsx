@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { View } from 'react-native';
-import { responsiveStyleSheet } from './responsive';
+import { responsiveSize, responsiveStyleSheet } from './responsive';
 import type { SvgProps } from 'react-native-svg';
 import CreateVector from '../../assets/figma-icons/create.svg';
 import DialogOutlineDetail from '../../assets/figma-icons/dialog-outline-detail.svg';
@@ -75,7 +75,7 @@ export function CreateTabGlyph() {
 
 export function StatsGlyph() {
   const { colors } = useAppTheme();
-  return <Stats color={colors.text} width={24} height={24} />;
+  return <Stats color={colors.text} width={responsiveSize(24)} height={responsiveSize(24)} />;
 }
 
 export function NotificationsGlyph() {

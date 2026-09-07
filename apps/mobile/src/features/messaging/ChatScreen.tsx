@@ -27,7 +27,7 @@ import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useProfile } from '../profile/api';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
@@ -379,7 +379,7 @@ export function ChatScreen({
                 <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
               </View>
             )}
-            ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} /> : null}
+            ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(16) }} /> : null}
             onEndReached={() => {
               if (messageHistory.hasNextPage && !messageHistory.isFetchingNextPage) void messageHistory.fetchNextPage();
             }}
@@ -425,7 +425,7 @@ export function ChatScreen({
           onPress={() => void send()}
           style={({ pressed }) => [styles.send, (!text.trim() || sending) && styles.sendDisabled, pressed && styles.sendPressed]}
         >
-          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={16.667} width={16.667} />}
+          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
         </Pressable>
       </View>
       <ActivityInviteModal

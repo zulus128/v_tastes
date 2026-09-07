@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import { firestore } from '../../infrastructure/firebase';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 type Member = {
   id: string;
@@ -116,7 +116,7 @@ export function ActivityDetailsScreen({
   const price = details.venue.priceLevel > 0 ? '$'.repeat(details.venue.priceLevel) : null;
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 24 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, responsiveSize(16)) + responsiveSize(24) }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Image source={imageFor(details.venue.imageUrl)} style={styles.heroImage} />
           <View style={styles.heroShade} />

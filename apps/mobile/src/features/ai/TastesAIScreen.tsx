@@ -34,7 +34,7 @@ import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesP
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 type AiTurn = {
   id: string;
@@ -85,8 +85,8 @@ function AiMark({ color }: { color?: string } = {}) {
   const { colors } = useAppTheme();
   return (
     <View style={markStyles.container}>
-      <AiMouthPink height={10} style={markStyles.pink} width={13} />
-      <AiMouthOutline color={color ?? colors.text} height={13} style={markStyles.outline} width={18} />
+      <AiMouthPink height={responsiveSize(10)} style={markStyles.pink} width={responsiveSize(13)} />
+      <AiMouthOutline color={color ?? colors.text} height={responsiveSize(13)} style={markStyles.outline} width={responsiveSize(18)} />
     </View>
   );
 }
@@ -272,9 +272,9 @@ export function TastesAIScreen({
           <View style={styles.errorPanel}>
             <View style={styles.errorContent}>
               {failure === 'location' ? (
-                <LocationOffIcon color={colors.text} height={62} width={52} />
+                <LocationOffIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(52)} />
               ) : (
-                <OfflineIcon color={colors.text} height={62} width={62} />
+                <OfflineIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(62)} />
               )}
               <Text style={styles.errorTitle}>
                 {failure === 'location' ? 'Location is off' : "You're offline"}
@@ -407,7 +407,7 @@ export function TastesAIScreen({
             }
             style={[styles.send, !asking && !text.trim() && styles.sendDisabled]}
           >
-            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={16.667} width={16.667} />}
+            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -580,11 +580,11 @@ function PlaceCard({
           style={styles.bookmark}
         >
           {isDark ? (
-            <BookmarkIcon height={20} width={18} />
+            <BookmarkIcon height={responsiveSize(20)} width={responsiveSize(18)} />
           ) : (
             <View style={styles.bookmarkOutline}>
-              <BookmarkOutline height={17} width={15} />
-              <BookmarkOutlineLine height={1.2} style={styles.bookmarkOutlineLine} width={6} />
+              <BookmarkOutline height={responsiveSize(17)} width={responsiveSize(15)} />
+              <BookmarkOutlineLine height={responsiveSize(1.2)} style={styles.bookmarkOutlineLine} width={responsiveSize(6)} />
             </View>
           )}
         </Pressable>

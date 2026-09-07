@@ -68,12 +68,17 @@ export type RootStackParamList = {
   DiscoverFilters: undefined;
 };
 
-type MainTabParamList = {
+export type MainTabParamList = {
   Home: undefined;
   Discover: undefined;
   Create: { venueId?: string } | undefined;
   Dialog: undefined;
   Profile: { initialFollowing?: boolean; userId?: string } | undefined;
+};
+
+export type ProductVisualAuditRoute = {
+  root: keyof RootStackParamList;
+  tab?: keyof MainTabParamList;
 };
 
 type RootNavigation = NativeStackNavigationProp<RootStackParamList>;
@@ -151,10 +156,12 @@ function tabOptions(
 
 function MainTabs({
   discoverFilters,
+  initialTab,
   user,
   rootNavigation,
 }: {
   discoverFilters: string[];
+  initialTab?: keyof MainTabParamList;
   user: User;
   rootNavigation: RootNavigation;
 }) {
@@ -176,7 +183,7 @@ function MainTabs({
   return (
     <>
       <Tabs.Navigator
-        initialRouteName="Home"
+        initialRouteName={initialTab ?? 'Home'}
         screenOptions={(props) => tabOptions(colors, props)}
         backBehavior="history"
         safeAreaInsets={{ bottom: 0 }}
@@ -299,7 +306,13 @@ function MainTabs({
   );
 }
 
-export function ProductNavigator({ user }: { user: User }) {
+export function ProductNavigator({
+  user,
+  visualAuditRoute,
+}: {
+  user: User;
+  visualAuditRoute?: ProductVisualAuditRoute;
+}) {
   const { colors, isDark } = useAppTheme();
   const [discoverFilters, setDiscoverFilters] = useState<string[]>([]);
   const navigationTheme = useMemo<Theme>(() => {
@@ -317,14 +330,14 @@ export function ProductNavigator({ user }: { user: User }) {
     };
   }, [colors, isDark]);
   return (
-    <NavigationContainer linking={linking} theme={navigationTheme}>
-      <RootStack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
+    <NavigationContainer key={`${visualAuditRoute?.root ?? 'MainTabs'}:${visualAuditRoute?.tab ?? ''}`} linking={linking} theme={navigationTheme}>
+      <RootStack.Navigator initialRouteName={visualAuditRoute?.root ?? 'MainTabs'} screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="MainTabs">
           {({ navigation }) => (
-            <MainTabs discoverFilters={discoverFilters} user={user} rootNavigation={navigation} />
+            <MainTabs discoverFilters={discoverFilters} initialTab={visualAuditRoute?.tab} user={user} rootNavigation={navigation} />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Comments">
+        <RootStack.Screen name="Comments" initialParams={visualAuditRoute?.root === 'Comments' ? { reviewId: 'visual-audit-review' } : undefined}>
           {({ navigation, route }) => (
             <PaginatedCommentsScreen
               commentId={route.params.commentId}
@@ -336,7 +349,7 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Recap">
+        <RootStack.Screen name="Recap" initialParams={visualAuditRoute?.root === 'Recap' ? { mode: 'ready' } : undefined}>
           {({ navigation, route }) => (
             <MonthlyRecapFlow mode={route.params.mode} onClose={navigation.goBack} user={user} />
           )}
@@ -350,7 +363,7 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Place">
+        <RootStack.Screen name="Place" initialParams={visualAuditRoute?.root === 'Place' ? { venueId: 'visual-audit-venue' } : undefined}>
           {({ navigation, route }) => (
             <PlaceScreen
               onBack={() => {
@@ -369,7 +382,7 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Conversation">
+        <RootStack.Screen name="Conversation" initialParams={visualAuditRoute?.root === 'Conversation' ? { conversationId: 'visual-audit-conversation' } : undefined}>
           {({ navigation, route }) => (
             <ChatScreen
               conversationId={route.params.conversationId}
@@ -395,7 +408,7 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="ActivityDetails">
+        <RootStack.Screen name="ActivityDetails" initialParams={visualAuditRoute?.root === 'ActivityDetails' ? { activityId: 'visual-audit-activity' } : undefined}>
           {({ navigation, route }) => (
             <ActivityDetailsScreen
               activityId={route.params.activityId}
@@ -483,7 +496,7 @@ export function ProductNavigator({ user }: { user: User }) {
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="GroupDetails">
+        <RootStack.Screen name="GroupDetails" initialParams={visualAuditRoute?.root === 'GroupDetails' ? { groupId: 'visual-audit-group', admin: true } : undefined}>
           {({ navigation, route }) => (
             <GroupDetailsScreen
               groupId={route.params.groupId}

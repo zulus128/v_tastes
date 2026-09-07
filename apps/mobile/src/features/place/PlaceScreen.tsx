@@ -25,7 +25,7 @@ import { usePlace, usePlaceReviews } from '../discover/api';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -114,9 +114,9 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     </ScrollView>
     <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
     <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
-    <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + 12 }]}><Text style={styles.back}>‹</Text></Pressable>
-    <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + 12 }]}>
-      {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={18} width={18} />}
+    <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable>
+    <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + responsiveSize(12) }]}>
+      {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={responsiveSize(18)} width={responsiveSize(18)} />}
     </Pressable>
     <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
     <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
@@ -146,7 +146,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
         maxToRenderPerBatch={8}
         ListHeaderComponent={<>{hero}{intro}</>}
         ListEmptyComponent={!reviews.isPending && !reviews.isError ? <Text style={styles.empty}>No reviews yet.</Text> : null}
-        ListFooterComponent={reviews.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 18 }} /> : null}
+        ListFooterComponent={reviews.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(18) }} /> : null}
         onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetchingNextPage) void reviews.fetchNextPage(); }}
         onEndReachedThreshold={0.5}
         windowSize={7}
@@ -172,11 +172,11 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
 function Overview({ details, openHours, openPhotos, styles }: { details: NonNullable<ReturnType<typeof usePlace>['data']>; openHours: () => void; openPhotos: () => void; styles: ReturnType<typeof createStyles> }) {
   const iconColor = styles.detailIcon.color;
   return <View style={styles.section}>
-    <DetailRow icon={<CalendarIcon color={iconColor} height={20} width={20} />} label={todayHours(details.openingHours)?.hours ?? 'Opening hours'} onPress={openHours} styles={styles} />
-    {details.phone ? <DetailRow icon={<PhoneIcon color={iconColor} height={20} width={20} />} label={details.phone} onPress={() => void Linking.openURL(`tel:${details.phone!.replace(/[^+\d]/g, '')}`)} styles={styles} /> : null}
-    {details.website ? <DetailRow icon={<PlanetIcon color={iconColor} height={20} width={20} />} label={details.website} onPress={() => void Linking.openURL(/^https?:\/\//i.test(details.website!) ? details.website! : `https://${details.website}`)} styles={styles} /> : null}
+    <DetailRow icon={<CalendarIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={todayHours(details.openingHours)?.hours ?? 'Opening hours'} onPress={openHours} styles={styles} />
+    {details.phone ? <DetailRow icon={<PhoneIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={details.phone} onPress={() => void Linking.openURL(`tel:${details.phone!.replace(/[^+\d]/g, '')}`)} styles={styles} /> : null}
+    {details.website ? <DetailRow icon={<PlanetIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={details.website} onPress={() => void Linking.openURL(/^https?:\/\//i.test(details.website!) ? details.website! : `https://${details.website}`)} styles={styles} /> : null}
     <Pressable onPress={openPhotos} style={styles.strip}>{details.photoUrls.slice(0, 3).map((url, index) => <Image key={url + String(index)} source={placeImage(url)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
-    <View style={styles.sectionTitleRow}><TopRatedDishesIcon color={styles.sectionTitleIcon.color} height={22} width={24} /><Text style={styles.sectionTitle}>Top rated dishes</Text></View>
+    <View style={styles.sectionTitleRow}><TopRatedDishesIcon color={styles.sectionTitleIcon.color} height={responsiveSize(22)} width={responsiveSize(24)} /><Text style={styles.sectionTitle}>Top rated dishes</Text></View>
     {details.popularDishes.map((dish, index) => <View key={dish.name} style={styles.dish}><Text style={styles.dishName}>{index + 1}. {dish.name}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>)}
   </View>;
 }
@@ -185,14 +185,14 @@ function DetailRow({ icon, label, onPress, styles }: { icon: ReactNode; label: s
   return <Pressable onPress={onPress} style={styles.detail}>
     {icon}
     <Text numberOfLines={1} style={styles.detailText}>{label}</Text>
-    <ArrowUpRightIcon color={styles.detailIcon.color} height={20} style={styles.detailArrow} width={20} />
+    <ArrowUpRightIcon color={styles.detailIcon.color} height={responsiveSize(20)} style={styles.detailArrow} width={responsiveSize(20)} />
   </Pressable>;
 }
 
 function CloseButton({ onPress, styles }: { onPress: () => void; styles: ReturnType<typeof createStyles> }) {
   return <Pressable accessibilityLabel="Close" hitSlop={12} onPress={onPress} style={styles.closeButton}>
-    <CloseCircle color={styles.closeIcon.color} height={24} width={24} />
-    <CloseX color={styles.closeIcon.color} height={8} style={styles.closeX} width={8} />
+    <CloseCircle color={styles.closeIcon.color} height={responsiveSize(24)} width={responsiveSize(24)} />
+    <CloseX color={styles.closeIcon.color} height={responsiveSize(8)} style={styles.closeX} width={responsiveSize(8)} />
   </Pressable>;
 }
 
@@ -205,7 +205,7 @@ function ReviewsHeader({ error, loading, openSort, retry, scope, setScope, sort,
         <Pressable onPress={() => setScope('all')} style={[styles.scopeButton, scope === 'all' && styles.scopeButtonActive]}><Text style={[styles.scopeText, scope === 'all' && styles.scopeTextActive]}>All</Text></Pressable>
         <Pressable onPress={() => setScope('friends')} style={[styles.scopeButton, scope === 'friends' && styles.scopeButtonActive]}><Text style={[styles.scopeText, scope === 'friends' && styles.scopeTextActive]}>Friends</Text></Pressable>
       </View>
-      <Pressable accessibilityLabel={`Sort reviews: ${sorts[sort]}`} onPress={openSort} style={styles.sortButton}><SortIcon color={styles.sort.color} height={16} width={20} /></Pressable>
+      <Pressable accessibilityLabel={`Sort reviews: ${sorts[sort]}`} onPress={openSort} style={styles.sortButton}><SortIcon color={styles.sort.color} height={responsiveSize(16)} width={responsiveSize(20)} /></Pressable>
     </View>
   </View>;
 }
@@ -229,7 +229,7 @@ function ReviewCard({ item: review, onComments, onReact, onShare, reacted, react
       <View style={styles.reviewer}><UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
       <View style={styles.reviewBody}>
         <RatingStars rating={review.rating} styles={styles} /><Text style={styles.reviewText}>{review.text}</Text>
-        {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} /> : <HeartIcon color={colors.text} height={15.5978} width={17.9167} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={20} width={20} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={20} width={20} /></Pressable></View>
+        {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
       </View>
   </View>;
 }
@@ -245,7 +245,7 @@ function Loading({ onBack }: { onBack: () => void }) {
     animation.start();
     return () => animation.stop();
   }, [pulse]);
-  return <View style={styles.screen}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + 12 }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
+  return <View style={styles.screen}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
 }
 function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => void; retry: () => void }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]);
@@ -255,7 +255,7 @@ function Hours({ close, hours, styles, visible }: { close: () => void; hours: Ar
   const today = todayHours(hours)?.day;
   return <Modal animationType="slide" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sheet}>
     <View style={styles.sheetHead}>
-      <CalendarIcon color={styles.sheetIcon.color} height={22} width={22} />
+      <CalendarIcon color={styles.sheetIcon.color} height={responsiveSize(22)} width={responsiveSize(22)} />
       <Text style={styles.sheetTitle}>Opening hours</Text>
       <CloseButton onPress={close} styles={styles} />
     </View>
@@ -282,7 +282,7 @@ function Sort({ close, select, selected, styles, visible }: { close: () => void;
     <Text style={styles.sortTitle}>Sort by</Text>
     {(Object.keys(sorts) as PlaceReviewSort[]).map((key) => <Pressable key={key} onPress={() => { select(key); close(); }} style={styles.sortRow}>
       <Text style={styles.sortOption}>{sorts[key]}</Text>
-      <View style={[styles.radio, key === selected && styles.radioSelected]}>{key === selected ? <CheckIcon height={8.6} width={12} /> : null}</View>
+      <View style={[styles.radio, key === selected && styles.radioSelected]}>{key === selected ? <CheckIcon height={responsiveSize(8.6)} width={responsiveSize(12)} /> : null}</View>
     </Pressable>)}
     <Pressable onPress={close} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
   </Pressable></Pressable></Modal>;

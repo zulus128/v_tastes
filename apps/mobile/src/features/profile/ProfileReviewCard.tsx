@@ -6,7 +6,7 @@ import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
@@ -110,7 +110,7 @@ export function ProfileReviewCard({
           <Text style={styles.reviewAuthor}>{profile.displayName}</Text>
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
         </View>
-        {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={16} width={16} /></View> : null}
+        {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={responsiveSize(16)} width={responsiveSize(16)} /></View> : null}
         <Text style={styles.reviewDate}>{formatDisplayDate(item.createdAt)}</Text>
         <Pressable
           accessibilityLabel="Review actions"
@@ -131,7 +131,7 @@ export function ProfileReviewCard({
           </View>
           {tags[0] ? (
             <View style={styles.visitTag}>
-              {tags[0] === 'date-night' ? <NightIcon color={colors.text} height={12} width={12} /> : null}
+              {tags[0] === 'date-night' ? <NightIcon color={colors.text} height={responsiveSize(12)} width={responsiveSize(12)} /> : null}
               <Text style={styles.visitTagText}>{tagLabels[tags[0]] ?? tags[0]}</Text>
             </View>
           ) : null}
@@ -151,20 +151,20 @@ export function ProfileReviewCard({
         <View style={styles.metrics}>
           <View style={styles.metricActions}>
             <Pressable onPress={onReact} style={styles.metricIconRow}>
-              <HeartIcon color={reacted ? colors.primary : colors.text} height={15.5978} width={17.9167} />
+              <HeartIcon color={reacted ? colors.primary : colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />
               <Text style={[styles.metric, reacted && styles.metricActive]}>{item.reactionCount}</Text>
             </Pressable>
             <Pressable accessibilityLabel="Open comments" onPress={onComments} style={styles.metricIconRow}>
-              <ChatIcon color={colors.text} height={20} width={20} />
+              <ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
               <Text style={styles.metric}>{item.commentCount}</Text>
             </Pressable>
             <Pressable accessibilityLabel="Share review" onPress={onShare} style={styles.metricIconButton}>
-              <ShareIcon color={colors.text} height={18.1667} width={18.1673} />
+              <ShareIcon color={colors.text} height={responsiveSize(18.1667)} width={responsiveSize(18.1673)} />
             </Pressable>
           </View>
           {dishes.length > 0 ? (
             <View style={styles.dishCountTag}>
-              <DishIcon color={colors.text} height={10.8392} width={12} />
+              <DishIcon color={colors.text} height={responsiveSize(10.8392)} width={responsiveSize(12)} />
               <Text style={styles.dishCountText}>{dishes.length} {dishes.length === 1 ? 'dish' : 'dishes'}</Text>
             </View>
           ) : null}

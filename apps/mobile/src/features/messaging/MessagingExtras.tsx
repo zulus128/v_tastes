@@ -25,7 +25,7 @@ import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
@@ -217,7 +217,7 @@ export function NewGroupScreen({
       </View>
       <View style={styles.searchRow}>
         <View style={[styles.search, styles.newGroupSearch]}>
-          <SearchIcon color={colors.textSecondary} height={24} style={styles.searchIcon} width={24} />
+          <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} style={styles.searchIcon} width={responsiveSize(24)} />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search people"
@@ -232,7 +232,7 @@ export function NewGroupScreen({
           onPress={() => setQuery('')}
           style={styles.contactsButton}
         >
-          {isDark ? <UserHeartIcon height={21.5} width={21.5} /> : <UserHeartLightIcon height={21.5} width={21.5} />}
+          {isDark ? <UserHeartIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} /> : <UserHeartLightIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} />}
         </Pressable>
       </View>
       {loading || searching ? (
@@ -273,7 +273,7 @@ export function NewGroupScreen({
           }}
         />
       )}
-      <View style={[styles.createFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
+      <View style={[styles.createFooter, { paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
         <Pressable
           disabled={creating || name.trim().length < 2 || selected.size < 1}
           onPress={() => void create()}

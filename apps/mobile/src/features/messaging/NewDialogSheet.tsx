@@ -8,7 +8,7 @@ import SearchIcon from '../../../assets/profile/search.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -191,7 +191,7 @@ export function NewDialogSheet({
               <Text style={styles.title}>New Dialog</Text>
               <Pressable accessibilityLabel="Close" onPress={() => void closeSheet()} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
             </View>
-            <View style={styles.searchBox}><SearchIcon color={colors.text} height={24} width={24} /><TextInput ref={searchInputRef} autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
+            <View style={styles.searchBox}><SearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput ref={searchInputRef} autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
             <Animated.View
               accessibilityElementsHidden={actionsHidden}
               importantForAccessibility={actionsHidden ? 'no-hide-descendants' : 'auto'}
@@ -240,11 +240,11 @@ export function NewDialogSheet({
 }
 
 function GroupIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={18} viewBox="0 0 18 18" width={18}><Circle cx={6.25} cy={6} r={2.4} stroke={color} strokeWidth={1.5} /><Circle cx={12.25} cy={6.75} r={1.8} stroke={color} strokeWidth={1.4} /><Path d="M1.8 14.5c.35-3 2-4.5 4.45-4.5s4.1 1.5 4.45 4.5H1.8ZM10.5 10.7c2.7-.7 4.75.7 5 3.15h-3.4" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 18 18" width={responsiveSize(18)}><Circle cx={6.25} cy={6} r={2.4} stroke={color} strokeWidth={1.5} /><Circle cx={12.25} cy={6.75} r={1.8} stroke={color} strokeWidth={1.4} /><Path d="M1.8 14.5c.35-3 2-4.5 4.45-4.5s4.1 1.5 4.45 4.5H1.8ZM10.5 10.7c2.7-.7 4.75.7 5 3.15h-3.4" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /></Svg>;
 }
 
 function BellIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={18} viewBox="0 0 18 18" width={18}><Path d="M4.3 12.2h9.4l-1.05-1.45V7.5A3.65 3.65 0 0 0 9 3.85 3.65 3.65 0 0 0 5.35 7.5v3.25L4.3 12.2Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /><Path d="M7.4 14.1a1.8 1.8 0 0 0 3.2 0" stroke={color} strokeLinecap="round" strokeWidth={1.5} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 18 18" width={responsiveSize(18)}><Path d="M4.3 12.2h9.4l-1.05-1.45V7.5A3.65 3.65 0 0 0 9 3.85 3.65 3.65 0 0 0 5.35 7.5v3.25L4.3 12.2Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /><Path d="M7.4 14.1a1.8 1.8 0 0 0 3.2 0" stroke={color} strokeLinecap="round" strokeWidth={1.5} /></Svg>;
 }
 
 function createStyles(colors: ThemeColors) {

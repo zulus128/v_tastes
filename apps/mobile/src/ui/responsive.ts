@@ -137,6 +137,12 @@ export function responsiveValue(value: number, scale: number) {
   return PixelRatio.roundToNearestPixel(value * scale);
 }
 
+/** Scales numeric component props (most often SVG width/height) like styles. */
+export function responsiveSize(value: number) {
+  const { width, height } = Dimensions.get('window');
+  return responsiveValue(value, responsiveMetrics(width, height).scale);
+}
+
 function scaleOffset(value: unknown, scale: number) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const offset = value as Record<string, unknown>;

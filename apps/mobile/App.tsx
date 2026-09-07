@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { type PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { useVisualAuditCase, VisualAuditScreen } from './src/dev/VisualAuditScreen';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
 import { queryClient, queryPersister } from './src/infrastructure/query';
@@ -33,13 +34,14 @@ function ResponsiveAppFrame({ children }: PropsWithChildren) {
 function AppGate() {
   const { state, completeOnboarding, logout, minimumSupportedIosBuild, refresh } = useSession();
   const { colors, isDark } = useAppTheme();
+  const visualAuditCase = useVisualAuditCase();
   const splashHidden = useRef(false);
 
   const onRootLayout = useCallback(() => {
-    if (state.status === 'booting' || splashHidden.current) return;
+    if ((!visualAuditCase && state.status === 'booting') || splashHidden.current) return;
     splashHidden.current = true;
     void SplashScreen.hideAsync();
-  }, [state.status]);
+  }, [state.status, visualAuditCase]);
 
   useEffect(() => {
     if (state.status === 'authenticated') return undefined;
@@ -61,6 +63,19 @@ function AppGate() {
       ],
     );
   }, [minimumSupportedIosBuild, state.status]);
+
+  if (visualAuditCase) {
+    return (
+      <View onLayout={onRootLayout} style={[styles.root, { backgroundColor: colors.background }]}>
+        <VisualAuditScreen auditCase={visualAuditCase} />
+        {process.env.EXPO_PUBLIC_VISUAL_AUDIT_AUTOCYCLE === 'true' ? (
+          <View pointerEvents="none" style={styles.auditLabel}>
+            <Text style={styles.auditLabelText}>{visualAuditCase}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
   if (state.status === 'booting') return null;
 
@@ -133,4 +148,6 @@ const styles = responsiveStyleSheet({
   button: { marginTop: 8, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24, backgroundColor: '#B82F29' },
   buttonText: { color: '#fff', fontWeight: '600' },
   signOut: { color: 'rgba(255,255,255,0.65)', padding: 10 },
+  auditLabel: { position: 'absolute', top: 3, right: 3, zIndex: 1000, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 5, paddingVertical: 2 },
+  auditLabelText: { color: '#FFFFFF', fontSize: 8 },
 });

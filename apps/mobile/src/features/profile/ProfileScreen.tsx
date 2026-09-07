@@ -48,7 +48,7 @@ import { captureException } from '../../infrastructure/observability';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
@@ -110,24 +110,24 @@ function mapVenueIcon(venue: Venue, active: boolean) {
 }
 
 function MapFilterGlyph({ value }: { value: MapFilter }) {
-  if (value === 'trending') return <MapFilterTrendingIcon height={11.3438} width={9.9167} />;
-  if (value === 'restaurant') return <MapFilterRestaurantIcon height={11.053} width={11.0527} />;
+  if (value === 'trending') return <MapFilterTrendingIcon height={responsiveSize(11.3438)} width={responsiveSize(9.9167)} />;
+  if (value === 'restaurant') return <MapFilterRestaurantIcon height={responsiveSize(11.053)} width={responsiveSize(11.0527)} />;
   if (value === 'cafe') return <Image source={mapFilterCafeIcon} style={staticStyles.mapFilterCafeIcon} />;
-  if (value === 'bar') return <MapFilterBarIcon height={13.2408} width={11.586} />;
-  if (value === 'my-reviews') return <MapFilterReviewsIcon height={8.3256} width={11.6603} />;
-  return <MapFilterFriendsIcon height={14} width={14} />;
+  if (value === 'bar') return <MapFilterBarIcon height={responsiveSize(13.2408)} width={responsiveSize(11.586)} />;
+  if (value === 'my-reviews') return <MapFilterReviewsIcon height={responsiveSize(8.3256)} width={responsiveSize(11.6603)} />;
+  return <MapFilterFriendsIcon height={responsiveSize(14)} width={responsiveSize(14)} />;
 }
 
 function PencilIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="M4 20l4.2-1 10.6-10.6a2.12 2.12 0 0 0-3-3L5.2 16 4 20Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /><Path d="m14.6 6.6 3 3" stroke={color} strokeLinecap="round" strokeWidth={1.7} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M4 20l4.2-1 10.6-10.6a2.12 2.12 0 0 0-3-3L5.2 16 4 20Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /><Path d="m14.6 6.6 3 3" stroke={color} strokeLinecap="round" strokeWidth={1.7} /></Svg>;
 }
 
 function PinIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="m14.2 4.3 5.5 5.5-3.1 1.1-3.9 3.9.3 3.1-1 1-3.4-3.4-4.1 4.1-.8-.8 4.1-4.1-3.4-3.4 1-1 3.1.3 3.9-3.9 1.1-3.1.7.7Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.55} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="m14.2 4.3 5.5 5.5-3.1 1.1-3.9 3.9.3 3.1-1 1-3.4-3.4-4.1 4.1-.8-.8 4.1-4.1-3.4-3.4 1-1 3.1.3 3.9-3.9 1.1-3.1.7.7Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.55} /></Svg>;
 }
 
 function TrashIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="M5 7h14M9 7V4h6v3m2 0-.8 13H7.8L7 7m3 3v7m4-7v7" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M5 7h14M9 7V4h6v3m2 0-.8 13H7.8L7 7m3 3v7m4-7v7" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /></Svg>;
 }
 
 export function ProfileScreen({
@@ -510,9 +510,9 @@ export function ProfileScreen({
       </View>
       {activeTab === 'reviews' ? (
         <View style={styles.searchBar}>
-          <SearchIcon color={colors.textMuted} width={24} height={24} />
+          <SearchIcon color={colors.textMuted} width={responsiveSize(24)} height={responsiveSize(24)} />
           <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={24} width={24} /></Pressable>
+          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} /></Pressable>
         </View>
       ) : null}
     </View>
@@ -523,7 +523,7 @@ export function ProfileScreen({
       {activeTab === 'reviews' ? (
         <FlatList
           automaticallyAdjustKeyboardInsets
-          contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + 24 }]}
+          contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
           data={sortedReviews}
           initialNumToRender={6}
           keyExtractor={(review) => review.id}
@@ -551,7 +551,7 @@ export function ProfileScreen({
       ) : (
         <Animated.ScrollView
           automaticallyAdjustKeyboardInsets={activeTab !== 'map'}
-          contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -620,12 +620,12 @@ export function ProfileScreen({
         <Animated.View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
           <View style={styles.mapSearchRow}>
             <View style={[styles.searchBar, styles.mapSearchBar]}>
-              <SearchIcon color={colors.textMuted} width={24} height={24} />
+              <SearchIcon color={colors.textMuted} width={responsiveSize(24)} height={responsiveSize(24)} />
               <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-              <MapSearchVoiceIcon color={colors.textMuted} height={24} width={24} />
+              <MapSearchVoiceIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
             </View>
             <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapTuningButton}>
-              <MapFilterTuningIcon height={21.1838} width={17.1838} />
+              <MapFilterTuningIcon height={responsiveSize(21.1838)} width={responsiveSize(17.1838)} />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>

@@ -27,7 +27,7 @@ import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useDiscoverVenues } from '../discover/api';
 import { useFavourites } from '../favourites/api';
 
@@ -126,7 +126,7 @@ export function NewActivityScreen({
         <Text style={styles.navTitle}>New activity</Text>
         <View style={styles.navButton} />
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 14) + 78 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, responsiveSize(14)) + responsiveSize(78) }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>PLACE</Text>
         {venue ? (
           <View style={styles.venueCard}>
@@ -136,7 +136,7 @@ export function NewActivityScreen({
               <Text numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
             </View>
             <Pressable accessibilityLabel="Change place" onPress={() => setPlaceOpen(true)} style={styles.edit}>
-              <PenIcon color={colors.text} height={18} width={18} />
+              <PenIcon color={colors.text} height={responsiveSize(18)} width={responsiveSize(18)} />
             </Pressable>
           </View>
         ) : (
@@ -192,7 +192,7 @@ export function NewActivityScreen({
         </Pressable>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, responsiveSize(14)) }]}>
         <Pressable disabled={!valid || submitting} onPress={() => void submit()} style={[styles.createButton, (!valid || submitting) && styles.disabled]}>
           {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createText}>Create activity</Text>}
         </Pressable>
@@ -250,12 +250,12 @@ function PlaceSelector({ dark, onClose, onSelect, styles, userId, visible }: { d
             {search ? <Pressable accessibilityLabel="Clear search" onPress={() => setSearch('')}><Text style={styles.searchClear}>×</Text></Pressable> : null}
           </View>
           <Pressable accessibilityLabel="Place filters" onPress={() => setCategoryFilter((value) => value ? null : 'Restaurant')} style={styles.searchAction}>
-            {dark ? <SearchTuneIcon height={21.184} width={17.184} /> : <SearchTuneLightIcon height={21.184} width={17.184} />}
+            {dark ? <SearchTuneIcon height={responsiveSize(21.184)} width={responsiveSize(17.184)} /> : <SearchTuneLightIcon height={responsiveSize(21.184)} width={responsiveSize(17.184)} />}
           </Pressable>
           <Pressable accessibilityLabel="Saved places" accessibilityState={{ selected: savedOnly }} onPress={() => setSavedOnly((active) => !active)} style={[styles.searchAction, savedOnly && styles.searchActionActive]}>
             <View style={styles.bookmarkIcon}>
-              {dark ? <BookmarkBodyIcon height={21.5} style={styles.bookmarkBody} width={19.5} /> : <BookmarkBodyLightIcon height={21.5} style={styles.bookmarkBody} width={19.5} />}
-              {dark ? <BookmarkLineIcon height={1.5} style={styles.bookmarkLine} width={7.5} /> : <BookmarkLineLightIcon height={1.5} style={styles.bookmarkLine} width={7.5} />}
+              {dark ? <BookmarkBodyIcon height={responsiveSize(21.5)} style={styles.bookmarkBody} width={responsiveSize(19.5)} /> : <BookmarkBodyLightIcon height={responsiveSize(21.5)} style={styles.bookmarkBody} width={responsiveSize(19.5)} />}
+              {dark ? <BookmarkLineIcon height={responsiveSize(1.5)} style={styles.bookmarkLine} width={responsiveSize(7.5)} /> : <BookmarkLineLightIcon height={responsiveSize(1.5)} style={styles.bookmarkLine} width={responsiveSize(7.5)} />}
             </View>
           </Pressable>
         </View>

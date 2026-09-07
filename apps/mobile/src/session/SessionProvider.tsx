@@ -173,6 +173,23 @@ export function SessionProvider({ children }: PropsWithChildren) {
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
+/**
+ * Supplies a deterministic signed-in identity to development previews while
+ * preserving the real API and session actions from the surrounding provider.
+ */
+export function SessionStateOverrideProvider({
+  children,
+  user,
+}: PropsWithChildren<{ user: User }>) {
+  const session = useSession();
+  const value = useMemo<SessionContextValue>(() => ({
+    ...session,
+    state: { status: 'authenticated', user },
+  }), [session, user]);
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
 export function useSession(): SessionContextValue {
   const value = useContext(SessionContext);
   if (!value) throw new Error('useSession must be used inside SessionProvider.');

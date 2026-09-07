@@ -38,7 +38,7 @@ import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons'
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
@@ -90,10 +90,10 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
     {[1, 2, 3, 4, 5].map((star) => {
       const fill = Math.max(0, Math.min(1, clamped - star + 1));
       return <View key={star} style={styles.starCell}>
-        <ReviewStarOutline color="#B82F29" height={17.9166} opacity={0.3} width={17.9179} />
+        <ReviewStarOutline color="#B82F29" height={responsiveSize(17.9166)} opacity={0.3} width={responsiveSize(17.9179)} />
         {fill > 0 ? (
           <View style={[styles.starFill, { width: `${fill * 100}%` }]}>
-            <ReviewStarFilled color="#B82F29" height={16.6666} width={16.6671} />
+            <ReviewStarFilled color="#B82F29" height={responsiveSize(16.6666)} width={responsiveSize(16.6671)} />
           </View>
         ) : null}
       </View>;
@@ -219,7 +219,7 @@ function FeedCard({
           <RatingStars rating={item.rating} styles={styles} />
           {primaryTag ? (
             <View style={styles.tagBadge}>
-              {PrimaryTagIcon ? <PrimaryTagIcon color={colors.text} height={12} width={12} /> : null}
+              {PrimaryTagIcon ? <PrimaryTagIcon color={colors.text} height={responsiveSize(12)} width={responsiveSize(12)} /> : null}
               <Text style={styles.tagBadgeText}>{primaryTag.label}</Text>
             </View>
           ) : null}
@@ -255,7 +255,7 @@ function FeedCard({
                 <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
               </View>
               <View style={styles.dishRatingBadge}>
-                <RecommendationStar height={14} width={14} />
+                <RecommendationStar height={responsiveSize(14)} width={responsiveSize(14)} />
                 <Text style={styles.dishRatingValue}>{dish.rating.toFixed(1)}</Text>
               </View>
             </Pressable>
@@ -286,19 +286,19 @@ function FeedCard({
             <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
               <View style={styles.heartIcon}>
                 {isReactionActive
-                  ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} />
-                  : <HeartIcon color={colors.text} height={15.5978} width={17.9167} />}
+                  ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} />
+                  : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}
               </View>
               <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
                 {item.reactionCount}
               </Text>
             </Pressable>
             <Pressable onPress={onComments} style={styles.metricIconRow}>
-              <ChatIcon color={colors.text} height={20} width={20} />
+              <ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
               <Text style={styles.metric}>{item.commentCount}</Text>
             </Pressable>
             <Pressable onPress={onShare} style={styles.metricIconRow}>
-              <ShareIcon color={colors.text} height={20} width={20} />
+              <ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
             </Pressable>
           </View>
           {dishReviews.length > 0 ? (
@@ -310,7 +310,7 @@ function FeedCard({
               }}
               style={styles.dishesButton}
             >
-              <TopRatedDishesIcon color={colors.primary} height={14} width={14} />
+              <TopRatedDishesIcon color={colors.primary} height={responsiveSize(14)} width={responsiveSize(14)} />
               <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
             </Pressable>
           ) : null}
@@ -715,7 +715,7 @@ export function HomeFeedScreen({
                       {rec.rating != null ? (
                         <View style={styles.recommendationRatingRow}>
                           <View style={styles.recommendationRatingPill}>
-                            <RecommendationStar height={14} width={14} />
+                            <RecommendationStar height={responsiveSize(14)} width={responsiveSize(14)} />
                             <Text style={styles.recommendationRatingValue}>{rec.rating.toFixed(1)}</Text>
                           </View>
                           {rec.reviewCount != null ? (
@@ -727,8 +727,8 @@ export function HomeFeedScreen({
                   </View>
 
                   <View style={styles.recommendationAddIcon} pointerEvents="none">
-                    <RecommendationPlusRing height={18} width={18} style={styles.recommendationPlusRing} />
-                    <RecommendationPlus height={7} width={7} style={styles.recommendationPlus} />
+                    <RecommendationPlusRing height={responsiveSize(18)} width={responsiveSize(18)} style={styles.recommendationPlusRing} />
+                    <RecommendationPlus height={responsiveSize(7)} width={responsiveSize(7)} style={styles.recommendationPlus} />
                   </View>
 
                   {(rec.category || priceDots || distanceLabel) ? (
