@@ -536,7 +536,9 @@ function RatingCurve({
   const markerScale = scaleWidth / 359.903;
   // Same idea for the curved scale: shrink the whole arc+pins as one unit (see
   // curveDesignWidth) rather than let the end pins overflow the hero card's edge.
-  const curveScale = heroWidth > 0 ? curveScaleFor(heroWidth - 32) : 1;
+  const curveScale = heroWidth > 0
+    ? Math.min(1, (heroWidth - 32) / responsiveSize(curveDesignWidth))
+    : 1;
   return (
     <View style={ratingStyles.wrap}>
       {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt

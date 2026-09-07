@@ -57,6 +57,8 @@ function visualAuditData(operation: string): unknown {
     case 'getPlaceReviews':
     case 'listConversations':
     case 'getMessages':
+    case 'getComments':
+    case 'getLeaderboard':
     case 'listNotifications':
       return { items: [], nextCursor: null };
     case 'getPlace':
@@ -247,8 +249,12 @@ export function SessionStateOverrideProvider({
   const value = useMemo<SessionContextValue>(() => ({
     ...session,
     api,
+    completeOnboarding: visualAudit ? async () => undefined : session.completeOnboarding,
+    deleteAccount: visualAudit ? async () => undefined : session.deleteAccount,
+    logout: visualAudit ? async () => undefined : session.logout,
+    refresh: visualAudit ? async () => undefined : session.refresh,
     state: { status: 'authenticated', user },
-  }), [api, session, user]);
+  }), [api, session, user, visualAudit]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

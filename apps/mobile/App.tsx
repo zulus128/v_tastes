@@ -25,10 +25,11 @@ configureObservability();
 function ResponsiveAppFrame({ children }: PropsWithChildren) {
   const { colors } = useAppTheme();
   const { height, width } = useResponsiveViewport();
+  const viewportKey = `${Math.round(width)}:${Math.round(height)}`;
 
   return (
     <View style={[styles.viewport, { backgroundColor: colors.background }]}>
-      <View style={[styles.appFrame, { height, width }]}>{children}</View>
+      <View key={viewportKey} style={[styles.appFrame, { height, width }]}>{children}</View>
     </View>
   );
 }
