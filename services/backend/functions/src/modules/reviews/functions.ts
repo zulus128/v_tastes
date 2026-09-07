@@ -21,6 +21,7 @@ import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { requireUserId } from '../../shared/auth';
 import { db, firestoreDatabaseId } from '../../shared/firebase';
 import {
@@ -1022,25 +1023,20 @@ export const deleteComment = onCall(callableOptions, async (request) => {
     if (!review.exists || review.get('status') !== 'published') throw new HttpsError('not-found', 'The review was not found.');
     if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
     if (comment.get('authorId') !== uid) throw new HttpsError('permission-denied', 'You can only delete your own comments.');
-    const replies = comment.get('parentCommentId')
-      ? null
-      : await transaction.get(reviewRef.collection('comments')
-        .where('status', '==', 'published')
-        .where('parentCommentId', '==', input.commentId));
-    if (replies && replies.size > 450) {
-      throw new HttpsError('resource-exhausted', 'This comment thread is too large to delete at once.');
-    }
     const parentId = comment.get('parentCommentId');
     const parentRef = parentId ? reviewRef.collection('comments').doc(String(parentId)) : null;
     const parent = parentRef ? await transaction.get(parentRef) : null;
-    const deletedCount = 1 + (replies?.size ?? 0);
-    transaction.update(commentRef, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
-    replies?.docs.forEach((reply) => transaction.update(reply.ref, {
+    // Delete the root immediately. Its replies are cleaned in bounded batches
+    // by the schedule below, so a popular thread never becomes undeletable
+    // because it exceeds Firestore's transaction write limit.
+    const deletingRoot = !parentRef;
+    transaction.update(commentRef, {
       status: 'deleted',
+      ...(deletingRoot ? { replyDeletionPending: true } : {}),
       updatedAt: FieldValue.serverTimestamp(),
-    }));
+    });
     transaction.update(reviewRef, {
-      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - deletedCount),
+      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - 1),
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (parentRef && parent?.exists && parent.get('status') === 'published') {
@@ -1051,6 +1047,51 @@ export const deleteComment = onCall(callableOptions, async (request) => {
     }
   });
   return { id: input.commentId };
+});
+
+const COMMENT_REPLY_CLEANUP_BATCH_SIZE = 400;
+
+/**
+ * Removes replies from deleted root comments without making comment deletion
+ * depend on the size of the discussion. A root is already hidden immediately;
+ * this job only reconciles its now-unreachable replies and review count.
+ */
+export const cleanupDeletedCommentReplies = onSchedule({
+  schedule: 'every 5 minutes',
+  region: 'europe-west1',
+  timeZone: 'UTC',
+  maxInstances: 1,
+}, async () => {
+  const roots = await db.collectionGroup('comments')
+    .where('replyDeletionPending', '==', true)
+    .limit(10)
+    .get();
+  for (const root of roots.docs) {
+    const reviewRef = root.ref.parent.parent;
+    if (!reviewRef) continue;
+    const replies = await root.ref.parent
+      .where('parentCommentId', '==', root.id)
+      .where('status', '==', 'published')
+      .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE)
+      .get();
+    if (replies.empty) {
+      await root.ref.update({ replyDeletionPending: FieldValue.delete(), replyCount: 0, updatedAt: FieldValue.serverTimestamp() });
+      continue;
+    }
+    const batch = db.batch();
+    for (const reply of replies.docs) {
+      batch.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+    }
+    batch.update(reviewRef, {
+      commentCount: FieldValue.increment(-replies.size),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    batch.update(root.ref, {
+      replyCount: FieldValue.increment(-replies.size),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
 });
 
 export const reactToReview = onCall(callableOptions, async (request) => {

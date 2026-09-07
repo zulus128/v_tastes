@@ -60,6 +60,7 @@ export {
 } from './modules/users/functions';
 export {
   addComment,
+  cleanupDeletedCommentReplies,
   deleteComment,
   createReview,
   deleteReview,
