@@ -36,7 +36,7 @@ import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern
 import backIcon from '../../../assets/onboarding/back.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
@@ -79,6 +79,7 @@ export function ProfileSettingsSheet({
   visible: boolean;
 }) {
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
   const settingsScale = 1;
@@ -181,6 +182,7 @@ export function ProfileSettingsSheet({
 
   async function chooseProfilePhoto(camera: boolean) {
     if (!profile || uploadingPhoto) return;
+    if (visualAudit) return;
     const permission = camera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -420,7 +422,7 @@ export function ProfileSettingsSheet({
             style={styles.inviteRing}
           >
             <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastesapp.com' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
-              <InviteUsersIcon height={Math.round(24 * settingsScale)} width={Math.round(24 * settingsScale)} />
+              <InviteUsersIcon height={responsiveSize(24)} width={responsiveSize(24)} />
               <Text style={styles.inviteText}>Invite a Friend</Text>
             </Pressable>
           </LinearGradient>

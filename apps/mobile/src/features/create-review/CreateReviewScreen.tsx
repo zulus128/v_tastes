@@ -154,7 +154,9 @@ export function CreateReviewScreen({
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
-  const [feedbackHeight, setFeedbackHeight] = useState(50);
+  const feedbackMinHeight = responsiveSize(50);
+  const feedbackMaxHeight = responsiveSize(140);
+  const [feedbackHeight, setFeedbackHeight] = useState(() => responsiveSize(50));
   const [tags, setTags] = useState<ReviewTag[]>([]);
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
   const [placeSelectorOpen, setPlaceSelectorOpen] = useState(false);
@@ -369,10 +371,10 @@ export function CreateReviewScreen({
             maxLength={2_000}
             multiline
             onChangeText={setText}
-            onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(140, Math.max(50, nativeEvent.contentSize.height)))}
+            onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(feedbackMaxHeight, Math.max(feedbackMinHeight, nativeEvent.contentSize.height)))}
             placeholder="Enter text"
             placeholderTextColor={colors.placeholder}
-            scrollEnabled={feedbackHeight >= 140}
+            scrollEnabled={feedbackHeight >= feedbackMaxHeight}
             style={[styles.feedback, { height: feedbackHeight }]}
             textAlignVertical="top"
             value={text}

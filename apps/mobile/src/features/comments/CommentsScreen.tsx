@@ -177,6 +177,12 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+  const connectorX = responsiveSize(36);
+  const connectorArmX = responsiveSize(63);
+  const connectorReplyCenter = responsiveSize(32);
+  const connectorStartY = responsiveSize(52);
+  const connectorStroke = responsiveSize(2);
+  const connectorDash = `${responsiveSize(2)},${responsiveSize(4)}`;
   const [text, setText] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('comment'));
   const [reportCommentId, setReportCommentId] = useState<string | null>(null);
@@ -297,8 +303,8 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
                 }} />) : null}
                 {!hidden && replies.length > 0 ? (
                   <Svg height="100%" pointerEvents="none" style={styles.threadConnector} width="100%">
-                    {replies.map((reply) => replyOffsets[reply.id] == null ? null : <Line key={reply.id} stroke={connectorColor} strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={63} y1={replyOffsets[reply.id] + 32} y2={replyOffsets[reply.id] + 32} />)}
-                    {Object.keys(replyOffsets).some((replyId) => replies.some((reply) => reply.id === replyId)) ? <Line stroke={connectorColor} strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={36} y1={52} y2={Math.max(...replies.map((reply) => replyOffsets[reply.id] == null ? 52 : replyOffsets[reply.id] + 32))} /> : null}
+                    {replies.map((reply) => replyOffsets[reply.id] == null ? null : <Line key={reply.id} stroke={connectorColor} strokeDasharray={connectorDash} strokeLinecap="round" strokeWidth={connectorStroke} x1={connectorX} x2={connectorArmX} y1={replyOffsets[reply.id] + connectorReplyCenter} y2={replyOffsets[reply.id] + connectorReplyCenter} />)}
+                    {Object.keys(replyOffsets).some((replyId) => replies.some((reply) => reply.id === replyId)) ? <Line stroke={connectorColor} strokeDasharray={connectorDash} strokeLinecap="round" strokeWidth={connectorStroke} x1={connectorX} x2={connectorX} y1={connectorStartY} y2={Math.max(...replies.map((reply) => replyOffsets[reply.id] == null ? connectorStartY : replyOffsets[reply.id] + connectorReplyCenter))} /> : null}
                   </Svg>
                 ) : null}
               </View>;

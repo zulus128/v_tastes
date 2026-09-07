@@ -166,7 +166,11 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
   const [group, name] = auditCase.split('/');
 
   if (group === 'onboarding' && onboardingScreens.includes(name as OnboardingScreen)) {
-    return <OnboardingFlow key={auditCase} initialScreen={name as OnboardingScreen} />;
+    return (
+      <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
+        <OnboardingFlow key={auditCase} initialScreen={name as OnboardingScreen} visualAudit />
+      </SessionStateOverrideProvider>
+    );
   }
 
   if (group === 'post-signup' && postSignupScreens.includes(name as PostSignupScreen)) {

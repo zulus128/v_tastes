@@ -1,4 +1,3 @@
-import { createTastesApi } from '@tastes/firebase-client';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +24,8 @@ import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
 import pattern from '../../../assets/onboarding/pattern.png';
-import { auth, functions } from '../../infrastructure/firebase';
+import { auth } from '../../infrastructure/firebase';
+import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
@@ -46,6 +46,13 @@ interface Challenge {
   localCode?: string;
 }
 
+const visualAuditChallenge: Challenge = {
+  id: 'visual-audit-challenge',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  resendAvailableAt: '2000-01-01T00:00:00.000Z',
+  localCode: '1234',
+};
+
 function errorDetails(error: unknown): Record<string, unknown> {
   if (typeof error !== 'object' || error === null) return {};
   const details = (error as { details?: unknown }).details;
@@ -63,14 +70,14 @@ function useOnboardingStyles() {
   return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
 
-export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingScreen } = {}) {
-  const api = useMemo(() => createTastesApi(functions), []);
+export function OnboardingFlow({ initialScreen, visualAudit = false }: { initialScreen?: OnboardingScreen; visualAudit?: boolean } = {}) {
+  const api = useTastesApi();
   const [screen, setScreen] = useState<OnboardingScreen>(initialScreen ?? 'entry');
   const [country, setCountry] = useState(defaultCountry);
   const [countrySearch, setCountrySearch] = useState('');
-  const [phoneDigits, setPhoneDigits] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState(() => visualAudit && initialScreen === 'otp' ? '7700900123' : '');
   const [phoneError, setPhoneError] = useState('');
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [challenge, setChallenge] = useState<Challenge | null>(() => visualAudit && initialScreen === 'otp' ? visualAuditChallenge : null);
   const [otpCode, setOtpCode] = useState('');
   const [otpState, setOtpState] = useState<OtpState>('idle');
   const [pendingCustomToken, setPendingCustomToken] = useState<string | null>(null);
@@ -101,7 +108,7 @@ export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingSc
   }, [challenge]);
 
   useEffect(() => {
-    if (googleResponse?.type !== 'success') return;
+    if (visualAudit || googleResponse?.type !== 'success') return;
     const idToken = googleResponse.params.id_token;
     if (!idToken) {
       Alert.alert('Google sign-in failed', 'Google did not return an identity token.');
@@ -111,9 +118,10 @@ export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingSc
     void signInWithCredential(auth, GoogleAuthProvider.credential(idToken))
       .catch((error: unknown) => Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.'))
       .finally(() => setBusy(false));
-  }, [googleResponse]);
+  }, [googleResponse, visualAudit]);
 
   const signInWithGoogle = async () => {
+    if (visualAudit) return;
     if (!selectedGoogleClientId && !googleWebClientId) {
       Alert.alert('Google sign-in needs configuration', 'Add an OAuth client ID to EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID or EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID.');
       return;
@@ -123,6 +131,7 @@ export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingSc
   };
 
   const signInWithApple = async () => {
+    if (visualAudit) return;
     if (Platform.OS !== 'ios' || !await AppleAuthentication.isAvailableAsync()) {
       Alert.alert('Apple sign-in unavailable', 'Sign in with Apple is available on supported Apple devices.');
       return;
@@ -171,6 +180,16 @@ export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingSc
     }
 
     Keyboard.dismiss();
+    if (visualAudit) {
+      setChallenge(visualAuditChallenge);
+      setNow(Date.now());
+      setOtpCode('');
+      setOtpState('idle');
+      setPendingCustomToken(null);
+      setScreen('otp');
+      setTimeout(() => otpInput.current?.focus(), 250);
+      return;
+    }
     setBusy(true);
     setPhoneError('');
     try {
@@ -201,6 +220,10 @@ export function OnboardingFlow({ initialScreen }: { initialScreen?: OnboardingSc
 
   async function verifyCode() {
     if ((!challenge && !pendingCustomToken) || otpCode.length !== 4) return;
+    if (visualAudit) {
+      setOtpState(otpCode === visualAuditChallenge.localCode ? 'idle' : 'incorrect');
+      return;
+    }
     setBusy(true);
     setOtpState('idle');
     let customToken = pendingCustomToken;

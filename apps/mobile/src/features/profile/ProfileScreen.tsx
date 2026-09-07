@@ -45,7 +45,7 @@ import { matchesPlaceFilters } from '../discover/placeFilters';
 import { firestore, storage } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
@@ -165,6 +165,7 @@ export function ProfileScreen({
   const actionDangerColor = colors.background === '#080808' ? '#D32620' : '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const followMutation = useToggleFollow(currentUserId);
   const { loading, profile } = useProfile(targetUserId, fallbackName);
   const profileReviews = useProfileReviews(targetUserId);
@@ -357,6 +358,7 @@ export function ProfileScreen({
 
   async function chooseProfilePhoto() {
     if (!own || uploadingPhoto || !profile) return;
+    if (visualAudit) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission needed', 'Allow photo library access to update your profile photo.');

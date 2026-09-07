@@ -276,6 +276,7 @@ export function PostSignupOnboardingFlow({
 
   async function choosePhoto(camera: boolean) {
     setPhotoSheet(false);
+    if (visualAudit) return;
     const permission = camera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -330,6 +331,12 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestLocation() {
+    if (visualAudit) {
+      setCity('London');
+      setCityFlag(flagUk);
+      enterPlaces();
+      return;
+    }
     const result = await Location.requestForegroundPermissionsAsync();
     if (!result.granted) {
       navigate('locationDenied');
@@ -351,6 +358,11 @@ export function PostSignupOnboardingFlow({
 
   function enterPlaces() {
     navigate('place');
+    if (visualAudit) {
+      setPlaceLoading(false);
+      setPlaceError(null);
+      return;
+    }
     setPlaceLoading(true);
     setPlaceError(null);
     void api.getVenues({ limit: 20 }).then((response) => {
@@ -371,6 +383,10 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestContacts() {
+    if (visualAudit) {
+      navigate('contacts');
+      return;
+    }
     const permission = await Contacts.requestPermissionsAsync();
     if (permission.status === 'granted') {
       const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails] });
@@ -411,6 +427,10 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestNotifications() {
+    if (visualAudit) {
+      navigate('ready');
+      return;
+    }
     try {
       await syncPushNotifications(api, { requestPermission: true });
     } catch (error) {
@@ -421,16 +441,22 @@ export function PostSignupOnboardingFlow({
   }
 
   async function shareInvite() {
+    if (visualAudit) return;
     await Share.share({ message: 'Join me on Tastes: https://tastesapp.com/invite' });
   }
 
   async function textInvite(phoneNumber?: string | null) {
+    if (visualAudit) return;
     const message = encodeURIComponent('Join me on Tastes: https://tastesapp.com/invite');
     const separator = Platform.OS === 'ios' ? '&' : '?';
     await Linking.openURL(`sms:${phoneNumber ?? ''}${separator}body=${message}`);
   }
 
   async function inviteContact(contact: ContactCandidate) {
+    if (visualAudit) {
+      setContacts((items) => items.map((item) => item.id === contact.id ? { ...item, invited: true } : item));
+      return;
+    }
     try {
       if (contact.userId) await api.followUser({ targetUserId: contact.userId });
       else if (contact.phoneNumber) await textInvite(contact.phoneNumber);
@@ -444,7 +470,7 @@ export function PostSignupOnboardingFlow({
   async function finishOnboarding() {
     setBusy(true);
     try {
-      await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
+      if (!visualAudit) await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
       await onComplete(buildCompletionInput({
         dish,
         place,

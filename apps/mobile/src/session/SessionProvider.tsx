@@ -9,6 +9,7 @@ import {
   type CompleteOnboardingInput,
   type PlaceDetails,
   type ProfileExtrasResult,
+  type TastesAiAnswer,
   type TastesGroup,
 } from '@tastes/contracts';
 import type { User } from 'firebase/auth';
@@ -42,6 +43,7 @@ export type SessionState =
 interface SessionContextValue {
   state: SessionState;
   api: TastesApi;
+  visualAudit: boolean;
   minimumSupportedIosBuild: number;
   refresh: () => Promise<void>;
   completeOnboarding: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
@@ -130,6 +132,21 @@ function visualAuditData(operation: string): unknown {
       return { folders: [], places: [], nextCursor: null };
     case 'getMonthlyRecap':
       return { ready: false };
+    case 'askTastesAi':
+      return {
+        id: 'visual-audit-answer',
+        text: 'Try Gemini for a polished dinner, or explore one of the nearby favourites below.',
+        followUps: ['Show me something casual', 'Find a nearby option'],
+        places: [{
+          id: 'visual-audit-venue',
+          name: 'Gemini',
+          description: 'Modern European dining in Knightsbridge.',
+          rating: 4.8,
+          price: '$$$',
+          cuisine: 'European',
+          distanceKm: 1.2,
+        }],
+      } satisfies TastesAiAnswer;
     default:
       return { id: 'visual-audit-id', active: false, reactionCount: 0 };
   }
@@ -266,7 +283,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [api]);
 
   const value = useMemo(
-    () => ({ state, api, minimumSupportedIosBuild, refresh, completeOnboarding, logout, deleteAccount }),
+    () => ({ state, api, visualAudit: false, minimumSupportedIosBuild, refresh, completeOnboarding, logout, deleteAccount }),
     [api, completeOnboarding, deleteAccount, logout, minimumSupportedIosBuild, refresh, state],
   );
 
@@ -287,6 +304,7 @@ export function SessionStateOverrideProvider({
   const value = useMemo<SessionContextValue>(() => ({
     ...session,
     api,
+    visualAudit,
     completeOnboarding: visualAudit ? async () => undefined : session.completeOnboarding,
     deleteAccount: visualAudit ? async () => undefined : session.deleteAccount,
     logout: visualAudit ? async () => undefined : session.logout,
@@ -305,6 +323,10 @@ export function useSession(): SessionContextValue {
 
 export function useTastesApi(): TastesApi {
   return useSession().api;
+}
+
+export function useIsVisualAudit(): boolean {
+  return useSession().visualAudit;
 }
 
 export function useAuthenticatedUserId(): string {
