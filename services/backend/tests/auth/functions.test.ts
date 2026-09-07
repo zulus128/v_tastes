@@ -519,6 +519,7 @@ describe('authenticated session and paginated reads', () => {
     expect(reviewDocument.get('dishNames')).toEqual(['Soup dumplings']);
     expect(reviewDocument.get('dishReviews')).toEqual(reviewCommand.dishReviews);
     expect(reviewDocument.get('xpBefore')).toBe(0);
+    expect(reviewDocument.get('xpAfter')).toBe(50);
     expect((await db.collection('venues').doc('demo-cafe').get()).get('reviewCount')).toBe(1);
     expect((await author.ref.get()).get('reviewCount')).toBe(1);
     const friendsFeed = await callFunction<{

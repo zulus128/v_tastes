@@ -16,6 +16,11 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    function validVenueImage() {
+      return request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     function isAdmin() {
       return signedIn()
         && request.auth.token.keys().hasAll(['role'])
@@ -36,7 +41,7 @@ service firebase.storage {
 
     match /venue-images/{venueId}/{fileName} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() && validImage();
+      allow create, update: if isAdmin() && validVenueImage();
       allow delete: if isAdmin();
     }
 

@@ -415,11 +415,20 @@ export const processReviewEffects = onDocumentCreated({
 }, async (event) => {
   const review = event.data;
   if (!review?.exists || review.get('status') !== 'published') return;
+  const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
+  const claimed = await db.runTransaction(async (transaction) => {
+    if ((await transaction.get(effectRef)).exists) return false;
+    transaction.create(effectRef, { reviewId: event.params.reviewId, createdAt: FieldValue.serverTimestamp() });
+    return true;
+  });
+  if (!claimed) return;
   const authorId = String(review.get('authorId') ?? '');
   if (!authorId) return;
   const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
   const storedXpBefore = Number(review.get('xpBefore'));
   const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
+  const storedXpAfter = Number(review.get('xpAfter'));
+  const nextXp = Number.isFinite(storedXpAfter) ? Math.max(0, storedXpAfter) : xp;
   const effects = [
     attachDishPhotoUrls(review),
     announceReview(event.params.reviewId, authorId, String(review.get('authorDisplayName') ?? 'Someone'), {
@@ -428,7 +437,7 @@ export const processReviewEffects = onDocumentCreated({
       city: String(review.get('venueCity') ?? ''),
       reviewCount: review.get('wasFirstVenueReview') === true ? 0 : 1,
     }),
-    notifyLevelChange(authorId, previousXp, xp),
+    notifyLevelChange(authorId, previousXp, nextXp),
     syncRewardNotifications(authorId),
   ];
   const results = await Promise.allSettled(effects);
@@ -487,6 +496,7 @@ export const createReview = onCall(callableOptions, async (request) => {
       reactionCount: 0,
       wasFirstVenueReview: reviewCount === 0,
       xpBefore,
+      xpAfter: xpBefore + 50,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -502,6 +512,7 @@ export const createReview = onCall(callableOptions, async (request) => {
     transaction.update(userRef, {
       reviewCount: FieldValue.increment(1),
       rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
     });
   });
 
@@ -552,7 +563,10 @@ export const editReview = onCall(callableOptions, async (request) => {
       rating: Math.max(0, Math.min(5, ((average * count) - oldRating + input.rating) / count)),
       updatedAt: now,
     });
-    transaction.update(db.collection('users').doc(uid), { rewardProgressDirty: true });
+    transaction.update(db.collection('users').doc(uid), {
+      rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
+    });
   });
   try {
     await attachDishPhotoUrls(await reviewRef.get());
@@ -600,6 +614,7 @@ export const deleteReview = onCall(callableOptions, async (request) => {
       transaction.update(userRef, {
         reviewCount: Math.max(0, Number(user.get('reviewCount') ?? 0) - 1),
         rewardProgressDirty: true,
+        rewardProgressVersion: FieldValue.increment(1),
         updatedAt: now,
       });
     }

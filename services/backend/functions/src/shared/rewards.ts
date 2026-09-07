@@ -159,16 +159,24 @@ export async function syncRewardNotifications(profileId: string): Promise<void> 
       targetId: reward.id,
     });
   }
-  await userRef.update({
-    rewardProgress: rewards,
-    rewardProgressDirty: false,
-    rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
-    ...(newlyUnlocked.length > 0
-      ? { unlockedBadges: FieldValue.arrayUnion(...newlyUnlocked.map((reward) => reward.id)) }
-      : {}),
-    ...(almostThere.length > 0
-      ? { nudgedBadges: FieldValue.arrayUnion(...almostThere.map((reward) => reward.id)) }
-      : {}),
+  const observedVersion = Math.max(0, Number(profile.get('rewardProgressVersion') ?? 0));
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(userRef);
+    if (!current.exists) return;
+    const unchanged = Number(current.get('rewardProgressVersion') ?? 0) === observedVersion;
+    transaction.update(userRef, {
+      ...(unchanged ? {
+        rewardProgress: rewards,
+        rewardProgressDirty: false,
+        rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
+      } : {}),
+      ...(newlyUnlocked.length > 0
+        ? { unlockedBadges: FieldValue.arrayUnion(...newlyUnlocked.map((reward) => reward.id)) }
+        : {}),
+      ...(almostThere.length > 0
+        ? { nudgedBadges: FieldValue.arrayUnion(...almostThere.map((reward) => reward.id)) }
+        : {}),
+    });
   });
 }
 

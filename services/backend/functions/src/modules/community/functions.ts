@@ -413,11 +413,16 @@ export const getProfileExtras = onCall(
       : storedRewardProgress(profile.get('rewardProgress'));
     const rewards = storedRewards ?? await computeRewards(profileId);
     if (!storedRewards) {
-      await userRef.set({
-        rewardProgress: rewards,
-        rewardProgressDirty: false,
-        rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      const observedVersion = Math.max(0, Number(profile.get('rewardProgressVersion') ?? 0));
+      await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(userRef);
+        if (!current.exists || Number(current.get('rewardProgressVersion') ?? 0) !== observedVersion) return;
+        transaction.set(userRef, {
+          rewardProgress: rewards,
+          rewardProgressDirty: false,
+          rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
     }
 
     const followerProfiles = followers.size

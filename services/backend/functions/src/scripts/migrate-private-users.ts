@@ -3,7 +3,9 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 if (getApps().length === 0) initializeApp({ credential: applicationDefault() });
 
-const db = getFirestore();
+const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID ??
+  (process.env.FIRESTORE_EMULATOR_HOST ? '(default)' : 'tastes-eu');
+const db = firestoreDatabaseId === '(default)' ? getFirestore() : getFirestore(firestoreDatabaseId);
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const profiles = await db.collection('users').get();

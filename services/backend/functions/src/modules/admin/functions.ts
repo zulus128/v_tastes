@@ -106,6 +106,31 @@ function contentReference(input: z.infer<typeof contentTargetSchema>) {
     : db.collection('reviews').doc(input.parentId).collection('comments').doc(input.targetId);
 }
 
+async function invalidateRewardProgress(userId: string): Promise<void> {
+  if (!userId) return;
+  await db.collection('users').doc(userId).set({
+    rewardProgressDirty: true,
+    rewardProgressVersion: FieldValue.increment(1),
+  }, { merge: true });
+}
+
+async function invalidateVenueRewardProgress(venueId: string): Promise<void> {
+  const reviews = await db.collection('reviews')
+    .where('venueId', '==', venueId)
+    .where('status', '==', 'published')
+    .limit(200)
+    .get();
+  const authorIds = [...new Set(reviews.docs.map((review) => String(review.get('authorId') ?? '')).filter(Boolean))];
+  for (let offset = 0; offset < authorIds.length; offset += 400) {
+    const batch = db.batch();
+    authorIds.slice(offset, offset + 400).forEach((authorId) => batch.set(db.collection('users').doc(authorId), {
+      rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
+    }, { merge: true }));
+    await batch.commit();
+  }
+}
+
 function audit(actorId: string, action: string, subjectId: string, details: Record<string, unknown> = {}) {
   return db.collection('_adminAudit').add({
     actorId,
@@ -330,6 +355,7 @@ export const deleteContent = onCall(callableOptions, async (request) => {
     }),
     notifyReportResolved(report),
   ]);
+  if (input.targetType === 'review') await invalidateRewardProgress(String(content.get('authorId') ?? ''));
   return { id: input.targetId };
 });
 
@@ -344,6 +370,10 @@ export const editContent = onCall(callableOptions, async (request) => {
   });
   await audit(actorId, 'edit-content', input.targetId, { targetType: input.targetType });
   await notifyReportResolved(await db.collection('reports').doc(input.reportId).get());
+  if (input.targetType === 'review') {
+    const content = await reference.get();
+    await invalidateRewardProgress(String(content.get('authorId') ?? ''));
+  }
   return { id: input.targetId };
 });
 
@@ -576,6 +606,7 @@ export const upsertVenue = onCall(callableOptions, async (request) => {
     }),
   }, { merge: true });
   await audit(actorId, existing.exists ? 'update-venue' : 'create-venue', reference.id);
+  if (existing.exists) await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
@@ -609,6 +640,7 @@ export const updateVenue = onCall(callableOptions, async (request) => {
     updatedBy: actorId,
   });
   await audit(actorId, 'update-venue', reference.id);
+  await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
