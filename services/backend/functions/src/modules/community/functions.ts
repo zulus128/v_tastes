@@ -24,7 +24,7 @@ import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { notificationPreferences, sendNotification, sendNotifications } from '../../shared/notifications';
-import { computeRewards, levelForXp } from '../../shared/rewards';
+import { computeRewards, levelForXp, storedRewardProgress } from '../../shared/rewards';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { enforceRateLimit } from '../../shared/mutations';
@@ -399,15 +399,25 @@ export const getProfileExtras = onCall(
     const input = parseInput(profileExtrasInputSchema, request.data ?? {});
     const profileId = input.targetUserId ?? viewerId;
     const userRef = db.collection('users').doc(profileId);
-    const [profile, followers, following, viewerFollowing, rewards] = await Promise.all([
+    const [profile, followers, following, viewerFollowing] = await Promise.all([
       userRef.get(),
       userRef.collection('followers').limit(100).get(),
       userRef.collection('following').limit(100).get(),
       db.collection('users').doc(viewerId).collection('following').get(),
-      computeRewards(profileId),
     ]);
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
+    const storedRewards = profile.get('rewardProgressDirty') === true
+      ? null
+      : storedRewardProgress(profile.get('rewardProgress'));
+    const rewards = storedRewards ?? await computeRewards(profileId);
+    if (!storedRewards) {
+      await userRef.set({
+        rewardProgress: rewards,
+        rewardProgressDirty: false,
+        rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
     }
 
     const followerProfiles = followers.size

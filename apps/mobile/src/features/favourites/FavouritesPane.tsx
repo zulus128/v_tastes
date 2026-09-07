@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -158,29 +159,32 @@ export function FavouritesPane({
         <EmptyState folderName={selectedFolder?.name} query={normalizedQuery} styles={styles} />
       ) : null}
       {favourites.isSuccess && places.length > 0 ? (
-        <ScrollView
-            contentContainerStyle={styles.placeList}
-            nestedScrollEnabled
-            onScroll={({ nativeEvent }) => {
-              const nearEnd = nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y
-                >= nativeEvent.contentSize.height - 120;
-              if (nearEnd && favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
-            }}
-            scrollEventThrottle={120}
-            showsVerticalScrollIndicator={false}
-          >
-            {places.map((place, index) => (
-              <FavouriteCard
-                index={index}
-                key={place.venueId}
-                onOpen={() => onOpenPlace(place.venueId)}
-                onUnsave={() => unsaveVenue.mutate(place.venueId)}
-                place={place}
-                styles={styles}
-              />
-            ))}
-            {favourites.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
-        </ScrollView>
+        <FlatList
+          contentContainerStyle={styles.placeList}
+          data={places}
+          initialNumToRender={8}
+          keyExtractor={(place) => place.venueId}
+          ListFooterComponent={favourites.isFetchingNextPage
+            ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} />
+            : null}
+          maxToRenderPerBatch={8}
+          nestedScrollEnabled
+          onEndReached={() => {
+            if (favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          renderItem={({ item: place, index }) => (
+            <FavouriteCard
+              index={index}
+              onOpen={() => onOpenPlace(place.venueId)}
+              onUnsave={() => unsaveVenue.mutate(place.venueId)}
+              place={place}
+              styles={styles}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          windowSize={7}
+        />
       ) : null}
 
       <FolderNameSheet

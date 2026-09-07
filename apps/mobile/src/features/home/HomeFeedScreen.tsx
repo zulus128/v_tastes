@@ -1,4 +1,3 @@
-import { getDownloadURL, ref } from 'firebase/storage';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { storage } from '../../infrastructure/firebase';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -101,12 +100,16 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
   </View>;
 }
 
-function DishPhoto({ photoPath }: { photoPath?: string }) {
-  const [uri, setUri] = useState<string>();
+function DishPhoto({ photoPath, photoUrl }: { photoPath?: string; photoUrl?: string }) {
+  const [uri, setUri] = useState<string | undefined>(photoUrl);
   const normalizedPath = photoPath?.trim().replace(/^\/+|\/+$/g, '');
 
   useEffect(() => {
     let active = true;
+    if (photoUrl) {
+      setUri(photoUrl);
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setUri(undefined);
       return () => {
@@ -116,9 +119,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
 
     let download: Promise<string>;
     try {
-      const photoRef = ref(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-review-dish-photo', photoPath: normalizedPath });
@@ -143,7 +144,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
     return () => {
       active = false;
     };
-  }, [normalizedPath]);
+  }, [normalizedPath, photoUrl]);
 
   // Keep the full dish visible inside the fixed Figma tile. The default
   // `cover` mode trims the photo edges when its aspect ratio differs from the
@@ -245,7 +246,7 @@ function FeedCard({
               }}
               style={styles.dish}
             >
-              <DishPhoto photoPath={dish.photoPath} />
+              <DishPhoto photoPath={dish.photoPath} photoUrl={dish.photoUrl} />
               <LinearGradient
                 colors={['#161616', 'rgba(22,22,22,0)']}
                 locations={[0.0167, 0.3067]}
@@ -344,7 +345,7 @@ function FeedCard({
             {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
               <>
                 <View style={overlayStyles.dishReviewPhoto}>
-                  <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} />
+                  <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} photoUrl={dishReviews[selectedDishIndex].photoUrl} />
                   {dishReviews.length > 1 ? (
                     <View style={overlayStyles.dishReviewArrows} pointerEvents="box-none">
                       <Pressable

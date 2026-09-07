@@ -10,7 +10,8 @@ export function useUnreadNotificationCount() {
   return useQuery({
     queryKey: unreadNotificationCountQueryKey(userId),
     queryFn: async () => (await api.getUnreadNotificationCount()).data.count,
-    refetchInterval: 20_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     staleTime: 10_000,
   });
 }

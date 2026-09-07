@@ -74,6 +74,7 @@ export {
   reactToComment,
   reactToContent,
   reportContent,
+  processReviewEffects,
 } from './modules/reviews/functions';
 export {
   banUser,

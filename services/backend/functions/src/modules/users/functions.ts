@@ -6,7 +6,7 @@ import {
   updateProfileSettingsInputSchema,
   type MonthlyRecapResult,
 } from '@tastes/contracts';
-import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -30,8 +30,11 @@ export const getSessionStatus = onCall(callableOptions, async (request) => {
   const profile = await db.collection('users').doc(uid).get();
   const onboardingVersion = profile.exists ? Number(profile.get('onboardingVersion') ?? 0) : 0;
   if (profile.exists) {
-    // Powers the "been a while" reminder without an extra round trip from the app.
-    await profile.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
+    // Keep DAU/MAU accurate without rewriting this hot profile document at every launch.
+    const lastSeenAt = profile.get('lastSeenAt');
+    if (!(lastSeenAt instanceof Timestamp) || Date.now() - lastSeenAt.toMillis() >= 6 * 60 * 60_000) {
+      await profile.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
+    }
   }
 
   return {

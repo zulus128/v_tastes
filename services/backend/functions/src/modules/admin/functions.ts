@@ -2,7 +2,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
 import { notificationTypes, sendCampaignNotificationInputSchema } from '@tastes/contracts';
 import { db } from '../../shared/firebase';
@@ -124,6 +123,7 @@ interface AnalyticsBatchResponse {
 async function getAnalyticsMetrics() {
   const propertyId = process.env.GA4_PROPERTY_ID ?? '550185288';
   try {
+    const { GoogleAuth } = await import('google-auth-library');
     const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/analytics.readonly'] });
     const token = await auth.getAccessToken();
     if (!token) throw new Error('Google Analytics credentials are unavailable.');
@@ -131,6 +131,7 @@ async function getAnalyticsMetrics() {
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:batchRunReports`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(8_000),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requests: [

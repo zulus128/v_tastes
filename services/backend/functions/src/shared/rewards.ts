@@ -110,6 +110,22 @@ function storedIds(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
+/** Returns materialized badge progress when it has the current expected shape. */
+export function storedRewardProgress(value: unknown): RewardProgress[] | null {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  const rewards = value.filter((entry): entry is RewardProgress => Boolean(
+    entry
+      && typeof entry === 'object'
+      && typeof (entry as RewardProgress).id === 'string'
+      && typeof (entry as RewardProgress).name === 'string'
+      && typeof (entry as RewardProgress).description === 'string'
+      && typeof (entry as RewardProgress).progress === 'number'
+      && typeof (entry as RewardProgress).completed === 'boolean'
+      && typeof (entry as RewardProgress).xp === 'number',
+  ));
+  return rewards.length === value.length ? rewards : null;
+}
+
 /**
  * Recomputes badges after a scoring event and raises the reward notifications the catalog defines:
  * one per newly unlocked badge, plus a single nudge per badge that is nearly there.
@@ -125,8 +141,6 @@ export async function syncRewardNotifications(profileId: string): Promise<void> 
   const almostThere = rewards.filter(
     (reward) => !reward.completed && reward.progress >= ALMOST_THERE_THRESHOLD && !nudged.has(reward.id),
   );
-  if (newlyUnlocked.length === 0 && almostThere.length === 0) return;
-
   for (const reward of newlyUnlocked) {
     await sendNotification({
       recipientId: profileId,
@@ -146,13 +160,15 @@ export async function syncRewardNotifications(profileId: string): Promise<void> 
     });
   }
   await userRef.update({
+    rewardProgress: rewards,
+    rewardProgressDirty: false,
+    rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
     ...(newlyUnlocked.length > 0
       ? { unlockedBadges: FieldValue.arrayUnion(...newlyUnlocked.map((reward) => reward.id)) }
       : {}),
     ...(almostThere.length > 0
       ? { nudgedBadges: FieldValue.arrayUnion(...almostThere.map((reward) => reward.id)) }
       : {}),
-    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 

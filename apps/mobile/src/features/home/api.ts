@@ -47,7 +47,8 @@ export function useLatestFeedItem(scope: 'friends' | 'local') {
       return response.data.items[0] ?? null;
     },
     staleTime: 45_000,
-    refetchInterval: 20_000,
+    refetchInterval: 2 * 60_000,
+    refetchIntervalInBackground: false,
   });
 }
 

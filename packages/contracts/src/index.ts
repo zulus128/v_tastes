@@ -88,6 +88,7 @@ export const reviewSchema = z.object({
     title: z.string().trim().min(1).max(120),
     rating: z.number().min(1).max(5),
     photoPath: z.string().trim().min(1).max(512),
+    photoUrl: z.string().url().optional(),
   })).max(5).default([]),
   status: z.enum(['published', 'hidden', 'deleted']),
   commentCount: z.number().int().nonnegative(),

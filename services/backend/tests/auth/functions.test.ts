@@ -554,6 +554,16 @@ describe('authenticated session and paginated reads', () => {
       parentCommentId: firstComment.id,
       text: 'A complete branch',
     }, first.token);
+    const newerReplies: string[] = [];
+    for (let index = 2; index <= 4; index += 1) {
+      const newerReply = await callFunction<{ id: string }>('addComment', {
+        idempotencyKey: `comment-reply-command-00${index}`,
+        reviewId: firstReview.id,
+        parentCommentId: firstComment.id,
+        text: `Bounded reply ${index}`,
+      }, first.token);
+      newerReplies.push(newerReply.id);
+    }
     const commentReaction = {
       idempotencyKey: 'comment-reaction-command-001',
       reviewId: firstReview.id,
@@ -583,7 +593,10 @@ describe('authenticated session and paginated reads', () => {
       authorUsername: 'review.author',
       dishReviews: reviewCommand.dishReviews,
     });
-    expect(thread.items.map((comment) => comment.id)).toEqual([firstComment.id, reply.id]);
+    expect(thread.items[0]?.id).toBe(firstComment.id);
+    expect(thread.items).toHaveLength(4);
+    expect(thread.items.map((comment) => comment.id)).not.toContain(reply.id);
+    expect(new Set(thread.items.slice(1).map((comment) => comment.id))).toEqual(new Set(newerReplies));
 
     const report = await callFunction<{ id: string }>(
       'reportComment',
@@ -614,6 +627,7 @@ describe('authenticated session and paginated reads', () => {
     expect((await db.collection('reviews').doc(firstReview.id).get()).get('commentCount')).toBe(0);
     expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(firstComment.id).get()).get('status')).toBe('deleted');
     expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(reply.id).get()).get('status')).toBe('deleted');
+    expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(newerReplies[0]).get()).get('status')).toBe('deleted');
   }, 15_000);
 
   it('applies review rewards, XP, and reactions exactly once', async () => {

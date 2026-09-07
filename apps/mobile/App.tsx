@@ -9,7 +9,7 @@ import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { useVisualAuditCase, VisualAuditScreen } from './src/dev/VisualAuditScreen';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
-import { queryClient, queryPersister } from './src/infrastructure/query';
+import { queryClient, queryPersister, shouldPersistQuery } from './src/infrastructure/query';
 import { configureObservability } from './src/infrastructure/observability';
 import { ProductNavigator } from './src/navigation/ProductNavigator';
 import { rememberPendingDeepLink } from './src/navigation/pendingDeepLink';
@@ -164,7 +164,12 @@ export default function App() {
         <AppErrorBoundary>
           <PersistQueryClientProvider
             client={queryClient}
-            persistOptions={{ maxAge: 24 * 60 * 60_000, persister: queryPersister }}
+            persistOptions={{
+              buster: Application.nativeBuildVersion ?? 'development',
+              dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+              maxAge: 24 * 60 * 60_000,
+              persister: queryPersister,
+            }}
           >
             <SessionProvider>
               <AppGate />

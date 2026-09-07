@@ -1,7 +1,6 @@
 import type { Comment, CommentReview, ReportReason } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Clipboard from 'expo-clipboard';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
-import { storage } from '../../infrastructure/firebase';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -58,11 +57,15 @@ function commentShareUrl(reviewId: string, commentId: string) {
   return `https://tastesapp.com/reviews/${encodeURIComponent(reviewId)}/comments?commentId=${encodeURIComponent(commentId)}`;
 }
 
-function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof createStyles> }) {
-  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+function DishPhoto({ path, styles, url }: { path?: string; styles: ReturnType<typeof createStyles>; url?: string }) {
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ uri: url, failed: false });
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
   useEffect(() => {
     let active = true;
+    if (url) {
+      setState({ uri: url, failed: false });
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setState({ failed: true });
       return () => { active = false; };
@@ -70,9 +73,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
 
     let download: Promise<string>;
     try {
-      const photoRef = storageRef(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });
@@ -89,7 +90,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
       if (active) setState({ failed: true });
     });
     return () => { active = false; };
-  }, [normalizedPath]);
+  }, [normalizedPath, url]);
   if (state.uri) return <Image resizeMode="contain" source={{ uri: state.uri }} style={styles.dishImage} />;
   return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
 }
@@ -119,7 +120,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     </View>
     <View style={styles.reviewBody}>
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><RatingStars rating={review.rating} styles={styles} /></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
-      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
+      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} url={dish.photoUrl} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
       <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
     </View>
@@ -128,14 +129,14 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
         <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
         <View style={styles.dishModal}>
           <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
-          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
         </View>
       </View>
     </Modal>
   </View>;
 }
 
-function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { count: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
+function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { loaded: number; total: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -161,7 +162,9 @@ function CommentRow({ item, nested = false, highlighted = false, onDelete, onRea
           <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.action}>Reply</Text></Pressable>
           {repliesToggle ? (
             <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
-              <Text style={styles.action}>{repliesToggle.hidden ? `Show replies (${repliesToggle.count})` : 'Hide replies'}</Text>
+              <Text style={styles.action}>{repliesToggle.hidden
+                ? `Show latest replies (${repliesToggle.loaded}${repliesToggle.total > repliesToggle.loaded ? ` of ${repliesToggle.total}` : ''})`
+                : 'Hide replies'}</Text>
               <CaretDownIcon color={colors.textSecondary} height={responsiveSize(14)} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={responsiveSize(14)} />
             </Pressable>
           ) : null}
@@ -296,7 +299,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
               const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
               return <View style={styles.thread}>
-                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { count: replies.length, hidden, onToggle: toggleReplies } : undefined} />
+                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { loaded: replies.length, total: item.replyCount, hidden, onToggle: toggleReplies } : undefined} />
                 {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
                   const nextOffset = event.nativeEvent.layout.y;
                   setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });

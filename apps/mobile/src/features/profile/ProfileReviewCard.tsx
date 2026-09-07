@@ -1,8 +1,7 @@
 import type { FeedItem } from '@tastes/contracts';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { storage } from '../../infrastructure/firebase';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -24,13 +23,17 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
-function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string; large?: boolean; path?: string }) {
-  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+function DishPhoto({ fallbackUri, large = false, path, url }: { fallbackUri?: string; large?: boolean; path?: string; url?: string }) {
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ uri: url, failed: false });
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
   const imageStyle = large ? staticStyles.dishImageLarge : staticStyles.dishImage;
 
   useEffect(() => {
     let active = true;
+    if (url) {
+      setState({ uri: url, failed: false });
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
       return () => { active = false; };
@@ -38,9 +41,7 @@ function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string;
 
     let download: Promise<string>;
     try {
-      const photoRef = storageRef(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath });
@@ -57,7 +58,7 @@ function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string;
       if (active) setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
     });
     return () => { active = false; };
-  }, [fallbackUri, normalizedPath]);
+  }, [fallbackUri, normalizedPath, url]);
 
   return state.uri
     ? <Image onError={() => setState({ failed: true })} source={{ uri: state.uri }} style={imageStyle} />
@@ -140,7 +141,7 @@ export function ProfileReviewCard({
           <ScrollView contentContainerStyle={styles.dishRow} horizontal showsHorizontalScrollIndicator={false}>
             {dishes.map((dish) => (
               <Pressable accessibilityLabel={`Open photo of ${dish.title}`} key={dish.id} onPress={() => setSelectedDish(dish)} style={styles.dishCard}>
-                <DishPhoto fallbackUri={fallbackImageUrl} path={dish.photoPath} />
+                <DishPhoto fallbackUri={fallbackImageUrl} path={dish.photoPath} url={dish.photoUrl} />
                 <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
                 <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
               </Pressable>
@@ -178,7 +179,7 @@ export function ProfileReviewCard({
               <Text numberOfLines={1} style={styles.photoModalTitle}>{selectedDish?.title}</Text>
               <Pressable accessibilityLabel="Close photo" hitSlop={8} onPress={() => setSelectedDish(null)}><Text style={styles.photoModalClose}>×</Text></Pressable>
             </View>
-            {selectedDish ? <DishPhoto fallbackUri={fallbackImageUrl} large path={selectedDish.photoPath} /> : null}
+            {selectedDish ? <DishPhoto fallbackUri={fallbackImageUrl} large path={selectedDish.photoPath} url={selectedDish.photoUrl} /> : null}
             {selectedDish ? <Text style={styles.photoModalRating}>★ {selectedDish.rating.toFixed(1)}</Text> : null}
           </View>
         </View>

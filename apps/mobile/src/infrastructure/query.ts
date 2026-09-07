@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { TastesApiError } from '@tastes/firebase-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient, type Query } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
 import { captureException } from './observability';
 
 export const queryClient = new QueryClient({
@@ -28,5 +30,21 @@ export const queryClient = new QueryClient({
 export const queryPersister = createAsyncStoragePersister({
   storage: AsyncStorage,
   key: 'tastes:query-cache:v1',
-  throttleTime: 1_000,
+  throttleTime: 5_000,
 });
+
+const OFFLINE_QUERY_ROOTS = new Set(['feed', 'comments', 'leaderboard']);
+
+export function shouldPersistQuery(query: Query): boolean {
+  return typeof query.queryKey[0] === 'string' && OFFLINE_QUERY_ROOTS.has(query.queryKey[0]);
+}
+
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
+    return () => subscription.remove();
+  });
+  onlineManager.setEventListener((setOnline) => NetInfo.addEventListener((state) => {
+    setOnline(state.isConnected !== false && state.isInternetReachable !== false);
+  }));
+}
