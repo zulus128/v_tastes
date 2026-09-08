@@ -1026,17 +1026,28 @@ export const deleteComment = onCall(callableOptions, async (request) => {
     const parentId = comment.get('parentCommentId');
     const parentRef = parentId ? reviewRef.collection('comments').doc(String(parentId)) : null;
     const parent = parentRef ? await transaction.get(parentRef) : null;
-    // Delete the root immediately. Its replies are cleaned in bounded batches
-    // by the schedule below, so a popular thread never becomes undeletable
-    // because it exceeds Firestore's transaction write limit.
+    // Preserve the synchronous path for normal threads. For a larger root,
+    // hide it right away and let the scheduled worker remove replies in safe
+    // batches instead of exceeding Firestore's 500-write transaction limit.
     const deletingRoot = !parentRef;
+    const replies = deletingRoot
+      ? await transaction.get(reviewRef.collection('comments')
+        .where('status', '==', 'published')
+        .where('parentCommentId', '==', input.commentId)
+        .limit(451))
+      : null;
+    const deferredReplyDeletion = (replies?.size ?? 0) > 450;
+    const repliesToDelete = deferredReplyDeletion ? [] : replies?.docs ?? [];
     transaction.update(commentRef, {
       status: 'deleted',
-      ...(deletingRoot ? { replyDeletionPending: true } : {}),
+      ...(deferredReplyDeletion ? { replyDeletionPending: true } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    for (const reply of repliesToDelete) {
+      transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+    }
     transaction.update(reviewRef, {
-      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - 1),
+      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - 1 - repliesToDelete.length),
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (parentRef && parent?.exists && parent.get('status') === 'published') {
@@ -1069,28 +1080,38 @@ export const cleanupDeletedCommentReplies = onSchedule({
   for (const root of roots.docs) {
     const reviewRef = root.ref.parent.parent;
     if (!reviewRef) continue;
-    const replies = await root.ref.parent
-      .where('parentCommentId', '==', root.id)
-      .where('status', '==', 'published')
-      .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE)
-      .get();
-    if (replies.empty) {
-      await root.ref.update({ replyDeletionPending: FieldValue.delete(), replyCount: 0, updatedAt: FieldValue.serverTimestamp() });
-      continue;
-    }
-    const batch = db.batch();
-    for (const reply of replies.docs) {
-      batch.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
-    }
-    batch.update(reviewRef, {
-      commentCount: FieldValue.increment(-replies.size),
-      updatedAt: FieldValue.serverTimestamp(),
+    await db.runTransaction(async (transaction) => {
+      const [currentRoot, review, replies] = await Promise.all([
+        transaction.get(root.ref),
+        transaction.get(reviewRef),
+        transaction.get(root.ref.parent
+          .where('parentCommentId', '==', root.id)
+          .where('status', '==', 'published')
+          .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE)),
+      ]);
+      if (!currentRoot.exists || currentRoot.get('replyDeletionPending') !== true) return;
+      if (replies.empty) {
+        transaction.update(root.ref, {
+          replyDeletionPending: FieldValue.delete(),
+          replyCount: 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      for (const reply of replies.docs) {
+        transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+      }
+      if (review.exists) {
+        transaction.update(reviewRef, {
+          commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - replies.size),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      transaction.update(root.ref, {
+        replyCount: Math.max(0, Number(currentRoot.get('replyCount') ?? 0) - replies.size),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     });
-    batch.update(root.ref, {
-      replyCount: FieldValue.increment(-replies.size),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
   }
 });
 

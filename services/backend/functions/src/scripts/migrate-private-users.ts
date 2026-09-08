@@ -11,6 +11,7 @@ async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const profiles = await db.collection('users').get();
   const usernameOwners = new Map<string, string>();
+  const collidingUsernames = new Set<string>();
   const collisions: string[] = [];
   let piiProfiles = 0;
 
@@ -20,7 +21,10 @@ async function main(): Promise<void> {
       : null;
     if (username) {
       const owner = usernameOwners.get(username);
-      if (owner && owner !== profile.id) collisions.push(`${username}: ${owner}, ${profile.id}`);
+      if (owner && owner !== profile.id) {
+        collisions.push(`${username}: ${owner}, ${profile.id}`);
+        collidingUsernames.add(username);
+      }
       else usernameOwners.set(username, profile.id);
     }
     if (profile.get('email') || profile.get('phoneNumber')) piiProfiles += 1;
@@ -28,9 +32,7 @@ async function main(): Promise<void> {
 
   process.stdout.write(`Scanned ${profiles.size} profiles; ${piiProfiles} contain PII; ${collisions.length} username collisions.\n`);
   if (collisions.length > 0) {
-    process.stdout.write(`Resolve duplicate usernames before applying:\n${collisions.join('\n')}\n`);
-    process.exitCode = 1;
-    return;
+    process.stdout.write(`Skipping username claims for duplicate handles while migrating PII:\n${collisions.join('\n')}\n`);
   }
   if (!apply) {
     process.stdout.write('Dry run only. Re-run with --apply to migrate PII and create username claims.\n');
@@ -56,7 +58,10 @@ async function main(): Promise<void> {
         }, { merge: true });
         transaction.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
       }
-      if (!username || !claimRef) return;
+      // PII is migrated regardless of an old username collision. Leave only
+      // the ambiguous claim for manual resolution instead of exposing every
+      // legacy profile's contact data until that work is complete.
+      if (!username || !claimRef || collidingUsernames.has(username)) return;
       // A live profile mutation owns a conflicting claim. Never replace it;
       // the migration can be safely re-run for this legacy profile later.
       if (claim?.exists && claim.get('uid') !== profile.id) return;

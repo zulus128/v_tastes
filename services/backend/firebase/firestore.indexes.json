@@ -266,6 +266,13 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "comments",
+      "fieldPath": "replyDeletionPending",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "savedVenues",
       "fieldPath": "venueId",
       "indexes": [

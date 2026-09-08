@@ -132,8 +132,14 @@ export function storedRewardProgress(value: unknown): RewardProgress[] | null {
  */
 export async function syncRewardNotifications(profileId: string): Promise<void> {
   const userRef = db.collection('users').doc(profileId);
-  const [profile, rewards] = await Promise.all([userRef.get(), computeRewards(profileId)]);
+  // Establish the profile version before reading review data. If a review
+  // changes while rewards are being calculated, the later transaction sees a
+  // different version and leaves the cache dirty rather than saving a stale
+  // calculation as current.
+  const profile = await userRef.get();
   if (!profile.exists) return;
+  const observedVersion = Math.max(0, Number(profile.get('rewardProgressVersion') ?? 0));
+  const rewards = await computeRewards(profileId);
 
   const unlocked = new Set(storedIds(profile.get('unlockedBadges')));
   const nudged = new Set(storedIds(profile.get('nudgedBadges')));
@@ -159,7 +165,6 @@ export async function syncRewardNotifications(profileId: string): Promise<void> 
       targetId: reward.id,
     });
   }
-  const observedVersion = Math.max(0, Number(profile.get('rewardProgressVersion') ?? 0));
   await db.runTransaction(async (transaction) => {
     const current = await transaction.get(userRef);
     if (!current.exists) return;
