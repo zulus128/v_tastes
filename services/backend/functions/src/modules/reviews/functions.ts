@@ -368,6 +368,7 @@ async function mentionedUserIds(text: string): Promise<string[]> {
 
 /** Everyone who should hear about a freshly published review. */
 async function announceReview(
+  reviewRef: FirebaseFirestore.DocumentReference,
   reviewId: string,
   authorId: string,
   authorName: string,
@@ -405,6 +406,14 @@ async function announceReview(
       targetId: reviewId,
     });
   }
+  // Deletion/moderation can happen after the create-trigger lease is acquired.
+  // Recheck immediately before each outward fan-out so notifications never
+  // point to a review that is no longer published.
+  const reviewIsPublished = async (): Promise<boolean> => {
+    const current = await reviewRef.get();
+    return current.exists && current.get('status') === 'published';
+  };
+  if (!(await reviewIsPublished())) return;
   await sendNotifications(requests);
 
   // The very first review of a venue is news for everyone living in that city.
@@ -414,6 +423,7 @@ async function announceReview(
     .where('city', '==', venue.city)
     .limit(400)
     .get();
+  if (!(await reviewIsPublished())) return;
   await sendNotifications(neighbours.docs
     .filter((neighbour) => neighbour.id !== authorId)
     .map((neighbour) => ({
@@ -528,7 +538,7 @@ export const processReviewEffects = onDocumentCreated({
   const completedEffects = (await effectRef.get()).get('completedEffects') as Record<string, unknown> | undefined ?? {};
   const effects: Array<[string, () => Promise<void>]> = [
     ['photoUrls', () => attachDishPhotoUrls(activeReview)],
-    ['announcement', () => announceReview(event.params.reviewId, authorId, String(activeReview.get('authorDisplayName') ?? 'Someone'), {
+    ['announcement', () => announceReview(review.ref, event.params.reviewId, authorId, String(activeReview.get('authorDisplayName') ?? 'Someone'), {
       id: String(activeReview.get('venueId') ?? ''),
       name: String(activeReview.get('venueName') ?? 'a place'),
       city: String(activeReview.get('venueCity') ?? ''),
