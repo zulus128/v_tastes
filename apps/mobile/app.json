@@ -4,9 +4,17 @@
     "slug": "tastes-local",
     "scheme": "tastes",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e59da34b-7fa8-4212-b85b-48932ad6da9d",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
       "associatedDomains": [
