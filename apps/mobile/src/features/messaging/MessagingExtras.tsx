@@ -25,13 +25,14 @@ import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -64,6 +65,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
         action={requests.length ? 'Delete all' : undefined}
         onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
         onBack={onBack}
+        safeTop={insets.top}
         styles={styles}
         title="Requests"
       />
@@ -126,7 +128,7 @@ export function NewGroupScreen({
 }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
@@ -178,7 +180,7 @@ export function NewGroupScreen({
     };
   }, [api, normalizedQuery]);
   const filtered = normalizedQuery.length >= 2
-    ? searchResults
+    ? searchResults.filter((result) => people.some((candidate) => candidate.userId === result.userId))
     : people.filter(
         (person) =>
           !normalizedQuery ||
@@ -199,6 +201,7 @@ export function NewGroupScreen({
     <View style={styles.newGroupScreen}>
       <Header
         onBack={onBack}
+        safeTop={insets.top}
         style={styles.newGroupHeader}
         styles={styles}
         title="New group"
@@ -216,7 +219,7 @@ export function NewGroupScreen({
       </View>
       <View style={styles.searchRow}>
         <View style={[styles.search, styles.newGroupSearch]}>
-          <SearchIcon color={colors.textSecondary} height={24} style={styles.searchIcon} width={24} />
+          <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} style={styles.searchIcon} width={responsiveSize(24)} />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search people"
@@ -231,7 +234,7 @@ export function NewGroupScreen({
           onPress={() => setQuery('')}
           style={styles.contactsButton}
         >
-          {isDark ? <UserHeartIcon height={21.5} width={21.5} /> : <UserHeartLightIcon height={21.5} width={21.5} />}
+          {isDark ? <UserHeartIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} /> : <UserHeartLightIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} />}
         </Pressable>
       </View>
       {loading || searching ? (
@@ -272,7 +275,7 @@ export function NewGroupScreen({
           }}
         />
       )}
-      <View style={[styles.createFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
+      <View style={[styles.createFooter, { paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
         <Pressable
           disabled={creating || name.trim().length < 2 || selected.size < 1}
           onPress={() => void create()}
@@ -290,7 +293,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   const currentUserId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [group, setGroup] = useState<TastesGroup | null>(null);
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [memberQuery, setMemberQuery] = useState('');
@@ -338,7 +341,7 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   if (!group)
     return (
       <Screen style={styles.screen}>
-        <Header onBack={onBack} styles={styles} title="Group details" />
+        <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       </Screen>
     );
@@ -355,14 +358,16 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     }
   };
   const pendingMembers = group.pendingMembers ?? [];
-  const available = (normalizedMemberQuery.length >= 2 ? searchResults : candidates).filter(
+  const available = (normalizedMemberQuery.length >= 2
+    ? searchResults.filter((result) => candidates.some((candidate) => candidate.userId === result.userId))
+    : candidates).filter(
     (candidate) =>
       !group.members.some((member) => member.userId === candidate.userId)
       && !pendingMembers.some((member) => member.userId === candidate.userId),
   );
   return (
     <Screen style={styles.screen}>
-      <Header onBack={onBack} styles={styles} title="Group details" />
+      <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
       <ScrollView contentContainerStyle={styles.details}>
         <View style={styles.groupAvatarLarge}>
           <Text style={styles.groupAvatarLargeText}>
@@ -504,6 +509,7 @@ function Header({
   actionDisabled,
   onAction,
   onBack,
+  safeTop,
   style,
   styles,
   title,
@@ -512,12 +518,13 @@ function Header({
   actionDisabled?: boolean;
   onAction?: () => void;
   onBack: () => void;
+  safeTop: number;
   style?: StyleProp<ViewStyle>;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
   return (
-    <View style={[styles.header, style]}>
+    <View style={[styles.header, { height: responsiveSize(62) + safeTop, paddingTop: safeTop }, style]}>
       <Pressable onPress={onBack} style={styles.headerButton}>
         <Text style={styles.back}>‹</Text>
       </Pressable>
@@ -569,15 +576,15 @@ function Empty({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
-  return StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupHeader: { backgroundColor: colors.surface },
     patternBody: { flex: 1 },
     header: {
-      height: safeTop + 62,
-      paddingTop: safeTop,
+      height: 62,
+      paddingTop: 0,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',

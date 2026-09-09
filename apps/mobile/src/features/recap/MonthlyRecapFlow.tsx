@@ -10,7 +10,6 @@ import {
   Dimensions,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -54,10 +53,12 @@ import ShareGlyph from '../../../assets/recap/story/share.svg';
 import starsBackground from '../../../assets/recap/story/stars-background.png';
 import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { DESIGN_VIEWPORT, responsiveMetrics, responsiveStyleSheet, responsiveValue } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 
-type RecapStep =
+export type RecapStep =
   | 'loading'
   | 'lowData'
   | 'intro'
@@ -74,9 +75,35 @@ type RecapStep =
   | 'share';
 
 type MonthlyRecapFlowProps = {
+  initialConfirmingClose?: boolean;
+  initialStep?: RecapStep;
   mode?: 'ready' | 'lowData';
   onClose: () => void;
   user?: User;
+};
+
+const visualAuditRecap: MonthlyRecapResult = {
+  month: 'August',
+  previousMonth: 'July',
+  ready: true,
+  placesVisited: 15,
+  previousPlacesVisited: 11,
+  areasExplored: 3,
+  previousAreasExplored: 2,
+  reviewsWritten: 9,
+  previousReviewsWritten: 11,
+  followersGained: 132,
+  favoriteArea: 'Belgravia',
+  topPlaces: [
+    { venueId: 'gemini', name: 'Gemini', address: '38 Beauchamp Place', rating: 4.8, imageUrl: null, area: 'Belgravia' },
+    { venueId: 'terrace', name: 'The Terrace', address: '11 Motcomb Street', rating: 4.7, imageUrl: null, area: 'Mayfair' },
+    { venueId: 'garden', name: 'The Garden', address: '9 Pavilion Road', rating: 4.6, imageUrl: null, area: 'Chelsea' },
+  ],
+  topDishes: [
+    { name: 'Grilled Salmon with Lemon', rating: 5, imageUrl: null },
+    { name: 'Sushi Roll', rating: 4.6, imageUrl: null },
+    { name: 'Tiramisu', rating: 4.2, imageUrl: null },
+  ],
 };
 
 type Place = {
@@ -109,20 +136,21 @@ const progressByStep: Partial<Record<RecapStep, number>> = {
   comparison: 7,
 };
 
-export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
+export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const [step, setStep] = useState<RecapStep>('loading');
-  const [confirmingClose, setConfirmingClose] = useState(false);
+  const [step, setStep] = useState<RecapStep>(initialStep ?? 'loading');
+  const [confirmingClose, setConfirmingClose] = useState(initialConfirmingClose);
   const [placeGuess, setPlaceGuess] = useState<number | null>(null);
   const [areaGuess, setAreaGuess] = useState<string | null>(null);
   const [ratingGuess, setRatingGuess] = useState(1);
-  const [recap, setRecap] = useState<MonthlyRecapResult | null>(null);
+  const [recap, setRecap] = useState<MonthlyRecapResult | null>(initialStep ? visualAuditRecap : null);
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    if (initialStep) return undefined;
     let active = true;
     setLoadError(false);
     void api.getMonthlyRecap().then((response) => {
@@ -131,7 +159,7 @@ export function MonthlyRecapFlow({ mode = 'ready', onClose, user }: MonthlyRecap
       if (active) setLoadError(true);
     });
     return () => { active = false; };
-  }, [api, loadAttempt]);
+  }, [api, initialStep, loadAttempt]);
 
   useEffect(() => {
     if (step !== 'loading' || !recap) return;
@@ -227,8 +255,8 @@ function CloseButton({ color, onPress }: { color?: string; onPress: () => void }
       onPress={onPress}
       style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
     >
-      <CloseCircle color={color ?? colors.text} height={24} width={24} />
-      <CloseX color={color ?? colors.text} height={7} style={styles.closeX} width={7} />
+      <CloseCircle color={color ?? colors.text} height={recapSize(24)} width={recapSize(24)} />
+      <CloseX color={color ?? colors.text} height={recapSize(7)} style={styles.closeX} width={recapSize(7)} />
     </Pressable>
   );
 }
@@ -292,7 +320,7 @@ function IntroScreen({ onNext }: { onNext: () => void }) {
             </View>
           ))}
         </View>
-        <TastesMouth height={57} width={230} />
+        <TastesMouth height={recapSize(57)} width={recapSize(230)} />
       </View>
       <View style={styles.introCollage}>
         <TiltedPhoto source={recapFood} style={styles.introPhotoLeft} rating="2.5" />
@@ -600,7 +628,7 @@ function ShareCard({ onShare, recap, user }: { onShare: (channel: string) => voi
       <Image source={isDark ? shareRays : shareRaysLight} resizeMode="cover" style={styles.shareRays} />
       <View style={styles.shareIdentity}>
         <Image source={profileSource} style={styles.profileAvatar} />
-        <TastesLogo width={110} />
+        <TastesLogo width={recapSize(110)} />
       </View>
       <Text style={styles.recapTitle}>Monthly Recap</Text>
       <View style={styles.metrics}>
@@ -678,7 +706,7 @@ function RecapButton({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, pressed && styles.pressed]}>
-      {shareIcon ? <ShareGlyph height={20} width={20} /> : null}
+      {shareIcon ? <ShareGlyph height={recapSize(20)} width={recapSize(20)} /> : null}
       {leading ? <Text style={styles.ctaLeading}>{leading}</Text> : null}
       <Text style={styles.ctaLabel}>{label}</Text>
       {showArrow ? <Image source={arrowIcon} resizeMode="contain" style={styles.arrow} /> : null}
@@ -717,8 +745,7 @@ function CloseConfirmation({
 }
 
 const createStyles = (_colors: ThemeColors, isDark: boolean) => {
-  const layoutScale = Math.min(1, Dimensions.get('window').height / 875);
-  const s = (value: number) => Math.round(value * layoutScale);
+  const s = (value: number) => value;
   const text = isDark ? '#FFFFFF' : '#080808';
   const secondaryText = isDark ? '#AAB2C5' : '#677083';
   const subtleText = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(8,8,8,0.6)';
@@ -728,7 +755,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   const cardBorder = isDark ? 'rgba(255,255,255,0.1)' : '#E4E4E4';
   const cardSurface = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.78)';
 
-  return StyleSheet.create({
+  return responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: isDark ? '#080808' : '#F2EFEA' },
   pattern: { opacity: isDark ? 0.18 : 0.04 },
   starsPattern: { opacity: isDark ? 0.18 : 0.25 },
@@ -757,7 +784,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   letterTile: { width: 31, height: 47, borderRadius: 6, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   letterTilePink: { backgroundColor: '#FF9EB1' },
   letterTileText: { color: '#080808', fontSize: 26, fontWeight: '700' },
-  introCollage: { position: 'absolute', top: layoutScale < 1 ? s(320) : 294, left: 0, right: 0, height: s(420) },
+  introCollage: { position: 'absolute', top: 294, left: 0, right: 0, height: s(420) },
   tiltedPhoto: { position: 'absolute', borderRadius: 8 },
   tiltedPhotoImage: { width: '100%', height: '100%', borderRadius: 8 },
   introPhotoLeft: { left: 22, top: s(80), width: s(120), height: s(120), transform: [{ rotate: '8deg' }] },
@@ -891,5 +918,18 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   keepButton: { alignSelf: 'stretch', height: 50, marginTop: 18, borderRadius: 25, backgroundColor: '#B82F29', alignItems: 'center', justifyContent: 'center' },
   keepLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     leaveLabel: { marginTop: 16, color: secondaryText, fontSize: 16 },
-  });
+  }, recapScale);
 };
+
+function recapScale() {
+  const { width, height } = Dimensions.get('window');
+  const widthScale = responsiveMetrics(width, height).scale;
+  // Story screens use absolute Figma coordinates and have no natural scroll
+  // container. Keep the complete story inside short phone viewports while
+  // still using the available width on large phones and tablets.
+  return Math.max(0.68, Math.min(widthScale, height / DESIGN_VIEWPORT.height));
+}
+
+function recapSize(value: number) {
+  return responsiveValue(value, recapScale());
+}

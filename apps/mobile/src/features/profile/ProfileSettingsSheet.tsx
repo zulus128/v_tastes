@@ -18,10 +18,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -29,7 +27,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,12 +35,14 @@ import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern
 import backIcon from '../../../assets/onboarding/back.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
@@ -79,13 +78,14 @@ export function ProfileSettingsSheet({
   visible: boolean;
 }) {
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
-  const settingsScale = settingsLayoutScale(screenHeight, insets.top, insets.bottom);
+  const { width: viewportWidth } = useResponsiveViewport();
+  const settingsScale = 1;
   const styles = useMemo(
-    () => createStyles(colors, insets.top, insets.bottom, isDark, settingsScale),
-    [colors, insets.bottom, insets.top, isDark, settingsScale],
+    () => createStyles(colors, isDark, settingsScale),
+    [colors, isDark, settingsScale],
   );
   const { profile } = useProfile(userId, fallbackName);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
@@ -104,10 +104,10 @@ export function ProfileSettingsSheet({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  const appearanceTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const appearanceTranslateX = useRef(new Animated.Value(viewportWidth)).current;
   const appearanceClosing = useRef(false);
   const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notificationTranslateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const notificationTranslateX = useRef(new Animated.Value(viewportWidth)).current;
   const notificationClosing = useRef(false);
   const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
@@ -124,9 +124,9 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = null;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
-    appearanceTranslateX.setValue(Dimensions.get('window').width);
-    notificationTranslateX.setValue(Dimensions.get('window').width);
-  }, [appearanceTranslateX, notificationTranslateX, visible]);
+    appearanceTranslateX.setValue(viewportWidth);
+    notificationTranslateX.setValue(viewportWidth);
+  }, [appearanceTranslateX, notificationTranslateX, viewportWidth, visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -182,6 +182,7 @@ export function ProfileSettingsSheet({
 
   async function chooseProfilePhoto(camera: boolean) {
     if (!profile || uploadingPhoto) return;
+    if (visualAudit) return;
     const permission = camera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -269,7 +270,7 @@ export function ProfileSettingsSheet({
     appearanceCloseTimer.current = null;
     appearanceTranslateX.stopAnimation();
     setAppearanceOpen(true);
-    appearanceTranslateX.setValue(Dimensions.get('window').width);
+    appearanceTranslateX.setValue(viewportWidth);
     Animated.timing(appearanceTranslateX, {
       duration: 280,
       toValue: 0,
@@ -290,7 +291,7 @@ export function ProfileSettingsSheet({
     appearanceCloseTimer.current = setTimeout(finish, 300);
     Animated.timing(appearanceTranslateX, {
       duration: 240,
-      toValue: Dimensions.get('window').width,
+      toValue: viewportWidth,
       useNativeDriver: true,
     }).start(finish);
   }
@@ -301,7 +302,7 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = null;
     notificationTranslateX.stopAnimation();
     setNotificationsOpen(true);
-    notificationTranslateX.setValue(Dimensions.get('window').width);
+    notificationTranslateX.setValue(viewportWidth);
     Animated.timing(notificationTranslateX, {
       duration: 280,
       toValue: 0,
@@ -334,7 +335,7 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = setTimeout(finish, 300);
     Animated.timing(notificationTranslateX, {
       duration: 240,
-      toValue: Dimensions.get('window').width,
+      toValue: viewportWidth,
       useNativeDriver: true,
     }).start(finish);
   }
@@ -369,13 +370,18 @@ export function ProfileSettingsSheet({
       <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.screen}>
         {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
         <PatternBackgroundLift />
-        <View style={styles.header}>
+        <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
           <Pressable accessibilityLabel="Back" hitSlop={8} onPress={() => settingsSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
           <Text style={styles.title}>Settings</Text>
           <View style={styles.headerButton} />
         </View>
         {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-          <View style={styles.content}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.contentScroll}
+              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) + responsiveSize(118) }]}
+            >
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
               <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
               {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
@@ -403,12 +409,12 @@ export function ProfileSettingsSheet({
                 <Text style={styles.deleteAccount}>Delete account</Text>
               </Pressable>
             </View>
-            <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
-              Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
-            </Text>
-          </View>
+            </ScrollView>
         )}
-        <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={styles.actions}>
+        <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}>
+          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
+            Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
+          </Text>
           <LinearGradient
             colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
             end={{ x: 0.5, y: 1 }}
@@ -416,7 +422,7 @@ export function ProfileSettingsSheet({
             style={styles.inviteRing}
           >
             <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastesapp.com' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
-              <InviteUsersIcon height={Math.round(24 * settingsScale)} width={Math.round(24 * settingsScale)} />
+              <InviteUsersIcon height={responsiveSize(24)} width={responsiveSize(24)} />
               <Text style={styles.inviteText}>Invite a Friend</Text>
             </Pressable>
           </LinearGradient>
@@ -428,13 +434,13 @@ export function ProfileSettingsSheet({
           <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.notificationBackground}>
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
-            <View style={styles.header}>
+            <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
               <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeNotifications} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Notifications</Text>
               <View style={styles.headerButton} />
             </View>
             {notificationsLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-              <ScrollView contentContainerStyle={styles.notificationSettings}>
+              <ScrollView contentContainerStyle={[styles.notificationSettings, { paddingBottom: responsiveSize(30) + insets.bottom }]}>
                 <NotificationSetting label="Enable notifications" onChange={(enabled) => saveNotifications({ ...notifications, enabled })} styles={styles} value={notifications.enabled} />
                 <NotificationSetting disabled={!notifications.enabled} label="Push notifications" onChange={(push) => saveNotifications({ ...notifications, push })} styles={styles} value={notifications.push} />
                 <NotificationSetting disabled={!notifications.enabled} label="Email notifications" onChange={(email) => saveNotifications({ ...notifications, email })} styles={styles} value={notifications.email} />
@@ -464,7 +470,7 @@ export function ProfileSettingsSheet({
           <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.notificationBackground}>
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
-            <View style={styles.header}>
+            <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
               <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeAppearance} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Appearance</Text>
               <View style={styles.headerButton} />
@@ -516,7 +522,7 @@ export function ProfileSettingsSheet({
 
       <SideSlideScreen onRequestClose={() => setPlaceOpen(false)} ref={placeSlide} visible={placeOpen}>
         <View style={styles.screen}>
-          <View style={styles.header}><Pressable onPress={() => placeSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>Favourite place</Text><View style={styles.headerButton} /></View>
+          <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}><Pressable onPress={() => placeSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>Favourite place</Text><View style={styles.headerButton} /></View>
           <View style={styles.placeContent}>
             <TextInput autoFocus onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={placeQuery} />
             {searching ? <ActivityIndicator color={colors.primary} style={styles.searchLoader} /> : places.map((place) => (
@@ -530,7 +536,7 @@ export function ProfileSettingsSheet({
 
       <SideSlideScreen onRequestClose={() => setCityOpen(false)} ref={citySlide} visible={cityOpen}>
         <View style={styles.screen}>
-          <View style={styles.header}><Pressable onPress={() => citySlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>City</Text><View style={styles.headerButton} /></View>
+          <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}><Pressable onPress={() => citySlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>City</Text><View style={styles.headerButton} /></View>
           <CityPicker onSelect={(name) => void save({ city: name })} topPadding={24} />
         </View>
       </SideSlideScreen>
@@ -542,25 +548,19 @@ function NotificationSetting({ disabled = false, label, onChange, styles, value 
   return <View style={[styles.notificationRow, disabled && styles.notificationDisabled]}><Text style={styles.notificationLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} style={styles.notificationSwitch} thumbColor="#FFFFFF" trackColor={{ false: '#5A5B60', true: '#C8322D' }} value={value} /></View>;
 }
 
-function settingsLayoutScale(screenHeight: number, safeTop: number, safeBottom: number) {
-  const baseLayoutHeight = 770;
-  const availableHeight = screenHeight - safeTop - Math.max(24, safeBottom) - 48;
-  return Math.max(0.6, Math.min(1, availableHeight / baseLayoutHeight));
-}
-
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, isDark: boolean, settingsScale: number) {
+function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: number) {
   const s = (value: number) => Math.round(value * settingsScale);
-  const actionBottom = Math.max(24, safeBottom);
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
+    contentScroll: { flex: 1 },
     patternImage: { opacity: isDark ? 1 : 0.08 },
     darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },
-    header: { zIndex: 2, height: safeTop + 48, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
+    header: { zIndex: 2, height: 48, paddingTop: 0, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     backIcon: { width: 24, height: 24, tintColor: colors.text },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
     loader: { flex: 1 },
-    content: { flex: 1, paddingHorizontal: 16, paddingTop: s(24), paddingBottom: actionBottom + s(70), alignItems: 'center' },
+    content: { paddingHorizontal: 16, paddingTop: s(24), paddingBottom: s(24) + s(70), alignItems: 'center' },
     avatar: { width: s(120), height: s(120), borderRadius: s(60), backgroundColor: colors.canvas },
     photoUploading: { opacity: 0.55 },
     photoLoader: { position: 'absolute', inset: 0 },
@@ -569,16 +569,16 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number, 
     accountActions: { width: '100%', marginTop: s(32), gap: s(16), alignItems: 'center' },
     logout: { color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
     deleteAccount: { color: colors.danger, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
-    version: { marginTop: s(20), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
+    version: { marginBottom: s(8), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
     row: { width: '100%', height: s(50), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
     rowLabel: { flex: 1, color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41 },
     rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
     cityFlag: { width: s(18), height: s(18), marginLeft: s(5) },
     chevron: { width: s(8), marginLeft: s(8), color: colors.textMuted, fontSize: s(27), lineHeight: s(29) },
-    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: s(16), paddingBottom: actionBottom, alignItems: 'center', justifyContent: 'center' },
+    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: s(16), paddingBottom: s(24), alignItems: 'center', justifyContent: 'center' },
     notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.canvas },
     notificationBackground: { flex: 1, backgroundColor: colors.canvas },
-    notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: safeBottom + 30 },
+    notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 30 },
     notificationSectionTitle: { marginTop: 18, marginBottom: 10, marginLeft: 16, color: colors.textSecondary, fontSize: 13, lineHeight: 18, letterSpacing: -0.24, textTransform: 'uppercase' },
     notificationFootnote: { marginTop: 14, marginHorizontal: 16, color: colors.textSecondary, opacity: 0.7, fontSize: 12, lineHeight: 16 },
     notificationRow: { height: 50, marginBottom: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },

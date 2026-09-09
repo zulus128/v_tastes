@@ -1,5 +1,6 @@
 import type { ReviewTag } from '@tastes/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { storage } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -26,7 +27,15 @@ async function uploadDishPhoto(
   dish: DishReviewDraft,
 ) {
   const photoPath = `review-images/${userId}/${idempotencyKey}/${dish.id}`;
-  const response = await fetch(dish.photoUri);
+  // Drafts can survive app restarts and may predate the picker-side resize.
+  // Recompress at the upload boundary so every Storage object obeys the same
+  // 1080px / JPEG quality budget, including restored drafts.
+  const optimized = await manipulateAsync(
+    dish.photoUri,
+    [{ resize: { height: 1080, width: 1080 } }],
+    { compress: 0.75, format: SaveFormat.JPEG },
+  );
+  const response = await fetch(optimized.uri);
   const blob = await response.blob();
   await uploadBytes(storageRef(storage, photoPath), blob, {
     contentType: blob.type || 'image/jpeg',

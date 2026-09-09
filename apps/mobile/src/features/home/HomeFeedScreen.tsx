@@ -1,4 +1,3 @@
-import { getDownloadURL, ref } from 'firebase/storage';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -6,7 +5,6 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -17,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { storage } from '../../infrastructure/firebase';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +36,8 @@ import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
@@ -89,10 +89,10 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
     {[1, 2, 3, 4, 5].map((star) => {
       const fill = Math.max(0, Math.min(1, clamped - star + 1));
       return <View key={star} style={styles.starCell}>
-        <ReviewStarOutline color="#B82F29" height={17.9166} opacity={0.3} width={17.9179} />
+        <ReviewStarOutline color="#B82F29" height={responsiveSize(17.9166)} opacity={0.3} width={responsiveSize(17.9179)} />
         {fill > 0 ? (
           <View style={[styles.starFill, { width: `${fill * 100}%` }]}>
-            <ReviewStarFilled color="#B82F29" height={16.6666} width={16.6671} />
+            <ReviewStarFilled color="#B82F29" height={responsiveSize(16.6666)} width={responsiveSize(16.6671)} />
           </View>
         ) : null}
       </View>;
@@ -100,12 +100,16 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
   </View>;
 }
 
-function DishPhoto({ photoPath }: { photoPath?: string }) {
-  const [uri, setUri] = useState<string>();
+function DishPhoto({ photoPath, photoUrl }: { photoPath?: string; photoUrl?: string }) {
+  const [uri, setUri] = useState<string | undefined>(photoUrl);
   const normalizedPath = photoPath?.trim().replace(/^\/+|\/+$/g, '');
 
   useEffect(() => {
     let active = true;
+    if (photoUrl) {
+      setUri(photoUrl);
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setUri(undefined);
       return () => {
@@ -115,9 +119,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
 
     let download: Promise<string>;
     try {
-      const photoRef = ref(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-review-dish-photo', photoPath: normalizedPath });
@@ -142,7 +144,7 @@ function DishPhoto({ photoPath }: { photoPath?: string }) {
     return () => {
       active = false;
     };
-  }, [normalizedPath]);
+  }, [normalizedPath, photoUrl]);
 
   // Keep the full dish visible inside the fixed Figma tile. The default
   // `cover` mode trims the photo edges when its aspect ratio differs from the
@@ -218,7 +220,7 @@ function FeedCard({
           <RatingStars rating={item.rating} styles={styles} />
           {primaryTag ? (
             <View style={styles.tagBadge}>
-              {PrimaryTagIcon ? <PrimaryTagIcon color={colors.text} height={12} width={12} /> : null}
+              {PrimaryTagIcon ? <PrimaryTagIcon color={colors.text} height={responsiveSize(12)} width={responsiveSize(12)} /> : null}
               <Text style={styles.tagBadgeText}>{primaryTag.label}</Text>
             </View>
           ) : null}
@@ -244,7 +246,7 @@ function FeedCard({
               }}
               style={styles.dish}
             >
-              <DishPhoto photoPath={dish.photoPath} />
+              <DishPhoto photoPath={dish.photoPath} photoUrl={dish.photoUrl} />
               <LinearGradient
                 colors={['#161616', 'rgba(22,22,22,0)']}
                 locations={[0.0167, 0.3067]}
@@ -254,7 +256,7 @@ function FeedCard({
                 <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
               </View>
               <View style={styles.dishRatingBadge}>
-                <RecommendationStar height={14} width={14} />
+                <RecommendationStar height={responsiveSize(14)} width={responsiveSize(14)} />
                 <Text style={styles.dishRatingValue}>{dish.rating.toFixed(1)}</Text>
               </View>
             </Pressable>
@@ -285,19 +287,19 @@ function FeedCard({
             <Pressable disabled={reactionDisabled} onPress={onReaction} style={styles.metricIconRow}>
               <View style={styles.heartIcon}>
                 {isReactionActive
-                  ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} />
-                  : <HeartIcon color={colors.text} height={15.5978} width={17.9167} />}
+                  ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} />
+                  : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}
               </View>
               <Text style={[styles.metric, isReactionActive ? styles.metricActive : undefined, reactionDisabled ? styles.metricDisabled : undefined]}>
                 {item.reactionCount}
               </Text>
             </Pressable>
             <Pressable onPress={onComments} style={styles.metricIconRow}>
-              <ChatIcon color={colors.text} height={20} width={20} />
+              <ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
               <Text style={styles.metric}>{item.commentCount}</Text>
             </Pressable>
             <Pressable onPress={onShare} style={styles.metricIconRow}>
-              <ShareIcon color={colors.text} height={20} width={20} />
+              <ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
             </Pressable>
           </View>
           {dishReviews.length > 0 ? (
@@ -309,7 +311,7 @@ function FeedCard({
               }}
               style={styles.dishesButton}
             >
-              <TopRatedDishesIcon color={colors.primary} height={14} width={14} />
+              <TopRatedDishesIcon color={colors.primary} height={responsiveSize(14)} width={responsiveSize(14)} />
               <Text style={styles.dishesButtonText}>Dishes ({dishReviews.length})</Text>
             </Pressable>
           ) : null}
@@ -343,7 +345,7 @@ function FeedCard({
             {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
               <>
                 <View style={overlayStyles.dishReviewPhoto}>
-                  <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} />
+                  <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} photoUrl={dishReviews[selectedDishIndex].photoUrl} />
                   {dishReviews.length > 1 ? (
                     <View style={overlayStyles.dishReviewArrows} pointerEvents="box-none">
                       <Pressable
@@ -626,7 +628,7 @@ export function HomeFeedScreen({
           >
             <StatsGlyph />
           </Pressable>
-          <TastesLogo />
+          <TastesLogo width={responsiveSize(72)} />
           <Pressable
             accessibilityLabel={unreadNotificationCount > 0 ? `Open notifications, ${unreadNotificationCount} unread` : 'Open notifications'}
             onPress={onOpenNotifications}
@@ -714,7 +716,7 @@ export function HomeFeedScreen({
                       {rec.rating != null ? (
                         <View style={styles.recommendationRatingRow}>
                           <View style={styles.recommendationRatingPill}>
-                            <RecommendationStar height={14} width={14} />
+                            <RecommendationStar height={responsiveSize(14)} width={responsiveSize(14)} />
                             <Text style={styles.recommendationRatingValue}>{rec.rating.toFixed(1)}</Text>
                           </View>
                           {rec.reviewCount != null ? (
@@ -726,8 +728,8 @@ export function HomeFeedScreen({
                   </View>
 
                   <View style={styles.recommendationAddIcon} pointerEvents="none">
-                    <RecommendationPlusRing height={18} width={18} style={styles.recommendationPlusRing} />
-                    <RecommendationPlus height={7} width={7} style={styles.recommendationPlus} />
+                    <RecommendationPlusRing height={responsiveSize(18)} width={responsiveSize(18)} style={styles.recommendationPlusRing} />
+                    <RecommendationPlus height={responsiveSize(7)} width={responsiveSize(7)} style={styles.recommendationPlus} />
                   </View>
 
                   {(rec.category || priceDots || distanceLabel) ? (
@@ -798,7 +800,7 @@ export function HomeFeedScreen({
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   header: { height: 157, paddingTop: 54, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
   headerTop: { height: 44, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -876,12 +878,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   dishesButtonText: { color: colors.text, fontSize: 12, fontWeight: '400', lineHeight: 14, letterSpacing: -0.23 },
 });
 
-const stylesStatic = StyleSheet.create({
+const stylesStatic = responsiveStyleSheet({
   dishPhoto: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
   dishPhotoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
 });
 
-const overlayStyles = StyleSheet.create({
+const overlayStyles = responsiveStyleSheet({
   scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { gap: 8 },
   sheetGroup: { overflow: 'hidden', borderRadius: 16, backgroundColor: '#272727' },
@@ -920,7 +922,10 @@ const overlayStyles = StyleSheet.create({
   dishReviewTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
   dishReviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   dishReviewCloseText: { color: '#FFFFFF', fontSize: 30, fontWeight: '300', lineHeight: 30 },
-  dishReviewPhoto: { width: '100%', aspectRatio: 1, maxHeight: 434, paddingHorizontal: 16, position: 'relative' },
+  // The review photo is a square and should use the full sheet width. A fixed
+  // maxHeight made React Native constrain the width as well on Mac/iPad,
+  // leaving a large empty column beside the image.
+  dishReviewPhoto: { width: '100%', aspectRatio: 1, paddingHorizontal: 16, position: 'relative' },
   dishReviewArrows: { position: 'absolute', top: '50%', left: 21, right: 21, flexDirection: 'row', justifyContent: 'space-between' },
   dishReviewArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(22,22,22,0.45)' },
   dishReviewArrowText: { color: '#FFFFFF', fontSize: 34, fontWeight: '300', lineHeight: 30 },

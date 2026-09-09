@@ -4,7 +4,14 @@ import {
   type TastesApiError,
 } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CompleteOnboardingInput } from '@tastes/contracts';
+import {
+  defaultNotificationPreferences,
+  type CompleteOnboardingInput,
+  type PlaceDetails,
+  type ProfileExtrasResult,
+  type TastesAiAnswer,
+  type TastesGroup,
+} from '@tastes/contracts';
 import type { User } from 'firebase/auth';
 import { deleteUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -36,6 +43,7 @@ export type SessionState =
 interface SessionContextValue {
   state: SessionState;
   api: TastesApi;
+  visualAudit: boolean;
   minimumSupportedIosBuild: number;
   refresh: () => Promise<void>;
   completeOnboarding: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
@@ -44,6 +52,115 @@ interface SessionContextValue {
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+function visualAuditData(operation: string): unknown {
+  switch (operation) {
+    case 'getDiscoverFeed':
+      return { hero: null, topReviewer: null, trending: [], newSpots: [], mostReviewed: [], forYou: [], hiddenGems: [], popularReviews: [] };
+    case 'getDiscoverPeople':
+      return { trending: [], new: [], suggested: [] };
+    case 'searchPeople':
+      return [];
+    case 'searchVenues':
+      return { items: [], externalResultsAvailable: false };
+    case 'getFeed':
+    case 'getFriendFeed':
+    case 'getVenues':
+    case 'getPlaceReviews':
+    case 'listConversations':
+    case 'getMessages':
+    case 'getComments':
+    case 'getLeaderboard':
+    case 'listNotifications':
+      return { items: [], nextCursor: null };
+    case 'getPlace':
+    case 'getVenue':
+      return {
+        venue: {
+          id: 'visual-audit-venue',
+          name: 'Gemini',
+          address: '38 Beauchamp Place',
+          city: 'London',
+          category: 'Restaurant',
+          status: 'active',
+          priceLevel: 2,
+          rating: 4.8,
+          reviewCount: 24,
+          distanceKm: 1.2,
+        },
+        phone: '+44 20 7589 2020',
+        website: 'https://example.com',
+        chips: [],
+        photoUrls: [],
+        photoCount: 0,
+        openingHours: [],
+        popularDishes: [
+          { name: 'Salmon nigiri', rating: 4.9 },
+          { name: 'Spicy tuna roll', rating: 4.7 },
+        ],
+      } satisfies PlaceDetails;
+    case 'getProfileExtras':
+      return {
+        followers: [],
+        following: [],
+        level: 3,
+        xp: 240,
+        rewards: [],
+        notificationPreferences: defaultNotificationPreferences,
+      } satisfies ProfileExtrasResult;
+    case 'getGroup':
+      return {
+        id: 'visual-audit-group',
+        name: 'Tastes group',
+        adminId: 'visual-audit-user',
+        members: [{
+          userId: 'visual-audit-user',
+          displayName: 'Alex Morgan',
+          username: 'alex.morgan',
+          photoUrl: null,
+          admin: true,
+        }],
+        pendingMembers: [],
+        createdAt: '2026-09-01T12:00:00.000Z',
+      } satisfies TastesGroup;
+    case 'importContacts':
+      return { matches: [] };
+    case 'listRequests':
+    case 'listActivityCandidates':
+      return [];
+    case 'getFavourites':
+      return { folders: [], places: [], nextCursor: null };
+    case 'getMonthlyRecap':
+      return { ready: false };
+    case 'askTastesAi':
+      return {
+        id: 'visual-audit-answer',
+        text: 'Try Gemini for a polished dinner, or explore one of the nearby favourites below.',
+        followUps: ['Show me something casual', 'Find a nearby option'],
+        places: [{
+          id: 'visual-audit-venue',
+          name: 'Gemini',
+          description: 'Modern European dining in Knightsbridge.',
+          rating: 4.8,
+          price: '$$$',
+          cuisine: 'European',
+          distanceKm: 1.2,
+        }],
+      } satisfies TastesAiAnswer;
+    default:
+      return { id: 'visual-audit-id', active: false, reactionCount: 0 };
+  }
+}
+
+function createVisualAuditApi(api: TastesApi): TastesApi {
+  return new Proxy(api, {
+    get(target, property, receiver) {
+      const operation = Reflect.get(target, property, receiver);
+      if (typeof operation !== 'function') return operation;
+      return async () => ({ data: visualAuditData(String(property)) });
+    },
+  });
+}
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<SessionState>({ status: 'booting', user: null });
@@ -166,9 +283,34 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [api]);
 
   const value = useMemo(
-    () => ({ state, api, minimumSupportedIosBuild, refresh, completeOnboarding, logout, deleteAccount }),
+    () => ({ state, api, visualAudit: false, minimumSupportedIosBuild, refresh, completeOnboarding, logout, deleteAccount }),
     [api, completeOnboarding, deleteAccount, logout, minimumSupportedIosBuild, refresh, state],
   );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+/**
+ * Supplies a deterministic signed-in identity to development previews while
+ * preserving the real API and session actions from the surrounding provider.
+ */
+export function SessionStateOverrideProvider({
+  children,
+  visualAudit = false,
+  user,
+}: PropsWithChildren<{ user: User; visualAudit?: boolean }>) {
+  const session = useSession();
+  const api = useMemo(() => visualAudit ? createVisualAuditApi(session.api) : session.api, [session.api, visualAudit]);
+  const value = useMemo<SessionContextValue>(() => ({
+    ...session,
+    api,
+    visualAudit,
+    completeOnboarding: visualAudit ? async () => undefined : session.completeOnboarding,
+    deleteAccount: visualAudit ? async () => undefined : session.deleteAccount,
+    logout: visualAudit ? async () => undefined : session.logout,
+    refresh: visualAudit ? async () => undefined : session.refresh,
+    state: { status: 'authenticated', user },
+  }), [api, session, user, visualAudit]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -181,6 +323,10 @@ export function useSession(): SessionContextValue {
 
 export function useTastesApi(): TastesApi {
   return useSession().api;
+}
+
+export function useIsVisualAudit(): boolean {
+  return useSession().visualAudit;
 }
 
 export function useAuthenticatedUserId(): string {

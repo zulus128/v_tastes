@@ -17,6 +17,8 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60_000;
 const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60_000;
 const MAX_PHONE_REQUESTS_PER_WINDOW = 5;
 const MAX_IP_REQUESTS_PER_WINDOW = 20;
+const MAX_IP_VERIFY_ATTEMPTS_PER_WINDOW = 20;
+const MAX_PHONE_VERIFY_ATTEMPTS_PER_WINDOW = 10;
 const MAX_CHECK_ATTEMPTS = 5;
 
 interface RateLimitState {
@@ -25,7 +27,7 @@ interface RateLimitState {
   nextAllowedAt?: Timestamp;
 }
 
-function rateLimitId(scope: 'phone' | 'ip', value: string): string {
+function rateLimitId(scope: 'phone' | 'ip' | 'phone-verify' | 'ip-verify', value: string): string {
   return createHash('sha256').update(`${scope}:${value}`).digest('hex');
 }
 
@@ -179,6 +181,9 @@ export const requestPhoneOtp = onCall(callableOptions, async (request) => {
 export const verifyPhoneOtp = onCall(callableOptions, async (request) => {
   const input = parseInput(verifyPhoneOtpInputSchema, request.data);
   const challengeRef = db.collection('_otpChallenges').doc(input.challengeId);
+  const ipVerifyRateLimitRef = db.collection('_otpRateLimits').doc(
+    rateLimitId('ip-verify', request.rawRequest.ip || 'unknown'),
+  );
   const verificationId = randomUUID();
 
   const challengeData = await db.runTransaction(async (transaction) => {
@@ -214,6 +219,33 @@ export const verifyPhoneOtp = onCall(callableOptions, async (request) => {
       });
     }
 
+    const now = Date.now();
+    const phoneNumber = String(challenge.get('phoneNumber'));
+    const phoneVerifyRateLimitRef = db.collection('_otpRateLimits').doc(rateLimitId('phone-verify', phoneNumber));
+    const [ipVerifyRateLimit, phoneVerifyRateLimit] = await Promise.all([
+      transaction.get(ipVerifyRateLimitRef),
+      transaction.get(phoneVerifyRateLimitRef),
+    ]);
+    const expiresAtForLimit = Timestamp.fromMillis(now + RATE_LIMIT_RETENTION_MS);
+    transaction.set(ipVerifyRateLimitRef, {
+      ...nextRateLimitState(
+        ipVerifyRateLimit.exists ? ipVerifyRateLimit.data() as RateLimitState : undefined,
+        now,
+        MAX_IP_VERIFY_ATTEMPTS_PER_WINDOW,
+      ),
+      expiresAt: expiresAtForLimit,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.set(phoneVerifyRateLimitRef, {
+      ...nextRateLimitState(
+        phoneVerifyRateLimit.exists ? phoneVerifyRateLimit.data() as RateLimitState : undefined,
+        now,
+        MAX_PHONE_VERIFY_ATTEMPTS_PER_WINDOW,
+      ),
+      expiresAt: expiresAtForLimit,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
     transaction.update(challengeRef, {
       status: 'verifying',
       verificationId,
@@ -221,7 +253,7 @@ export const verifyPhoneOtp = onCall(callableOptions, async (request) => {
     });
 
     return {
-      phoneNumber: String(challenge.get('phoneNumber')),
+      phoneNumber,
       providerReference: String(challenge.get('providerReference')),
     };
   });

@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type PropsWithChildren } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { captureException } from '../infrastructure/observability';
+import { responsiveStyleSheet } from '../ui/responsive';
 import { useAppTheme } from '../ui/ThemeProvider';
 
 interface State {
@@ -37,7 +38,7 @@ function ErrorFallback({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
   title: { fontSize: 22, fontWeight: '700' },
   body: { textAlign: 'center' },

@@ -15,7 +15,6 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -46,8 +45,10 @@ import { matchesPlaceFilters } from '../discover/placeFilters';
 import { firestore, storage } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
@@ -109,24 +110,24 @@ function mapVenueIcon(venue: Venue, active: boolean) {
 }
 
 function MapFilterGlyph({ value }: { value: MapFilter }) {
-  if (value === 'trending') return <MapFilterTrendingIcon height={11.3438} width={9.9167} />;
-  if (value === 'restaurant') return <MapFilterRestaurantIcon height={11.053} width={11.0527} />;
+  if (value === 'trending') return <MapFilterTrendingIcon height={responsiveSize(11.3438)} width={responsiveSize(9.9167)} />;
+  if (value === 'restaurant') return <MapFilterRestaurantIcon height={responsiveSize(11.053)} width={responsiveSize(11.0527)} />;
   if (value === 'cafe') return <Image source={mapFilterCafeIcon} style={staticStyles.mapFilterCafeIcon} />;
-  if (value === 'bar') return <MapFilterBarIcon height={13.2408} width={11.586} />;
-  if (value === 'my-reviews') return <MapFilterReviewsIcon height={8.3256} width={11.6603} />;
-  return <MapFilterFriendsIcon height={14} width={14} />;
+  if (value === 'bar') return <MapFilterBarIcon height={responsiveSize(13.2408)} width={responsiveSize(11.586)} />;
+  if (value === 'my-reviews') return <MapFilterReviewsIcon height={responsiveSize(8.3256)} width={responsiveSize(11.6603)} />;
+  return <MapFilterFriendsIcon height={responsiveSize(14)} width={responsiveSize(14)} />;
 }
 
 function PencilIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="M4 20l4.2-1 10.6-10.6a2.12 2.12 0 0 0-3-3L5.2 16 4 20Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /><Path d="m14.6 6.6 3 3" stroke={color} strokeLinecap="round" strokeWidth={1.7} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M4 20l4.2-1 10.6-10.6a2.12 2.12 0 0 0-3-3L5.2 16 4 20Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /><Path d="m14.6 6.6 3 3" stroke={color} strokeLinecap="round" strokeWidth={1.7} /></Svg>;
 }
 
 function PinIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="m14.2 4.3 5.5 5.5-3.1 1.1-3.9 3.9.3 3.1-1 1-3.4-3.4-4.1 4.1-.8-.8 4.1-4.1-3.4-3.4 1-1 3.1.3 3.9-3.9 1.1-3.1.7.7Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.55} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="m14.2 4.3 5.5 5.5-3.1 1.1-3.9 3.9.3 3.1-1 1-3.4-3.4-4.1 4.1-.8-.8 4.1-4.1-3.4-3.4 1-1 3.1.3 3.9-3.9 1.1-3.1.7.7Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.55} /></Svg>;
 }
 
 function TrashIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={20} viewBox="0 0 24 24" width={20}><Path d="M5 7h14M9 7V4h6v3m2 0-.8 13H7.8L7 7m3 3v7m4-7v7" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /></Svg>;
+  return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M5 7h14M9 7V4h6v3m2 0-.8 13H7.8L7 7m3 3v7m4-7v7" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /></Svg>;
 }
 
 export function ProfileScreen({
@@ -164,6 +165,7 @@ export function ProfileScreen({
   const actionDangerColor = colors.background === '#080808' ? '#D32620' : '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const followMutation = useToggleFollow(currentUserId);
   const { loading, profile } = useProfile(targetUserId, fallbackName);
   const profileReviews = useProfileReviews(targetUserId);
@@ -356,6 +358,7 @@ export function ProfileScreen({
 
   async function chooseProfilePhoto() {
     if (!own || uploadingPhoto || !profile) return;
+    if (visualAudit) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission needed', 'Allow photo library access to update your profile photo.');
@@ -509,9 +512,9 @@ export function ProfileScreen({
       </View>
       {activeTab === 'reviews' ? (
         <View style={styles.searchBar}>
-          <SearchIcon color={colors.textMuted} width={24} height={24} />
+          <SearchIcon color={colors.textMuted} width={responsiveSize(24)} height={responsiveSize(24)} />
           <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={24} width={24} /></Pressable>
+          <Pressable accessibilityLabel="Open filters" onPress={onOpenFilters}><SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} /></Pressable>
         </View>
       ) : null}
     </View>
@@ -522,7 +525,7 @@ export function ProfileScreen({
       {activeTab === 'reviews' ? (
         <FlatList
           automaticallyAdjustKeyboardInsets
-          contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + 24 }]}
+          contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
           data={sortedReviews}
           initialNumToRender={6}
           keyExtractor={(review) => review.id}
@@ -550,7 +553,7 @@ export function ProfileScreen({
       ) : (
         <Animated.ScrollView
           automaticallyAdjustKeyboardInsets={activeTab !== 'map'}
-          contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -565,7 +568,12 @@ export function ProfileScreen({
               <MapView
                 initialRegion={mapRegion}
                 key={mapKey}
-                mapPadding={{ top: 68, right: 12, bottom: 122, left: 12 }}
+                mapPadding={{
+                  top: responsiveSize(68),
+                  right: responsiveSize(12),
+                  bottom: responsiveSize(122),
+                  left: responsiveSize(12),
+                }}
                 mapType={Platform.OS === 'android' ? 'none' : 'standard'}
                 pitchEnabled={false}
                 rotateEnabled={false}
@@ -619,17 +627,17 @@ export function ProfileScreen({
         <Animated.View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
           <View style={styles.mapSearchRow}>
             <View style={[styles.searchBar, styles.mapSearchBar]}>
-              <SearchIcon color={colors.textMuted} width={24} height={24} />
+              <SearchIcon color={colors.textMuted} width={responsiveSize(24)} height={responsiveSize(24)} />
               <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-              <MapSearchVoiceIcon color={colors.textMuted} height={24} width={24} />
+              <MapSearchVoiceIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
             </View>
             <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapTuningButton}>
-              <MapFilterTuningIcon height={21.1838} width={17.1838} />
+              <MapFilterTuningIcon height={responsiveSize(21.1838)} width={responsiveSize(17.1838)} />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>
             {MAP_FILTERS.map((item) => (
-              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: item.width }]}>
+              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: responsiveSize(item.width) }]}>
                 <View style={[styles.mapFilterIcon, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}><MapFilterGlyph value={item.value} /></View>
                 <Text style={[styles.mapFilterText, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}>{item.label}</Text>
               </Pressable>
@@ -685,7 +693,7 @@ export function ProfileScreen({
 
 const createStyles = (colors: ThemeColors) => {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
   screen: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 102, paddingBottom: 24 },
@@ -748,10 +756,10 @@ const createStyles = (colors: ThemeColors) => {
   editInput: { minHeight: 120, marginTop: 16, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 16, color: colors.text, backgroundColor: colors.canvas, textAlignVertical: 'top' },
   editSave: { height: 50, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 25, backgroundColor: colors.primary },
   editSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  wishlistPane: { minHeight: 720 },
+  wishlistPane: {},
   });
 };
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   mapFilterCafeIcon: { width: 14, height: 14 },
 });

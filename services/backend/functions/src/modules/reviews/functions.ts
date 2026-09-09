@@ -6,6 +6,8 @@ import {
   editReviewInputSchema,
   setReviewPinnedInputSchema,
   getCommentsInputSchema,
+  getCommentRepliesInputSchema,
+  getCommentContextInputSchema,
   getFeedInputSchema,
   hideReviewInputSchema,
   reactToReviewInputSchema,
@@ -16,9 +18,12 @@ import {
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { getDownloadURL, getStorage } from 'firebase-admin/storage';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { requireUserId } from '../../shared/auth';
-import { db } from '../../shared/firebase';
+import { db, firestoreDatabaseId } from '../../shared/firebase';
 import {
   addXp,
   enforceRateLimit,
@@ -32,6 +37,7 @@ import {
 } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
 import { levelForXp, notifyLevelChange, syncRewardNotifications } from '../../shared/rewards';
+import { isFirebaseEmulator } from '../../shared/runtime-environment';
 import {
   compareDocumentIdsDesc,
   cursorDate,
@@ -40,6 +46,7 @@ import {
 } from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { normalizeUsername, usernameReference } from '../../shared/user-data';
 
 export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -158,14 +165,14 @@ export const getComments = onCall(callableOptions, async (request) => {
   const snapshot = await commentsQuery.limit(input.limit + 1).get();
   const rootDocuments = snapshot.docs.slice(0, input.limit);
   const last = rootDocuments.at(-1);
-  const rootIdChunks = Array.from(
-    { length: Math.ceil(rootDocuments.length / 30) },
-    (_, index) => rootDocuments.slice(index * 30, index * 30 + 30).map((document) => document.id),
-  );
-  const replySnapshots = await Promise.all(rootIdChunks.map((rootIds) => review.ref
+  // The UI previews only the latest replies for each root. Fetching every reply made this
+  // callable unbounded (20 roots could previously return thousands of documents).
+  const replySnapshots = await Promise.all(rootDocuments.map((rootDocument) => review.ref
     .collection('comments')
     .where('status', '==', 'published')
-    .where('parentCommentId', 'in', rootIds)
+    .where('parentCommentId', '==', rootDocument.id)
+    .orderBy('createdAt', 'desc')
+    .limit(3)
     .get()));
   const replyDocuments = replySnapshots.flatMap((replySnapshot) => replySnapshot.docs);
   const pageDocuments = [...rootDocuments, ...replyDocuments];
@@ -227,6 +234,106 @@ export const getComments = onCall(callableOptions, async (request) => {
   };
 });
 
+/** Fetches a bounded, independently paginated reply thread. */
+export const getCommentReplies = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(getCommentRepliesInputSchema, request.data);
+  const cursor = decodeCursor(input.cursor);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const [review, parent] = await Promise.all([
+    reviewRef.get(),
+    reviewRef.collection('comments').doc(input.parentCommentId).get(),
+  ]);
+  if (!review.exists || review.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The review was not found.');
+  }
+  if (!parent.exists || parent.get('status') !== 'published' || parent.get('parentCommentId') !== null) {
+    throw new HttpsError('not-found', 'The parent comment was not found.');
+  }
+
+  let repliesQuery = reviewRef.collection('comments')
+    .where('status', '==', 'published')
+    .where('parentCommentId', '==', input.parentCommentId)
+    .orderBy('createdAt', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc');
+  if (cursor) repliesQuery = repliesQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+  const snapshot = await repliesQuery.limit(input.limit + 1).get();
+  const documents = snapshot.docs.slice(0, input.limit);
+  const last = documents.at(-1);
+  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const [reactionDocuments, authorDocuments] = await Promise.all([
+    documents.length > 0
+      ? db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid)))
+      : Promise.resolve([]),
+    authorIds.length > 0
+      ? db.getAll(...authorIds.map((id) => db.collection('users').doc(id)))
+      : Promise.resolve([]),
+  ]);
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const authorPhotoById = new Map(authorDocuments.map((document) => [
+    document.id,
+    document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null,
+  ]));
+  return {
+    items: documents.map((document) => ({
+      id: document.id,
+      reviewId: input.reviewId,
+      authorId: String(document.get('authorId')),
+      authorDisplayName: String(document.get('authorDisplayName')),
+      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      parentCommentId: input.parentCommentId,
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      replyCount: Number(document.get('replyCount') ?? 0),
+      reacted: reactedIds.has(document.id),
+      text: String(document.get('text')),
+      createdAt: timestampToIso(document.get('createdAt')),
+    })),
+    nextCursor: snapshot.size > input.limit && last
+      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
+      : null,
+  };
+});
+
+/** Resolves the root and target comment behind an unchanged deep-link URL. */
+export const getCommentContext = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(getCommentContextInputSchema, request.data);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const targetRef = reviewRef.collection('comments').doc(input.commentId);
+  const [review, target] = await Promise.all([reviewRef.get(), targetRef.get()]);
+  if (!review.exists || review.get('status') !== 'published' || !target.exists || target.get('status') !== 'published') {
+    throw new HttpsError('not-found', 'The comment was not found.');
+  }
+  const rootRef = target.get('parentCommentId')
+    ? reviewRef.collection('comments').doc(String(target.get('parentCommentId')))
+    : targetRef;
+  const root = rootRef.path === targetRef.path ? target : await rootRef.get();
+  if (!root.exists || root.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+  const documents = root.id === target.id ? [root] : [root, target];
+  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const [reactionDocuments, authorDocuments] = await Promise.all([
+    db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid))),
+    db.getAll(...authorIds.map((id) => db.collection('users').doc(id))),
+  ]);
+  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const authorPhotoById = new Map(authorDocuments.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]));
+  return {
+    items: documents.map((document) => ({
+      id: document.id,
+      reviewId: input.reviewId,
+      authorId: String(document.get('authorId')),
+      authorDisplayName: String(document.get('authorDisplayName')),
+      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      replyCount: Number(document.get('replyCount') ?? 0),
+      reacted: reactedIds.has(document.id),
+      text: String(document.get('text')),
+      createdAt: timestampToIso(document.get('createdAt')),
+    })),
+  };
+});
+
 /** Like counts that are worth telling the author about. */
 const REVIEW_LIKE_MILESTONES = [10, 50, 100];
 const MENTION_PATTERN = /@([a-zA-Z0-9._]{2,40})/g;
@@ -238,18 +345,30 @@ function commentPreview(text: string): string {
 
 /** Resolves the `@username` handles inside a comment to the accounts they belong to. */
 async function mentionedUserIds(text: string): Promise<string[]> {
-  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].map((match) => match[1]))].slice(0, 10);
+  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].flatMap((match) => (
+    match[1] ? [normalizeUsername(match[1])] : []
+  )))].slice(0, 10);
   if (usernames.length === 0) return [];
-  const profiles = await Promise.all(usernames.map((username) => db
-    .collection('users')
-    .where('username', '==', username)
-    .limit(1)
-    .get()));
-  return [...new Set(profiles.flatMap((profile) => profile.docs.map((document) => document.id)))];
+  const claims = await db.getAll(...usernames.map(usernameReference));
+  const claimedUserIds = claims.flatMap((claim) => claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : []);
+  const unresolvedUsernames = usernames.filter((_, index) => !claims[index]?.exists);
+  if (unresolvedUsernames.length === 0) return [...new Set(claimedUserIds)];
+
+  // Username claims are populated by a rolling migration. searchTokens was
+  // already normalized on old profiles, so it is a bounded, case-insensitive
+  // bridge for mentions until every account has a claim document.
+  const legacyMatches = await Promise.all(unresolvedUsernames.map(async (username) => {
+    const profiles = await db.collection('users').where('searchTokens', 'array-contains', `p:${username}`).limit(2).get();
+    return profiles.docs.flatMap((profile) => (
+      normalizeUsername(String(profile.get('username') ?? '')) === username ? [profile.id] : []
+    ));
+  }));
+  return [...new Set([...claimedUserIds, ...legacyMatches.flat()])];
 }
 
 /** Everyone who should hear about a freshly published review. */
 async function announceReview(
+  reviewRef: FirebaseFirestore.DocumentReference,
   reviewId: string,
   authorId: string,
   authorName: string,
@@ -287,6 +406,14 @@ async function announceReview(
       targetId: reviewId,
     });
   }
+  // Deletion/moderation can happen after the create-trigger lease is acquired.
+  // Recheck immediately before each outward fan-out so notifications never
+  // point to a review that is no longer published.
+  const reviewIsPublished = async (): Promise<boolean> => {
+    const current = await reviewRef.get();
+    return current.exists && current.get('status') === 'published';
+  };
+  if (!(await reviewIsPublished())) return;
   await sendNotifications(requests);
 
   // The very first review of a venue is news for everyone living in that city.
@@ -296,6 +423,7 @@ async function announceReview(
     .where('city', '==', venue.city)
     .limit(400)
     .get();
+  if (!(await reviewIsPublished())) return;
   await sendNotifications(neighbours.docs
     .filter((neighbour) => neighbour.id !== authorId)
     .map((neighbour) => ({
@@ -307,6 +435,133 @@ async function announceReview(
       targetId: venue.id,
     })));
 }
+
+type StoredDishReview = {
+  id?: unknown;
+  photoPath?: unknown;
+  photoUrl?: unknown;
+  rating?: unknown;
+  title?: unknown;
+};
+
+async function attachDishPhotoUrls(
+  review: FirebaseFirestore.DocumentSnapshot,
+): Promise<void> {
+  // The auth/function test contour deliberately does not start Storage. Never let it
+  // fall through to a real bucket when Application Default Credentials are present.
+  if (isFirebaseEmulator()
+    && !process.env.FIREBASE_STORAGE_EMULATOR_HOST
+    && !process.env.STORAGE_EMULATOR_HOST) return;
+  const dishes = Array.isArray(review.get('dishReviews'))
+    ? review.get('dishReviews') as StoredDishReview[]
+    : [];
+  if (dishes.length === 0 || dishes.every((dish) => typeof dish.photoUrl === 'string')) return;
+  const bucket = getStorage().bucket();
+  const enriched = await Promise.all(dishes.map(async (dish) => {
+    if (typeof dish.photoUrl === 'string' || typeof dish.photoPath !== 'string') return dish;
+    try {
+      return { ...dish, photoUrl: await getDownloadURL(bucket.file(dish.photoPath)) };
+    } catch (error) {
+      console.warn(`Unable to resolve the review photo ${dish.photoPath}.`, error);
+      return dish;
+    }
+  }));
+  if (enriched.some((dish, index) => dish !== dishes[index])) {
+    const resolvedUrlByPath = new Map(enriched.flatMap((dish) =>
+      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    // The trigger can run while its author edits the review. Re-read in a
+    // transaction and add URLs only to matching, still-current photo paths.
+    await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(review.ref);
+      if (!current.exists) return;
+      const currentDishes = Array.isArray(current.get('dishReviews'))
+        ? current.get('dishReviews') as StoredDishReview[]
+        : [];
+      const merged = currentDishes.map((dish) => {
+        const photoUrl = typeof dish.photoPath === 'string' ? resolvedUrlByPath.get(dish.photoPath) : undefined;
+        return photoUrl && typeof dish.photoUrl !== 'string' ? { ...dish, photoUrl } : dish;
+      });
+      if (merged.some((dish, index) => dish !== currentDishes[index])) {
+        transaction.update(review.ref, { dishReviews: merged, updatedAt: FieldValue.serverTimestamp() });
+      }
+    });
+  }
+}
+
+/** Heavy post-publication work runs after the callable has returned to the app. */
+export const processReviewEffects = onDocumentCreated({
+  document: 'reviews/{reviewId}',
+  database: firestoreDatabaseId,
+  region: 'europe-west1',
+  retry: true,
+}, async (event) => {
+  const review = event.data;
+  if (!review?.exists || review.get('status') !== 'published') return;
+  const authorId = String(review.get('authorId') ?? '');
+  if (!authorId) return;
+  const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
+  const claim = await db.runTransaction(async (transaction) => {
+    const [effect, currentReview] = await Promise.all([
+      transaction.get(effectRef),
+      transaction.get(review.ref),
+    ]);
+    // The create-event snapshot remains published after a delete/moderation
+    // update. Check the current document in the lease transaction, so that a
+    // concurrent status change retries this transaction rather than sending
+    // notifications for content which is no longer visible.
+    if (!currentReview.exists || currentReview.get('status') !== 'published') return { claimed: false, review: null };
+    if (effect.get('status') === 'complete') return false;
+    // A duplicate delivery retries while a live worker owns the lease. If the
+    // worker died, a later delivery can reclaim it after the short lease.
+    const leaseExpiresAt = effect.get('leaseExpiresAt') as Timestamp | undefined;
+    if (effect.exists && leaseExpiresAt instanceof Timestamp && leaseExpiresAt.toMillis() > Date.now()) {
+      throw new Error(`Review effect ${event.id} is already processing.`);
+    }
+    transaction.set(effectRef, {
+      reviewId: event.params.reviewId,
+      status: 'processing',
+      leaseExpiresAt: Timestamp.fromMillis(Date.now() + 5 * 60_000),
+      // TTL retains the completed marker long enough to deduplicate delayed
+      // Eventarc deliveries without growing this internal collection forever.
+      expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60_000),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { claimed: true, review: currentReview };
+  });
+  if (claim === false || !claim.claimed || !claim.review) return;
+  const activeReview = claim.review;
+  const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
+  const storedXpBefore = Number(activeReview.get('xpBefore'));
+  const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
+  const storedXpAfter = Number(activeReview.get('xpAfter'));
+  const nextXp = Number.isFinite(storedXpAfter) ? Math.max(0, storedXpAfter) : xp;
+  const completedEffects = (await effectRef.get()).get('completedEffects') as Record<string, unknown> | undefined ?? {};
+  const effects: Array<[string, () => Promise<void>]> = [
+    ['photoUrls', () => attachDishPhotoUrls(activeReview)],
+    ['announcement', () => announceReview(review.ref, event.params.reviewId, authorId, String(activeReview.get('authorDisplayName') ?? 'Someone'), {
+      id: String(activeReview.get('venueId') ?? ''),
+      name: String(activeReview.get('venueName') ?? 'a place'),
+      city: String(activeReview.get('venueCity') ?? ''),
+      reviewCount: activeReview.get('wasFirstVenueReview') === true ? 0 : 1,
+    })],
+    ['levelNotification', () => notifyLevelChange(authorId, previousXp, nextXp)],
+    ['rewardNotifications', () => syncRewardNotifications(authorId)],
+  ];
+  for (const [name, run] of effects) {
+    if (completedEffects[name] === true) continue;
+    try {
+      await run();
+      // Store progress immediately after each completed side effect. A retry
+      // after a later failure resumes from here instead of re-delivering the
+      // earlier notification fan-out.
+      await effectRef.set({ [`completedEffects.${name}`]: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    } catch (error) {
+      console.warn(`Review effect ${name} failed for ${event.params.reviewId}.`, error);
+      throw error;
+    }
+  }
+  await effectRef.set({ status: 'complete', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+});
 
 export const createReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -320,13 +575,6 @@ export const createReview = onCall(callableOptions, async (request) => {
   if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(expectedPhotoPrefix))) {
     throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user and draft.');
   }
-
-  type ReviewAnnouncement = {
-    authorName: string;
-    venue: { id: string; name: string; city: string; reviewCount: number };
-    previousXp: number;
-  };
-  let announcement: ReviewAnnouncement | null = null;
 
   await db.runTransaction(async (transaction) => {
     const [user, venue, existingReview] = await Promise.all([
@@ -345,6 +593,9 @@ export const createReview = onCall(callableOptions, async (request) => {
     }
 
     await enforceRateLimit(transaction, uid, 'create-review', 10, 60 * 60_000);
+    const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
+    const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
+    const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
     transaction.create(reviewRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
@@ -360,50 +611,27 @@ export const createReview = onCall(callableOptions, async (request) => {
       status: 'published',
       commentCount: 0,
       reactionCount: 0,
+      wasFirstVenueReview: reviewCount === 0,
+      xpBefore,
+      xpAfter: xpBefore + 50,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
-    const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
     transaction.update(venueRef, {
       rating: ((averageRating * reviewCount) + input.rating) / (reviewCount + 1),
       reviewCount: reviewCount + 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
     addXp(transaction, userRef, 50, {
-      xp: Number(user.get('xp') ?? 0),
+      xp: xpBefore,
       monthlyXp: Number(user.get('monthlyXp') ?? 0),
     });
     transaction.update(userRef, {
       reviewCount: FieldValue.increment(1),
+      rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
     });
-    announcement = {
-      authorName: String(user.get('displayName') ?? 'Someone'),
-      venue: {
-        id: venue.id,
-        name: String(venue.get('name') ?? 'a place'),
-        city: String(venue.get('city') ?? ''),
-        reviewCount,
-      },
-      previousXp: Number(user.get('xp') ?? 0),
-    };
   });
-
-  const published = announcement as ReviewAnnouncement | null;
-  if (published) {
-    const { authorName, venue, previousXp } = published;
-    const effects = await Promise.allSettled([
-      announceReview(reviewRef.id, uid, authorName, venue),
-      notifyLevelChange(uid, previousXp, previousXp + 50),
-      syncRewardNotifications(uid),
-    ]);
-    const effectNames = ['review announcement', 'level notification', 'reward notification'] as const;
-    effects.forEach((effect, index) => {
-      if (effect.status === 'rejected') {
-        console.warn(`Unable to complete the post-create ${effectNames[index]}.`, effect.reason);
-      }
-    });
-  }
 
   return { id: reviewRef.id };
 });
@@ -432,20 +660,36 @@ export const editReview = onCall(callableOptions, async (request) => {
     const average = Math.max(0, Number(venue.get('rating') ?? 0));
     const oldRating = Number(review.get('rating') ?? 0);
     const now = FieldValue.serverTimestamp();
+    const previousDishes = Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') as StoredDishReview[] : [];
+    const photoUrlByPath = new Map(previousDishes.flatMap((dish) =>
+      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    const dishReviews = input.dishReviews.map((dish) => ({
+      ...dish,
+      ...(photoUrlByPath.get(dish.photoPath) ? { photoUrl: photoUrlByPath.get(dish.photoPath) } : {}),
+    }));
     transaction.update(reviewRef, {
       rating: input.rating,
       text: input.text,
       tags: input.tags,
       tag: input.tags[0] ?? null,
-      dishReviews: input.dishReviews,
-      dishNames: input.dishReviews.map((dish) => dish.title),
+      dishReviews,
+      dishNames: dishReviews.map((dish) => dish.title),
       updatedAt: now,
     });
     transaction.update(venueRef, {
       rating: Math.max(0, Math.min(5, ((average * count) - oldRating + input.rating) / count)),
       updatedAt: now,
     });
+    transaction.update(db.collection('users').doc(uid), {
+      rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
+    });
   });
+  try {
+    await attachDishPhotoUrls(await reviewRef.get());
+  } catch (error) {
+    console.warn(`Unable to resolve review photos after editing ${input.reviewId}.`, error);
+  }
   return { id: input.reviewId };
 });
 
@@ -486,6 +730,8 @@ export const deleteReview = onCall(callableOptions, async (request) => {
       });
       transaction.update(userRef, {
         reviewCount: Math.max(0, Number(user.get('reviewCount') ?? 0) - 1),
+        rewardProgressDirty: true,
+        rewardProgressVersion: FieldValue.increment(1),
         updatedAt: now,
       });
     }
@@ -542,13 +788,24 @@ export const reactToContent = onCall(callableOptions, async (request) => {
     if (content.get('authorId') === uid) {
       throw new HttpsError('failed-precondition', 'You cannot react to your own content.');
     }
-    await enforceRateLimit(transaction, uid, 'react-content', 120, 60_000);
+    const authorRef = input.targetType === 'review'
+      ? db.collection('users').doc(String(content.get('authorId')))
+      : null;
+    const author = authorRef ? await transaction.get(authorRef) : null;
+    await enforceRateLimit(transaction, uid, input.targetType === 'review' ? 'react-review' : 'react-content', 120, 60_000);
     const currentCount = Math.max(0, Number(content.get('reactionCount') ?? 0));
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
     if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
     else transaction.delete(reactionRef);
     transaction.update(contentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    const authorXp = Math.max(0, Number(author?.get('xp') ?? 0));
+    if (authorRef && author?.exists) {
+      addXp(transaction, authorRef, active ? 5 : -5, {
+        xp: authorXp,
+        monthlyXp: Number(author.get('monthlyXp') ?? 0),
+      });
+    }
     transaction.create(idempotencyRef, {
       active,
       reactionCount,
@@ -572,6 +829,16 @@ export const reactToContent = onCall(callableOptions, async (request) => {
           eventKey: `${input.reviewId}:${reactionCount}`,
           params: { place: venueName, count: reactionCount },
           targetId: input.reviewId,
+        });
+      }
+      if (levelForXp(authorXp + 5) > levelForXp(authorXp)) {
+        const level = levelForXp(authorXp + 5);
+        queueNotification(transaction, {
+          recipientId: String(content.get('authorId') ?? ''),
+          type: 'level-up',
+          eventKey: `level-${level}`,
+          params: { level },
+          targetId: String(level),
         });
       }
     }
@@ -733,11 +1000,15 @@ export const reactToComment = onCall(callableOptions, async (request) => {
   const reactionRef = commentRef.collection('reactions').doc(uid);
   const idempotencyRef = db.collection('_idempotency').doc(idempotentDocumentId(uid, `comment-reaction:${input.commentId}`, input.idempotencyKey));
   return db.runTransaction(async (transaction) => {
-    const [comment, reaction, idempotency] = await Promise.all([
-      transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
+    const [profile, comment, reaction, idempotency] = await Promise.all([
+      transaction.get(db.collection('users').doc(uid)), transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
     ]);
+    if (!profile.exists || profile.get('status') !== 'active') {
+      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    }
     if (idempotency.exists) return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount')) };
     if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+    await enforceRateLimit(transaction, uid, 'react-comment', 120, 60_000);
     const currentCount = Number(comment.get('reactionCount') ?? 0);
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
@@ -762,25 +1033,31 @@ export const deleteComment = onCall(callableOptions, async (request) => {
     if (!review.exists || review.get('status') !== 'published') throw new HttpsError('not-found', 'The review was not found.');
     if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
     if (comment.get('authorId') !== uid) throw new HttpsError('permission-denied', 'You can only delete your own comments.');
-    const replies = comment.get('parentCommentId')
-      ? null
-      : await transaction.get(reviewRef.collection('comments')
-        .where('status', '==', 'published')
-        .where('parentCommentId', '==', input.commentId));
-    if (replies && replies.size > 450) {
-      throw new HttpsError('resource-exhausted', 'This comment thread is too large to delete at once.');
-    }
     const parentId = comment.get('parentCommentId');
     const parentRef = parentId ? reviewRef.collection('comments').doc(String(parentId)) : null;
     const parent = parentRef ? await transaction.get(parentRef) : null;
-    const deletedCount = 1 + (replies?.size ?? 0);
-    transaction.update(commentRef, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
-    replies?.docs.forEach((reply) => transaction.update(reply.ref, {
+    // Preserve the synchronous path for normal threads. For a larger root,
+    // hide it right away and let the scheduled worker remove replies in safe
+    // batches instead of exceeding Firestore's 500-write transaction limit.
+    const deletingRoot = !parentRef;
+    const replies = deletingRoot
+      ? await transaction.get(reviewRef.collection('comments')
+        .where('status', '==', 'published')
+        .where('parentCommentId', '==', input.commentId)
+        .limit(451))
+      : null;
+    const deferredReplyDeletion = (replies?.size ?? 0) > 450;
+    const repliesToDelete = deferredReplyDeletion ? [] : replies?.docs ?? [];
+    transaction.update(commentRef, {
       status: 'deleted',
+      ...(deferredReplyDeletion ? { replyDeletionPending: true } : {}),
       updatedAt: FieldValue.serverTimestamp(),
-    }));
+    });
+    for (const reply of repliesToDelete) {
+      transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+    }
     transaction.update(reviewRef, {
-      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - deletedCount),
+      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - 1 - repliesToDelete.length),
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (parentRef && parent?.exists && parent.get('status') === 'published') {
@@ -791,6 +1068,61 @@ export const deleteComment = onCall(callableOptions, async (request) => {
     }
   });
   return { id: input.commentId };
+});
+
+const COMMENT_REPLY_CLEANUP_BATCH_SIZE = 400;
+
+/**
+ * Removes replies from deleted root comments without making comment deletion
+ * depend on the size of the discussion. A root is already hidden immediately;
+ * this job only reconciles its now-unreachable replies and review count.
+ */
+export const cleanupDeletedCommentReplies = onSchedule({
+  schedule: 'every 5 minutes',
+  region: 'europe-west1',
+  timeZone: 'UTC',
+  maxInstances: 1,
+}, async () => {
+  const roots = await db.collectionGroup('comments')
+    .where('replyDeletionPending', '==', true)
+    .limit(10)
+    .get();
+  for (const root of roots.docs) {
+    const reviewRef = root.ref.parent.parent;
+    if (!reviewRef) continue;
+    await db.runTransaction(async (transaction) => {
+      const [currentRoot, review, replies] = await Promise.all([
+        transaction.get(root.ref),
+        transaction.get(reviewRef),
+        transaction.get(root.ref.parent
+          .where('parentCommentId', '==', root.id)
+          .where('status', '==', 'published')
+          .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE)),
+      ]);
+      if (!currentRoot.exists || currentRoot.get('replyDeletionPending') !== true) return;
+      if (replies.empty) {
+        transaction.update(root.ref, {
+          replyDeletionPending: FieldValue.delete(),
+          replyCount: 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      for (const reply of replies.docs) {
+        transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+      }
+      if (review.exists) {
+        transaction.update(reviewRef, {
+          commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - replies.size),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      transaction.update(root.ref, {
+        replyCount: Math.max(0, Number(currentRoot.get('replyCount') ?? 0) - replies.size),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  }
 });
 
 export const reactToReview = onCall(callableOptions, async (request) => {

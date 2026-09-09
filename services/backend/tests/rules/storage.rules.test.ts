@@ -86,6 +86,15 @@ describe('Storage security rules', () => {
     );
   });
 
+  it('denies review images at or above the 1.5 MB limit', async () => {
+    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    await assertFails(
+      ownerStorage
+        .ref('review-images/user-a/review-command/oversized-image')
+        .put(new Uint8Array(1536 * 1024), { contentType: 'image/jpeg' }),
+    );
+  });
+
   it('allows admins to manage venue images', async () => {
     const adminStorage = testEnvironment.authenticatedContext('admin-a', { role: 'admin' }).storage();
     const readerStorage = testEnvironment.authenticatedContext('user-a').storage();

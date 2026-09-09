@@ -60,12 +60,15 @@ export {
 } from './modules/users/functions';
 export {
   addComment,
+  cleanupDeletedCommentReplies,
   deleteComment,
   createReview,
   deleteReview,
   editReview,
   setReviewPinned,
   getComments,
+  getCommentReplies,
+  getCommentContext,
   getFeed,
   getFeed as getFriendFeed,
   hideReview,
@@ -74,6 +77,7 @@ export {
   reactToComment,
   reactToContent,
   reportContent,
+  processReviewEffects,
 } from './modules/reviews/functions';
 export {
   banUser,

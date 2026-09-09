@@ -25,8 +25,9 @@ import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-patt
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useProfile } from '../profile/api';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
@@ -161,8 +162,9 @@ export function ChatScreen({
 }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top, insets.bottom), [colors, insets.bottom, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
   const { profile: currentUserProfile } = useProfile(userId, 'You');
   const realtimeMessages = useConversationMessages(conversationId, userId);
   const messageHistory = useInfiniteQuery({
@@ -229,7 +231,8 @@ export function ChatScreen({
       }
     },
     setConversationError,
-  ), [api, conversationId, userId]);
+    visualAudit,
+  ), [api, conversationId, userId, visualAudit]);
 
   useEffect(() => {
     if (!groupTitle) {
@@ -317,7 +320,7 @@ export function ChatScreen({
         keyboardVerticalOffset={0}
         style={styles.screen}
       >
-      <View style={styles.header}>
+      <View style={[styles.header, { minHeight: responsiveSize(64) + insets.top, paddingTop: responsiveSize(8) + insets.top }]}>
         <Pressable accessibilityLabel="Back" hitSlop={12} onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
@@ -378,7 +381,7 @@ export function ChatScreen({
                 <Text style={styles.stateCopy}>{activity ? 'Plan the activity with everyone here.' : `Say hello to ${participant?.displayName ?? 'your connection'}.`}</Text>
               </View>
             )}
-            ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} /> : null}
+            ListFooterComponent={messageHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(16) }} /> : null}
             onEndReached={() => {
               if (messageHistory.hasNextPage && !messageHistory.isFetchingNextPage) void messageHistory.fetchNextPage();
             }}
@@ -406,7 +409,7 @@ export function ChatScreen({
         )}
       </ImageBackground>
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, { minHeight: responsiveSize(62) + insets.bottom, paddingBottom: Math.max(responsiveSize(8), insets.bottom) }]}>
         <TextInput
           blurOnSubmit={false}
           editable={!sending && !conversationError}
@@ -424,7 +427,7 @@ export function ChatScreen({
           onPress={() => void send()}
           style={({ pressed }) => [styles.send, (!text.trim() || sending) && styles.sendDisabled, pressed && styles.sendPressed]}
         >
-          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={16.667} width={16.667} />}
+          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
         </Pressable>
       </View>
       <ActivityInviteModal
@@ -438,11 +441,11 @@ export function ChatScreen({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
-  return StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
-    header: { minHeight: safeTop + 64, paddingTop: safeTop + 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
+    header: { minHeight: 64, paddingTop: 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
     backText: { color: colors.text, fontSize: 38, lineHeight: 40, fontWeight: '300', marginTop: -3 },
     headerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center' },
@@ -478,7 +481,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     messageTime: { color: colors.textMuted, marginTop: 3, fontSize: 10, textAlign: 'right' },
     mineTime: { color: 'rgba(255,255,255,0.70)' },
     readReceipt: { color: colors.textMuted, marginTop: 2, marginRight: 4, fontSize: 10 },
-    composer: { minHeight: 62 + safeBottom, paddingTop: 8, paddingBottom: Math.max(8, safeBottom), paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, backgroundColor: colors.background },
+    composer: { minHeight: 62, paddingTop: 8, paddingBottom: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, backgroundColor: colors.background },
     input: { flex: 1, minHeight: 44, maxHeight: 118, paddingHorizontal: 15, paddingTop: 11, paddingBottom: 10, borderRadius: 22, color: colors.text, backgroundColor: colors.surfaceRaised, fontSize: 16 },
     send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     sendDisabled: { opacity: 0.45 },

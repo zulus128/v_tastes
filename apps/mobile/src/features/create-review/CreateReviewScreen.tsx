@@ -12,7 +12,6 @@ import {
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -45,6 +44,8 @@ import successPattern from '../../../assets/create-review/success-pattern.png';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { cancelDraftReminder, scheduleDraftReminder } from '../../infrastructure/pushNotifications';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -153,7 +154,9 @@ export function CreateReviewScreen({
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
-  const [feedbackHeight, setFeedbackHeight] = useState(50);
+  const feedbackMinHeight = responsiveSize(50);
+  const feedbackMaxHeight = responsiveSize(140);
+  const [feedbackHeight, setFeedbackHeight] = useState(() => responsiveSize(50));
   const [tags, setTags] = useState<ReviewTag[]>([]);
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
   const [placeSelectorOpen, setPlaceSelectorOpen] = useState(false);
@@ -340,7 +343,7 @@ export function CreateReviewScreen({
                     <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.venueAddress}>{venue.address ?? venue.city}</Text>
                   </View>
                   <View style={styles.edit}>
-                    <PenIcon color={colors.text} height={20} width={20} />
+                    <PenIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
                   </View>
                 </Pressable>
                 {/* Fixed-height card above the arc — the venue name/address are capped so a
@@ -353,8 +356,8 @@ export function CreateReviewScreen({
                 {place.isPending && venueId ? <ActivityIndicator color={colors.text} /> : (
                   <View style={styles.selectPlaceContent}>
                     <View style={styles.selectPlaceIcon}>
-                      <SelectPlaceCircle color={colors.text} height={21.5} style={styles.selectPlaceCircle} width={21.5} />
-                      <SelectPlacePlus color={colors.text} height={7.5} style={styles.selectPlacePlus} width={7.5} />
+                      <SelectPlaceCircle color={colors.text} height={responsiveSize(21.5)} style={styles.selectPlaceCircle} width={responsiveSize(21.5)} />
+                      <SelectPlacePlus color={colors.text} height={responsiveSize(7.5)} style={styles.selectPlacePlus} width={responsiveSize(7.5)} />
                     </View>
                     <Text maxFontSizeMultiplier={1.3} style={styles.selectPlaceText}>Select Place</Text>
                   </View>
@@ -368,10 +371,10 @@ export function CreateReviewScreen({
             maxLength={2_000}
             multiline
             onChangeText={setText}
-            onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(140, Math.max(50, nativeEvent.contentSize.height)))}
+            onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(feedbackMaxHeight, Math.max(feedbackMinHeight, nativeEvent.contentSize.height)))}
             placeholder="Enter text"
             placeholderTextColor={colors.placeholder}
-            scrollEnabled={feedbackHeight >= 140}
+            scrollEnabled={feedbackHeight >= feedbackMaxHeight}
             style={[styles.feedback, { height: feedbackHeight }]}
             textAlignVertical="top"
             value={text}
@@ -394,7 +397,7 @@ export function CreateReviewScreen({
                     accessibilityLabel={`Remove ${dish.title}`}
                     onPress={() => setDishToRemove(dish)}
                     style={styles.deleteDish}
-                  ><DeleteDishIcon height={17} width={16} /></Pressable>
+                  ><DeleteDishIcon height={responsiveSize(17)} width={responsiveSize(16)} /></Pressable>
                   <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
                   <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
                 </Pressable>
@@ -406,7 +409,7 @@ export function CreateReviewScreen({
               onPress={() => setDishEditor({ id: createIdempotencyKey('dish'), photoUri: '', rating: 1, title: '' })}
               style={styles.addDish}
             >
-              <AddDishIcon color={colors.text} height={18.0654} width={20} />
+              <AddDishIcon color={colors.text} height={responsiveSize(18.0654)} width={responsiveSize(20)} />
               <Text maxFontSizeMultiplier={1.3} style={styles.addDishText}>Add Dish</Text>
             </Pressable>
           ) : null}
@@ -506,9 +509,9 @@ function SectionLabel({ label }: { label: string }) {
 }
 
 function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
-  if (value === 'date-night') return <TagNightIcon color={color} height={12} width={12} />;
-  if (value === 'birthday') return <TagBirthdayIcon color={color} height={12} width={12} />;
-  if (value === 'children') return <TagChildrenIcon color={color} height={12} width={12} />;
+  if (value === 'date-night') return <TagNightIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
+  if (value === 'birthday') return <TagBirthdayIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
+  if (value === 'children') return <TagChildrenIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
   return null;
 }
 
@@ -535,7 +538,9 @@ function RatingCurve({
   const markerScale = scaleWidth / 359.903;
   // Same idea for the curved scale: shrink the whole arc+pins as one unit (see
   // curveDesignWidth) rather than let the end pins overflow the hero card's edge.
-  const curveScale = heroWidth > 0 ? curveScaleFor(heroWidth - 32) : 1;
+  const curveScale = heroWidth > 0
+    ? Math.min(1, (heroWidth - 32) / responsiveSize(curveDesignWidth))
+    : 1;
   return (
     <View style={ratingStyles.wrap}>
       {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt
@@ -558,7 +563,7 @@ function RatingCurve({
               <View style={ratingStyles.starGlyph}>
                 <Text allowFontScaling={false} style={ratingStyles.starOutline}>☆</Text>
                 {fill > 0 ? (
-                  <View style={[ratingStyles.starFillClip, { width: 26 * fill }]}>
+                  <View style={[ratingStyles.starFillClip, { width: responsiveSize(26) * fill }]}>
                     <Text allowFontScaling={false} style={ratingStyles.starFill}>★</Text>
                   </View>
                 ) : null}
@@ -572,22 +577,29 @@ function RatingCurve({
           {scaleWidth > 0 ? (
             <>
               {isDark
-                ? <RatingScale height={15.1808} width={scaleWidth} />
-                : <RatingScaleLight height={15.1808} width={scaleWidth} />}
+                ? <RatingScale height={responsiveSize(15.1808)} width={scaleWidth} />
+                : <RatingScaleLight height={responsiveSize(15.1808)} width={scaleWidth} />}
               {value >= 1 ? (
-                <Svg height={15.1808} pointerEvents="none" style={ratingStyles.linearProgress} width={scaleWidth}>
+                <Svg
+                  height={responsiveSize(15.1808)}
+                  pointerEvents="none"
+                  preserveAspectRatio="none"
+                  style={ratingStyles.linearProgress}
+                  viewBox="0 0 359.903 15.1808"
+                  width={scaleWidth}
+                >
                   <Line
                     stroke={accent}
                     strokeLinecap="round"
                     strokeWidth={4}
-                    x1={4 * markerScale}
-                    x2={(dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4) * markerScale}
+                    x1={4}
+                    x2={dishRatingMarkers.find((marker) => marker.value === value)?.x ?? 4}
                     y1={8}
                     y2={8}
                   />
                   {dishRatingMarkers.filter((marker) => marker.value <= value).map((marker) => Number.isInteger(marker.value) ? (
                     <Circle
-                      cx={marker.x * markerScale}
+                      cx={marker.x}
                       cy={7.59038}
                       fill="#FFFFFF"
                       key={marker.value}
@@ -601,8 +613,8 @@ function RatingCurve({
                       stroke={accent}
                       strokeLinecap="round"
                       strokeWidth={2}
-                      x1={marker.x * markerScale}
-                      x2={marker.x * markerScale}
+                      x1={marker.x}
+                      x2={marker.x}
                       y1={2}
                       y2={13.3857}
                     />
@@ -615,9 +627,9 @@ function RatingCurve({
                   accessibilityRole="button"
                   key={marker.value}
                   onPress={() => onChange(marker.value)}
-                  style={[ratingStyles.linearPointHit, { left: marker.x * markerScale - 22 }]}
+                  style={[ratingStyles.linearPointHit, { left: marker.x * markerScale - responsiveSize(22) }]}
                 >
-                  {marker.value === value ? <RatingPin color="#B82F29" height={38} width={38} /> : null}
+                  {marker.value === value ? <RatingPin color="#B82F29" height={responsiveSize(38)} width={responsiveSize(38)} /> : null}
                 </Pressable>
               ))}
             </>
@@ -625,7 +637,7 @@ function RatingCurve({
         </View>
       ) : (
         <View style={[ratingStyles.curve, curveScale < 1 && { transform: [{ scale: curveScale }] }]}>
-          <Svg height={139} pointerEvents="none" width={338} style={StyleSheet.absoluteFill}>
+          <Svg height={responsiveSize(139)} pointerEvents="none" viewBox="0 0 338 139" width={responsiveSize(338)} style={StyleSheet.absoluteFill}>
             <Defs>
               <ClipPath id="review-rating-progress">
                 <Rect height={139} width={selectedMarker?.x ?? 0} x={0} y={0} />
@@ -653,10 +665,10 @@ function RatingCurve({
                 accessibilityRole="button"
                 key={marker.value}
                 onPress={() => onChange(marker.value)}
-                style={[ratingStyles.pointHit, { left: marker.x - 22, top: marker.y - 22 }]}
+                style={[ratingStyles.pointHit, { left: responsiveSize(marker.x - 22), top: responsiveSize(marker.y - 22) }]}
               >
                 {selected ? (
-                  <RatingPin color={accent} height={38} width={38} />
+                  <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
                 ) : marker.kind === 'dot' ? (
                   <View style={[ratingStyles.point, { backgroundColor: curvePoint, borderColor: active ? accent : curveBase }]} />
                 ) : (
@@ -859,7 +871,11 @@ function DishEditor({
     const result = camera
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], mediaTypes: ['images'], quality: 0.8 })
       : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], mediaTypes: ['images'], quality: 0.8 });
-    if (!result.canceled) setDraft({ ...draft, photoUri: result.assets[0].uri });
+    if (!result.canceled) {
+      // Normalize at the upload boundary so restored drafts and newly chosen
+      // images take exactly one lossy resize/encode pass.
+      setDraft({ ...draft, photoUri: result.assets[0].uri });
+    }
   }
 
   function pickSource() {
@@ -893,7 +909,7 @@ function DishEditor({
               ? <Image source={{ uri: draft.photoUri }} style={styles.photoImage} />
               : isDark
                 ? <Text style={styles.photoAdd}>⊕</Text>
-                : <PhotoAddLightIcon color={colors.text} height={23.3333} width={23.3333} />}
+                : <PhotoAddLightIcon color={colors.text} height={responsiveSize(23.3333)} width={responsiveSize(23.3333)} />}
           </Pressable>
           <RatingCurve linear onChange={(rating) => setDraft({ ...draft, rating })} value={draft.rating} />
           <SectionLabel label="Title" />
@@ -903,7 +919,7 @@ function DishEditor({
           <Pressable onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
           <Pressable disabled={!valid} onPress={() => onSave(draft)} style={[styles.save, !valid && styles.disabled]}>
             <View style={styles.saveContent}>
-              <View style={styles.saveIcon}><SaveCheck height={14.2724} width={19.9891} /></View>
+              <View style={styles.saveIcon}><SaveCheck height={responsiveSize(14.2724)} width={responsiveSize(19.9891)} /></View>
               <Text style={styles.saveText}>Save</Text>
             </View>
           </Pressable>
@@ -971,8 +987,8 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
       {isDark ? <Image source={successGlow} style={styles.glow} /> : null}
       <View style={styles.center}>
         <View style={styles.logo}>
-          <SuccessMouthPink height={61} style={styles.logoPink} width={77} />
-          <SuccessMouthOutline color={colors.text} height={76} style={styles.logoOutline} width={105} />
+          <SuccessMouthPink height={responsiveSize(61)} style={styles.logoPink} width={responsiveSize(77)} />
+          <SuccessMouthOutline color={colors.text} height={responsiveSize(76)} style={styles.logoOutline} width={responsiveSize(105)} />
         </View>
         <Text style={styles.copy}>Your review has been added</Text>
       </View>
@@ -983,8 +999,8 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
   );
 }
 
-const sectionStyles = StyleSheet.create({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
-const ratingStyles = StyleSheet.create({
+const sectionStyles = responsiveStyleSheet({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
+const ratingStyles = responsiveStyleSheet({
   wrap: { height: 198, position: 'relative', alignItems: 'center' },
   value: { position: 'absolute', top: 18, zIndex: 3, color: '#B82F29', fontSize: 34, lineHeight: 40, fontWeight: '500' },
   stars: { position: 'absolute', top: 61, zIndex: 4, flexDirection: 'row', gap: 4 },
@@ -1002,7 +1018,7 @@ const ratingStyles = StyleSheet.create({
   tick: { width: 12, height: 2, borderRadius: 1 },
 });
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: isDark ? colors.background : colors.canvas },
   patternImage: { opacity: isDark ? 1 : 0.06, resizeMode: 'repeat', tintColor: '#161616' },
   content: { flexGrow: 1 },
@@ -1047,7 +1063,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   postText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });
 
-const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
+const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '91%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
@@ -1071,7 +1087,7 @@ const createSelectorStyles = (colors: ThemeColors) => StyleSheet.create({
   more: { height: 54, alignItems: 'center', justifyContent: 'center' }, moreText: { color: colors.primary, fontWeight: '600' },
 });
 
-const createDishStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createDishStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? colors.border : '#45474B', backgroundColor: isDark ? colors.canvas : colors.surface },
@@ -1085,7 +1101,7 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.cr
   save: { flex: 1, height: isDark ? 52 : 40, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' }, saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 }, saveIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }, saveText: { color: '#fff', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 }, disabled: { opacity: 0.5 },
 });
 
-const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
+const createConfirmationStyles = (colors: ThemeColors) => responsiveStyleSheet({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { paddingTop: 32, paddingHorizontal: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, alignItems: 'center', backgroundColor: colors.surfaceRaised },
   handle: { position: 'absolute', top: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
@@ -1099,7 +1115,7 @@ const createConfirmationStyles = (colors: ThemeColors) => StyleSheet.create({
   dangerText: { color: '#D94D45', fontSize: 16, fontWeight: '500' },
 });
 
-const createSuccessStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createSuccessStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: isDark ? '#161616' : colors.canvas },
   pattern: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', opacity: isDark ? 1 : 0.06, resizeMode: 'cover', tintColor: isDark ? undefined : '#161616' },
   glow: { position: 'absolute', left: '50%', top: '50%', width: 553, height: 552, marginLeft: -276.5, marginTop: -283 },

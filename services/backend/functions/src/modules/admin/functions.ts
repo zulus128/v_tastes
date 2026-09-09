@@ -2,7 +2,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
 import { notificationTypes, sendCampaignNotificationInputSchema } from '@tastes/contracts';
 import { db } from '../../shared/firebase';
@@ -10,6 +9,7 @@ import { sendNotification, sendNotifications } from '../../shared/notifications'
 import { callableOptions } from '../../shared/options';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
+import { privateUserReference } from '../../shared/user-data';
 
 type StaffRole = 'admin' | 'moderator';
 
@@ -106,6 +106,42 @@ function contentReference(input: z.infer<typeof contentTargetSchema>) {
     : db.collection('reviews').doc(input.parentId).collection('comments').doc(input.targetId);
 }
 
+async function invalidateRewardProgress(userId: string): Promise<void> {
+  if (!userId) return;
+  await db.collection('users').doc(userId).set({
+    rewardProgressDirty: true,
+    rewardProgressVersion: FieldValue.increment(1),
+  }, { merge: true });
+}
+
+async function invalidateVenueRewardProgress(venueId: string): Promise<void> {
+  const authorIds = new Set<string>();
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  do {
+    let reviewsQuery = db.collection('reviews')
+      .where('venueId', '==', venueId)
+      .where('status', '==', 'published')
+      .orderBy('__name__')
+      .limit(400);
+    if (cursor) reviewsQuery = reviewsQuery.startAfter(cursor);
+    const reviews = await reviewsQuery.get();
+    reviews.docs.forEach((review) => {
+      const authorId = String(review.get('authorId') ?? '');
+      if (authorId) authorIds.add(authorId);
+    });
+    cursor = reviews.docs.at(-1);
+  } while (cursor);
+  const uniqueAuthors = [...authorIds];
+  for (let offset = 0; offset < uniqueAuthors.length; offset += 400) {
+    const batch = db.batch();
+    uniqueAuthors.slice(offset, offset + 400).forEach((authorId) => batch.set(db.collection('users').doc(authorId), {
+      rewardProgressDirty: true,
+      rewardProgressVersion: FieldValue.increment(1),
+    }, { merge: true }));
+    await batch.commit();
+  }
+}
+
 function audit(actorId: string, action: string, subjectId: string, details: Record<string, unknown> = {}) {
   return db.collection('_adminAudit').add({
     actorId,
@@ -123,6 +159,7 @@ interface AnalyticsBatchResponse {
 async function getAnalyticsMetrics() {
   const propertyId = process.env.GA4_PROPERTY_ID ?? '550185288';
   try {
+    const { GoogleAuth } = await import('google-auth-library');
     const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/analytics.readonly'] });
     const token = await auth.getAccessToken();
     if (!token) throw new Error('Google Analytics credentials are unavailable.');
@@ -130,6 +167,7 @@ async function getAnalyticsMetrics() {
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:batchRunReports`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(8_000),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requests: [
@@ -328,6 +366,7 @@ export const deleteContent = onCall(callableOptions, async (request) => {
     }),
     notifyReportResolved(report),
   ]);
+  if (input.targetType === 'review') await invalidateRewardProgress(String(content.get('authorId') ?? ''));
   return { id: input.targetId };
 });
 
@@ -342,6 +381,10 @@ export const editContent = onCall(callableOptions, async (request) => {
   });
   await audit(actorId, 'edit-content', input.targetId, { targetType: input.targetType });
   await notifyReportResolved(await db.collection('reports').doc(input.reportId).get());
+  if (input.targetType === 'review') {
+    const content = await reference.get();
+    await invalidateRewardProgress(String(content.get('authorId') ?? ''));
+  }
   return { id: input.targetId };
 });
 
@@ -349,28 +392,40 @@ export const searchUsers = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(searchInputSchema, request.data);
   const query = input.query.toLowerCase();
-  let profiles;
+  let profileDocs: FirebaseFirestore.QueryDocumentSnapshot[];
   if (!query) {
-    profiles = await db.collection('users').orderBy('createdAt', 'desc').limit(50).get();
+    profileDocs = (await db.collection('users').orderBy('createdAt', 'desc').limit(50).get()).docs;
   } else {
-    const candidates = await db.collection('users').limit(1_000).get();
-    profiles = {
-      docs: candidates.docs.filter((profile) => [
+    const [candidates, privateCandidates] = await Promise.all([
+      db.collection('users').limit(1_000).get(),
+      db.collection('_userPrivate').limit(1_000).get(),
+    ]);
+    const privateMatches = new Set(privateCandidates.docs.filter((profile) => [
+      String(profile.get('email') ?? ''),
+      String(profile.get('phoneNumber') ?? ''),
+    ].some((value) => value.toLowerCase().includes(query))).map((profile) => profile.id));
+    profileDocs = candidates.docs.filter((profile) => privateMatches.has(profile.id) || [
         profile.id,
         String(profile.get('username') ?? ''),
         String(profile.get('displayName') ?? ''),
         String(profile.get('email') ?? ''),
         String(profile.get('phoneNumber') ?? ''),
-      ].some((value) => value.toLowerCase().includes(query))).slice(0, 50),
-    };
+      ].some((value) => value.toLowerCase().includes(query))).slice(0, 50);
   }
-
-  return profiles.docs.map((profile) => ({
+  const privateProfiles = profileDocs.length > 0
+    ? await db.getAll(...profileDocs.map((profile) => privateUserReference(profile.id)))
+    : [];
+  const privateById = new Map(privateProfiles.map((profile) => [profile.id, profile]));
+  return profileDocs.map((profile) => ({
     id: profile.id,
     displayName: String(profile.get('displayName') ?? 'Tastes user'),
     username: profile.get('username') ? String(profile.get('username')) : null,
-    email: profile.get('email') ? String(profile.get('email')) : null,
-    phoneNumber: profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
+    email: privateById.get(profile.id)?.get('email')
+      ? String(privateById.get(profile.id)?.get('email'))
+      : profile.get('email') ? String(profile.get('email')) : null,
+    phoneNumber: privateById.get(profile.id)?.get('phoneNumber')
+      ? String(privateById.get(profile.id)?.get('phoneNumber'))
+      : profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
     status: String(profile.get('status') ?? 'active'),
     createdAt: timestampToIso(profile.get('createdAt')),
   }));
@@ -380,8 +435,9 @@ export const getUserHistory = onCall(callableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(z.object({ userId: idSchema }), request.data);
   const userReference = db.collection('users').doc(input.userId);
-  const [profile, reviews, reports, actions] = await Promise.all([
+  const [profile, privateProfile, reviews, reports, actions] = await Promise.all([
     userReference.get(),
+    privateUserReference(input.userId).get(),
     db.collection('reviews').where('authorId', '==', input.userId).limit(25).get(),
     db.collection('reports').where('reporterId', '==', input.userId).limit(25).get(),
     db.collection('_adminAudit').where('subjectId', '==', input.userId).limit(25).get(),
@@ -394,8 +450,10 @@ export const getUserHistory = onCall(callableOptions, async (request) => {
       id: profile.id,
       displayName: String(profile.get('displayName') ?? 'Tastes user'),
       username: profile.get('username') ? String(profile.get('username')) : null,
-      email: profile.get('email') ? String(profile.get('email')) : null,
-      phoneNumber: profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
+      email: privateProfile.get('email') ? String(privateProfile.get('email'))
+        : profile.get('email') ? String(profile.get('email')) : null,
+      phoneNumber: privateProfile.get('phoneNumber') ? String(privateProfile.get('phoneNumber'))
+        : profile.get('phoneNumber') ? String(profile.get('phoneNumber')) : null,
       status: String(profile.get('status') ?? 'active'),
       createdAt: timestampToIso(profile.get('createdAt')),
       moderationReason: profile.get('moderationReason') ? String(profile.get('moderationReason')) : null,
@@ -567,6 +625,7 @@ export const upsertVenue = onCall(callableOptions, async (request) => {
     }),
   }, { merge: true });
   await audit(actorId, existing.exists ? 'update-venue' : 'create-venue', reference.id);
+  if (existing.exists) await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
@@ -600,6 +659,7 @@ export const updateVenue = onCall(callableOptions, async (request) => {
     updatedBy: actorId,
   });
   await audit(actorId, 'update-venue', reference.id);
+  await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
@@ -660,6 +720,9 @@ export const mergeVenues = onCall(callableOptions, async (request) => {
     source.update({ status: 'merged', mergedInto: target.id, reviewCount: 0, updatedAt: FieldValue.serverTimestamp(), updatedBy: actorId }),
     movedReviews > 0 ? target.update({ reviewCount: FieldValue.increment(movedReviews), updatedAt: FieldValue.serverTimestamp() }) : Promise.resolve(),
   ]);
+  // Authors of the moved reviews now contribute to the target venue's reward
+  // progress. Mark their materialized reward state stale before returning.
+  if (movedReviews > 0) await invalidateVenueRewardProgress(target.id);
   await audit(actorId, 'merge-venues', source.id, { targetVenueId: target.id, movedReviews });
   return { id: source.id, targetVenueId: target.id, movedReviews };
 });

@@ -266,6 +266,13 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "comments",
+      "fieldPath": "replyDeletionPending",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "savedVenues",
       "fieldPath": "venueId",
       "indexes": [
@@ -292,6 +299,12 @@
     },
     {
       "collectionGroup": "_idempotency",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "_reviewEffectEvents",
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []

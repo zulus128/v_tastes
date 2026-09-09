@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -32,8 +31,10 @@ import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
-import { useTastesApi } from '../../session/SessionProvider';
+import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 type AiTurn = {
   id: string;
@@ -84,13 +85,13 @@ function AiMark({ color }: { color?: string } = {}) {
   const { colors } = useAppTheme();
   return (
     <View style={markStyles.container}>
-      <AiMouthPink height={10} style={markStyles.pink} width={13} />
-      <AiMouthOutline color={color ?? colors.text} height={13} style={markStyles.outline} width={18} />
+      <AiMouthPink height={responsiveSize(10)} style={markStyles.pink} width={responsiveSize(13)} />
+      <AiMouthOutline color={color ?? colors.text} height={responsiveSize(13)} style={markStyles.outline} width={responsiveSize(18)} />
     </View>
   );
 }
 
-const markStyles = StyleSheet.create({
+const markStyles = responsiveStyleSheet({
   container: { width: 20, height: 18 },
   pink: { position: 'absolute', top: 6, left: 4 },
   outline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
@@ -106,12 +107,11 @@ export function TastesAIScreen({
   userId: string;
 }) {
   const api = useTastesApi();
+  const visualAudit = useIsVisualAudit();
+  const historyKey = visualAudit ? `${HISTORY_KEY}:visual-audit` : HISTORY_KEY;
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => createStyles(colors, insets.top, insets.bottom),
-    [colors, insets.bottom, insets.top],
-  );
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [text, setText] = useState('');
   const [conversation, setConversation] = useState<AiConversation | null>(null);
   const [history, setHistory] = useState<AiConversation[]>([]);
@@ -129,7 +129,7 @@ export function TastesAIScreen({
   const [lastPrompt, setLastPrompt] = useState('');
 
   useEffect(() => {
-    void AsyncStorage.getItem(HISTORY_KEY)
+    void AsyncStorage.getItem(historyKey)
       .then((raw) => {
         if (!raw) return;
         try {
@@ -145,7 +145,7 @@ export function TastesAIScreen({
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, []);
+  }, [historyKey]);
 
   function showToast(message: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -201,7 +201,7 @@ export function TastesAIScreen({
         ...history.filter((item) => item.id !== nextConversation.id),
       ].slice(0, 30);
       setHistory(nextHistory);
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
+      await AsyncStorage.setItem(historyKey, JSON.stringify(nextHistory));
     } catch (error) {
       if (currentRequest !== requestId.current) return;
       const code = (error as { code?: string }).code ?? '';
@@ -212,7 +212,7 @@ export function TastesAIScreen({
   }
 
   async function clearHistory() {
-    await AsyncStorage.removeItem(HISTORY_KEY);
+    await AsyncStorage.removeItem(historyKey);
     setHistory([]);
     setConversation(null);
   }
@@ -220,7 +220,7 @@ export function TastesAIScreen({
     const next = history.filter((item) => item.id !== id);
     setHistory(next);
     if (conversation?.id === id) setConversation(null);
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(historyKey, JSON.stringify(next));
   }
   async function enableLocation() {
     const permission = await Location.requestForegroundPermissionsAsync();
@@ -248,7 +248,7 @@ export function TastesAIScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.screen}
       >
-        <View style={styles.header}>
+          <View style={[styles.header, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
           <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.headerAction}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
@@ -271,9 +271,9 @@ export function TastesAIScreen({
           <View style={styles.errorPanel}>
             <View style={styles.errorContent}>
               {failure === 'location' ? (
-                <LocationOffIcon color={colors.text} height={62} width={52} />
+                <LocationOffIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(52)} />
               ) : (
-                <OfflineIcon color={colors.text} height={62} width={62} />
+                <OfflineIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(62)} />
               )}
               <Text style={styles.errorTitle}>
                 {failure === 'location' ? 'Location is off' : "You're offline"}
@@ -353,7 +353,7 @@ export function TastesAIScreen({
         )}
 
         {toast ? (
-          <View style={styles.toast}>
+          <View style={[styles.toast, { bottom: responsiveSize(82) + insets.bottom }]}>
             <Text style={styles.toastText}>✓ {toast}</Text>
           </View>
         ) : null}
@@ -381,7 +381,7 @@ export function TastesAIScreen({
             </View>
           </View>
         ) : null}
-        <View style={styles.composer}>
+        <View style={[styles.composer, { minHeight: responsiveSize(isDark ? 64 : 55) + insets.bottom, paddingBottom: Math.max(responsiveSize(10), insets.bottom) }]}>
           <TextInput
             editable={!asking}
             maxLength={500}
@@ -406,7 +406,7 @@ export function TastesAIScreen({
             }
             style={[styles.send, !asking && !text.trim() && styles.sendDisabled]}
           >
-            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={16.667} width={16.667} />}
+            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -579,11 +579,11 @@ function PlaceCard({
           style={styles.bookmark}
         >
           {isDark ? (
-            <BookmarkIcon height={20} width={18} />
+            <BookmarkIcon height={responsiveSize(20)} width={responsiveSize(18)} />
           ) : (
             <View style={styles.bookmarkOutline}>
-              <BookmarkOutline height={17} width={15} />
-              <BookmarkOutlineLine height={1.2} style={styles.bookmarkOutlineLine} width={6} />
+              <BookmarkOutline height={responsiveSize(17)} width={responsiveSize(15)} />
+              <BookmarkOutlineLine height={responsiveSize(1.2)} style={styles.bookmarkOutlineLine} width={responsiveSize(6)} />
             </View>
           )}
         </Pressable>
@@ -630,6 +630,7 @@ function HistoryModal({
   styles: ReturnType<typeof createStyles>;
   visible: boolean;
 }) {
+  const insets = useSafeAreaInsets();
   const [clearConfirm, setClearConfirm] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   return (
@@ -644,8 +645,8 @@ function HistoryModal({
         <View pointerEvents="none" style={styles.historyGlow}>
           <Image source={bottomGlow} style={styles.historyGlowImage} />
         </View>
-        <View pointerEvents="none" style={styles.historyPanel} />
-        <View style={styles.historyHeader}>
+        <View pointerEvents="none" style={[styles.historyPanel, { top: responsiveSize(66) + insets.top }]} />
+        <View style={[styles.historyHeader, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
           <Pressable accessibilityLabel="Back" onPress={onClose} style={styles.historyButton}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
@@ -688,7 +689,7 @@ function HistoryModal({
               <Text style={styles.newChatText}>New chat</Text>
             </Pressable>
             <Text style={styles.historySectionTitle}>RECENT</Text>
-            <ScrollView contentContainerStyle={styles.historyList}>
+            <ScrollView contentContainerStyle={[styles.historyList, { paddingBottom: responsiveSize(24) + insets.bottom }]}>
               {history.map((item, index) => {
                 const firstTurn = item.turns[0];
                 const latestTurn = item.turns[item.turns.length - 1];
@@ -765,9 +766,9 @@ function HistoryModal({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) {
+function createStyles(colors: ThemeColors) {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     backgroundDim: {
       position: 'absolute',
@@ -787,8 +788,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     },
     bottomGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
     header: {
-      height: safeTop + 66,
-      paddingTop: safeTop + 6,
+      height: 66,
+      paddingTop: 6,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',
@@ -1156,10 +1157,10 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       textAlign: 'center',
     },
     composer: {
-      minHeight: (isDark ? 64 : 55) + safeBottom,
+      minHeight: isDark ? 64 : 55,
       paddingHorizontal: 16,
       paddingTop: isDark ? 10 : 16,
-      paddingBottom: Math.max(10, safeBottom),
+      paddingBottom: 10,
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
@@ -1191,7 +1192,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       position: 'absolute',
       left: 90,
       right: 90,
-      bottom: 82 + safeBottom,
+      bottom: 82,
       padding: 12,
       borderRadius: 21,
       alignItems: 'center',
@@ -1218,7 +1219,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
     historyGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
     historyPanel: {
       position: 'absolute',
-      top: safeTop + 66,
+      top: 66,
       right: 0,
       bottom: 0,
       left: 0,
@@ -1227,8 +1228,8 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       backgroundColor: isDark ? 'rgba(8,8,8,0.24)' : colors.canvas,
     },
     historyHeader: {
-      height: safeTop + 66,
-      paddingTop: safeTop + 6,
+      height: 66,
+      paddingTop: 6,
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',
@@ -1317,7 +1318,7 @@ function createStyles(colors: ThemeColors, safeTop: number, safeBottom: number) 
       marginTop: 25,
       marginLeft: 0,
     },
-    historyList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 + safeBottom },
+    historyList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
     historyRow: {
       minHeight: 66,
       paddingVertical: 14,

@@ -1,7 +1,6 @@
 import type { Comment, CommentReview, ReportReason } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Clipboard from 'expo-clipboard';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +9,6 @@ import {
   Image,
   KeyboardAvoidingView,
   type LayoutChangeEvent,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -21,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
-import { storage } from '../../infrastructure/firebase';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -33,6 +31,8 @@ import SendIcon from '../../../assets/ai/send.svg';
 import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/components';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 
@@ -57,11 +57,15 @@ function commentShareUrl(reviewId: string, commentId: string) {
   return `https://tastesapp.com/reviews/${encodeURIComponent(reviewId)}/comments?commentId=${encodeURIComponent(commentId)}`;
 }
 
-function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof createStyles> }) {
-  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+function DishPhoto({ path, styles, url }: { path?: string; styles: ReturnType<typeof createStyles>; url?: string }) {
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ uri: url, failed: false });
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
   useEffect(() => {
     let active = true;
+    if (url) {
+      setState({ uri: url, failed: false });
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setState({ failed: true });
       return () => { active = false; };
@@ -69,9 +73,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
 
     let download: Promise<string>;
     try {
-      const photoRef = storageRef(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-comments-review-photo', path: normalizedPath });
@@ -88,7 +90,7 @@ function DishPhoto({ path, styles }: { path?: string; styles: ReturnType<typeof 
       if (active) setState({ failed: true });
     });
     return () => { active = false; };
-  }, [normalizedPath]);
+  }, [normalizedPath, url]);
   if (state.uri) return <Image resizeMode="contain" source={{ uri: state.uri }} style={styles.dishImage} />;
   return <View style={styles.dishImageFallback}>{state.failed ? <Text style={styles.dishImageFallbackText}>Photo unavailable</Text> : <ActivityIndicator color="#fff" />}</View>;
 }
@@ -118,23 +120,23 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     </View>
     <View style={styles.reviewBody}>
       <View style={styles.reviewVenueRow}><View style={styles.reviewVenueCopy}><Text style={styles.reviewVenue}>{review.venueName}</Text><RatingStars rating={review.rating} styles={styles} /></View>{review.tags[0] ? <Text style={styles.reviewTag}>{tagLabels[review.tags[0]] ?? review.tags[0]}</Text> : null}</View>
-      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
+      {review.dishReviews.length > 0 ? <View><FlatList contentContainerStyle={styles.dishes} data={review.dishReviews} horizontal keyExtractor={(dish) => dish.id} renderItem={({ item: dish }) => <Pressable onPress={() => setSelectedDish(dish)} style={styles.dishCard}><DishPhoto path={dish.photoPath} styles={styles} url={dish.photoUrl} /><View style={styles.dishShade} /><Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></Pressable>} showsHorizontalScrollIndicator={false} /></View> : null}
       <Text style={styles.reviewText}>{review.text}</Text>
-      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={20} width={20} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={20} width={20} /></Pressable></View>
+      <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
     </View>
     <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
         <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
         <View style={styles.dishModal}>
           <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
-          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
         </View>
       </View>
     </Modal>
   </View>;
 }
 
-function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { count: number; hidden: boolean; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
+function CommentRow({ item, nested = false, highlighted = false, onDelete, onReact, onReply, onReport, repliesToggle, onLayout }: { item: Comment; nested?: boolean; highlighted?: boolean; onDelete?: () => void; onReact: () => void; onReply: () => void; onReport: () => void; repliesToggle?: { loaded: number; total: number; hidden: boolean; loading?: boolean; onLoadMore?: () => void; onToggle: () => void }; onLayout?: (event: LayoutChangeEvent) => void }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -154,15 +156,22 @@ function CommentRow({ item, nested = false, highlighted = false, onDelete, onRea
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>
           <Pressable onPress={onReact} style={styles.reactionAction}>
-            <HeartIcon color={item.reacted ? colors.primary : colors.text} height={20} width={20} />
+            <HeartIcon color={item.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
             {item.reactionCount ? <Text style={styles.reactionCount}>{item.reactionCount}</Text> : null}
           </Pressable>
-          <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={20} width={20} /><Text style={styles.action}>Reply</Text></Pressable>
+          <Pressable onPress={onReply} style={styles.actionIconRow}><ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.action}>Reply</Text></Pressable>
           {repliesToggle ? (
-            <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
-              <Text style={styles.action}>{repliesToggle.hidden ? `Show replies (${repliesToggle.count})` : 'Hide replies'}</Text>
-              <CaretDownIcon color={colors.textSecondary} height={14} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={14} />
-            </Pressable>
+            <>
+              <Pressable onPress={repliesToggle.onToggle} style={styles.actionIconRow}>
+                <Text style={styles.action}>{repliesToggle.hidden
+                  ? `Show latest replies (${repliesToggle.loaded}${repliesToggle.total > repliesToggle.loaded ? ` of ${repliesToggle.total}` : ''})`
+                  : 'Hide replies'}</Text>
+                <CaretDownIcon color={colors.textSecondary} height={responsiveSize(14)} style={repliesToggle.hidden ? undefined : styles.caretFlipped} width={responsiveSize(14)} />
+              </Pressable>
+              {!repliesToggle.hidden && repliesToggle.onLoadMore ? <Pressable disabled={repliesToggle.loading} onPress={repliesToggle.onLoadMore} style={styles.actionIconRow}>
+                <Text style={styles.action}>{repliesToggle.loading ? 'Loading replies…' : `Show ${repliesToggle.total - repliesToggle.loaded} more replies`}</Text>
+              </Pressable> : null}
+            </>
           ) : null}
         </View>
       </View>
@@ -176,6 +185,12 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+  const connectorX = responsiveSize(36);
+  const connectorArmX = responsiveSize(63);
+  const connectorReplyCenter = responsiveSize(32);
+  const connectorStartY = responsiveSize(52);
+  const connectorStroke = responsiveSize(2);
+  const connectorDash = `${responsiveSize(2)},${responsiveSize(4)}`;
   const [text, setText] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('comment'));
   const [reportCommentId, setReportCommentId] = useState<string | null>(null);
@@ -185,6 +200,10 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const [reportSent, setReportSent] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
+  const [extraReplies, setExtraReplies] = useState<Record<string, { items: Comment[]; nextCursor: string | null | undefined }>>({});
+  const [deepLinkedItems, setDeepLinkedItems] = useState<Comment[]>([]);
+  const [deepLinkRevision, setDeepLinkRevision] = useState(0);
+  const [loadingReplyIds, setLoadingReplyIds] = useState<Set<string>>(new Set());
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
   const listRef = useRef<FlatList<Comment> | null>(null);
@@ -192,7 +211,8 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const mutation = useAddComment(reviewId);
   const reaction = useReactToComment(reviewId);
   const deletion = useDeleteComment(reviewId);
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const pageItems = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = [...new Map([...deepLinkedItems, ...pageItems].map((item) => [item.id, item])).values()];
   const review = query.data?.pages[0]?.review;
   const rootItems = items.filter((item) => !item.parentCommentId);
   const repliesByParent = new Map<string, Comment[]>();
@@ -201,6 +221,61 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
     replies.push(item);
     repliesByParent.set(item.parentCommentId!, replies);
   });
+
+  // These pages live outside React Query only while this screen is mounted.
+  // A refetch after a reaction or deletion must drop stale reply copies.
+  useEffect(() => {
+    setExtraReplies({});
+  }, [query.dataUpdatedAt]);
+
+  useEffect(() => {
+    if (!commentId) {
+      setDeepLinkedItems([]);
+      return undefined;
+    }
+    let active = true;
+    void api.getCommentContext({ reviewId, commentId })
+      .then((response) => { if (active) setDeepLinkedItems(response.data.items); })
+      .catch(() => { if (active) setDeepLinkedItems([]); });
+    return () => { active = false; };
+  }, [api, commentId, deepLinkRevision, reviewId]);
+
+  function refreshDeepLinkContext() {
+    setExtraReplies({});
+    setDeepLinkRevision((revision) => revision + 1);
+  }
+
+  async function loadMoreReplies(parentCommentId: string) {
+    if (loadingReplyIds.has(parentCommentId)) return;
+    setLoadingReplyIds((current) => new Set(current).add(parentCommentId));
+    try {
+      const response = await api.getCommentReplies({
+        reviewId,
+        parentCommentId,
+        cursor: extraReplies[parentCommentId]?.nextCursor ?? null,
+        limit: 20,
+      });
+      setExtraReplies((current) => {
+        const previous = current[parentCommentId]?.items ?? [];
+        const byId = new Map([...previous, ...response.data.items].map((item) => [item.id, item]));
+        return {
+          ...current,
+          [parentCommentId]: {
+            items: [...byId.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+            nextCursor: response.data.nextCursor,
+          },
+        };
+      });
+    } catch (error) {
+      Alert.alert('Could not load replies', apiErrorMessage(error));
+    } finally {
+      setLoadingReplyIds((current) => {
+        const next = new Set(current);
+        next.delete(parentCommentId);
+        return next;
+      });
+    }
+  }
   const targetRootIndex = commentId
     ? rootItems.findIndex((item) => item.id === commentId || items.some((candidate) => candidate.id === commentId && candidate.parentCommentId === item.id))
     : -1;
@@ -284,20 +359,23 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             windowSize={7}
             refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.primary} />}
             renderItem={({ item }) => {
-              const replies = repliesByParent.get(item.id) ?? [];
+              const previewReplies = repliesByParent.get(item.id) ?? [];
+              const additionalReplies = extraReplies[item.id]?.items ?? [];
+              const replies = [...new Map([...additionalReplies, ...previewReplies].map((reply) => [reply.id, reply])).values()]
+                .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
               const hidden = hiddenReplies.has(item.id);
               const showError = (error: Error) => Alert.alert('Could not update comment', apiErrorMessage(error));
               const toggleReplies = () => setHiddenReplies((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; });
               return <View style={styles.thread}>
-                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={replies.length > 0 ? { count: replies.length, hidden, onToggle: toggleReplies } : undefined} />
-                {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
+                <CommentRow highlighted={commentId === item.id} item={item} onDelete={item.authorId === currentUserId ? () => deletion.mutate(item.id, { onError: showError, onSuccess: refreshDeepLinkContext }) : undefined} onReact={() => reaction.mutate({ commentId: item.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError, onSuccess: refreshDeepLinkContext })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(item.id)} repliesToggle={item.replyCount > 0 ? { loaded: replies.length, total: item.replyCount, hidden, loading: loadingReplyIds.has(item.id), onLoadMore: replies.length < item.replyCount && extraReplies[item.id]?.nextCursor !== null ? () => void loadMoreReplies(item.id) : undefined, onToggle: toggleReplies } : undefined} />
+                {!hidden ? replies.map((reply) => <CommentRow highlighted={commentId === reply.id} key={reply.id} item={reply} nested onDelete={reply.authorId === currentUserId ? () => deletion.mutate(reply.id, { onError: showError, onSuccess: refreshDeepLinkContext }) : undefined} onReact={() => reaction.mutate({ commentId: reply.id, idempotencyKey: createIdempotencyKey('comment-reaction') }, { onError: showError, onSuccess: refreshDeepLinkContext })} onReply={() => setReplyTarget(item)} onReport={() => setReportCommentId(reply.id)} onLayout={(event) => {
                   const nextOffset = event.nativeEvent.layout.y;
                   setReplyOffsets((current) => current[reply.id] === nextOffset ? current : { ...current, [reply.id]: nextOffset });
                 }} />) : null}
                 {!hidden && replies.length > 0 ? (
                   <Svg height="100%" pointerEvents="none" style={styles.threadConnector} width="100%">
-                    {replies.map((reply) => replyOffsets[reply.id] == null ? null : <Line key={reply.id} stroke={connectorColor} strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={63} y1={replyOffsets[reply.id] + 32} y2={replyOffsets[reply.id] + 32} />)}
-                    {Object.keys(replyOffsets).some((replyId) => replies.some((reply) => reply.id === replyId)) ? <Line stroke={connectorColor} strokeDasharray="2,4" strokeLinecap="round" strokeWidth={2} x1={36} x2={36} y1={52} y2={Math.max(...replies.map((reply) => replyOffsets[reply.id] == null ? 52 : replyOffsets[reply.id] + 32))} /> : null}
+                    {replies.map((reply) => replyOffsets[reply.id] == null ? null : <Line key={reply.id} stroke={connectorColor} strokeDasharray={connectorDash} strokeLinecap="round" strokeWidth={connectorStroke} x1={connectorX} x2={connectorArmX} y1={replyOffsets[reply.id] + connectorReplyCenter} y2={replyOffsets[reply.id] + connectorReplyCenter} />)}
+                    {Object.keys(replyOffsets).some((replyId) => replies.some((reply) => reply.id === replyId)) ? <Line stroke={connectorColor} strokeDasharray={connectorDash} strokeLinecap="round" strokeWidth={connectorStroke} x1={connectorX} x2={connectorX} y1={connectorStartY} y2={Math.max(...replies.map((reply) => replyOffsets[reply.id] == null ? connectorStartY : replyOffsets[reply.id] + connectorReplyCenter))} /> : null}
                   </Svg>
                 ) : null}
               </View>;
@@ -320,7 +398,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             value={text}
           />
           <Pressable accessibilityLabel="Send comment" disabled={!text.trim() || mutation.isPending} onPress={() => void submit()} style={styles.send}>
-            <SendIcon height={20} width={20} />
+            <SendIcon height={responsiveSize(20)} width={responsiveSize(20)} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -330,7 +408,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   keyboardAvoiding: { flex: 1 },
   header: { height: 102, paddingTop: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background },
   back: { width: 52, height: 48, alignItems: 'center', justifyContent: 'center' },

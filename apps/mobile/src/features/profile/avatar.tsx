@@ -1,6 +1,7 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Image, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { responsiveStyleSheet } from '../../ui/responsive';
 import type { ProfileData } from './api';
 
 export function ProfileAvatar({ profile, style }: {
@@ -29,7 +30,7 @@ export function UserAvatar({ displayName, photoUrl, style }: {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   frame: {
     alignItems: 'center',
     justifyContent: 'center',

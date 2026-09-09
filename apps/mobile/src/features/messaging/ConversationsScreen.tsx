@@ -11,7 +11,6 @@ import {
   ImageBackground,
   PanResponder,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -21,6 +20,7 @@ import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-patt
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
@@ -59,25 +59,28 @@ function ConversationRow({
       : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
   const translateX = useMemo(() => new Animated.Value(0), []);
+  const deleteActionWidth = responsiveSize(82);
+  const deleteThreshold = responsiveSize(64);
+  const swipeStartThreshold = responsiveSize(8);
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+      gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy)
     ),
     onPanResponderMove: (_, gesture) => {
-      translateX.setValue(Math.max(-82, Math.min(0, gesture.dx)));
+      translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx)));
     },
     onPanResponderRelease: (_, gesture) => {
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
       }).start(() => {
-        if (gesture.dx < -64 && !deleting) onDelete();
+        if (gesture.dx < -deleteThreshold && !deleting) onDelete();
       });
     },
     onPanResponderTerminate: () => {
       Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
     },
-  }), [deleting, onDelete, translateX]);
+  }), [deleteActionWidth, deleteThreshold, deleting, onDelete, swipeStartThreshold, translateX]);
   return (
     <View style={styles.swipeRow}>
       <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
@@ -131,7 +134,7 @@ export function ConversationsScreen({
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
@@ -201,7 +204,7 @@ export function ConversationsScreen({
 
   return (
     <Screen style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
           <View style={styles.headerButton} />
           <Text style={styles.title}>Dialog</Text>
@@ -252,7 +255,7 @@ export function ConversationsScreen({
                 </Text>
               </View>
             )}
-            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: 20 }} /> : null}
+            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(20) }} /> : null}
             onEndReached={() => {
               if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
             }}
@@ -282,11 +285,11 @@ export function ConversationsScreen({
   );
 }
 
-function createStyles(colors: ThemeColors, safeTop: number) {
-  return StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
-    header: { paddingTop: safeTop, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
+    header: { paddingTop: 0, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
     title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
     headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

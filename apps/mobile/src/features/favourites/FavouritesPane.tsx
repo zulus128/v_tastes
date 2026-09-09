@@ -7,12 +7,10 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   PanResponder,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -28,6 +26,8 @@ import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { matchesPlaceFilters } from '../discover/placeFilters';
 import {
   useCreateFolder,
@@ -101,7 +101,7 @@ export function FavouritesPane({
     <View style={styles.pane}>
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <SearchIcon color={colors.textMuted} height={24} width={24} />
+          <SearchIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search"
@@ -110,7 +110,7 @@ export function FavouritesPane({
             value={query}
           />
           <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters}>
-            <SearchTuneIcon color={colors.textMuted} height={24} width={24} />
+            <SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
           </Pressable>
         </View>
       </View>
@@ -158,29 +158,21 @@ export function FavouritesPane({
         <EmptyState folderName={selectedFolder?.name} query={normalizedQuery} styles={styles} />
       ) : null}
       {favourites.isSuccess && places.length > 0 ? (
-        <ScrollView
-            contentContainerStyle={styles.placeList}
-            nestedScrollEnabled
-            onScroll={({ nativeEvent }) => {
-              const nearEnd = nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y
-                >= nativeEvent.contentSize.height - 120;
-              if (nearEnd && favourites.hasNextPage && !favourites.isFetchingNextPage) void favourites.fetchNextPage();
-            }}
-            scrollEventThrottle={120}
-            showsVerticalScrollIndicator={false}
-          >
-            {places.map((place, index) => (
-              <FavouriteCard
-                index={index}
-                key={place.venueId}
-                onOpen={() => onOpenPlace(place.venueId)}
-                onUnsave={() => unsaveVenue.mutate(place.venueId)}
-                place={place}
-                styles={styles}
-              />
-            ))}
-            {favourites.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pageLoader} /> : null}
-        </ScrollView>
+        <View style={styles.placeList}>
+          {places.map((place, index) => (
+            <FavouriteCard
+              index={index}
+              key={place.venueId}
+              onOpen={() => onOpenPlace(place.venueId)}
+              onUnsave={() => unsaveVenue.mutate(place.venueId)}
+              place={place}
+              styles={styles}
+            />
+          ))}
+          {favourites.hasNextPage ? <Pressable disabled={favourites.isFetchingNextPage} onPress={() => void favourites.fetchNextPage()} style={styles.loadMoreButton}>
+            <Text style={styles.loadMoreText}>{favourites.isFetchingNextPage ? 'Loading…' : 'Load more'}</Text>
+          </Pressable> : null}
+        </View>
       ) : null}
 
       <FolderNameSheet
@@ -281,9 +273,9 @@ export function SaveToFolderSheet({
             <View style={styles.addTitleSpacer} />
           </View>
           <View style={styles.addSearch}>
-            <SearchIcon color={colors.textMuted} height={22} width={22} />
+            <SearchIcon color={colors.textMuted} height={responsiveSize(22)} width={responsiveSize(22)} />
             <TextInput onChangeText={setQuery} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={query} />
-            <SearchTuneIcon color={colors.textMuted} height={24} width={24} />
+            <SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
           </View>
         </View>
         <ScrollView contentContainerStyle={styles.selectionList} keyboardShouldPersistTaps="handled">
@@ -368,7 +360,7 @@ function FolderChip({
       onPress={onPress}
       style={[styles.folderChip, active && styles.folderChipActive]}
     >
-      <Icon color={active ? '#FFFFFF' : styles.folderChipText.color} height={14} width={14} />
+      <Icon color={active ? '#FFFFFF' : styles.folderChipText.color} height={responsiveSize(14)} width={responsiveSize(14)} />
       <Text style={[styles.folderChipText, active && styles.folderChipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -391,7 +383,7 @@ function EmptyState({
       : 'Tap the bookmark on any place to save it here.';
   return (
     <View style={styles.emptyState}>
-      <EmptyIcon color={styles.stateTitle.color} height={60} width={60} />
+      <EmptyIcon color={styles.stateTitle.color} height={responsiveSize(60)} width={responsiveSize(60)} />
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateBody}>{body}</Text>
     </View>
@@ -426,7 +418,7 @@ function FavouriteCard({
         </View>
       </Pressable>
       <Pressable accessibilityLabel={`Remove ${place.name} from favourites`} hitSlop={10} onPress={onUnsave} style={styles.cardBookmark}>
-        <BookmarkIcon color={styles.cardTitle.color} height={20} width={20} />
+        <BookmarkIcon color={styles.cardTitle.color} height={responsiveSize(20)} width={responsiveSize(20)} />
       </Pressable>
       <View style={styles.metaRow}>
         <Text style={styles.metaPill}>{place.category}</Text>
@@ -450,21 +442,24 @@ function FolderSelectionRow({
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
+  const deleteActionWidth = responsiveSize(60);
+  const deleteThreshold = responsiveSize(36);
+  const swipeStartThreshold = responsiveSize(8);
   const translateX = useMemo(() => new Animated.Value(0), []);
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Boolean(onDelete) && gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-    onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(-60, Math.min(0, gesture.dx))),
+    onMoveShouldSetPanResponder: (_, gesture) => Boolean(onDelete) && gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx))),
     onPanResponderRelease: (_, gesture) => {
-      Animated.spring(translateX, { toValue: gesture.dx < -36 ? -60 : 0, useNativeDriver: true }).start();
+      Animated.spring(translateX, { toValue: gesture.dx < -deleteThreshold ? -deleteActionWidth : 0, useNativeDriver: true }).start();
     },
     onPanResponderTerminate: () => Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(),
-  }), [onDelete, translateX]);
+  }), [deleteActionWidth, deleteThreshold, onDelete, swipeStartThreshold, translateX]);
   return (
     <View style={styles.selectionSwipe}>
       {onDelete ? <Pressable accessibilityLabel={`Delete ${label}`} onPress={onDelete} style={styles.selectionDeleteAction}><Image source={trashIcon} style={styles.selectionDelete} /></Pressable> : null}
       <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }] }}>
         <Pressable onPress={() => { if ((translateX as unknown as { _value: number })._value < 0) Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(); else onPress(); }} style={styles.selectionRow}>
-          <View style={styles.selectionName}><FolderIcon color={styles.selectionLabel.color} height={20} width={20} /><Text style={styles.selectionLabel}>{label}</Text></View>
+          <View style={styles.selectionName}><FolderIcon color={styles.selectionLabel.color} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.selectionLabel}>{label}</Text></View>
           <View style={[styles.radioCircle, checked && styles.radioCircleChecked]}>
             {checked ? <Text style={styles.checkmark}>✓</Text> : null}
           </View>
@@ -573,8 +568,10 @@ function FolderActionSheet({
 
 function createStyles(colors: ThemeColors) {
   const isDark = colors.background === '#080808';
-  return StyleSheet.create({
-    pane: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
+  return responsiveStyleSheet({
+    // This pane is also rendered inside ProfileScreen's outer ScrollView.
+    // Let its cards participate in that scroll view's measured content height.
+    pane: { backgroundColor: colors.canvas },
     searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
     searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
@@ -585,7 +582,8 @@ function createStyles(colors: ThemeColors) {
     folderChipText: { color: isDark ? colors.textMuted : '#677083', fontSize: 12 },
     folderChipTextActive: { color: '#FFFFFF' },
     placeList: { paddingBottom: 32 },
-    pageLoader: { paddingVertical: 20 },
+    loadMoreButton: { alignSelf: 'center', paddingVertical: 20 },
+    loadMoreText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
     placeCard: { minHeight: 188, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
     cardImageWrap: { width: 122, height: 122, borderRadius: 12, overflow: 'hidden' },
     cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },

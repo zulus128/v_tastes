@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import FriendsEmptyIcon from '../../../assets/figma-icons/home-empty-friends.svg';
 import LocalEmptyIcon from '../../../assets/figma-icons/home-empty-local.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 type FeedScope = 'friends' | 'local';
 
@@ -29,7 +30,7 @@ export function HomeFeedEmptyState({
   return (
     <View style={styles.centeredState}>
       <View style={[styles.stateContent, styles.emptyStateOffset]}>
-        <Icon color={colors.text} width={60} height={60} />
+        <Icon color={colors.text} width={responsiveSize(60)} height={responsiveSize(60)} />
         <Text style={styles.title}>
           {friends ? 'Your feed is quiet' : 'No posts in your city yet'}
         </Text>
@@ -59,7 +60,7 @@ export function HomeFeedOfflineState({ onRetry }: { onRetry: () => void }) {
       <View style={styles.centeredState}>
       <View style={styles.stateContent}>
         <View style={styles.offlineIcon}>
-          <OfflineIcon color={colors.text} width={53.75} height={53.75} />
+          <OfflineIcon color={colors.text} width={responsiveSize(53.75)} height={responsiveSize(53.75)} />
         </View>
         <Text style={styles.title}>No connection</Text>
         <Text style={styles.body}>Check your internet connection and try again.</Text>
@@ -107,7 +108,7 @@ export function HomeFeedLoadingState() {
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   centeredState: {
     flex: 1,
     alignItems: 'center',

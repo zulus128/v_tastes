@@ -1,5 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef, type PropsWithChildren } from 'react';
-import { Animated, Dimensions, Modal, StyleSheet } from 'react-native';
+import { Animated } from 'react-native';
+import { ResponsiveModal as Modal } from './ResponsiveModal';
+import { responsiveStyleSheet, useResponsiveViewport } from './responsive';
 
 export interface SideSlideScreenHandle {
   close: (afterClose?: () => void) => void;
@@ -10,7 +12,8 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
   onRequestClose,
   visible,
 }, ref) {
-  const translateX = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const { width: frameWidth } = useResponsiveViewport();
+  const translateX = useRef(new Animated.Value(frameWidth)).current;
   const closing = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const afterClose = useRef<(() => void) | undefined>(undefined);
@@ -35,10 +38,10 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
     closeTimer.current = setTimeout(finishClose, 300);
     Animated.timing(translateX, {
       duration: 240,
-      toValue: Dimensions.get('window').width,
+      toValue: frameWidth,
       useNativeDriver: true,
     }).start(finishClose);
-  }, [finishClose, translateX]);
+  }, [finishClose, frameWidth, translateX]);
 
   useImperativeHandle(ref, () => ({ close }), [close]);
 
@@ -48,12 +51,12 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
       if (closeTimer.current) clearTimeout(closeTimer.current);
       closeTimer.current = null;
       afterClose.current = undefined;
-      translateX.setValue(Dimensions.get('window').width);
+      translateX.setValue(frameWidth);
       return;
     }
     closing.current = false;
     translateX.stopAnimation();
-    translateX.setValue(Dimensions.get('window').width);
+    translateX.setValue(frameWidth);
     const animation = Animated.timing(translateX, {
       duration: 280,
       toValue: 0,
@@ -65,7 +68,7 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
       if (closeTimer.current) clearTimeout(closeTimer.current);
       closeTimer.current = null;
     };
-  }, [translateX, visible]);
+  }, [frameWidth, translateX, visible]);
 
   return (
     <Modal animationType="none" onRequestClose={() => close()} presentationStyle="overFullScreen" transparent visible={visible}>
@@ -76,4 +79,4 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
   );
 });
 
-const styles = StyleSheet.create({ screen: { flex: 1 } });
+const styles = responsiveStyleSheet({ screen: { flex: 1 } });

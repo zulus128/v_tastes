@@ -1,5 +1,5 @@
 import { createUserProfileInputSchema, type CompleteOnboardingInput } from '@tastes/contracts';
-import { apiErrorMessage, createTastesApi } from '@tastes/firebase-client';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -20,7 +19,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -66,14 +64,17 @@ import styleDark from '../../../assets/onboarding/style-dark.png';
 import styleLight from '../../../assets/onboarding/style-light.png';
 import styleSelected from '../../../assets/onboarding/style-selected.png';
 import styleUnselected from '../../../assets/onboarding/style-unselected.png';
-import { auth, functions, storage } from '../../infrastructure/firebase';
+import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
+import { useTastesApi } from '../../session/SessionProvider';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 
-type Screen =
+export type PostSignupScreen =
   | 'profile'
   | 'city'
   | 'dish'
@@ -88,8 +89,10 @@ type Screen =
   | 'ready';
 
 interface PostSignupOnboardingFlowProps {
+  initialScreen?: PostSignupScreen;
   onAuthenticationRequired: () => Promise<void>;
   onComplete: (input?: Partial<Omit<CompleteOnboardingInput, 'version'>>) => Promise<void>;
+  visualAudit?: boolean;
 }
 
 function suggestedUsername(displayName: string | null | undefined, email: string | null | undefined): string {
@@ -207,25 +210,24 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
 }
 
 export function PostSignupOnboardingFlow({
+  initialScreen,
   onAuthenticationRequired,
   onComplete,
+  visualAudit = false,
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
-  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const { height: viewportHeight, width: viewportWidth } = useResponsiveViewport();
+  const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
-  const collageWidth = Math.max(0, Math.min(402, viewportWidth));
-  const collageScale = collageWidth / 402;
-  const collageHeight = 288 * collageScale;
+  const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));
+  const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
-  const dishGap = usesCompactDishLayout ? 5 : 8;
-  const dishPanelHeight = viewportHeight - (usesCompactDishLayout ? 205 : 212) - (usesCompactDishLayout ? 105 : 110);
-  const dishPillHeight = Math.max(30, Math.min(45, Math.floor((dishPanelHeight - 8 - dishGap * (dishes.length - 1)) / dishes.length)));
   const usesNarrowPlaceLayout = viewportWidth < 360;
-  const api = useMemo(() => createTastesApi(functions), []);
-  const [screen, setScreen] = useState<Screen>('profile');
-  const [history, setHistory] = useState<Screen[]>([]);
-  const [displayName, setDisplayName] = useState(() => auth.currentUser?.displayName?.trim() ?? '');
-  const [username, setUsername] = useState(() => suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
+  const api = useTastesApi();
+  const [screen, setScreen] = useState<PostSignupScreen>(initialScreen ?? 'profile');
+  const [history, setHistory] = useState<PostSignupScreen[]>([]);
+  const [displayName, setDisplayName] = useState(() => visualAudit ? 'Alex Morgan' : auth.currentUser?.displayName?.trim() ?? '');
+  const [username, setUsername] = useState(() => visualAudit ? 'alex.morgan' : suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
   const [city, setCity] = useState('London');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -237,10 +239,18 @@ export function PostSignupOnboardingFlow({
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
-  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>([]);
+  const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>(() => visualAudit ? [
+    { id: 'gemini', name: 'Gemini', address: '38 Beauchamp Place, London', image: placeGeminiPopular, rating: '4.8', reviews: '243 reviews', popular: true, category: 'Restaurant', price: '$$$', distance: '0.4 km' },
+    { id: 'wasabi', name: 'Wasabi', address: '19 Kensington High St, London', image: placeWasabi, rating: '4.6', reviews: '187 reviews', popular: true, category: 'Japanese', price: '$$', distance: '0.7 km' },
+    { id: 'terrace', name: 'The Terrace', address: '11 Motcomb Street, London', image: placeGemini, rating: '4.5', reviews: '128 reviews', popular: false, category: 'Cafe', price: '$$', distance: '1.1 km' },
+  ] : []);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
-  const [contacts, setContacts] = useState<ContactCandidate[]>([]);
+  const [contacts, setContacts] = useState<ContactCandidate[]>(() => visualAudit ? [
+    { id: 'contact-1', name: 'Maya Thompson', handle: '@mayat', phoneNumber: null, invited: false, userId: 'maya', following: false },
+    { id: 'contact-2', name: 'Oliver Smith', handle: '@olivers', phoneNumber: null, invited: true, userId: 'oliver', following: true },
+    { id: 'contact-3', name: 'Sofia Rossi', handle: '+44 7700 900123', phoneNumber: '+447700900123', invited: false },
+  ] : []);
   const [busy, setBusy] = useState(false);
 
   function togglePlaceFilter(label: string) {
@@ -252,7 +262,7 @@ export function PostSignupOnboardingFlow({
     });
   }
 
-  function navigate(next: Screen) {
+  function navigate(next: PostSignupScreen) {
     setHistory((items) => [...items, screen]);
     setScreen(next);
   }
@@ -266,6 +276,7 @@ export function PostSignupOnboardingFlow({
 
   async function choosePhoto(camera: boolean) {
     setPhotoSheet(false);
+    if (visualAudit) return;
     const permission = camera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -297,7 +308,7 @@ export function PostSignupOnboardingFlow({
     setBusy(true);
     try {
       let photoPath: string | undefined;
-      if (photoUri && auth.currentUser) {
+      if (!visualAudit && photoUri && auth.currentUser) {
         photoPath = `profile-images/${auth.currentUser.uid}/avatar.jpg`;
         const response = await fetch(photoUri);
         const blob = await response.blob();
@@ -320,6 +331,12 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestLocation() {
+    if (visualAudit) {
+      setCity('London');
+      setCityFlag(flagUk);
+      enterPlaces();
+      return;
+    }
     const result = await Location.requestForegroundPermissionsAsync();
     if (!result.granted) {
       navigate('locationDenied');
@@ -341,6 +358,11 @@ export function PostSignupOnboardingFlow({
 
   function enterPlaces() {
     navigate('place');
+    if (visualAudit) {
+      setPlaceLoading(false);
+      setPlaceError(null);
+      return;
+    }
     setPlaceLoading(true);
     setPlaceError(null);
     void api.getVenues({ limit: 20 }).then((response) => {
@@ -361,6 +383,10 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestContacts() {
+    if (visualAudit) {
+      navigate('contacts');
+      return;
+    }
     const permission = await Contacts.requestPermissionsAsync();
     if (permission.status === 'granted') {
       const result = await Contacts.getContactsAsync({ fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails] });
@@ -401,6 +427,10 @@ export function PostSignupOnboardingFlow({
   }
 
   async function requestNotifications() {
+    if (visualAudit) {
+      navigate('ready');
+      return;
+    }
     try {
       await syncPushNotifications(api, { requestPermission: true });
     } catch (error) {
@@ -411,16 +441,22 @@ export function PostSignupOnboardingFlow({
   }
 
   async function shareInvite() {
+    if (visualAudit) return;
     await Share.share({ message: 'Join me on Tastes: https://tastesapp.com/invite' });
   }
 
   async function textInvite(phoneNumber?: string | null) {
+    if (visualAudit) return;
     const message = encodeURIComponent('Join me on Tastes: https://tastesapp.com/invite');
     const separator = Platform.OS === 'ios' ? '&' : '?';
     await Linking.openURL(`sms:${phoneNumber ?? ''}${separator}body=${message}`);
   }
 
   async function inviteContact(contact: ContactCandidate) {
+    if (visualAudit) {
+      setContacts((items) => items.map((item) => item.id === contact.id ? { ...item, invited: true } : item));
+      return;
+    }
     try {
       if (contact.userId) await api.followUser({ targetUserId: contact.userId });
       else if (contact.phoneNumber) await textInvite(contact.phoneNumber);
@@ -434,7 +470,7 @@ export function PostSignupOnboardingFlow({
   async function finishOnboarding() {
     setBusy(true);
     try {
-      await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
+      if (!visualAudit) await setPreference(automatic ? 'system' : (darkMode ? 'dark' : 'light'));
       await onComplete(buildCompletionInput({
         dish,
         place,
@@ -506,16 +542,14 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
-      <View
-        style={[
-          styles.pillsPanel,
-          usesCompactDishLayout && styles.pillsPanelCompact,
-          styles.pills,
-          { gap: dishGap },
-        ]}
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={styles.pills}
+        showsVerticalScrollIndicator={false}
+        style={[styles.pillsPanel, usesCompactDishLayout && styles.pillsPanelCompact]}
       >
-        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, { height: dishPillHeight }, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
-      </View>
+        {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
+      </ScrollView>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
     </PatternScreen>;
@@ -686,7 +720,7 @@ export function PostSignupOnboardingFlow({
   </LinearGradient>;
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   skip: { position: 'absolute', top: 58, right: 16, zIndex: 3, padding: 8 },
   skipText: { color: colors.textMuted, fontSize: 14 },
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },

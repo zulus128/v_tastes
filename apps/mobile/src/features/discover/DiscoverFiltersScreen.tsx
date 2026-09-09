@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 const CUISINES = [
   'Italian 🇮🇹',
@@ -31,7 +31,7 @@ function initialValue(values: string[], prefix: string) {
 
 function BackIcon() {
   return (
-    <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+    <Svg fill="none" height={responsiveSize(24)} viewBox="0 0 24 24" width={responsiveSize(24)}>
       <Path d="M16 19 9 12l7-7" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
     </Svg>
   );
@@ -39,7 +39,7 @@ function BackIcon() {
 
 function CheckIcon() {
   return (
-    <Svg fill="none" height={18} viewBox="0 0 20 15" width={20}>
+    <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 20 15" width={responsiveSize(20)}>
       <Path d="M19.55.44a1.5 1.5 0 0 1 0 2.12L8.307 13.804a1.6 1.6 0 0 1-2.263 0L.458 8.219A1.5 1.5 0 1 1 2.58 6.098l4.596 4.596L17.428.44a1.5 1.5 0 0 1 2.122 0Z" fill="#FFFFFF" />
     </Svg>
   );
@@ -54,12 +54,8 @@ export function DiscoverFiltersScreen({
   onApply: (values: string[]) => void;
   onBack: () => void;
 }) {
-  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => createStyles(colors, insets.top, insets.bottom),
-    [colors, insets.bottom, insets.top],
-  );
+  const styles = useMemo(() => createStyles(), []);
   const [selected, setSelected] = useState(() => new Set(
     initialValues.filter((value) => !/^(OpenNow|Distance):/.test(value)),
   ));
@@ -90,7 +86,7 @@ export function DiscoverFiltersScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { height: responsiveSize(58) + insets.top, paddingTop: insets.top }]}>
         <Pressable accessibilityLabel="Back" hitSlop={10} onPress={onBack} style={styles.backButton}>
           <BackIcon />
         </Pressable>
@@ -132,7 +128,7 @@ export function DiscoverFiltersScreen({
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(responsiveSize(21), insets.bottom) }]}>
         <Pressable onPress={clearAll} style={styles.clearButton}><Text style={styles.clearText}>Clear all</Text></Pressable>
         <Pressable onPress={apply} style={styles.applyButton}><CheckIcon /><Text style={styles.applyText}>Apply</Text></Pressable>
       </View>
@@ -170,12 +166,12 @@ function ChipSection({
   );
 }
 
-function createStyles(_colors: ThemeColors, safeTop: number, safeBottom: number) {
+function createStyles() {
   const accent = '#B82F29';
   const border = '#45474B';
-  return StyleSheet.create({
+  return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: '#161616' },
-    header: { height: safeTop + 58, paddingTop: safeTop, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    header: { paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: '#080808', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
     backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     headerSpacer: { width: 44 },
     title: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
@@ -199,7 +195,7 @@ function createStyles(_colors: ThemeColors, safeTop: number, safeBottom: number)
     distanceChoiceActive: { backgroundColor: accent },
     distanceText: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
     distanceTextActive: { color: '#FFFFFF' },
-    footer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(21, safeBottom), flexDirection: 'row', gap: 10, backgroundColor: '#080808' },
+    footer: { paddingHorizontal: 16, paddingTop: 16, flexDirection: 'row', gap: 10, backgroundColor: '#080808' },
     clearButton: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: accent, borderRadius: 36, backgroundColor: '#161616' },
     clearText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
     applyButton: { flex: 1, height: 40, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 36, backgroundColor: accent },

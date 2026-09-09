@@ -13,6 +13,7 @@
     "seed": "node lib/scripts/seed.js",
     "comments:recount-seed": "node lib/scripts/recount-seed-comment-counts.js",
     "search:backfill": "node lib/scripts/backfill-user-search.js",
+    "users:migrate-private": "node lib/scripts/migrate-private-users.js",
     "staff:set-role": "node lib/scripts/set-staff-role.js"
   },
   "dependencies": {

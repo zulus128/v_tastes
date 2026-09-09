@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import { responsiveSize, responsiveStyleSheet } from './responsive';
 import type { SvgProps } from 'react-native-svg';
 import CreateVector from '../../assets/figma-icons/create.svg';
 import DialogOutlineDetail from '../../assets/figma-icons/dialog-outline-detail.svg';
@@ -18,13 +19,24 @@ type Vector = ComponentType<SvgProps>;
 function Layer({
   component: Component,
   color,
+  height,
   style,
+  width,
 }: {
   component: Vector;
   color: string;
+  height: number;
   style: object;
+  width: number;
 }) {
-  return <Component color={color} style={[styles.layer, style]} />;
+  return (
+    <Component
+      color={color}
+      height={responsiveSize(height)}
+      style={[styles.layer, style]}
+      width={responsiveSize(width)}
+    />
+  );
 }
 
 // Each tab keeps a single glyph in both states — filled feed for Home,
@@ -35,7 +47,7 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Home') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={HomeBold} style={styles.homeBold} />
+        <Layer color={color} component={HomeBold} height={16.6667} style={styles.homeBold} width={15} />
       </View>
     );
   }
@@ -43,7 +55,7 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Discover') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={DiscoverOutline} style={styles.discoverOutline} />
+        <Layer color={color} component={DiscoverOutline} height={17.9169} style={styles.discoverOutline} width={14.5833} />
       </View>
     );
   }
@@ -51,15 +63,15 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
   if (name === 'Dialog') {
     return (
       <View style={styles.icon}>
-        <Layer color={color} component={DialogOutlineMain} style={styles.dialogOutlineMain} />
-        <Layer color={color} component={DialogOutlineDetail} style={styles.dialogOutlineDetail} />
+        <Layer color={color} component={DialogOutlineMain} height={17.9951} style={styles.dialogOutlineMain} width={17.9554} />
+        <Layer color={color} component={DialogOutlineDetail} height={1.6667} style={styles.dialogOutlineDetail} width={7.5} />
       </View>
     );
   }
 
   return (
     <View style={styles.icon}>
-      <Layer color={color} component={ProfileOutline} style={styles.profileOutline} />
+      <Layer color={color} component={ProfileOutline} height={17.9167} style={styles.profileOutline} width={14.5834} />
     </View>
   );
 }
@@ -67,21 +79,21 @@ export function TabBarGlyph({ active, name }: { active: boolean; name: TabGlyphN
 export function CreateTabGlyph() {
   return (
     <View style={styles.createIcon}>
-      <Layer color="#FFFFFF" component={CreateVector} style={styles.createVector} />
+      <Layer color="#FFFFFF" component={CreateVector} height={14} style={styles.createVector} width={14} />
     </View>
   );
 }
 
 export function StatsGlyph() {
   const { colors } = useAppTheme();
-  return <Stats color={colors.text} width={24} height={24} />;
+  return <Stats color={colors.text} width={responsiveSize(24)} height={responsiveSize(24)} />;
 }
 
 export function NotificationsGlyph() {
   const { colors } = useAppTheme();
   return (
     <View style={styles.headerIcon}>
-      <Layer color={colors.text} component={Notifications} style={styles.notifications} />
+      <Layer color={colors.text} component={Notifications} height={17.9167} style={styles.notifications} width={16.8076} />
     </View>
   );
 }
@@ -91,16 +103,16 @@ export function TastesLogo({ width = 72 }: { width?: number } = {}) {
   return <Logo color={colors.text} width={width} height={width * (36.1319 / 72)} />;
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   layer: { position: 'absolute' },
   icon: { width: 20, height: 20 },
   headerIcon: { width: 24, height: 24 },
   createIcon: { width: 24, height: 24 },
-  homeBold: { top: '8.33%', right: '12.5%', bottom: '8.34%', left: '12.5%' },
-  discoverOutline: { top: '5.21%', right: '13.54%', bottom: '5.21%', left: '13.54%' },
-  dialogOutlineMain: { top: '4.82%', right: '5.02%', bottom: '5.2%', left: '5.21%' },
-  dialogOutlineDetail: { top: '54.17%', right: '39.58%', bottom: '37.5%', left: '22.92%' },
-  profileOutline: { top: '5.21%', right: '13.54%', bottom: '5.21%', left: '13.54%' },
-  createVector: { top: 5, right: 5, bottom: 5, left: 5 },
-  notifications: { top: '5.21%', right: '7.98%', bottom: '5.21%', left: '7.98%' },
+  homeBold: { top: '8.33%', left: '12.5%' },
+  discoverOutline: { top: '5.21%', left: '13.54%' },
+  dialogOutlineMain: { top: '4.82%', left: '5.21%' },
+  dialogOutlineDetail: { top: '54.17%', left: '22.92%' },
+  profileOutline: { top: '5.21%', left: '13.54%' },
+  createVector: { top: 5, left: 5 },
+  notifications: { top: '5.21%', left: '7.98%' },
 });

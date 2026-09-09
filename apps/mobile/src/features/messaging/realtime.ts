@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
+import { useIsVisualAudit } from '../../session/SessionProvider';
 
 const INBOX_LIMIT = 50;
 const MESSAGE_LIMIT = 50;
@@ -118,6 +119,7 @@ function isVisibleInInbox(document: QueryDocumentSnapshot<DocumentData>, userId:
 }
 
 export function useConversationInbox(userId: string): RealtimeState<ConversationSummary[]> {
+  const visualAudit = useIsVisualAudit();
   const [state, setState] = useState<RealtimeState<ConversationSummary[]>>({
     data: [],
     error: null,
@@ -126,6 +128,10 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
   const profileCache = useRef(new Map<string, ConversationParticipant>());
 
   useEffect(() => {
+    if (visualAudit) {
+      setState({ data: [], error: null, loading: false });
+      return undefined;
+    }
     let active = true;
     const inboxQuery = query(
       collection(firestore, 'conversations'),
@@ -162,15 +168,20 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
       active = false;
       unsubscribe();
     };
-  }, [userId]);
+  }, [userId, visualAudit]);
 
   return state;
 }
 
 export function useUnreadConversationCount(userId: string): number {
+  const visualAudit = useIsVisualAudit();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (visualAudit) {
+      setCount(0);
+      return undefined;
+    }
     const inboxQuery = query(
       collection(firestore, 'conversations'),
       where('participantIds', 'array-contains', userId),
@@ -188,7 +199,7 @@ export function useUnreadConversationCount(userId: string): number {
         return total + Math.max(0, unread);
       }, 0));
     }, () => setCount(0));
-  }, [userId]);
+  }, [userId, visualAudit]);
 
   return count;
 }
@@ -197,6 +208,7 @@ export function useConversationMessages(
   conversationId: string,
   userId: string,
 ): RealtimeState<ChatMessage[]> {
+  const visualAudit = useIsVisualAudit();
   const [state, setState] = useState<RealtimeState<ChatMessage[]>>({
     data: [],
     error: null,
@@ -204,6 +216,10 @@ export function useConversationMessages(
   });
 
   useEffect(() => {
+    if (visualAudit) {
+      setState({ data: [], error: null, loading: false });
+      return undefined;
+    }
     const messagesQuery = query(
       collection(firestore, 'conversations', conversationId, 'messages'),
       orderBy('createdAt', 'desc'),
@@ -236,7 +252,7 @@ export function useConversationMessages(
         loading: false,
       });
     }, (error) => setState((current) => ({ ...current, error: asError(error), loading: false })));
-  }, [conversationId, userId]);
+  }, [conversationId, userId, visualAudit]);
 
   return state;
 }
@@ -246,7 +262,22 @@ export function subscribeConversationDetails(
   userId: string,
   listener: (details: ConversationDetails) => void,
   onError: (error: Error) => void,
+  visualAudit = false,
 ): Unsubscribe {
+  if (visualAudit) {
+    listener({
+      activityId: null,
+      imageUrl: null,
+      kind: 'direct',
+      lastMessageId: null,
+      participant: null,
+      readByCount: 0,
+      someoneTyping: false,
+      title: 'Conversation',
+      unreadCount: 0,
+    });
+    return () => undefined;
+  }
   let profileUnsubscribe: Unsubscribe | undefined;
   const conversationUnsubscribe = onSnapshot(
     doc(firestore, 'conversations', conversationId),

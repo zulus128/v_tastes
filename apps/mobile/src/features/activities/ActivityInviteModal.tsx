@@ -6,9 +6,7 @@ import {
   Alert,
   Image,
   ImageBackground,
-  Modal,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type ImageSourcePropType,
@@ -20,6 +18,8 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { firestore } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
 import { PatternBackgroundLift } from '../../ui/components';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 type Member = {
   id: string;
@@ -200,7 +200,7 @@ export function ActivityInviteModal({
           ) : loading || !details ? <ActivityIndicator color="#B82F29" size="large" /> : (
             <>
               <View style={styles.identity}>
-                <Avatar person={details.organizer} size={100} />
+                <Avatar person={details.organizer} size={responsiveSize(100)} />
                 <Text style={styles.organizer}>{details.organizer.displayName}</Text>
                 <Text style={styles.inviteCopy}>
                   {pending ? `Invite you in “${details.venue.name}” restaurant` : `Activity in “${details.venue.name}” restaurant`}
@@ -208,7 +208,7 @@ export function ActivityInviteModal({
               </View>
 
               <View style={styles.dateRow}>
-                <CalendarIcon height={20} width={20} />
+                <CalendarIcon height={responsiveSize(20)} width={responsiveSize(20)} />
                 <Text style={styles.date}>{date}</Text>
               </View>
 
@@ -237,8 +237,8 @@ export function ActivityInviteModal({
               <View style={styles.peopleRow}>
                 <View style={styles.avatarStack}>
                   {details.members.slice(0, 3).map((person, index) => (
-                    <View key={person.id} style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : -14 }]}>
-                      <Avatar person={person} size={38} />
+                    <View key={person.id} style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : responsiveSize(-14) }]}>
+                      <Avatar person={person} size={responsiveSize(38)} />
                     </View>
                   ))}
                 </View>
@@ -253,7 +253,7 @@ export function ActivityInviteModal({
                   <Pressable disabled={responding} onPress={() => void respond('accepted')} style={[styles.button, styles.takeButton]}>
                     {responding ? <ActivityIndicator color="#FFFFFF" /> : (
                       <View style={styles.takePartContent}>
-                        <CheckIcon height={15} width={20} />
+                        <CheckIcon height={responsiveSize(15)} width={responsiveSize(20)} />
                         <Text style={styles.buttonText}>Take part</Text>
                       </View>
                     )}
@@ -272,7 +272,7 @@ export function ActivityInviteModal({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = responsiveStyleSheet({
   overlay: { flex: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { width: '100%', maxWidth: 370, minHeight: 540, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, borderWidth: 1, borderColor: '#45474B', borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#080808' },
   patternImage: { opacity: 0.18, resizeMode: 'repeat' },

@@ -1,11 +1,12 @@
 import type { FeedItem } from '@tastes/contracts';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { storage } from '../../infrastructure/firebase';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
@@ -22,13 +23,17 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
-function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string; large?: boolean; path?: string }) {
-  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ failed: false });
+function DishPhoto({ fallbackUri, large = false, path, url }: { fallbackUri?: string; large?: boolean; path?: string; url?: string }) {
+  const [state, setState] = useState<{ uri?: string; failed: boolean }>({ uri: url, failed: false });
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '');
   const imageStyle = large ? staticStyles.dishImageLarge : staticStyles.dishImage;
 
   useEffect(() => {
     let active = true;
+    if (url) {
+      setState({ uri: url, failed: false });
+      return () => { active = false; };
+    }
     if (!normalizedPath) {
       setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
       return () => { active = false; };
@@ -36,9 +41,7 @@ function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string;
 
     let download: Promise<string>;
     try {
-      const photoRef = storageRef(storage, normalizedPath);
-      if (!photoRef.fullPath.replace(/\//g, '')) throw { code: 'storage/invalid-root-operation' };
-      download = getDownloadURL(photoRef);
+      download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       if ((error as { code?: string }).code !== 'storage/invalid-root-operation')
         captureException(error, { operation: 'load-profile-review-photo', path: normalizedPath });
@@ -55,7 +58,7 @@ function DishPhoto({ fallbackUri, large = false, path }: { fallbackUri?: string;
       if (active) setState(fallbackUri ? { uri: fallbackUri, failed: false } : { failed: true });
     });
     return () => { active = false; };
-  }, [fallbackUri, normalizedPath]);
+  }, [fallbackUri, normalizedPath, url]);
 
   return state.uri
     ? <Image onError={() => setState({ failed: true })} source={{ uri: state.uri }} style={imageStyle} />
@@ -108,7 +111,7 @@ export function ProfileReviewCard({
           <Text style={styles.reviewAuthor}>{profile.displayName}</Text>
           <Text style={styles.reviewHandle}>{profile.username ? `@${profile.username}` : ''}</Text>
         </View>
-        {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={16} width={16} /></View> : null}
+        {item.pinned ? <View accessibilityLabel="Pinned review" style={styles.pinBadge}><PinnedIndicator height={responsiveSize(16)} width={responsiveSize(16)} /></View> : null}
         <Text style={styles.reviewDate}>{formatDisplayDate(item.createdAt)}</Text>
         <Pressable
           accessibilityLabel="Review actions"
@@ -129,7 +132,7 @@ export function ProfileReviewCard({
           </View>
           {tags[0] ? (
             <View style={styles.visitTag}>
-              {tags[0] === 'date-night' ? <NightIcon color={colors.text} height={12} width={12} /> : null}
+              {tags[0] === 'date-night' ? <NightIcon color={colors.text} height={responsiveSize(12)} width={responsiveSize(12)} /> : null}
               <Text style={styles.visitTagText}>{tagLabels[tags[0]] ?? tags[0]}</Text>
             </View>
           ) : null}
@@ -138,7 +141,7 @@ export function ProfileReviewCard({
           <ScrollView contentContainerStyle={styles.dishRow} horizontal showsHorizontalScrollIndicator={false}>
             {dishes.map((dish) => (
               <Pressable accessibilityLabel={`Open photo of ${dish.title}`} key={dish.id} onPress={() => setSelectedDish(dish)} style={styles.dishCard}>
-                <DishPhoto fallbackUri={fallbackImageUrl} path={dish.photoPath} />
+                <DishPhoto fallbackUri={fallbackImageUrl} path={dish.photoPath} url={dish.photoUrl} />
                 <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
                 <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
               </Pressable>
@@ -149,20 +152,20 @@ export function ProfileReviewCard({
         <View style={styles.metrics}>
           <View style={styles.metricActions}>
             <Pressable onPress={onReact} style={styles.metricIconRow}>
-              <HeartIcon color={reacted ? colors.primary : colors.text} height={15.5978} width={17.9167} />
+              <HeartIcon color={reacted ? colors.primary : colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />
               <Text style={[styles.metric, reacted && styles.metricActive]}>{item.reactionCount}</Text>
             </Pressable>
             <Pressable accessibilityLabel="Open comments" onPress={onComments} style={styles.metricIconRow}>
-              <ChatIcon color={colors.text} height={20} width={20} />
+              <ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
               <Text style={styles.metric}>{item.commentCount}</Text>
             </Pressable>
             <Pressable accessibilityLabel="Share review" onPress={onShare} style={styles.metricIconButton}>
-              <ShareIcon color={colors.text} height={18.1667} width={18.1673} />
+              <ShareIcon color={colors.text} height={responsiveSize(18.1667)} width={responsiveSize(18.1673)} />
             </Pressable>
           </View>
           {dishes.length > 0 ? (
             <View style={styles.dishCountTag}>
-              <DishIcon color={colors.text} height={10.8392} width={12} />
+              <DishIcon color={colors.text} height={responsiveSize(10.8392)} width={responsiveSize(12)} />
               <Text style={styles.dishCountText}>{dishes.length} {dishes.length === 1 ? 'dish' : 'dishes'}</Text>
             </View>
           ) : null}
@@ -176,7 +179,7 @@ export function ProfileReviewCard({
               <Text numberOfLines={1} style={styles.photoModalTitle}>{selectedDish?.title}</Text>
               <Pressable accessibilityLabel="Close photo" hitSlop={8} onPress={() => setSelectedDish(null)}><Text style={styles.photoModalClose}>×</Text></Pressable>
             </View>
-            {selectedDish ? <DishPhoto fallbackUri={fallbackImageUrl} large path={selectedDish.photoPath} /> : null}
+            {selectedDish ? <DishPhoto fallbackUri={fallbackImageUrl} large path={selectedDish.photoPath} url={selectedDish.photoUrl} /> : null}
             {selectedDish ? <Text style={styles.photoModalRating}>★ {selectedDish.rating.toFixed(1)}</Text> : null}
           </View>
         </View>
@@ -185,7 +188,7 @@ export function ProfileReviewCard({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   reviewCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   reviewHeader: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 23, borderTopRightRadius: 23, position: 'relative' },
   reviewAvatar: { width: 40, height: 40, borderRadius: 20 },
@@ -228,7 +231,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   photoModalRating: { padding: 16, color: '#D33B35', fontSize: 18, fontWeight: '700' },
 });
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   dishImage: { width: 150, height: 150 },
   dishImageLarge: { width: '100%', aspectRatio: 1 },
   dishImagePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#222222' },

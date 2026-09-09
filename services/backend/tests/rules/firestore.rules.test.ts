@@ -72,6 +72,8 @@ beforeEach(async () => {
     await setDoc(doc(db, '_contentRateLimits', 'secret'), { count: 1 });
     await setDoc(doc(db, '_idempotency', 'secret'), { active: true });
     await setDoc(doc(db, '_pushTokens', 'secret'), { uid: 'user-a' });
+    await setDoc(doc(db, '_userPrivate', 'user-a'), { email: 'private@example.com', phoneNumber: '+905551234567' });
+    await setDoc(doc(db, '_usernames', 'user.a'), { uid: 'user-a' });
   });
 });
 
@@ -170,6 +172,14 @@ describe('Firestore security rules', () => {
     await assertFails(getDoc(doc(staffDb, '_otpChallenges', 'secret')));
     await assertFails(setDoc(doc(userDb, '_otpChallenges', 'new'), { status: 'pending' }));
     await assertFails(getDoc(doc(staffDb, '_otpRateLimits', 'secret')));
+  });
+
+  it('never exposes private user data or username claims, even to staff', async () => {
+    const userDb = testEnvironment.authenticatedContext('user-a').firestore();
+    const staffDb = testEnvironment.authenticatedContext('staff', { role: 'admin' }).firestore();
+    await assertFails(getDoc(doc(userDb, '_userPrivate', 'user-a')));
+    await assertFails(getDoc(doc(staffDb, '_userPrivate', 'user-a')));
+    await assertFails(getDoc(doc(userDb, '_usernames', 'user.a')));
   });
 
   it('keeps social edges and mutation-control documents backend-owned', async () => {

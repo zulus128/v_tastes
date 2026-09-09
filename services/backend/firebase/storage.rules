@@ -7,12 +7,17 @@ service firebase.storage {
     }
 
     function validImage() {
-      return request.resource.size < 10 * 1024 * 1024
+      return request.resource.size < 1536 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
     function validProfileImage() {
       return request.resource.size < 750 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    function validVenueImage() {
+      return request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
@@ -36,7 +41,7 @@ service firebase.storage {
 
     match /venue-images/{venueId}/{fileName} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() && validImage();
+      allow create, update: if isAdmin() && validVenueImage();
       allow delete: if isAdmin();
     }
 

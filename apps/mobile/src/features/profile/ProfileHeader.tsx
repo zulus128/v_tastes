@@ -13,6 +13,7 @@ import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
@@ -124,7 +125,7 @@ export function ProfileHeader({
       <Pressable accessibilityLabel="Open rewards" onPress={onRewards} style={styles.badges}>
         {badgeAssets.map((BadgeArt, index) => (
           <View key={badgeLabels[index]} style={styles.badge}>
-            <BadgeArt width={59} height={59} />
+            <BadgeArt width={responsiveSize(59)} height={responsiveSize(59)} />
             <Text numberOfLines={2} style={styles.badgeLabel}>{badgeLabels[index]}</Text>
           </View>
         ))}
@@ -151,19 +152,19 @@ export function ProfileTopBar({
   return (
     <View style={styles.topBar}>
       <Pressable accessibilityLabel={own ? 'Open settings' : 'Back'} onPress={own ? onSettings : onBack} style={styles.topAction}>
-        {own ? <SettingsIcon color={colors.text} width={16.9641} height={17.9167} /> : <BackIcon color={colors.text} width={9} height={16} />}
+        {own ? <SettingsIcon color={colors.text} width={responsiveSize(16.9641)} height={responsiveSize(17.9167)} /> : <BackIcon color={colors.text} width={responsiveSize(9)} height={responsiveSize(16)} />}
       </Pressable>
       <Text numberOfLines={1} style={styles.username}>
         {profile.username ? `@${profile.username}` : profile.displayName}
       </Text>
       <Pressable accessibilityLabel="Share profile" onPress={onShare} style={styles.topAction}>
-          <ShareIcon color={colors.text} width={18.1673} height={18.1667} />
+          <ShareIcon color={colors.text} width={responsiveSize(18.1673)} height={responsiveSize(18.1667)} />
       </Pressable>
     </View>
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   hero: { width: '100%', zIndex: 1, alignSelf: 'stretch', paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
   heroPattern: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   topBar: {
@@ -209,7 +210,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   badgeLabel: { width: 72, marginTop: 4, color: colors.text, fontSize: 10, lineHeight: 10, fontWeight: '400', letterSpacing: -0.12, textAlign: 'center' },
 });
 
-const staticStyles = StyleSheet.create({
+const staticStyles = responsiveStyleSheet({
   stat: { width: 90, alignItems: 'center', justifyContent: 'center' },
   statValue: { fontSize: 18, fontWeight: '600' },
   statLabel: { marginTop: 2, fontSize: 13 },

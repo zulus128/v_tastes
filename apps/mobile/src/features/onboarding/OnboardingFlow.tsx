@@ -1,4 +1,3 @@
-import { createTastesApi } from '@tastes/firebase-client';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,22 +18,23 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
 import pattern from '../../../assets/onboarding/pattern.png';
-import { auth, functions } from '../../infrastructure/firebase';
+import { auth } from '../../infrastructure/firebase';
+import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
+import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
 
-type Screen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
+export type OnboardingScreen = 'entry' | 'consent' | 'phone' | 'country' | 'otp';
 type OtpState = 'idle' | 'incorrect' | 'expired' | 'locked' | 'failure' | 'sign-in-failed';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -45,6 +45,13 @@ interface Challenge {
   resendAvailableAt: string;
   localCode?: string;
 }
+
+const visualAuditChallenge: Challenge = {
+  id: 'visual-audit-challenge',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  resendAvailableAt: '2000-01-01T00:00:00.000Z',
+  localCode: '1234',
+};
 
 function errorDetails(error: unknown): Record<string, unknown> {
   if (typeof error !== 'object' || error === null) return {};
@@ -58,19 +65,19 @@ function displayPhone(country: Country, digits: string): string {
 
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
-  const { height, width } = useWindowDimensions();
+  const { height, width } = useResponsiveViewport();
   const compact = height <= 700 || width <= 340;
   return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
 
-export function OnboardingFlow() {
-  const api = useMemo(() => createTastesApi(functions), []);
-  const [screen, setScreen] = useState<Screen>('entry');
+export function OnboardingFlow({ initialScreen, visualAudit = false }: { initialScreen?: OnboardingScreen; visualAudit?: boolean } = {}) {
+  const api = useTastesApi();
+  const [screen, setScreen] = useState<OnboardingScreen>(initialScreen ?? 'entry');
   const [country, setCountry] = useState(defaultCountry);
   const [countrySearch, setCountrySearch] = useState('');
-  const [phoneDigits, setPhoneDigits] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState(() => visualAudit && initialScreen === 'otp' ? '7700900123' : '');
   const [phoneError, setPhoneError] = useState('');
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [challenge, setChallenge] = useState<Challenge | null>(() => visualAudit && initialScreen === 'otp' ? visualAuditChallenge : null);
   const [otpCode, setOtpCode] = useState('');
   const [otpState, setOtpState] = useState<OtpState>('idle');
   const [pendingCustomToken, setPendingCustomToken] = useState<string | null>(null);
@@ -89,9 +96,10 @@ export function OnboardingFlow() {
   });
 
   useEffect(() => {
+    if (initialScreen) return undefined;
     const timeout = setTimeout(() => setScreen('consent'), 1_250);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [initialScreen]);
 
   useEffect(() => {
     if (!challenge) return undefined;
@@ -100,7 +108,7 @@ export function OnboardingFlow() {
   }, [challenge]);
 
   useEffect(() => {
-    if (googleResponse?.type !== 'success') return;
+    if (visualAudit || googleResponse?.type !== 'success') return;
     const idToken = googleResponse.params.id_token;
     if (!idToken) {
       Alert.alert('Google sign-in failed', 'Google did not return an identity token.');
@@ -110,9 +118,10 @@ export function OnboardingFlow() {
     void signInWithCredential(auth, GoogleAuthProvider.credential(idToken))
       .catch((error: unknown) => Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.'))
       .finally(() => setBusy(false));
-  }, [googleResponse]);
+  }, [googleResponse, visualAudit]);
 
   const signInWithGoogle = async () => {
+    if (visualAudit) return;
     if (!selectedGoogleClientId && !googleWebClientId) {
       Alert.alert('Google sign-in needs configuration', 'Add an OAuth client ID to EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID or EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID.');
       return;
@@ -122,6 +131,7 @@ export function OnboardingFlow() {
   };
 
   const signInWithApple = async () => {
+    if (visualAudit) return;
     if (Platform.OS !== 'ios' || !await AppleAuthentication.isAvailableAsync()) {
       Alert.alert('Apple sign-in unavailable', 'Sign in with Apple is available on supported Apple devices.');
       return;
@@ -170,6 +180,16 @@ export function OnboardingFlow() {
     }
 
     Keyboard.dismiss();
+    if (visualAudit) {
+      setChallenge(visualAuditChallenge);
+      setNow(Date.now());
+      setOtpCode('');
+      setOtpState('idle');
+      setPendingCustomToken(null);
+      setScreen('otp');
+      setTimeout(() => otpInput.current?.focus(), 250);
+      return;
+    }
     setBusy(true);
     setPhoneError('');
     try {
@@ -200,6 +220,10 @@ export function OnboardingFlow() {
 
   async function verifyCode() {
     if ((!challenge && !pendingCustomToken) || otpCode.length !== 4) return;
+    if (visualAudit) {
+      setOtpState(otpCode === visualAuditChallenge.localCode ? 'idle' : 'incorrect');
+      return;
+    }
     setBusy(true);
     setOtpState('idle');
     let customToken = pendingCustomToken;
@@ -288,7 +312,7 @@ function EntryScreen() {
         imageStyle={{ opacity: isDark ? 0.04 : 0.05, tintColor: isDark ? '#FFFFFF' : '#000000' }}
         style={styles.centered}
       >
-        <TastesLogo width={189} />
+        <TastesLogo width={responsiveSize(189)} />
       </ImageBackground>
     </LinearGradient>
   );
@@ -296,14 +320,17 @@ function EntryScreen() {
 
 function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; onApple: () => void; onGoogle: () => void; onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
-  const { height, width } = useWindowDimensions();
+  const { height, width } = useResponsiveViewport();
+  const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
-  const panelHeight = compact ? 390 : 414;
+  const panelHeight = responsiveValue(compact ? 390 : 414, layoutScale);
   const heroHeight = height - panelHeight;
-  const heroOverflow = 48;
-  const heroScale = Math.min(1, heroHeight / 387);
-  const pinTop = (top: number) => top * heroScale - (1 - heroScale) * 34 - heroOverflow / 2;
+  const heroOverflow = responsiveValue(48, layoutScale);
+  const heroScale = Math.min(1, heroHeight / responsiveValue(387, layoutScale));
+  const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
+    - (1 - heroScale) * responsiveValue(34, layoutScale)
+    - heroOverflow / 2;
   const pinPositions = [
     { left: width * 0.17, top: pinTop(109) },
     { left: width * 0.70, top: pinTop(121) },
@@ -331,7 +358,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
         >
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
-              <TastesLogo width={compact ? 80 : 98} />
+              <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
               <View style={styles.consentCopy}>
                 <Text style={styles.consentTitle}>Discover the best places!</Text>
                 <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>
@@ -536,7 +563,7 @@ function OtpScreen(props: {
   );
 }
 
-const createStyles = (colors: ThemeColors, compact: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleSheet({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },

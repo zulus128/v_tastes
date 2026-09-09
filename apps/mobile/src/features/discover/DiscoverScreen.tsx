@@ -20,7 +20,6 @@ import {
   Text,
   TextInput,
   View,
-  Modal,
   type ImageSourcePropType,
 } from 'react-native';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
@@ -69,6 +68,8 @@ import {
 } from '../favourites/FavouritesPane';
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { matchesPlaceFilters } from './placeFilters';
@@ -296,8 +297,8 @@ export function DiscoverScreen({
       />
       <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={styles.aiFab}>
         <View style={styles.aiFabMark}>
-          <AiMouthPink height={10} style={styles.aiFabMarkPink} width={13} />
-          <AiMouthOutline color={colors.text} height={13} style={styles.aiFabMarkOutline} width={18} />
+          <AiMouthPink height={responsiveSize(10)} style={styles.aiFabMarkPink} width={responsiveSize(13)} />
+          <AiMouthOutline color={colors.text} height={responsiveSize(13)} style={styles.aiFabMarkOutline} width={responsiveSize(18)} />
         </View>
       </Pressable>
       <SeeAllPlacesModal onClose={() => setSeeAllPlaces(null)} onOpenPlace={onOpenPlace} onSave={setSaveTarget} savedVenueIds={savedVenueIds} venues={seeAllPlaces} />
@@ -550,6 +551,7 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const discoverHeaderHeight = responsiveSize(DISCOVER_HEADER_HEIGHT);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -772,8 +774,8 @@ function PlacesMap({
 
   function handleMapLayout(height: number) {
     const availableHeight = Math.max(0, height - 8);
-    const expanded = Math.max(0, availableHeight - DISCOVER_HEADER_HEIGHT);
-    const collapsed = Math.min(expanded, Math.max(330, Math.round(height * 0.53)));
+    const expanded = Math.max(0, availableHeight - discoverHeaderHeight);
+    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(height * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
       sheetBounds.current = { collapsed, expanded };
@@ -909,7 +911,7 @@ function PlacesMap({
           onPress={() => void goToCurrentLocation()}
           style={[styles.mapControlButton, locationEnabled && styles.mapControlButtonActive]}
         >
-          <MapLocateIcon color={locationEnabled ? '#FFFFFF' : colors.text} height={18} width={18} />
+          <MapLocateIcon color={locationEnabled ? '#FFFFFF' : colors.text} height={responsiveSize(18)} width={responsiveSize(18)} />
         </Pressable>
         <Pressable
           accessibilityLabel="Show on map"
@@ -917,7 +919,7 @@ function PlacesMap({
           onPress={() => setLayersOpen((value) => !value)}
           style={[styles.mapControlButton, layersOpen && styles.mapControlButtonActive]}
         >
-          <MapLayersControlIcon color={layersOpen ? '#FFFFFF' : colors.text} height={20} width={20} />
+          <MapLayersControlIcon color={layersOpen ? '#FFFFFF' : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
         </Pressable>
       </View>
       {layersOpen ? (
@@ -948,7 +950,7 @@ function PlacesMap({
         </Pressable>
         <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
-            <SearchIcon color={colors.textSecondary} height={24} width={24} />
+            <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} />
             <TextInput
               autoCorrect={false}
               onChangeText={setSearch}
@@ -959,13 +961,13 @@ function PlacesMap({
               style={styles.mapSearchInput}
               value={search}
             />
-            <VoiceIcon color={colors.text} height={24} width={24} />
+            <VoiceIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
           </View>
           <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapHeaderIcon}>
-            <MapTuneIcon color={colors.text} height={24} width={20} />
+            <MapTuneIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(20)} />
           </Pressable>
           <Pressable accessibilityLabel="Open favourites" hitSlop={8} onPress={onOpenFavourites} style={styles.mapHeaderIcon}>
-            <MapFavouriteIcon color={colors.text} height={22} width={20} />
+            <MapFavouriteIcon color={colors.text} height={responsiveSize(22)} width={responsiveSize(20)} />
           </Pressable>
         </View>
         <ScrollView
@@ -998,7 +1000,7 @@ function PlacesMap({
               onPress={() => setSortOpen((value) => !value)}
               style={styles.mapSortButton}
             >
-              <SortIcon color={colors.textSecondary} height={12} width={16} />
+              <SortIcon color={colors.textSecondary} height={responsiveSize(12)} width={responsiveSize(16)} />
               <Text style={styles.mapSortText}>Sort by: {sortLabel}</Text>
               <Text style={styles.mapSortChevron}>⌄</Text>
             </Pressable>
@@ -1073,7 +1075,7 @@ function PlacesMap({
                 >
                   <Text style={styles.sortSheetLabel}>{option.label}</Text>
                   <View style={[styles.sortSheetRadio, selected && styles.sortSheetRadioSelected]}>
-                    {selected ? <CheckIcon height={8} width={11} /> : null}
+                    {selected ? <CheckIcon height={responsiveSize(8)} width={responsiveSize(11)} /> : null}
                   </View>
                 </Pressable>
               );
@@ -1117,7 +1119,7 @@ function MapVenueMarker({
 
   return (
     <View style={styles.mapRatingMarker}>
-      <MapRatingPin height={44} width={36} />
+      <MapRatingPin height={responsiveSize(44)} width={responsiveSize(36)} />
       <Text style={styles.mapRatingMarkerText}>{(venue.rating ?? 0).toFixed(1)}</Text>
     </View>
   );
@@ -1202,7 +1204,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
     <ScrollView contentContainerStyle={styles.peopleContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.peopleSearchRow}>
         <View style={styles.peopleSearch}>
-          <PeopleSearchIcon color={colors.text} height={24} width={24} />
+          <PeopleSearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -1221,8 +1223,8 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
         </View>
         <View accessibilityLabel="People you may know" style={styles.peopleSearchFriends}>
           {isDark
-            ? <UserHeartIcon height={24} width={24} />
-            : <UserHeartLightIcon height={24} width={24} />}
+            ? <UserHeartIcon height={responsiveSize(24)} width={responsiveSize(24)} />
+            : <UserHeartLightIcon height={responsiveSize(24)} width={responsiveSize(24)} />}
         </View>
       </View>
 
@@ -1258,7 +1260,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
             </>
           ) : (
             <View style={styles.peopleSearchEmpty}>
-              <PeopleSearchIcon color={colors.text} height={60} width={60} />
+              <PeopleSearchIcon color={colors.text} height={responsiveSize(60)} width={responsiveSize(60)} />
               <Text style={styles.peopleSearchEmptyTitle}>
                 {isSearching ? 'No people found' : 'Search people'}
               </Text>
@@ -1390,7 +1392,7 @@ function SectionLabel({ onSeeAll, subtitle, title }: { onSeeAll?: () => void; su
 function SeeAllPlacesModal({ onClose, onOpenPlace, onSave, savedVenueIds, venues }: { onClose: () => void; onOpenPlace: (id: string) => void; onSave: (place: SaveablePlace) => void; savedVenueIds: Set<string>; venues: Venue[] | null }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]); const [query, setQuery] = useState('');
   const visible = (venues ?? []).filter((venue) => venue.name.toLowerCase().includes(query.toLowerCase()));
-  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: 16 }]}><PeopleSearchIcon color={colors.textSecondary} height={24} width={24} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30, gap: 10 }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
+  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}><PeopleSearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: responsiveSize(16), paddingBottom: responsiveSize(30), gap: responsiveSize(10) }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
 }
 
 function RatingPill({ value }: { value: string }) {
@@ -1438,7 +1440,7 @@ function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave
         </View>
       </Pressable>
       <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} hitSlop={8} onPress={onSave} style={styles.placeSave}>
-        <BookmarkIcon color={saved ? colors.primary : colors.text} height={20} width={20} />
+        <BookmarkIcon color={saved ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
       </Pressable>
     </View>
   );
@@ -1509,15 +1511,15 @@ function ReviewCard({
         <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
         <View style={styles.reviewFooter}>
           <Pressable accessibilityLabel="Like review" onPress={(event) => { event.stopPropagation(); onReact(); }} style={styles.reviewActionIconRow}>
-            {reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={14.3462} width={16.6667} /> : <HeartIcon color={colors.textSecondary} height={15.5978} width={17.9167} />}
+            {reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.textSecondary} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}
             <Text style={styles.reviewAction}>{reactionCount}</Text>
           </Pressable>
           <Pressable accessibilityLabel="Open comments" onPress={(event) => { event.stopPropagation(); onComments(); }} style={styles.reviewActionIconRow}>
-            <ChatIcon color={colors.textSecondary} height={20} width={20} />
+            <ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} />
             <Text style={styles.reviewAction}>{commentCount}</Text>
           </Pressable>
           <Pressable accessibilityLabel="Share review" onPress={(event) => { event.stopPropagation(); onShare(); }} style={styles.reviewActionIconRow}>
-            <ShareIcon color={colors.textSecondary} height={20} width={20} />
+            <ShareIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} />
           </Pressable>
           <Text style={styles.reviewTime}>{time}</Text>
         </View>
@@ -1827,7 +1829,7 @@ function ProfileSuggestion({
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: colors.canvas },
   mapDiscoverScreen: { backgroundColor: colors.canvas },
   aiFab: { position: 'absolute', right: 16, bottom: 18, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },

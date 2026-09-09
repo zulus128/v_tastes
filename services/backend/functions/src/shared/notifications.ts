@@ -101,8 +101,14 @@ export function queueNotificationInBatch(batch: WriteBatch, request: Notificatio
 export async function sendNotification(request: NotificationRequest): Promise<void> {
   if (!request.recipientId || request.recipientId === request.actorId) return;
   try {
-    await notificationReference(request).set(notificationDocument(request), { merge: true });
+    const reference = notificationReference(request);
+    // Background effects can be retried after their external write has already
+    // committed. Preserve the original createdAt/push delivery by creating a
+    // deterministic notification document only once.
+    if ((await reference.get()).exists) return;
+    await reference.create(notificationDocument(request));
   } catch (error) {
+    if ((error as { code?: unknown }).code === 6) return;
     console.warn(`Unable to store the ${request.type} notification for ${request.recipientId}.`, error);
   }
 }
@@ -115,13 +121,19 @@ export async function sendNotifications(requests: NotificationRequest[]): Promis
   let written = 0;
   for (let index = 0; index < pending.length; index += BATCH_WRITE_LIMIT) {
     const chunk = pending.slice(index, index + BATCH_WRITE_LIMIT);
+    const references = chunk.map(notificationReference);
+    const existing = await db.getAll(...references);
+    const missing = chunk.filter((_, chunkIndex) => !existing[chunkIndex]?.exists);
+    if (missing.length === 0) continue;
     const batch = db.batch();
-    chunk.forEach((request) => queueNotificationInBatch(batch, request));
+    missing.forEach((request) => batch.create(notificationReference(request), notificationDocument(request)));
     try {
       await batch.commit();
-      written += chunk.length;
+      written += missing.length;
     } catch (error) {
-      console.warn(`Unable to fan out ${chunk.length} ${chunk[0]?.type} notifications.`, error);
+      if ((error as { code?: unknown }).code !== 6) {
+        console.warn(`Unable to fan out ${missing.length} ${missing[0]?.type} notifications.`, error);
+      }
     }
   }
   return written;
