@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "kind": "google-docs-trusted-read-context",
+  "target": {
+    "documentId": "18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "title": "Tastes — Dish Data Proposal",
+    "revisionId": "ANLCKQlbRmwHFJLgrdjtyh-hNmQvaM5rgaemu3y3G024TPmLsFWdGso_6Bbz7iVzSvbphcmnqqsDR93JJOjK1fysuwqQM6AmS03pTwsrCwM",
+    "documentUrl": "https://docs.google.com/document/d/18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "selectedTabId": null
+  },
+  "dropdownMetadata": {
+    "status": "unavailable",
+    "resolvedTool": null,
+    "authoritative": false,
+    "count": 0
+  },
+  "derivedControlInventory": {
+    "hasProtectedControls": false,
+    "authoritativeDropdownCount": 0,
+    "opaqueControlCount": 0,
+    "nativeElementCounts": {},
+    "tabsScanned": [
+      "t.0"
+    ],
+    "controls": [],
+    "nativeElements": []
+  },
+  "editGuidance": {
+    "advisoryOnly": true,
+    "requiresTargetedPreservation": false,
+    "recommendedBehavior": "No protected controls were detected in the scanned scope.",
+    "warnings": []
+  }
+}

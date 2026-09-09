@@ -1,0 +1,57 @@
+{
+  "bridgeVersion": "3.6",
+  "kind": "google-docs-trusted-read",
+  "status": "complete",
+  "outputDir": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908",
+  "target": {
+    "documentId": "18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "title": "Tastes — Dish Data Proposal",
+    "revisionId": "ANLCKQmE87f8G9jTHchAqUM4LLdKkAdGXQTZq2R2ao21OLF6pNiAUMCUdOqkW0bKk5B2O5YcBKjcP767EKS0rjSelWSq0przDxOUJoFdCzI",
+    "documentUrl": "https://docs.google.com/document/d/18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "selectedTabId": null
+  },
+  "dropdownMetadata": {
+    "status": "unavailable",
+    "resolvedTool": null,
+    "authoritative": false,
+    "count": 0
+  },
+  "controlAwareness": {
+    "hasProtectedControls": false,
+    "authoritativeDropdownCount": 0,
+    "opaqueControlCount": 0,
+    "affectedParagraphCount": 0,
+    "nativeElementCounts": {},
+    "preservationRequired": false,
+    "recommendedBehavior": "No protected controls were detected in the scanned scope."
+  },
+  "warnings": [],
+  "files": {
+    "document_result": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908/document-result.json",
+      "bytes": 416220,
+      "sha256": "abc414ca66e49d07a3aac4a94f2b4ed7b64054ad541d2b7f4d308d3bd591ec3f"
+    },
+    "control_inventory": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908/control-inventory.json",
+      "bytes": 1034,
+      "sha256": "8bc135769a19542daa746228bd78b3a0c2586245964547a53b09421a7c38088f"
+    },
+    "document_outline": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908/document-outline.json",
+      "bytes": 24544,
+      "sha256": "06c014113756ca9d8d54628ac26579d0cb5f895b3cdfc6ee3140d4435bcea3c5"
+    },
+    "document_text": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908/document-text.md",
+      "bytes": 4144,
+      "sha256": "671964bc549380efbb6d411f2bd433c662861870376b0f6af622b4119e883717"
+    },
+    "receipt": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-notes-20260908/receipt.json",
+      "bytes": 965,
+      "sha256": "d47edc0dce3af718bf3607c91a6001216555023e78a9aa8d38906128d42fddb0"
+    }
+  },
+  "error": null
+}

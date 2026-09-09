@@ -1,0 +1,57 @@
+{
+  "bridgeVersion": "3.6",
+  "kind": "google-docs-trusted-read",
+  "status": "complete",
+  "outputDir": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25",
+  "target": {
+    "documentId": "18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "title": "Tastes — Dish Data Proposal",
+    "revisionId": "ANLCKQk1ISDJ9vtgMIDtTSfZFU_RUCJKOmrelLMBRN1w1Tox81gjSyQ3e5CBun-oQ6vsjiG97yiK1as3B8xg2Gp859MFsIrS76cf3URL3Rc",
+    "documentUrl": "https://docs.google.com/document/d/18rs7sGUT1nSL-j6XBflRVI8f2Wer10P3XIj1gwZZwE8",
+    "selectedTabId": null
+  },
+  "dropdownMetadata": {
+    "status": "unavailable",
+    "resolvedTool": null,
+    "authoritative": false,
+    "count": 0
+  },
+  "controlAwareness": {
+    "hasProtectedControls": false,
+    "authoritativeDropdownCount": 0,
+    "opaqueControlCount": 0,
+    "affectedParagraphCount": 0,
+    "nativeElementCounts": {},
+    "preservationRequired": false,
+    "recommendedBehavior": "No protected controls were detected in the scanned scope."
+  },
+  "warnings": [],
+  "files": {
+    "document_result": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25/document-result.json",
+      "bytes": 437949,
+      "sha256": "4bd766d7220e81e306fe67041f010144cc366eddc4cf6154e8344e9a1c50dd8b"
+    },
+    "control_inventory": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25/control-inventory.json",
+      "bytes": 1034,
+      "sha256": "a35a56f0c13dc4086d31489a46b9e9bb3225c92930c504bc58a8ad3269aa42a7"
+    },
+    "document_outline": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25/document-outline.json",
+      "bytes": 33776,
+      "sha256": "1c52f9f0df1fa96046d0789b05d7d8cc65d5bb723c8bcf3c37a1f41aa92d4878"
+    },
+    "document_text": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25/document-text.md",
+      "bytes": 7472,
+      "sha256": "a3216e8c52d48c3839f85eaf0eee51c4e1601af8a7e81b5529bd1bfe7da60e13"
+    },
+    "receipt": {
+      "path": "/Users/vadimkassin/Not_Cloud/tastes/.docs-trusted-read-costs-25/receipt.json",
+      "bytes": 965,
+      "sha256": "f44b3d97b761ed835bbf816bdf48cf13fe616ad31f890c445b9b4ccdb2b9012f"
+    }
+  },
+  "error": null
+}
