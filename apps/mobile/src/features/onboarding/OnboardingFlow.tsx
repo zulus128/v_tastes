@@ -324,29 +324,32 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
-  const panelHeight = responsiveValue(compact ? 390 : 414, layoutScale);
-  const heroHeight = height - panelHeight;
+  const landscape = width > height;
+  const heroWidth = landscape ? Math.max(width * 0.38, responsiveValue(220, layoutScale)) : width;
+  const panelWidth = width - heroWidth;
+  const panelHeight = landscape ? height : responsiveValue(compact ? 390 : 414, layoutScale);
+  const heroHeight = landscape ? height : height - panelHeight;
   const heroOverflow = responsiveValue(48, layoutScale);
   const heroScale = Math.min(1, heroHeight / responsiveValue(387, layoutScale));
   const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
     - (1 - heroScale) * responsiveValue(34, layoutScale)
     - heroOverflow / 2;
   const pinPositions = [
-    { left: width * 0.17, top: pinTop(109) },
-    { left: width * 0.70, top: pinTop(121) },
-    { left: width * 0.31, top: pinTop(287) },
-    { left: width * 0.81, top: pinTop(319) },
+    { left: heroWidth * 0.17, top: pinTop(109) },
+    { left: heroWidth * 0.70, top: pinTop(121) },
+    { left: heroWidth * 0.31, top: pinTop(287) },
+    { left: heroWidth * 0.81, top: pinTop(319) },
   ];
   return (
     <View style={styles.fullScreen}>
-      <View style={[styles.heroLayer, { height: heroHeight }]}>
+      <View style={[styles.heroLayer, landscape ? { bottom: 0, right: undefined, width: heroWidth } : null, { height: heroHeight }]}>
         <Image source={hero} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
         <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
         <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
         <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
         <RatingPin label="3.5" scale={heroScale} style={pinPositions[3]} />
       </View>
-      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, { height: panelHeight }]}>
+      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, landscape ? styles.consentPanelLandscape : null, landscape ? { left: heroWidth, width: panelWidth } : null, { height: panelHeight }]}>
         {/* pattern.png is dark linework on transparent, so on the dark theme's
             near-black gradient it has to be tinted white to be visible at all —
             same treatment EntryScreen gives it. */}
@@ -574,6 +577,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleS
   ratingPointer: { width: 12, height: 12, backgroundColor: colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: colors.onPrimary, transform: [{ rotate: '45deg' }], marginTop: -7 },
   ratingStar: { color: colors.onPrimary, fontSize: 10, marginTop: 3 },
   consentPanel: { position: 'absolute', zIndex: 1, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  consentPanelLandscape: { top: 0, right: undefined, borderTopRightRadius: 0, borderBottomLeftRadius: 24, borderTopWidth: 0, borderLeftWidth: 1 },
   consentPanelBackground: { flex: 1 },
   consentScrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: compact ? 14 : 24, justifyContent: 'space-between' },
   panelPattern: { opacity: 0.06 },

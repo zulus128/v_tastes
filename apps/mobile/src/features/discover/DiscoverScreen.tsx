@@ -69,7 +69,13 @@ import {
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import {
+  responsiveSize,
+  responsiveStyleSheet,
+  responsiveWrapMetrics,
+  useResponsiveMetrics,
+  useResponsiveViewport,
+} from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { matchesPlaceFilters } from './placeFilters';
@@ -361,6 +367,11 @@ function TrendingFeed({
   const { colors } = useAppTheme();
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: viewportWidth } = useResponsiveViewport();
+  const { scale: layoutScale } = useResponsiveMetrics();
+  const placeCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2).itemWidth;
+  const gridCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 179, 4).itemWidth;
+  const reviewCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 300, 2).itemWidth;
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -442,6 +453,7 @@ function TrendingFeed({
                 onSave={() => onSave({ venueId: venue.id, name: venue.name })}
                 place={venueToPlace(venue)}
                 saved={savedVenueIds.has(venue.id)}
+                width={placeCardWidth}
               />
             ))}
           </View>
@@ -452,7 +464,7 @@ function TrendingFeed({
         <>
           <SectionLabel title="Most reviewed" subtitle="What everyone's talking about" />
           <View style={styles.grid}>
-            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gridCardWidth} />)}
           </View>
         </>
       ) : null}
@@ -481,6 +493,7 @@ function TrendingFeed({
                 text={review.text}
                 time={timeAgo(review.createdAt)}
                 commentCount={review.commentCount}
+                width={reviewCardWidth}
               />
             ))}
           </View>
@@ -1417,11 +1430,11 @@ function TrendingTile({ image, meta, name, onOpen, rating }: { image: ImageSourc
   );
 }
 
-function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean }) {
+function PlaceRow({ onOpen, onSave, place, saved, width }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean; width?: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.placeRow}>
+    <View style={[styles.placeRow, { width: width ?? '100%' }]}>
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
         <View style={styles.newChip}><Text style={styles.newChipText}>Popular</Text></View>
@@ -1446,11 +1459,11 @@ function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave
   );
 }
 
-function GridPlace({ onOpen, place }: { onOpen: () => void; place: Place }) {
+function GridPlace({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.gridCard}>
+    <Pressable onPress={onOpen} style={[styles.gridCard, { width }]}>
       <Image source={place.image} style={styles.gridImage} />
       <View style={styles.gridBody}>
         <Text numberOfLines={1} style={styles.gridTitle}>{place.name}</Text>
@@ -1478,6 +1491,7 @@ function ReviewCard({
   onShare,
   onOpen,
   reacted,
+  width,
 }: {
   author: string;
   avatarUrl: string | null;
@@ -1493,11 +1507,12 @@ function ReviewCard({
   onShare: () => void;
   onOpen: () => void;
   reacted: boolean;
+  width: number;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.reviewCard}>
+    <Pressable onPress={onOpen} style={[styles.reviewCard, { width }]}>
       <Image source={image} style={styles.reviewImage} />
       <View style={styles.reviewBody}>
         <View style={styles.reviewHead}>
@@ -1897,7 +1912,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
   placeRows: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  placeRow: { flexGrow: 1, flexBasis: 280, minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
+  placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
   newChip: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 7, borderRadius: 9, backgroundColor: '#E63946', justifyContent: 'center' },
   newChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
@@ -1909,13 +1924,13 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   infoChip: { height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   infoChipText: { color: colors.text, fontSize: 13 },
   grid: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridCard: { flexGrow: 1, flexBasis: 180, height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
+  gridCard: { height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
   gridImage: { width: '100%', height: 90, resizeMode: 'cover' },
   gridBody: { height: 61, padding: 9, gap: 4 },
   gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gridMeta: { color: colors.textSecondary, fontSize: 12 },
   reviewList: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  reviewCard: { flexGrow: 1, flexBasis: 300, height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
+  reviewCard: { height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
   reviewImage: { width: 110, height: 121, resizeMode: 'cover' },
   reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
   reviewHead: { height: 32, flexDirection: 'row', alignItems: 'center', gap: 7 },

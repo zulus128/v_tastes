@@ -19,6 +19,7 @@ describe('OTA configuration', () => {
     });
     expect(easJson.build.production.channel).toBe('production');
     expect(easJson.build.preview.channel).toBe('preview');
+    expect(packageJson.scripts['update:layout-preview']).toContain('pnpm dlx eas-cli@23.2.0');
   });
 
   it('allows the native window to use portrait and landscape layouts', () => {

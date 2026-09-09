@@ -2,6 +2,7 @@ import {
   DESIGN_VIEWPORT,
   responsiveMetrics,
   responsiveViewport,
+  responsiveWrapMetrics,
   scaleNamedStyles,
 } from '../src/ui/responsive';
 
@@ -38,6 +39,19 @@ describe('responsive layout metrics', () => {
     expect(responsiveViewport(1032, 1376)).toEqual({ width: 1032, height: 1376 });
     expect(responsiveViewport(1024, 600)).toEqual({ width: 1024, height: 600 });
     expect(responsiveViewport(1600, 500)).toEqual({ width: 1600, height: 500 });
+  });
+
+  it('keeps two phone cards on one row despite pixel rounding', () => {
+    const scale = responsiveMetrics(375, 667).scale;
+    const grid = responsiveWrapMetrics(375, scale, 179, 4);
+    expect(grid.columns).toBe(2);
+    expect((grid.itemWidth * 2) + 30 + 9.5).toBe(375);
+  });
+
+  it('keeps orphaned cards at the same width as a complete row', () => {
+    const layout = responsiveWrapMetrics(1024, responsiveMetrics(1024, 600).scale, 280, 2);
+    expect(layout.columns).toBe(2);
+    expect(layout.itemWidth).toBeLessThan(1024 - 32);
   });
 });
 

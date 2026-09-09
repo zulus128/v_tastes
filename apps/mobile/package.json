@@ -63,7 +63,7 @@
     "ios": "expo start --dev-client --ios --port 8082",
     "build:android": "expo run:android --no-bundler",
     "build:ios": "expo run:ios --no-bundler",
-    "update:layout-preview": "eas update --channel layout-preview --environment production",
+    "update:layout-preview": "pnpm dlx eas-cli@23.2.0 update --channel layout-preview --environment production",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit"
   },

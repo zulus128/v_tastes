@@ -86,6 +86,11 @@ export interface ResponsiveMetrics {
   width: number;
 }
 
+export interface ResponsiveWrapMetrics {
+  columns: number;
+  itemWidth: number;
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -149,6 +154,35 @@ export function useResponsiveViewport() {
 export function responsiveValue(value: number, scale: number) {
   if (value === 0) return 0;
   return PixelRatio.roundToNearestPixel(value * scale);
+}
+
+/**
+ * Fits wrapped cards to the exact available row width. Computing the item
+ * width from the already-rounded padding and gap avoids half-pixel overflow on
+ * narrow phones, while a fixed column count keeps an orphaned final card from
+ * growing across the row.
+ */
+export function responsiveWrapMetrics(
+  viewportWidth: number,
+  scale: number,
+  minimumItemWidth: number,
+  maximumColumns: number,
+  horizontalPadding = 16,
+  gap = 10,
+): ResponsiveWrapMetrics {
+  const scaledPadding = responsiveValue(horizontalPadding, scale);
+  const scaledGap = responsiveValue(gap, scale);
+  const scaledMinimum = responsiveValue(minimumItemWidth, scale);
+  const availableWidth = Math.max(0, viewportWidth - (scaledPadding * 2));
+  const columns = clamp(
+    Math.floor((availableWidth + scaledGap) / (scaledMinimum + scaledGap)),
+    1,
+    maximumColumns,
+  );
+  return {
+    columns,
+    itemWidth: (availableWidth - (scaledGap * (columns - 1))) / columns,
+  };
 }
 
 /** Scales numeric component props (most often SVG width/height) like styles. */
