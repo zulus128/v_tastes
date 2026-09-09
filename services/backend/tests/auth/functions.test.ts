@@ -365,7 +365,7 @@ describe('authenticated session and paginated reads', () => {
       profileExists: false,
       onboardingVersion: 0,
       onboardingComplete: false,
-      minimumSupportedIosBuild: 43,
+      minimumSupportedIosBuild: 45,
     });
     await callFunction(
       'createUserProfile',
