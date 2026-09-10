@@ -11,6 +11,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -91,6 +92,7 @@ export function ProfileExtras({
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [enabled, setEnabled] = useState(true);
   const [push, setPush] = useState(true);
@@ -172,7 +174,7 @@ export function ProfileExtras({
     <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
         <View style={[styles.header, { height: responsiveSize(screen === 'followers' || screen === 'following' ? 106 : 60) + insets.top, paddingTop: insets.top }, (screen === 'followers' || screen === 'following') && styles.peopleHeader]}>
-          <View style={styles.headerTitleRow}>
+          <View style={[styles.headerTitleRow, { paddingLeft: responsiveSize(6) + insets.left, paddingRight: responsiveSize(6) + insets.right }]}>
             <Pressable accessibilityLabel="Back" onPress={() => slide.current?.close()} style={styles.headerButton}>
               <BackIcon color={colors.text} height={responsiveSize(16)} width={responsiveSize(9)} />
             </Pressable>
@@ -243,7 +245,7 @@ export function ProfileExtras({
           />
         )}
 
-        <RewardDetailsModal onClose={() => setDetailReward(null)} reward={detailReward} safeBottom={insets.bottom} styles={styles} />
+        <RewardDetailsModal availableHeight={windowHeight} onClose={() => setDetailReward(null)} reward={detailReward} safeBottom={insets.bottom} styles={styles} />
         <AchievementModal
           onClose={() => setAchievementReward(null)}
           onViewAll={() => setAchievementReward(null)}
@@ -280,19 +282,19 @@ function RewardsList({ data, onPress, safeBottom, styles }: { data: ProfileExtra
   );
 }
 
-function RewardDetailsModal({ onClose, reward, safeBottom, styles }: { onClose: () => void; reward: RewardView | null; safeBottom: number; styles: ReturnType<typeof createStyles> }) {
+function RewardDetailsModal({ availableHeight, onClose, reward, safeBottom, styles }: { availableHeight: number; onClose: () => void; reward: RewardView | null; safeBottom: number; styles: ReturnType<typeof createStyles> }) {
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={reward !== null}>
       <View style={styles.modalRoot}>
         <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={[styles.detailSheet, { height: responsiveSize(450) + safeBottom, paddingBottom: Math.max(responsiveSize(30), safeBottom) }]}>
+        <View style={[styles.detailSheet, { height: Math.min(responsiveSize(450) + safeBottom, availableHeight), paddingBottom: Math.max(responsiveSize(30), safeBottom) }]}>
           <SheetHeader onClose={onClose} styles={styles}>Reward details</SheetHeader>
-          <View style={styles.detailContent}>
+          <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false} style={styles.detailScroll}>
             <Image source={reward?.detailImage} style={styles.detailImage} />
             <ProgressCount current={reward?.current ?? 0} styles={styles} target={reward?.target ?? 10} />
             <Text style={styles.detailName}>{reward?.name}</Text>
             <Text style={styles.detailCopy}>{reward?.description}</Text>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -385,7 +387,8 @@ function createStyles(colors: ThemeColors) {
     sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sheetTitle: { color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 },
     closeIcon: { width: 30, height: 30 },
-    detailContent: { paddingHorizontal: 16, gap: 16, alignItems: 'center' },
+    detailScroll: { flexShrink: 1 },
+    detailContent: { flexGrow: 1, paddingHorizontal: 16, gap: 16, alignItems: 'center', paddingBottom: 8 },
     detailImage: { width: 120, height: 120, resizeMode: 'stretch' },
     progressCount: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '700', letterSpacing: -0.41 },
     progressCurrent: { color: '#B82F29' },
