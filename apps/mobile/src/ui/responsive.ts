@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import {
   Dimensions,
+  Keyboard,
   PixelRatio,
   Platform,
   useWindowDimensions,
@@ -145,7 +147,12 @@ export function useResponsiveMetrics() {
  */
 export function useOrientationDimensions() {
   const windowDimensions = useWindowDimensions();
-  return Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const keyboardVisible = Platform.OS === 'android'
+    && typeof Keyboard.isVisible === 'function'
+    && Keyboard.isVisible();
+  const stableWindowDimensions = useRef(windowDimensions);
+  if (!keyboardVisible) stableWindowDimensions.current = windowDimensions;
+  return keyboardVisible ? stableWindowDimensions.current : windowDimensions;
 }
 
 export function responsiveValue(value: number, scale: number) {

@@ -36,14 +36,15 @@ export function NewDialogSheet({
   const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
   const minResultsHeight = responsiveSize(MIN_RESULTS_HEIGHT);
   const actionsTranslateY = responsiveSize(72);
+  const actionsInitiallyVisible = windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [actionsHidden, setActionsHidden] = useState(false);
-  const actionsVisibility = useRef(new Animated.Value(1)).current;
+  const [actionsHidden, setActionsHidden] = useState(!actionsInitiallyVisible);
+  const actionsVisibility = useRef(new Animated.Value(actionsInitiallyVisible ? 1 : 0)).current;
   const closing = useRef(false);
   const keyboardTop = useRef<number | null>(null);
   const searchInputRef = useRef<TextInput | null>(null);
@@ -78,10 +79,10 @@ export function NewDialogSheet({
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
         const nextKeyboardTop = Math.max(0, Math.min(windowHeight, event.endCoordinates.screenY));
-        const resultsHeight = nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight;
+        const actionsVisible = nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
         animateLayout(
           nextKeyboardTop,
-          resultsHeight >= minResultsHeight,
+          actionsVisible,
           event.duration || 280,
         );
       },
@@ -98,9 +99,12 @@ export function NewDialogSheet({
 
   useEffect(() => {
     const availableHeight = keyboardTop.current ?? windowHeight;
+    const actionsVisible = availableHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
+    setActionsHidden(!actionsVisible);
+    actionsVisibility.setValue(actionsVisible ? 1 : 0);
     sheetHeight.setValue(Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO));
     sheetBottom.setValue(keyboardTop.current === null ? 0 : Math.max(0, windowHeight - keyboardTop.current));
-  }, [sheetBottom, sheetHeight, windowHeight]);
+  }, [actionsVisibility, fixedContentHeight, minResultsHeight, sheetBottom, sheetHeight, windowHeight]);
 
   useEffect(() => {
     if (!visible) return;
@@ -151,10 +155,11 @@ export function NewDialogSheet({
     sheetHeight.stopAnimation();
     sheetBottom.stopAnimation();
     keyboardTop.current = null;
-    actionsVisibility.setValue(1);
+    const actionsVisible = windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
+    actionsVisibility.setValue(actionsVisible ? 1 : 0);
     sheetHeight.setValue(windowHeight * SHEET_HEIGHT_RATIO);
     sheetBottom.setValue(0);
-    setActionsHidden(false);
+    setActionsHidden(!actionsVisible);
   }
 
   async function openConversation(candidate: ActivityCandidate) {

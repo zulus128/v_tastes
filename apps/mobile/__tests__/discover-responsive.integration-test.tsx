@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Animated, Dimensions, Platform, StyleSheet } from 'react-native';
+import { Animated, Dimensions, Keyboard, Platform, StyleSheet } from 'react-native';
 import { DiscoverScreen } from '../src/features/discover/DiscoverScreen';
 import { responsiveSize } from '../src/ui/responsive';
 
@@ -177,6 +177,7 @@ describe('Discover responsive content', () => {
 
   it('keeps portrait layout when the Android keyboard shortens the window', async () => {
     jest.replaceProperty(Platform, 'OS', 'android');
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
     resize(800, 1200);
     await render(<DiscoverScreen {...props} />);
     await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
