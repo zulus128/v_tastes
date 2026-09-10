@@ -105,12 +105,22 @@ export function ProfileSettingsSheet({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  const appearanceTranslateX = useRef(new Animated.Value(viewportWidth)).current;
+  // Animate a fraction of the live width so closed and transitioning panes
+  // stay aligned when the native window is resized.
+  const appearanceProgress = useRef(new Animated.Value(1)).current;
   const appearanceClosing = useRef(false);
   const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notificationTranslateX = useRef(new Animated.Value(viewportWidth)).current;
+  const notificationProgress = useRef(new Animated.Value(1)).current;
   const notificationClosing = useRef(false);
   const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appearanceTranslateX = useMemo(
+    () => appearanceProgress.interpolate({ inputRange: [0, 1], outputRange: [0, viewportWidth] }),
+    [appearanceProgress, viewportWidth],
+  );
+  const notificationTranslateX = useMemo(
+    () => notificationProgress.interpolate({ inputRange: [0, 1], outputRange: [0, viewportWidth] }),
+    [notificationProgress, viewportWidth],
+  );
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
   const citySlide = useRef<SideSlideScreenHandle>(null);
@@ -125,9 +135,18 @@ export function ProfileSettingsSheet({
     notificationCloseTimer.current = null;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
-    appearanceTranslateX.setValue(viewportWidth);
-    notificationTranslateX.setValue(viewportWidth);
-  }, [appearanceTranslateX, notificationTranslateX, viewportWidth, visible]);
+    appearanceProgress.setValue(1);
+    notificationProgress.setValue(1);
+  }, [appearanceProgress, notificationProgress, visible]);
+
+  useEffect(() => () => {
+    appearanceClosing.current = false;
+    notificationClosing.current = false;
+    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
+    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
+    appearanceProgress.stopAnimation();
+    notificationProgress.stopAnimation();
+  }, [appearanceProgress, notificationProgress]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -269,10 +288,10 @@ export function ProfileSettingsSheet({
     appearanceClosing.current = false;
     if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
     appearanceCloseTimer.current = null;
-    appearanceTranslateX.stopAnimation();
+    appearanceProgress.stopAnimation();
     setAppearanceOpen(true);
-    appearanceTranslateX.setValue(viewportWidth);
-    Animated.timing(appearanceTranslateX, {
+    appearanceProgress.setValue(1);
+    Animated.timing(appearanceProgress, {
       duration: 280,
       toValue: 0,
       useNativeDriver: true,
@@ -287,12 +306,13 @@ export function ProfileSettingsSheet({
       appearanceClosing.current = false;
       if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
       appearanceCloseTimer.current = null;
+      appearanceProgress.setValue(1);
       setAppearanceOpen(false);
     };
     appearanceCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(appearanceTranslateX, {
+    Animated.timing(appearanceProgress, {
       duration: 240,
-      toValue: viewportWidth,
+      toValue: 1,
       useNativeDriver: true,
     }).start(finish);
   }
@@ -301,10 +321,10 @@ export function ProfileSettingsSheet({
     notificationClosing.current = false;
     if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
     notificationCloseTimer.current = null;
-    notificationTranslateX.stopAnimation();
+    notificationProgress.stopAnimation();
     setNotificationsOpen(true);
-    notificationTranslateX.setValue(viewportWidth);
-    Animated.timing(notificationTranslateX, {
+    notificationProgress.setValue(1);
+    Animated.timing(notificationProgress, {
       duration: 280,
       toValue: 0,
       useNativeDriver: true,
@@ -331,12 +351,13 @@ export function ProfileSettingsSheet({
       notificationClosing.current = false;
       if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
       notificationCloseTimer.current = null;
+      notificationProgress.setValue(1);
       setNotificationsOpen(false);
     };
     notificationCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(notificationTranslateX, {
+    Animated.timing(notificationProgress, {
       duration: 240,
-      toValue: viewportWidth,
+      toValue: 1,
       useNativeDriver: true,
     }).start(finish);
   }
@@ -429,6 +450,7 @@ export function ProfileSettingsSheet({
           </LinearGradient>
         </LinearGradient>
         <Animated.View
+          testID="notification-settings-pane"
           pointerEvents={notificationsOpen ? 'auto' : 'none'}
           style={[styles.notificationsScreen, { transform: [{ translateX: notificationTranslateX }] }]}
         >
@@ -465,6 +487,7 @@ export function ProfileSettingsSheet({
           </ImageBackground>
         </Animated.View>
         <Animated.View
+          testID="appearance-settings-pane"
           pointerEvents={appearanceOpen ? 'auto' : 'none'}
           style={[styles.notificationsScreen, { transform: [{ translateX: appearanceTranslateX }] }]}
         >

@@ -5,7 +5,7 @@ import * as Updates from 'expo-updates';
 import { StatusBar } from 'expo-status-bar';
 import { type PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { useState } from 'react';
-import { Linking, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { useVisualAuditCase, VisualAuditScreen } from './src/dev/VisualAuditScreen';
@@ -25,12 +25,12 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
 
-function ResponsiveAppFrame({ children, height, width }: PropsWithChildren<{ height: number; width: number }>) {
+function ResponsiveAppFrame({ children }: PropsWithChildren) {
   const { colors } = useAppTheme();
 
   return (
-    <View style={[styles.viewport, { backgroundColor: colors.background }]}>
-      <View style={[styles.appFrame, { height, width }]}>{children}</View>
+    <View style={[styles.appFrame, { backgroundColor: colors.background }]}>
+      {children}
     </View>
   );
 }
@@ -160,7 +160,6 @@ function UpdatePrompt({ onClose, onUpdate, visible }: { onClose: () => void; onU
 }
 
 export default function App() {
-  const { height, width } = useWindowDimensions();
   const cacheBuster = queryCacheBuster({
     nativeBuildVersion: Application.nativeBuildVersion,
     runtimeVersion: Updates.runtimeVersion,
@@ -170,7 +169,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ResponsiveAppFrame height={height} width={width}>
+        <ResponsiveAppFrame>
           <AppErrorBoundary>
             <PersistQueryClientProvider
               client={queryClient}
@@ -193,8 +192,7 @@ export default function App() {
 }
 
 const styles = responsiveStyleSheet({
-  viewport: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  appFrame: { overflow: 'hidden' },
+  appFrame: { flex: 1, overflow: 'hidden' },
   root: { flex: 1 },
   error: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32, backgroundColor: '#161616' },
   errorTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },

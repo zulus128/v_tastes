@@ -3,7 +3,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithCustomToken, updateProfile } from 'firebase/auth';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import {
   Alert,
   FlatList,
@@ -21,6 +21,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
@@ -30,7 +31,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
-import { BackButton, PatternScreen, PrimaryButton } from './components';
+import { BackButton, PatternScreen as PatternBackground, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
@@ -67,8 +68,19 @@ function displayPhone(country: Country, digits: string): string {
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
   const { height, width } = useWindowDimensions();
+  const { scale } = useResponsiveMetrics();
+  const insets = useSafeAreaInsets();
   const compact = height <= 700 || width <= 340;
-  return useMemo(() => createStyles(colors, compact), [colors, compact]);
+  const bottomGutter = Math.max(compact ? 12 : 24, insets.bottom / scale);
+  return useMemo(() => createStyles(colors, compact, bottomGutter), [colors, compact, bottomGutter]);
+}
+
+function PatternScreen({ children }: PropsWithChildren) {
+  return <PatternBackground>
+    <SafeAreaView edges={['left', 'right']} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>{children}</View>
+    </SafeAreaView>
+  </PatternBackground>;
 }
 
 export function OnboardingFlow({ initialScreen, visualAudit = false }: { initialScreen?: OnboardingScreen; visualAudit?: boolean } = {}) {
@@ -326,12 +338,14 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
   const landscape = width > height;
-  const heroWidth = landscape ? Math.max(width * 0.38, responsiveValue(220, layoutScale)) : width;
+  const heroWidth = landscape
+    ? Math.min(width * 0.46, Math.max(width * 0.38, responsiveValue(220, layoutScale)))
+    : width;
   const panelWidth = width - heroWidth;
-  const panelHeight = landscape ? height : responsiveValue(compact ? 390 : 414, layoutScale);
+  const panelHeight = landscape ? height : Math.min(height, responsiveValue(compact ? 390 : 414, layoutScale));
   const heroHeight = landscape ? height : height - panelHeight;
   const heroOverflow = responsiveValue(48, layoutScale);
-  const heroScale = Math.min(1, heroHeight / responsiveValue(387, layoutScale));
+  const heroScale = Math.max(0, Math.min(1, heroHeight / responsiveValue(387, layoutScale)));
   const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
     - (1 - heroScale) * responsiveValue(34, layoutScale)
     - heroOverflow / 2;
@@ -360,6 +374,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
           imageStyle={isDark ? styles.panelPatternDark : styles.panelPattern}
           style={styles.consentPanelBackground}
         >
+          <SafeAreaView edges={landscape ? ['right', 'bottom'] : ['left', 'right', 'bottom']} style={styles.consentPanelBackground}>
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
               <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
@@ -382,6 +397,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
               <Text style={styles.legal}>By continuing you agree to our <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/terms')} style={styles.legalLink}>Terms of Service</Text> & <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/privacy')} style={styles.legalLink}>Privacy Policy</Text></Text>
             </View>
           </ScrollView>
+          </SafeAreaView>
         </ImageBackground>
       </LinearGradient>
     </View>
@@ -567,7 +583,7 @@ function OtpScreen(props: {
   );
 }
 
-const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleSheet({
+const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: number) => responsiveStyleSheet({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
@@ -618,7 +634,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleS
   phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
   errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
   phoneErrorText: { width: '100%', textAlign: 'left' },
-  authButtonArea: { paddingHorizontal: 36, paddingBottom: compact ? 12 : 24 },
+  authButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter },
   countryContent: { flex: 1, paddingTop: compact ? 100 : 130, paddingHorizontal: 16 },
   countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
   search: { height: 44, marginTop: 19, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },

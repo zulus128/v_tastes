@@ -8,6 +8,7 @@ import {
   AppState,
   Animated,
   Alert,
+  Dimensions,
   Easing,
   Image,
   Keyboard,
@@ -212,13 +213,13 @@ export function DiscoverScreen({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
+  const windowDimensions = useWindowDimensions();
+  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const safeContentStyle = { paddingLeft: insets.left, paddingRight: insets.right };
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
   const headerHeight = responsiveSize(DISCOVER_HEADER_HEIGHT - 54) + headerTop;
   const headerSafeStyle = {
     height: headerHeight,
-    paddingLeft: Math.max(insets.left, responsiveSize(DISCOVER_GRID_PADDING)),
-    paddingRight: Math.max(insets.right, responsiveSize(DISCOVER_GRID_PADDING)),
     paddingTop: headerTop,
   };
   const [tab, setTab] = useState<DiscoverTab>('trending');
@@ -250,8 +251,8 @@ export function DiscoverScreen({
   }
 
   return (
-    <View style={[styles.screen, mapMode && styles.mapDiscoverScreen]}>
-      <View style={[styles.header, headerSafeStyle, mapMode && styles.mapHeader]}>
+    <View style={[styles.screen, safeContentStyle, mapMode && styles.mapDiscoverScreen]}>
+      <View style={[styles.header, headerSafeStyle, mapMode && styles.mapHeader, mapMode && { left: insets.left, right: insets.right }]}>
         <View style={styles.switcher}>
           {(['trending', 'places', 'people'] as const).map((value) => (
             <Pressable
@@ -315,7 +316,7 @@ export function DiscoverScreen({
         userId={userId}
         visible={saveTarget !== null}
       />
-      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={styles.aiFab}>
+      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={[styles.aiFab, { right: insets.right + responsiveSize(16) }]}>
         <View style={styles.aiFabMark}>
           <AiMouthPink height={responsiveSize(10)} style={styles.aiFabMarkPink} width={responsiveSize(13)} />
           <AiMouthOutline color={colors.text} height={responsiveSize(13)} style={styles.aiFabMarkOutline} width={responsiveSize(18)} />
@@ -382,13 +383,15 @@ function TrendingFeed({
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
   const { scale: layoutScale } = useResponsiveMetrics();
   const { gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth } = useMemo(() => ({
-    gemCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    gridCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 179, 4, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    placeCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    reviewCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 300, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-  }), [layoutScale, viewportWidth]);
+    gemCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    gridCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 179, 4, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    placeCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    reviewCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 300, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+  }), [contentWidth, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -583,6 +586,15 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { scale: layoutScale } = useResponsiveMetrics();
+  const windowDimensions = useWindowDimensions();
+  const orientationDimensions = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const insets = useSafeAreaInsets();
+  const contentWidth = Math.max(0, windowDimensions.width - insets.left - insets.right);
+  const splitLayout = orientationDimensions.width > orientationDimensions.height && windowDimensions.width >= 600;
+  const sheetRight = splitLayout ? contentWidth * 0.48 : 0;
+  const [mapHeight, setMapHeight] = useState(0);
+  const [keyboardAvoidanceActive, setKeyboardAvoidanceActive] = useState(false);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -605,7 +617,6 @@ function PlacesMap({
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
   const keyboardVisibleRef = useRef(false);
-  const keyboardTransitionRef = useRef(false);
   const keyboardAdjustedRef = useRef(false);
   const venueFilter = activeFilter
     ? { category: activeFilter.category, tag: activeFilter.tag }
@@ -686,9 +697,9 @@ function PlacesMap({
         Keyboard.dismiss();
         keyboardVisibleRef.current = false;
         keyboardAdjustedRef.current = false;
-        keyboardTransitionRef.current = false;
         sheetKeyboardTranslate.stopAnimation();
         sheetKeyboardTranslate.setValue(0);
+        setKeyboardAvoidanceActive(false);
         return;
       }
       if (!resumed) return;
@@ -726,11 +737,12 @@ function PlacesMap({
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: false,
       }).start(({ finished }) => {
-        if (finished) keyboardTransitionRef.current = false;
+        if (finished && !keyboardVisibleRef.current) setKeyboardAvoidanceActive(false);
       });
     };
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       keyboardVisibleRef.current = true;
+      setKeyboardAvoidanceActive(true);
       setSortOpen(false);
       searchRowRef.current?.measureInWindow((_x, y, _width, height) => {
         const keyboardOverlap = Math.max(
@@ -738,7 +750,6 @@ function PlacesMap({
           y + height + KEYBOARD_SEARCH_GAP - event.endCoordinates.screenY,
         );
         keyboardAdjustedRef.current = keyboardOverlap > 0;
-        keyboardTransitionRef.current = keyboardAdjustedRef.current;
         if (keyboardAdjustedRef.current) {
           animateKeyboardOffset(-keyboardOverlap, event.duration);
         }
@@ -747,11 +758,10 @@ function PlacesMap({
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
       keyboardVisibleRef.current = false;
       if (!keyboardAdjustedRef.current) {
-        keyboardTransitionRef.current = false;
+        setKeyboardAvoidanceActive(false);
         return;
       }
       keyboardAdjustedRef.current = false;
-      keyboardTransitionRef.current = true;
       animateKeyboardOffset(0, event.duration);
     });
     return () => {
@@ -803,10 +813,11 @@ function PlacesMap({
     },
   })).current;
 
-  function handleMapLayout(height: number) {
-    const availableHeight = Math.max(0, height - 8);
+  useEffect(() => {
+    if (mapHeight <= 0 || keyboardAvoidanceActive) return;
+    const availableHeight = Math.max(0, mapHeight - responsiveSize(8));
     const expanded = Math.max(0, availableHeight - headerHeight);
-    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(height * 0.53)));
+    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
       sheetBounds.current = { collapsed, expanded };
@@ -814,21 +825,21 @@ function PlacesMap({
       sheetHeight.setValue(collapsed);
       return;
     }
-    if (keyboardVisibleRef.current || keyboardTransitionRef.current) return;
-
     sheetBounds.current = { collapsed, expanded };
 
     // Animate orientation and container-size changes without jumping.
     sheetHeight.stopAnimation();
     const nextHeight = sheetExpandedRef.current ? expanded : collapsed;
     currentSheetHeight.current = nextHeight;
-    Animated.timing(sheetHeight, {
+    const animation = Animated.timing(sheetHeight, {
       toValue: nextHeight,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
-  }
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [headerHeight, keyboardAvoidanceActive, layoutScale, mapHeight, sheetHeight]);
 
   function zoom(multiplier: number) {
     const next = {
@@ -875,7 +886,7 @@ function PlacesMap({
   }
 
   return (
-    <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
+    <View onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)} style={styles.mapScreen}>
       <MapView
         key={mapInstanceKey}
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
@@ -929,7 +940,7 @@ function PlacesMap({
         pointerEvents="none"
         style={[styles.mapToneOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.19)' }]}
       />
-      <View style={styles.mapControls}>
+      <View style={[styles.mapControls, { top: headerHeight + responsiveSize(18) }, splitLayout && styles.mapControlsLandscape]}>
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.55)} style={styles.mapControlButton}>
           <Text style={styles.mapControlGlyph}>+</Text>
         </Pressable>
@@ -954,7 +965,7 @@ function PlacesMap({
         </Pressable>
       </View>
       {layersOpen ? (
-        <View style={styles.layersMenu}>
+        <View style={[styles.layersMenu, { top: headerHeight + responsiveSize(splitLayout ? 76 : 18) }, splitLayout && { right: responsiveSize(16) }]}>
           <Text style={styles.layersTitle}>Show on map</Text>
           <MapLayerToggle active={mapLayers.friends} label="Friends" onPress={() => toggleMapLayer('friends')} styles={styles} />
           <MapLayerToggle active={mapLayers.saved} label="Saved" onPress={() => toggleMapLayer('saved')} styles={styles} />
@@ -963,12 +974,12 @@ function PlacesMap({
       ) : null}
       <Animated.View
         pointerEvents="none"
-        style={[styles.mapSheetUnderlay, { height: sheetHeight }]}
+        style={[styles.mapSheetUnderlay, { height: sheetHeight, right: sheetRight }]}
       />
       <Animated.View
         style={[
           styles.mapSheet,
-          { height: sheetHeight, transform: [{ translateY: sheetKeyboardTranslate }] },
+          { height: sheetHeight, right: sheetRight, transform: [{ translateY: sheetKeyboardTranslate }] },
         ]}
       >
         <Pressable
@@ -2006,11 +2017,12 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
   mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-  mapControls: { position: 'absolute', zIndex: 5, top: 124, right: 16, gap: 10 },
+  mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
+  mapControlsLandscape: { flexDirection: 'row', gap: 6 },
   mapControlButton: { width: 48, height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   mapControlButtonActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.9)' },
   mapControlGlyph: { color: colors.text, fontSize: 22, lineHeight: 26, fontWeight: '700' },
-  layersMenu: { position: 'absolute', zIndex: 6, top: 124, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  layersMenu: { position: 'absolute', zIndex: 6, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
   layersTitle: { marginBottom: 4, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   layerOptionText: { color: colors.text, fontSize: 15 },

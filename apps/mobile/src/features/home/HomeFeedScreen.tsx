@@ -2,6 +2,7 @@ import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -491,12 +492,12 @@ export function HomeFeedScreen({
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
+  const windowDimensions = useWindowDimensions();
+  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerHeight = responsiveSize(157 - 54) + headerTop;
   const headerSafeStyle = {
-    height: responsiveSize(157 - 54) + headerTop,
-    paddingLeft: Math.max(insets.left, responsiveSize(16)),
-    paddingRight: Math.max(insets.right, responsiveSize(16)),
+    height: headerHeight,
     paddingTop: headerTop,
   };
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
@@ -629,7 +630,7 @@ export function HomeFeedScreen({
   );
 
   return (
-    <Screen background="homeFeed">
+    <Screen background="homeFeed" style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       <View style={[styles.header, headerSafeStyle]}>
         <View style={styles.headerTop}>
           <Pressable
@@ -668,7 +669,7 @@ export function HomeFeedScreen({
         </View>
       </View>
       {hasNewPosts ? (
-        <Pressable onPress={() => { void handleRefreshNewPosts(); }} style={styles.newPostsBanner}>
+        <Pressable onPress={() => { void handleRefreshNewPosts(); }} style={[styles.newPostsBanner, { top: headerHeight - responsiveSize(5), left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}>
           <Text style={styles.newPostsText}>↑ New posts</Text>
         </Pressable>
       ) : null}

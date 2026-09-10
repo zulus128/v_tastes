@@ -17,8 +17,10 @@ export const DESIGN_VIEWPORT = {
 const MIN_LAYOUT_SCALE = 0.82;
 const MAX_PHONE_LAYOUT_SCALE = 1.12;
 const MAX_TABLET_LAYOUT_SCALE = 2;
-const LARGE_WINDOW_SCALE_START = 480;
-const TABLET_MIN_EDGE = 600;
+const LARGE_WINDOW_SCALE_START = DESIGN_VIEWPORT.width;
+const LARGE_WINDOW_SCALE_END = 480;
+const WIDE_WINDOW_SCALE_START = 840;
+const WIDE_WINDOW_SCALE_END = 1024;
 
 type NamedStyle = ViewStyle | TextStyle | ImageStyle;
 type NamedStyles = Record<string, NamedStyle>;
@@ -96,8 +98,8 @@ function clamp(value: number, minimum: number, maximum: number) {
 /**
  * Phones scale from their short edge so a short 16:9 display does not make all
  * controls tiny. Larger, freely resizable windows use both dimensions: the
- * geometric mean follows the available area without letting an unusually wide
- * or tall aspect ratio dominate the typography and icon size.
+ * area-based scale is capped by height. Both transitions are continuous, even
+ * when a window crosses a square aspect ratio or a short-edge breakpoint.
  */
 export function responsiveMetrics(width: number, height: number): ResponsiveMetrics {
   const shortEdge = Math.min(width, height);
@@ -112,19 +114,22 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
       MAX_TABLET_LAYOUT_SCALE,
     ),
   );
-  const largeWindowProgress = clamp(
-    (shortEdge - LARGE_WINDOW_SCALE_START) / (TABLET_MIN_EDGE - LARGE_WINDOW_SCALE_START),
+  const shortEdgeProgress = clamp(
+    (shortEdge - LARGE_WINDOW_SCALE_START) / (LARGE_WINDOW_SCALE_END - LARGE_WINDOW_SCALE_START),
     0,
     1,
   );
   const heightConstrainedScale = Math.min(areaScale, height / DESIGN_VIEWPORT.height);
   // Large resizable windows still use their full width, but fixed-position
-  // screens must fit vertically. Phone landscape keeps the readable phone
-  // scale and uses screen-specific reflow where necessary.
-  const isWideResizableWindow = width > height && shortEdge >= LARGE_WINDOW_SCALE_START;
-  const scale = isWideResizableWindow
-    ? heightConstrainedScale
-    : phoneScale + ((heightConstrainedScale - phoneScale) * largeWindowProgress);
+  // screens must fit vertically. Smaller phone windows keep the width-based
+  // scale; larger windows gradually gain a height cap and use screen reflow.
+  const wideWindowProgress = clamp(
+    (width - WIDE_WINDOW_SCALE_START) / (WIDE_WINDOW_SCALE_END - WIDE_WINDOW_SCALE_START),
+    0,
+    1,
+  );
+  const largeWindowProgress = Math.max(shortEdgeProgress, wideWindowProgress);
+  const scale = phoneScale + ((heightConstrainedScale - phoneScale) * largeWindowProgress);
   return {
     height,
     scale,
@@ -133,12 +138,8 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
 }
 
 export function useResponsiveMetrics() {
-  // `window` height shrinks on Android while the resize-style keyboard is open.
-  // Use it only as a subscription to orientation/window changes; scale itself
-  // comes from stable physical screen dimensions.
-  useWindowDimensions();
-  const { width, height } = Dimensions.get('screen');
-  return { ...responsiveMetrics(width, height), scale: stableAvailableScale() };
+  const { width, height } = useWindowDimensions();
+  return { width, height, scale: stableAvailableScale() };
 }
 
 export function responsiveValue(value: number, scale: number) {
@@ -206,7 +207,7 @@ export function scaleStyle(style: NamedStyle, scale: number): NamedStyle {
     if (scalableProperties.has(property) && typeof value === 'number') {
       // 999 is the conventional fully-rounded sentinel and must remain larger
       // than every possible control after scaling.
-      result[property] = value >= 900 ? value : responsiveValue(value, scale);
+      result[property] = /^border.*Radius$/.test(property) && value >= 900 ? value : responsiveValue(value, scale);
     } else if (property === 'transform') {
       result[property] = scaleTransform(value, scale);
     } else if (property === 'shadowOffset' || property === 'textShadowOffset') {

@@ -22,17 +22,27 @@ describe('responsive layout metrics', () => {
   });
 
   it('transitions smoothly between phone and large-window scaling', () => {
-    const before = responsiveMetrics(479, 900).scale;
-    const afterBoundary = responsiveMetrics(481, 900).scale;
-    const during = responsiveMetrics(540, 900).scale;
-    const after = responsiveMetrics(600, 900).scale;
+    const before = responsiveMetrics(401, 700).scale;
+    const afterBoundary = responsiveMetrics(403, 700).scale;
+    const during = responsiveMetrics(440, 700).scale;
+    const after = responsiveMetrics(480, 700).scale;
     expect(Math.abs(afterBoundary - before)).toBeLessThan(0.01);
     expect(during).toBeLessThanOrEqual(Math.max(before, after));
     expect(during).toBeGreaterThanOrEqual(Math.min(before, after));
   });
 
+  it('does not jump while dragging either edge across breakpoints or a square window', () => {
+    for (const width of [401, 402, 403, 479, 480, 481, 599, 600, 601, 839, 840, 841, 1023, 1024, 1025]) {
+      for (const height of [375, 479, 480, 481, 599, 600, 601, 900]) {
+        const scale = responsiveMetrics(width, height).scale;
+        expect(Math.abs(responsiveMetrics(width + 1, height).scale - scale)).toBeLessThan(0.01);
+        expect(Math.abs(responsiveMetrics(width, height + 1).scale - scale)).toBeLessThan(0.01);
+      }
+    }
+  });
+
   it('keeps a scaled design canvas within large resizable window height', () => {
-    for (const [width, height] of [[768, 1024], [1024, 600], [1600, 500]]) {
+    for (const [width, height] of [[768, 1024], [1024, 600], [1024, 479], [800, 500], [600, 600], [1600, 500]]) {
       expect(DESIGN_VIEWPORT.height * responsiveMetrics(width, height).scale).toBeLessThanOrEqual(height + 0.001);
     }
   });
@@ -62,6 +72,7 @@ describe('scaleNamedStyles', () => {
         width: 100,
       },
       pill: { borderRadius: 999 },
+      largeImage: { width: 1000, height: 1200 },
     }, 0.9);
 
     expect(result.card.width).toBe(90);
@@ -72,5 +83,6 @@ describe('scaleNamedStyles', () => {
     expect(result.card.opacity).toBe(0.5);
     expect(result.card.transform).toEqual([{ translateY: -3.5 }, { scale: 0.8 }]);
     expect(result.pill.borderRadius).toBe(999);
+    expect(result.largeImage).toEqual({ width: 900, height: 1080 });
   });
 });

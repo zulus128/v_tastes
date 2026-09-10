@@ -5,9 +5,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type PropsWithChildren } from 'react';
 import {
   Alert,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -23,6 +24,7 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import addPhoto from '../../../assets/onboarding/add-photo.png';
 import chevronRight from '../../../assets/onboarding/chevron-right.png';
 import dishBurgers from '../../../assets/onboarding/dish-burgers.png';
@@ -68,7 +70,7 @@ import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
-import { BackButton, PatternScreen, PrimaryButton } from './components';
+import { BackButton, PatternScreen as PatternBackground, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
@@ -173,12 +175,28 @@ function slug(name: string) {
 
 function useOnboardingStyles() {
   const { colors, isDark } = useAppTheme();
-  return useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { width, height } = useWindowDimensions();
+  const { scale } = useResponsiveMetrics();
+  const insets = useSafeAreaInsets();
+  const orientation = Platform.OS === 'android' ? Dimensions.get('screen') : { width, height };
+  const landscape = orientation.width > orientation.height;
+  const bottomGutter = Math.max(Platform.OS === 'ios' ? 24 : 18, insets.bottom / scale);
+  return useMemo(() => createStyles(colors, isDark, landscape, bottomGutter), [colors, isDark, landscape, bottomGutter]);
+}
+
+function PatternScreen({ children }: PropsWithChildren) {
+  return <PatternBackground>
+    <SafeAreaView edges={['left', 'right']} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>{children}</View>
+    </SafeAreaView>
+  </PatternBackground>;
 }
 
 function Header({ onBack, onSkip }: { onBack: () => void; onSkip?: () => void }) {
   const styles = useOnboardingStyles();
-  return <><BackButton onPress={onBack} />{onSkip ? <Pressable onPress={onSkip} style={styles.skip}><Text style={styles.skipText}>Skip</Text></Pressable> : null}</>;
+  // Move the whole navigation row together: BackButton has a shared portrait
+  // top offset, while landscape step content starts much closer to the top.
+  return <View pointerEvents="box-none" style={styles.header}><BackButton onPress={onBack} />{onSkip ? <Pressable onPress={onSkip} style={styles.skip}><Text style={styles.skipText}>Skip</Text></Pressable> : null}</View>;
 }
 
 function StepDots({ step }: { step: number }) {
@@ -205,11 +223,11 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
   const styles = useOnboardingStyles();
   return <PatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
-    <View style={styles.permissionContent}>
+    <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={styles.permissionScroll} testID="onboarding-permission-scroll">
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={[styles.title, styles.permissionTitle]}>{title}</Text>
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
-    </View>
+    </ScrollView>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
   </PatternScreen>;
 }
@@ -222,11 +240,14 @@ export function PostSignupOnboardingFlow({
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
-  const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));
+  const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
+  const collageWidth = Math.min(DESIGN_VIEWPORT.width * layoutScale, contentWidth);
   const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
-  const landscape = viewportWidth > viewportHeight;
+  const orientation = Platform.OS === 'android' ? Dimensions.get('screen') : { width: viewportWidth, height: viewportHeight };
+  const landscape = orientation.width > orientation.height;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useTastesApi();
@@ -622,9 +643,9 @@ export function PostSignupOnboardingFlow({
             ))}
           </ScrollView>
         ) : placeError ? (
-          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>Couldn’t load places</Text><Text style={styles.emptyText}>{placeError}</Text><Pressable onPress={enterPlaces}><Text style={styles.retryText}>Try again</Text></Pressable></View>
+          <ScrollView contentContainerStyle={styles.empty} keyboardShouldPersistTaps="handled" style={styles.placeList}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>Couldn’t load places</Text><Text style={styles.emptyText}>{placeError}</Text><Pressable onPress={enterPlaces}><Text style={styles.retryText}>Try again</Text></Pressable></ScrollView>
         ) : noResults ? (
-          <View style={styles.empty}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search or clear a filter.</Text></View>
+          <ScrollView contentContainerStyle={styles.empty} style={styles.placeList}><Image source={emptySearch} style={styles.emptyIcon} /><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyText}>Try a different search or clear a filter.</Text></ScrollView>
         ) : (
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
             {filteredPlaces.map((item) => {
@@ -668,24 +689,26 @@ export function PostSignupOnboardingFlow({
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('contactsPermission')} />
       <StepHeader landscape={landscape} step={3} title="Choose Your Style" subtitle="Switch between dark and light mode anytime" />
-      <ScrollView contentContainerStyle={styles.styleCardContent} showsVerticalScrollIndicator={false} style={[styles.styleCard, landscape && styles.styleCardLandscape]}>
-        <View style={styles.previews}>
-          {[false, true].map((dark) => <Pressable key={String(dark)} onPress={() => {
-            setDarkMode(dark);
-            setAutomatic(false);
-            void setPreference(dark ? 'dark' : 'light');
-          }} style={styles.previewChoice}>
-            <View style={[styles.phonePreview, dark ? styles.previewDark : styles.previewLight]}><Image source={dark ? styleDark : styleLight} resizeMode="cover" style={styles.phonePreviewImage} /></View>
-            <Text style={styles.previewLabel}>{dark ? 'Dark' : 'Light'}</Text><Image source={(automatic ? resolvedTheme === 'dark' : darkMode) === dark ? styleSelected : styleUnselected} style={styles.styleSelection} />
-          </Pressable>)}
-        </View>
-        <View style={styles.automaticRow}><Text style={styles.automaticText}>Automatic</Text><Switch value={automatic} onValueChange={(value) => {
-          setAutomatic(value);
-          const currentIsDark = resolvedTheme === 'dark';
-          setDarkMode(currentIsDark);
-          void setPreference(value ? 'system' : (currentIsDark ? 'dark' : 'light'));
-        }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
-      </ScrollView>
+      <View style={[styles.styleCardViewport, landscape && styles.styleCardLandscape]} testID="onboarding-appearance-viewport">
+        <ScrollView contentContainerStyle={styles.styleCardContent} showsVerticalScrollIndicator={false} style={styles.styleCard} testID="onboarding-appearance-scroll">
+          <View style={styles.previews}>
+            {[false, true].map((dark) => <Pressable key={String(dark)} onPress={() => {
+              setDarkMode(dark);
+              setAutomatic(false);
+              void setPreference(dark ? 'dark' : 'light');
+            }} style={styles.previewChoice}>
+              <View style={[styles.phonePreview, dark ? styles.previewDark : styles.previewLight]}><Image source={dark ? styleDark : styleLight} resizeMode="cover" style={styles.phonePreviewImage} /></View>
+              <Text style={styles.previewLabel}>{dark ? 'Dark' : 'Light'}</Text><Image source={(automatic ? resolvedTheme === 'dark' : darkMode) === dark ? styleSelected : styleUnselected} style={styles.styleSelection} />
+            </Pressable>)}
+          </View>
+          <View style={styles.automaticRow}><Text style={styles.automaticText}>Automatic</Text><Switch value={automatic} onValueChange={(value) => {
+            setAutomatic(value);
+            const currentIsDark = resolvedTheme === 'dark';
+            setDarkMode(currentIsDark);
+            void setPreference(value ? 'system' : (currentIsDark ? 'dark' : 'light'));
+          }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
+        </ScrollView>
+      </View>
       <PrimaryButton label="Continue" onPress={() => navigate('contactsPermission')} style={styles.bottomButton} />
     </PatternScreen>;
   }
@@ -708,39 +731,44 @@ export function PostSignupOnboardingFlow({
   if (screen === 'invite') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('notifications')} />
-      <View style={styles.invitePage}><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
+      <ScrollView contentContainerStyle={styles.invitePage} showsVerticalScrollIndicator={false} style={styles.inviteScroll} testID="onboarding-invite-scroll"><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
         {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
         <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
-      </View><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
+      </ScrollView><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
     </PatternScreen>;
   }
 
   if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
-  const landscapeCollageHeight = Math.max(0, Math.min(collageHeight, viewportHeight - 32));
-  const landscapeCollageWidth = DESIGN_VIEWPORT.width * (landscapeCollageHeight / 288);
+  // Reserve at least half the row for the copy and action, including in a
+  // nearly square window. The whole page can scroll if its height is limited.
+  const landscapeCollageWidth = Math.max(0, Math.min(collageWidth, (contentWidth - 76 * layoutScale) * 0.46));
+  const landscapeCollageHeight = 288 * (landscapeCollageWidth / DESIGN_VIEWPORT.width);
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
-    <View style={[styles.readyContent, landscape && styles.readyContentLandscape]}>
-      <Image source={readyCollage} resizeMode="contain" style={{
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.ready}>
+    <ScrollView contentContainerStyle={[styles.readyContent, landscape && styles.readyContentLandscape]} showsVerticalScrollIndicator={false} testID="onboarding-ready-scroll">
+      <Image source={readyCollage} resizeMode="contain" testID="onboarding-ready-collage" style={{
         height: landscape ? landscapeCollageHeight : collageHeight,
         width: landscape ? landscapeCollageWidth : collageWidth,
       }} />
-      <View style={landscape ? styles.readyActionsLandscape : undefined}>
+      <View style={[styles.readyActions, landscape && styles.readyActionsLandscape]}>
         <View style={[styles.readyCopy, landscape && styles.readyCopyLandscape]}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
         <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={[styles.readyButton, landscape && styles.readyButtonLandscape]} />
       </View>
-    </View>
+    </ScrollView>
+    </SafeAreaView>
   </LinearGradient>;
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
+const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, bottomGutter: number) => responsiveStyleSheet({
+  header: { position: 'absolute', top: landscape ? -43 : 0, left: 0, right: 0, height: 102, zIndex: 3 },
   skip: { position: 'absolute', top: 58, right: 16, zIndex: 3, padding: 8 },
   skipText: { color: colors.textMuted, fontSize: 14 },
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  bottomButton: { position: 'absolute', left: 36, right: 36, bottom: Platform.OS === 'ios' ? 24 : 18 },
+  bottomButton: { position: 'absolute', left: 36, right: 36, bottom: bottomGutter },
   stepHeader: { position: 'absolute', top: 118, left: 16, right: 16, alignItems: 'center' },
-  stepHeaderLandscape: { top: 42 },
+  stepHeaderLandscape: { top: 64 },
   stepRow: { height: 17, flexDirection: 'row', gap: 7, alignItems: 'center' },
   stepLabel: { color: colors.text, fontSize: 14, lineHeight: 17, fontWeight: '400', letterSpacing: 0.6 },
   stepDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -748,7 +776,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   stepDotInactive: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.5 },
   stepTitle: { marginTop: 7, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
-  permissionContent: { position: 'absolute', top: 132, left: 26, right: 26, alignItems: 'center' },
+  permissionScroll: { position: 'absolute', top: landscape ? 80 : 132, left: 26, right: 26, bottom: Math.max(94, bottomGutter + 70) },
+  permissionContent: { alignItems: 'center', paddingBottom: 16 },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionTitle: { fontSize: 24, lineHeight: 29 },
   permissionSubtitle: { width: '100%', marginTop: 7, fontSize: 15, lineHeight: 18, textAlign: 'center' },
@@ -756,8 +785,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },
   profileScroll: { flex: 1 },
-  profilePage: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 126, paddingBottom: 16, alignItems: 'center' },
-  profileButtonArea: { paddingHorizontal: 36, paddingBottom: Platform.OS === 'ios' ? 24 : 18 },
+  profilePage: { flexGrow: 1, paddingHorizontal: 20, paddingTop: landscape ? 24 : 126, paddingBottom: 16, alignItems: 'center' },
+  profileButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter },
   profileSubtitle: { marginTop: 8, width: 285 },
   photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, marginTop: 22, marginBottom: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   photoImage: { width: '100%', height: '100%', borderRadius: 59 },
@@ -776,7 +805,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   sheetText: { color: colors.text, fontSize: 16 },
   destructive: { color: '#e34840', fontSize: 16 },
   cancel: { height: 56, alignItems: 'center', justifyContent: 'center' },
-  listPage: { flex: 1, paddingTop: 126, paddingHorizontal: 16, paddingBottom: 90 },
+  listPage: { flex: 1, paddingTop: landscape ? 64 : 126, paddingHorizontal: 16, paddingBottom: Math.max(90, bottomGutter + 66) },
   listTitle: { color: colors.text, fontSize: 23, lineHeight: 28, fontWeight: '700', marginBottom: 14 },
   listSubtitle: { color: colors.textMuted, fontSize: 13, marginTop: -7, marginBottom: 16 },
   search: { height: 44, borderRadius: 10, backgroundColor: colors.surfaceRaised, paddingHorizontal: 14, color: colors.text, fontSize: 14 },
@@ -784,9 +813,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   cityFlag: { width: 20, height: 20, marginRight: 14 },
   cityName: { color: colors.text, fontSize: 15, flex: 1 },
   cityCountry: { color: colors.textMuted, fontSize: 13 },
-  pillsPanel: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
-  pillsPanelCompact: { top: 205, bottom: 105 },
-  pillsPanelLandscape: { top: 126, bottom: 84 },
+  pillsPanel: { position: 'absolute', top: 212, left: 0, right: 0, bottom: Math.max(110, bottomGutter + 86) },
+  pillsPanelCompact: { top: 205 },
+  pillsPanelLandscape: { top: 148 },
   pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
@@ -795,10 +824,10 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   pillContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dishIcon: { width: 18, height: 18 },
   dishIconDimmed: { opacity: 0.5 },
-  helper: { position: 'absolute', bottom: 90, alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
+  helper: { position: 'absolute', bottom: Math.max(90, bottomGutter + 66), alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
   placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   placesCardNarrow: { top: 241 },
-  placesCardLandscape: { top: 126 },
+  placesCardLandscape: { top: 148 },
   placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.canvas },
   placeSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeSearch: { flex: 1, height: 39, borderRadius: 22, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
@@ -815,7 +844,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   filterText: { color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '500', letterSpacing: -0.23 },
   filterDimmed: { opacity: 0.5 },
   placeList: { flex: 1 },
-  placeListContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 110, gap: 12 },
+  placeListContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: Math.max(110, bottomGutter + 86), gap: 12 },
   venue: { minHeight: 167, padding: 12, gap: 12, borderWidth: 1, borderColor: isDark ? '#2A2A2A' : colors.border, borderRadius: 16, backgroundColor: isDark ? '#1A1A1A' : colors.surface },
   venueSelected: { borderColor: isDark ? '#2A2A2A' : colors.border, backgroundColor: isDark ? '#222222' : colors.surfaceRaised },
   venueSelection: { position: 'absolute', zIndex: 2, top: 9, right: 9, width: 22, height: 22 },
@@ -844,14 +873,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   skeletonLine: { width: '94%', height: 24, backgroundColor: colors.skeletonMuted, borderRadius: 4 },
   skeletonShort: { width: '52%', height: 28, backgroundColor: colors.skeletonMuted, borderRadius: 14 },
   skeletonTags: { width: '100%', height: 33, backgroundColor: colors.skeletonMuted, borderRadius: 17 },
-  placeFooterGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 94 },
-  empty: { alignItems: 'center', paddingHorizontal: 45, paddingTop: 118 },
+  placeFooterGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.max(94, bottomGutter + 70) },
+  empty: { alignItems: 'center', paddingHorizontal: 45, paddingTop: landscape ? 24 : 118, paddingBottom: Math.max(110, bottomGutter + 86) },
   emptyIcon: { width: 44, height: 44 },
   emptyTitle: { color: colors.text, fontWeight: '600', fontSize: 16, marginTop: 12 },
   emptyText: { color: colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 7 },
   retryText: { color: colors.primary, fontSize: 14, fontWeight: '600', marginTop: 14 },
-  styleCard: { position: 'absolute', top: 196, left: 16, right: 16, backgroundColor: colors.surface, borderRadius: 17 },
-  styleCardLandscape: { top: 126, bottom: 84 },
+  styleCardViewport: { position: 'absolute', top: 196, left: 16, right: 16, bottom: Math.max(94, bottomGutter + 70) },
+  styleCard: { flexGrow: 0, backgroundColor: colors.surface, borderRadius: 17 },
+  styleCardLandscape: { top: 148 },
   styleCardContent: { padding: 20 },
   previews: { flexDirection: 'row', gap: 18 },
   previewChoice: { flex: 1, alignItems: 'center' },
@@ -872,7 +902,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   inviteButton: { borderRadius: 16, paddingVertical: 7, paddingHorizontal: 13, backgroundColor: colors.primary },
   invitedButton: { backgroundColor: colors.surfaceRaised },
   inviteText: { color: colors.onPrimary, fontSize: 11 },
-  invitePage: { paddingTop: 131, paddingHorizontal: 18, alignItems: 'center' },
+  inviteScroll: { position: 'absolute', top: landscape ? 80 : 131, left: 0, right: 0, bottom: Math.max(94, bottomGutter + 70) },
+  invitePage: { paddingHorizontal: 18, paddingBottom: 16, alignItems: 'center' },
   peopleIcon: { width: 118, height: 46, marginBottom: 22 },
   progressText: { color: '#e0453c', fontSize: 12, fontWeight: '600', marginTop: 12 },
   progressDots: { height: 8, flexDirection: 'row', gap: 6, marginTop: 7 },
@@ -884,13 +915,14 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   actionText: { color: colors.text, fontSize: 13, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
-  readyContent: { position: 'absolute', top: 170, left: 0, right: 0, alignItems: 'center' },
-  readyContentLandscape: { top: 0, bottom: 0, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', gap: 28 },
-  readyActionsLandscape: { flex: 1, maxWidth: 330, alignItems: 'center' },
-  readyCopy: { width: '100%', maxWidth: 370, height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24, paddingHorizontal: 16 },
+  readyContent: { flexGrow: 1, paddingTop: 170, paddingBottom: 24, alignItems: 'center' },
+  readyContentLandscape: { paddingTop: 16, paddingBottom: 16, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', gap: 28 },
+  readyActions: { width: '100%', maxWidth: 370, alignItems: 'center' },
+  readyActionsLandscape: { flex: 1, maxWidth: 330 },
+  readyCopy: { width: '100%', minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24, paddingHorizontal: 16 },
   readyCopyLandscape: { marginTop: 0 },
   readyTitle: { width: '100%', color: '#FFFFFF', fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   readySubtitle: { width: '100%', color: '#AAB2C5', fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
-  readyButton: { width: 330, marginTop: 24 },
+  readyButton: { width: '90%', maxWidth: 330, marginTop: 24 },
   readyButtonLandscape: { width: '100%' },
 });

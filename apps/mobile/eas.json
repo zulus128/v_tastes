@@ -62,6 +62,15 @@
       "ios": {
         "distribution": "internal"
       }
+    },
+    "testflight-layout": {
+      "extends": "production",
+      "channel": "layout-preview",
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "distribution": "store"
+      }
     }
   },
   "submit": {

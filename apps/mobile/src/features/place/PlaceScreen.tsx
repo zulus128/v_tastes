@@ -30,6 +30,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { UserAvatar } from '../profile/avatar';
+import { PlacePhotoPager } from './PlacePhotoPager';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -48,7 +49,11 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const width = Math.max(0, windowWidth - insets.left - insets.right);
+  const safeScreenStyle = { paddingLeft: insets.left, paddingRight: insets.right };
+  const reviewButtonBottom = Math.max(insets.bottom, responsiveSize(18));
+  const contentBottom = reviewButtonBottom + responsiveSize(77);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<'overview' | 'reviews'>('overview');
   const [sort, setSort] = useState<PlaceReviewSort>('recent');
@@ -109,9 +114,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     .slice(0, 2);
   if (detailChips.length === 0) detailChips.push((place.venue.distanceKm ?? 0).toFixed(1) + ' km');
   const hero = <View style={styles.hero}>
-    <ScrollView horizontal onMomentumScrollEnd={(event) => setActivePhoto(Math.round(event.nativeEvent.contentOffset.x / width))} pagingEnabled showsHorizontalScrollIndicator={false}>
-      {photos.map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={[styles.heroImage, { width }]} />)}
-    </ScrollView>
+    <PlacePhotoPager activeIndex={activePhoto} imageStyle={styles.heroImage} onChange={setActivePhoto} sources={photos.map(placeImage)} width={width} />
     <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
     <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
     <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable>
@@ -121,7 +124,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
     <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
   </View>;
-  const intro = <View style={[styles.content, tab === 'reviews' && styles.reviewsContent]}>
+  const intro = <View style={[styles.content, { paddingBottom: contentBottom }, tab === 'reviews' && styles.reviewsContent]}>
     <View style={styles.badges}><Text style={styles.primaryBadge}>Popular</Text><Text style={styles.primaryBadge}>★ {place.venue.rating?.toFixed(1) ?? '–'}</Text><Text style={styles.count}>{place.venue.reviewCount ?? 0} reviews</Text></View>
     <Text style={styles.title}>{place.venue.name}</Text>
     <Text style={styles.address}>{place.venue.address ?? place.venue.city}</Text>
@@ -138,8 +141,9 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
       : <ReviewsHeader error={reviews.isError ? apiErrorMessage(reviews.error) : null} loading={reviews.isPending} openSort={() => setSheet('sort')} retry={() => void reviews.refetch()} scope={reviewScope} setScope={setReviewScope} sort={sort} styles={styles} />}
   </View>;
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, safeScreenStyle]}>
       {tab === 'overview' ? <ScrollView showsVerticalScrollIndicator={false}>{hero}{intro}</ScrollView> : <FlatList
+        contentContainerStyle={{ paddingBottom: contentBottom }}
         data={reviews.data ?? []}
         initialNumToRender={8}
         keyExtractor={(review) => review.id}
@@ -153,8 +157,8 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
         renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}/comments` })} reacted={reactedReviews.has(review.id)} reactingId={reactingId} styles={styles} />}
         showsVerticalScrollIndicator={false}
       />}
-      <Pressable onPress={onWriteReview} style={styles.reviewButton}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
-      {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
+      <Pressable onPress={onWriteReview} style={[styles.reviewButton, { bottom: reviewButtonBottom, left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
+      {toast ? <View style={[styles.toast, { bottom: reviewButtonBottom + responsiveSize(58) }]}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
       <Hours visible={sheet === 'hours'} close={() => setSheet(null)} hours={place.openingHours} styles={styles} />
       <Gallery visible={sheet === 'photos'} close={() => setSheet(null)} photos={photos} styles={styles} />
       <Sort visible={sheet === 'sort'} close={() => setSheet(null)} selected={sort} select={setSort} styles={styles} />
@@ -245,11 +249,13 @@ function Loading({ onBack }: { onBack: () => void }) {
     animation.start();
     return () => animation.stop();
   }, [pulse]);
-  return <View style={styles.screen}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
+  return <View style={[styles.screen, { paddingLeft: insets.left, paddingRight: insets.right }]}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
 }
 function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => void; retry: () => void }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]);
-  return <View style={[styles.screen, styles.errorPage]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
+  const insets = useSafeAreaInsets();
+  const safePadding = { paddingLeft: insets.left + responsiveSize(28), paddingRight: insets.right + responsiveSize(28), paddingTop: Math.max(insets.top, responsiveSize(28)), paddingBottom: Math.max(insets.bottom, responsiveSize(28)) };
+  return <View style={[styles.screen, styles.errorPage, safePadding]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
 }
 function Hours({ close, hours, styles, visible }: { close: () => void; hours: Array<{ day: string; hours: string }>; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   const today = todayHours(hours)?.day;

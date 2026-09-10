@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -187,14 +188,15 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
+  const windowDimensions = useWindowDimensions();
+  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
   const headerSafeStyle = {
     height: responsiveSize(102 - 54) + headerTop,
-    paddingLeft: Math.max(insets.left, responsiveSize(16)),
-    paddingRight: Math.max(insets.right, responsiveSize(16)),
     paddingTop: headerTop,
   };
+  const composerBottom = Math.max(insets.bottom, responsiveSize(16));
+  const composerSafeStyle = { height: responsiveSize(56) + composerBottom, paddingBottom: composerBottom };
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
   const connectorX = responsiveSize(36);
   const connectorArmX = responsiveSize(63);
@@ -337,7 +339,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   }
 
   return (
-    <Screen>
+    <Screen style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoiding}>
         <View style={[styles.header, headerSafeStyle]}>
           <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
@@ -393,7 +395,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             }}
           />
         )}
-        <View style={styles.composer}>
+        <View style={[styles.composer, composerSafeStyle]}>
           {replyTarget ? <View style={styles.replyBanner}><Text numberOfLines={1} style={styles.replyBannerText}>Replying to {replyTarget.authorDisplayName}</Text><Pressable onPress={() => setReplyTarget(null)}><Text style={styles.replyClose}>×</Text></Pressable></View> : null}
           <TextInput
             editable={!mutation.isPending}

@@ -1,26 +1,25 @@
-import { Modal as NativeModal, StyleSheet, useWindowDimensions, View, type ModalProps } from 'react-native';
+import { Modal as NativeModal, StyleSheet, View, type ModalProps } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppTheme } from './ThemeProvider';
 
-/** Keeps native React Native modals on the same proportional canvas as the app. */
+/** Fills the native presentation, including resized windows and iPad sheets. */
 export function ResponsiveModal({ children, transparent, ...props }: ModalProps) {
   const { colors } = useAppTheme();
-  const { height, width } = useWindowDimensions();
-
   return (
-    <NativeModal transparent={transparent} {...props}>
-      <View
+    <NativeModal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape']} transparent={transparent} {...props}>
+      <SafeAreaProvider
         style={[
           styles.viewport,
           { backgroundColor: transparent ? 'transparent' : colors.background },
         ]}
       >
-        <View style={[styles.frame, { height, width }]}>{children}</View>
-      </View>
+        <View style={styles.frame}>{children}</View>
+      </SafeAreaProvider>
     </NativeModal>
   );
 }
 
 const styles = StyleSheet.create({
-  viewport: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  frame: { overflow: 'hidden' },
+  viewport: { flex: 1 },
+  frame: { flex: 1, overflow: 'hidden' },
 });

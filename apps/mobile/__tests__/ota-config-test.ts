@@ -12,7 +12,7 @@ describe('OTA configuration', () => {
     expect(packageJson.dependencies['expo-updates']).toMatch(/^~57\./);
   });
 
-  it('keeps layout previews isolated from production updates', () => {
+  it('uses separate update channels for layout previews and production', () => {
     expect(easJson.build['layout-preview']).toMatchObject({
       channel: 'layout-preview',
       distribution: 'internal',
@@ -21,6 +21,13 @@ describe('OTA configuration', () => {
     });
     expect(easJson.build.production.channel).toBe('production');
     expect(easJson.build.preview.channel).toBe('preview');
+    expect(easJson.build['testflight-layout']).toMatchObject({
+      channel: 'layout-preview',
+      distribution: 'store',
+      extends: 'production',
+      autoIncrement: true,
+      ios: { distribution: 'store' },
+    });
     expect(easJson.cli.version).toBe(packageJson.devDependencies['eas-cli']);
     expect(packageJson.scripts['update:layout-preview']).toContain('--channel layout-preview');
     expect(packageJson.scripts['update:layout-preview']).toContain('--environment production');
