@@ -1,6 +1,12 @@
 import { execFileSync } from "node:child_process";
 import console from "node:console";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -148,20 +154,29 @@ export function shouldSecretlint(filePath) {
 }
 
 function gitNamesForCommit(commit) {
+  const parents = execFileSync(
+    "git",
+    ["rev-list", "--parents", "-n", "1", commit],
+    { encoding: "utf8", maxBuffer: Infinity },
+  )
+    .trim()
+    .split(/\s+/)
+    .slice(1);
+  const commitRange = parents.length > 0 ? [`${commit}^1`, commit] : [commit];
+  const rootFlag = parents.length === 0 ? ["--root"] : [];
   return execFileSync(
     "git",
     [
       "diff-tree",
-      "--root",
-      "-m",
+      ...rootFlag,
       "--no-commit-id",
       "--name-only",
       "--diff-filter=ACMRT",
       "-r",
       "-z",
-      commit,
+      ...commitRange,
     ],
-    { encoding: "utf8" },
+    { encoding: "utf8", maxBuffer: Infinity },
   )
     .split("\0")
     .filter(Boolean);
@@ -170,6 +185,7 @@ function gitNamesForCommit(commit) {
 function historyFiles(changedFrom) {
   const commits = execFileSync("git", ["rev-list", `${changedFrom}..HEAD`], {
     encoding: "utf8",
+    maxBuffer: Infinity,
   })
     .split("\n")
     .filter(Boolean);
@@ -187,6 +203,7 @@ function materializeHistoricalTextFiles(commits, directory) {
     const changedPaths = new Set(gitNamesForCommit(commit));
     const entries = execFileSync("git", ["ls-tree", "-r", "-z", commit], {
       encoding: "utf8",
+      maxBuffer: Infinity,
     })
       .split("\0")
       .filter(Boolean);
@@ -207,7 +224,9 @@ function materializeHistoricalTextFiles(commits, directory) {
       );
       writeFileSync(
         target,
-        execFileSync("git", ["cat-file", "blob", metadata[2]]),
+        execFileSync("git", ["cat-file", "blob", metadata[2]], {
+          maxBuffer: Infinity,
+        }),
       );
       materialized.push(target);
     }
@@ -232,7 +251,7 @@ function main() {
     : execFileSync(
         "git",
         ["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"],
-        { encoding: "utf8" },
+        { encoding: "utf8", maxBuffer: Infinity },
       )
         .split("\0")
         .filter(Boolean);
@@ -294,6 +313,10 @@ function main() {
   );
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+const entrypoint = process.argv[1];
+if (
+  entrypoint &&
+  realpathSync(entrypoint) === realpathSync(fileURLToPath(import.meta.url))
+) {
   main();
 }
