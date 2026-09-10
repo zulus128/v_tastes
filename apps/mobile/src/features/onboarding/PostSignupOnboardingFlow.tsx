@@ -5,10 +5,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState, type PropsWithChildren } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -70,7 +69,7 @@ import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
-import { BackButton, PatternScreen as PatternBackground, PrimaryButton } from './components';
+import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
@@ -78,6 +77,7 @@ import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import {
   DESIGN_VIEWPORT,
   responsiveStyleSheet,
+  useOrientationDimensions,
   useResponsiveMetrics,
 } from '../../ui/responsive';
 
@@ -175,21 +175,12 @@ function slug(name: string) {
 
 function useOnboardingStyles() {
   const { colors, isDark } = useAppTheme();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useOrientationDimensions();
   const { scale } = useResponsiveMetrics();
   const insets = useSafeAreaInsets();
-  const orientation = Platform.OS === 'android' ? Dimensions.get('screen') : { width, height };
-  const landscape = orientation.width > orientation.height;
+  const landscape = width > height;
   const bottomGutter = Math.max(Platform.OS === 'ios' ? 24 : 18, insets.bottom / scale);
   return useMemo(() => createStyles(colors, isDark, landscape, bottomGutter), [colors, isDark, landscape, bottomGutter]);
-}
-
-function PatternScreen({ children }: PropsWithChildren) {
-  return <PatternBackground>
-    <SafeAreaView edges={['left', 'right']} style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>{children}</View>
-    </SafeAreaView>
-  </PatternBackground>;
 }
 
 function Header({ onBack, onSkip }: { onBack: () => void; onSkip?: () => void }) {
@@ -240,13 +231,13 @@ export function PostSignupOnboardingFlow({
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const orientation = useOrientationDimensions();
   const insets = useSafeAreaInsets();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
   const collageWidth = Math.min(DESIGN_VIEWPORT.width * layoutScale, contentWidth);
   const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
-  const orientation = Platform.OS === 'android' ? Dimensions.get('screen') : { width: viewportWidth, height: viewportHeight };
   const landscape = orientation.width > orientation.height;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;

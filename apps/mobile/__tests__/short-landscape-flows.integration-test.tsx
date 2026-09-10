@@ -51,6 +51,19 @@ function Providers({ children }: PropsWithChildren) {
   return <SafeAreaProvider><ThemeProvider>{children}</ThemeProvider></SafeAreaProvider>;
 }
 
+function NotchedLandscapeProviders({ children }: PropsWithChildren) {
+  return (
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 667, height: 375 },
+        insets: { top: 0, right: 21, bottom: 21, left: 59 },
+      }}
+    >
+      <ThemeProvider>{children}</ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
 describe('fixed-coordinate flows in short landscape windows', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
@@ -82,6 +95,14 @@ describe('fixed-coordinate flows in short landscape windows', () => {
     const scroll = screen.getByTestId('monthly-recap-scroll');
     expect(scroll.props.scrollEnabled).toBe(true);
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).height).toBeGreaterThan(375);
+  });
+
+  it('keeps recap controls between landscape safe-area edges', async () => {
+    await render(<MonthlyRecapFlow initialStep="ratingGuess" onClose={jest.fn()} />, {
+      wrapper: NotchedLandscapeProviders,
+    });
+
+    expect(screen.getByTestId('monthly-recap-safe-content')).toHaveStyle({ left: 59, right: 21 });
   });
 
   it('does not add recap scrolling when the design canvas fits', async () => {

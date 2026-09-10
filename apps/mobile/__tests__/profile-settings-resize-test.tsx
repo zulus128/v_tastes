@@ -26,6 +26,7 @@ jest.mock('../src/features/profile/api', () => ({
   useProfile: () => ({ profile: { displayName: 'Test User', username: 'tester' } }),
 }));
 jest.mock('../src/ui/SideSlideScreen', () => ({
+  ...jest.requireActual('../src/ui/SideSlideScreen'),
   SideSlideScreen: ({ children, visible }: PropsWithChildren<{ visible: boolean }>) => visible ? children : null,
 }));
 

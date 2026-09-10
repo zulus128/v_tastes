@@ -248,7 +248,15 @@ export function TastesAIScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.screen}
       >
-          <View style={[styles.header, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
+          <View style={[
+            styles.header,
+            {
+              height: responsiveSize(66) + insets.top,
+              paddingTop: responsiveSize(6) + insets.top,
+              paddingRight: responsiveSize(6) + insets.right,
+              paddingLeft: responsiveSize(6) + insets.left,
+            },
+          ]}>
           <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.headerAction}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
@@ -646,7 +654,15 @@ function HistoryModal({
           <Image source={bottomGlow} style={styles.historyGlowImage} />
         </View>
         <View pointerEvents="none" style={[styles.historyPanel, { top: responsiveSize(66) + insets.top }]} />
-        <View style={[styles.historyHeader, { height: responsiveSize(66) + insets.top, paddingTop: responsiveSize(6) + insets.top }]}>
+        <View style={[
+          styles.historyHeader,
+          {
+            height: responsiveSize(66) + insets.top,
+            paddingTop: responsiveSize(6) + insets.top,
+            paddingRight: responsiveSize(6) + insets.right,
+            paddingLeft: responsiveSize(6) + insets.left,
+          },
+        ]}>
           <Pressable accessibilityLabel="Back" onPress={onClose} style={styles.historyButton}>
             <Text style={styles.back}>‹</Text>
           </Pressable>

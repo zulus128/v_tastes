@@ -76,7 +76,7 @@ it('can inset full-screen modal content on every safe-area edge', async () => {
   expect(content.parent?.props.edges).toEqual({ top: 'additive', right: 'additive', bottom: 'additive', left: 'additive' });
 });
 
-it('does not restart an open side sheet on resize and closes using the latest width', async () => {
+it('does not restart an open side sheet on resize and closes using normalized progress', async () => {
   const timing = jest.spyOn(Animated, 'timing');
   const onRequestClose = jest.fn();
   const ref = createRef<SideSlideScreenHandle>();
@@ -86,5 +86,5 @@ it('does not restart an open side sheet on resize and closes using the latest wi
   await act(() => resize(1200, 700));
   expect(timing).toHaveBeenCalledTimes(1);
   await act(() => ref.current?.close());
-  expect(timing.mock.calls.at(-1)?.[1].toValue).toBe(1200);
+  expect(timing.mock.calls.at(-1)?.[1].toValue).toBe(1);
 });

@@ -8,7 +8,6 @@ import {
   AppState,
   Animated,
   Alert,
-  Dimensions,
   Easing,
   Image,
   Keyboard,
@@ -77,6 +76,7 @@ import {
   responsiveStyleSheet,
   responsiveValue,
   responsiveWrapMetrics,
+  useOrientationDimensions,
   useResponsiveMetrics,
 } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -214,8 +214,7 @@ export function DiscoverScreen({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const windowDimensions = useWindowDimensions();
-  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const { height, width } = useOrientationDimensions();
   const safeContentStyle = { paddingLeft: insets.left, paddingRight: insets.right };
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
   const headerHeight = responsiveSize(DISCOVER_HEADER_HEIGHT - 54) + headerTop;
@@ -397,14 +396,24 @@ function TrendingFeed({
   const insets = useSafeAreaInsets();
   const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
   const { scale: layoutScale } = useResponsiveMetrics();
-  const { forYouCardWidth, gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth, trendingCardWidth } = useMemo(() => ({
-    forYouCardWidth: carouselCardWidth(contentWidth, layoutScale, 240, feed.forYou.length),
-    gemCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    gridCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 179, 4, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    placeCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    reviewCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 300, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-    trendingCardWidth: carouselCardWidth(contentWidth, layoutScale, 200, feed.trending.length),
-  }), [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
+  const { forYouCardWidth, gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth, trendingCardWidth } = useMemo(() => {
+    const wrapWidth = (minimumWidth: number, maximumColumns: number) => responsiveWrapMetrics(
+      contentWidth,
+      layoutScale,
+      minimumWidth,
+      maximumColumns,
+      DISCOVER_GRID_PADDING,
+      DISCOVER_GRID_GAP,
+    );
+    return {
+      forYouCardWidth: carouselCardWidth(contentWidth, layoutScale, 240, feed.forYou.length),
+      gemCardWidth: wrapWidth(280, 2),
+      gridCardWidth: wrapWidth(179, 4),
+      placeCardWidth: wrapWidth(280, 2),
+      reviewCardWidth: wrapWidth(300, 2),
+      trendingCardWidth: carouselCardWidth(contentWidth, layoutScale, 200, feed.trending.length),
+    };
+  }, [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -601,9 +610,8 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { scale: layoutScale } = useResponsiveMetrics();
   const windowDimensions = useWindowDimensions();
-  const orientationDimensions = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const orientationDimensions = useOrientationDimensions();
   const insets = useSafeAreaInsets();
   const contentWidth = Math.max(0, windowDimensions.width - insets.left - insets.right);
   const splitLayout = orientationDimensions.width > orientationDimensions.height && windowDimensions.width >= 600;
@@ -631,8 +639,6 @@ function PlacesMap({
   const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
-  const keyboardVisibleRef = useRef(false);
-  const keyboardAdjustedRef = useRef(false);
   const venueFilter = activeFilter
     ? { category: activeFilter.category, tag: activeFilter.tag }
     : {};
@@ -710,8 +716,6 @@ function PlacesMap({
         // locking. Reset our keyboard-driven layout before the app is
         // suspended so the map container can measure at its full height.
         Keyboard.dismiss();
-        keyboardVisibleRef.current = false;
-        keyboardAdjustedRef.current = false;
         sheetKeyboardTranslate.stopAnimation();
         sheetKeyboardTranslate.setValue(0);
         setKeyboardAvoidanceActive(false);
@@ -743,7 +747,7 @@ function PlacesMap({
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const animateKeyboardOffset = (translateY: number, duration?: number) => {
+    const animateKeyboardOffset = (translateY: number, duration?: number, onFinish?: () => void) => {
       sheetKeyboardTranslate.stopAnimation();
       const animationDuration = duration && duration > 0 ? duration : 250;
       Animated.timing(sheetKeyboardTranslate, {
@@ -752,11 +756,10 @@ function PlacesMap({
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: false,
       }).start(({ finished }) => {
-        if (finished && !keyboardVisibleRef.current) setKeyboardAvoidanceActive(false);
+        if (finished) onFinish?.();
       });
     };
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      keyboardVisibleRef.current = true;
       setKeyboardAvoidanceActive(true);
       setSortOpen(false);
       searchRowRef.current?.measureInWindow((_x, y, _width, height) => {
@@ -764,20 +767,13 @@ function PlacesMap({
           0,
           y + height + KEYBOARD_SEARCH_GAP - event.endCoordinates.screenY,
         );
-        keyboardAdjustedRef.current = keyboardOverlap > 0;
-        if (keyboardAdjustedRef.current) {
+        if (keyboardOverlap > 0) {
           animateKeyboardOffset(-keyboardOverlap, event.duration);
         }
       });
     });
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
-      keyboardVisibleRef.current = false;
-      if (!keyboardAdjustedRef.current) {
-        setKeyboardAvoidanceActive(false);
-        return;
-      }
-      keyboardAdjustedRef.current = false;
-      animateKeyboardOffset(0, event.duration);
+      animateKeyboardOffset(0, event.duration, () => setKeyboardAvoidanceActive(false));
     });
     return () => {
       showSubscription.remove();
@@ -786,7 +782,7 @@ function PlacesMap({
   }, [sheetKeyboardTranslate]);
 
   function settleSheet(expanded: boolean) {
-    if (keyboardVisibleRef.current) {
+    if (Keyboard.isVisible()) {
       Keyboard.dismiss();
       return;
     }
@@ -854,7 +850,7 @@ function PlacesMap({
     });
     animation.start();
     return () => animation.stop();
-  }, [headerHeight, keyboardAvoidanceActive, layoutScale, mapHeight, sheetHeight]);
+  }, [headerHeight, keyboardAvoidanceActive, mapHeight, sheetHeight]);
 
   function zoom(multiplier: number) {
     const next = {

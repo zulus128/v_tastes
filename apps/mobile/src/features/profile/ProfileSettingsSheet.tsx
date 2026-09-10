@@ -39,7 +39,7 @@ import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
-import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
+import { SideSlideScreen, type SideSlideScreenHandle, useSideSlideTransition } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -105,48 +105,25 @@ export function ProfileSettingsSheet({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  // Animate a fraction of the live width so closed and transitioning panes
-  // stay aligned when the native window is resized.
-  const appearanceProgress = useRef(new Animated.Value(1)).current;
-  const appearanceClosing = useRef(false);
-  const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notificationProgress = useRef(new Animated.Value(1)).current;
-  const notificationClosing = useRef(false);
-  const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const appearanceTranslateX = useMemo(
-    () => appearanceProgress.interpolate({ inputRange: [0, 1], outputRange: [0, viewportWidth] }),
-    [appearanceProgress, viewportWidth],
-  );
-  const notificationTranslateX = useMemo(
-    () => notificationProgress.interpolate({ inputRange: [0, 1], outputRange: [0, viewportWidth] }),
-    [notificationProgress, viewportWidth],
-  );
+  const { close: closeAppearance, translateX: appearanceTranslateX } = useSideSlideTransition({
+    frameWidth: viewportWidth,
+    onRequestClose: () => setAppearanceOpen(false),
+    visible: appearanceOpen,
+  });
+  const { close: closeNotifications, translateX: notificationTranslateX } = useSideSlideTransition({
+    frameWidth: viewportWidth,
+    onRequestClose: () => setNotificationsOpen(false),
+    visible: notificationsOpen,
+  });
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
   const citySlide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
     if (visible) return;
-    appearanceClosing.current = false;
-    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-    appearanceCloseTimer.current = null;
-    notificationClosing.current = false;
-    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-    notificationCloseTimer.current = null;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
-    appearanceProgress.setValue(1);
-    notificationProgress.setValue(1);
-  }, [appearanceProgress, notificationProgress, visible]);
-
-  useEffect(() => () => {
-    appearanceClosing.current = false;
-    notificationClosing.current = false;
-    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-    appearanceProgress.stopAnimation();
-    notificationProgress.stopAnimation();
-  }, [appearanceProgress, notificationProgress]);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -285,50 +262,11 @@ export function ProfileSettingsSheet({
   }
 
   function openAppearance() {
-    appearanceClosing.current = false;
-    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-    appearanceCloseTimer.current = null;
-    appearanceProgress.stopAnimation();
     setAppearanceOpen(true);
-    appearanceProgress.setValue(1);
-    Animated.timing(appearanceProgress, {
-      duration: 280,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  function closeAppearance() {
-    if (appearanceClosing.current) return;
-    appearanceClosing.current = true;
-    const finish = () => {
-      if (!appearanceClosing.current) return;
-      appearanceClosing.current = false;
-      if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-      appearanceCloseTimer.current = null;
-      appearanceProgress.setValue(1);
-      setAppearanceOpen(false);
-    };
-    appearanceCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(appearanceProgress, {
-      duration: 240,
-      toValue: 1,
-      useNativeDriver: true,
-    }).start(finish);
   }
 
   function openNotifications() {
-    notificationClosing.current = false;
-    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-    notificationCloseTimer.current = null;
-    notificationProgress.stopAnimation();
     setNotificationsOpen(true);
-    notificationProgress.setValue(1);
-    Animated.timing(notificationProgress, {
-      duration: 280,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
     setNotificationsLoading(true);
     void api.getProfileExtras({ targetUserId: userId })
       .then((result) => {
@@ -341,25 +279,6 @@ export function ProfileSettingsSheet({
       })
       .catch(() => Alert.alert('Could not load notification settings', 'Please try again.'))
       .finally(() => setNotificationsLoading(false));
-  }
-
-  function closeNotifications() {
-    if (notificationClosing.current) return;
-    notificationClosing.current = true;
-    const finish = () => {
-      if (!notificationClosing.current) return;
-      notificationClosing.current = false;
-      if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-      notificationCloseTimer.current = null;
-      notificationProgress.setValue(1);
-      setNotificationsOpen(false);
-    };
-    notificationCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(notificationProgress, {
-      duration: 240,
-      toValue: 1,
-      useNativeDriver: true,
-    }).start(finish);
   }
 
   function saveNotifications(next: NotificationPreferences) {
@@ -458,7 +377,7 @@ export function ProfileSettingsSheet({
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
             <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeNotifications} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeNotifications()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Notifications</Text>
               <View style={styles.headerButton} />
             </View>
@@ -495,7 +414,7 @@ export function ProfileSettingsSheet({
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
             <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeAppearance} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeAppearance()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Appearance</Text>
               <View style={styles.headerButton} />
             </View>

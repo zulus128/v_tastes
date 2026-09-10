@@ -19,6 +19,7 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import areasIcon from '../../../assets/recap/areas.png';
 import arrowIcon from '../../../assets/recap/arrow.png';
@@ -141,6 +142,7 @@ export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, 
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
   const { height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [step, setStep] = useState<RecapStep>(initialStep ?? 'loading');
   const [confirmingClose, setConfirmingClose] = useState(initialConfirmingClose);
@@ -219,32 +221,37 @@ export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, 
             imageStyle={[styles.pattern, usesStarsBackground && styles.starsPattern]}
             style={StyleSheet.absoluteFill}
           >
-            {progress ? <StoryProgress completed={progress} /> : null}
-            <CloseButton
-              color={!isDark && step === 'share' ? '#FFFFFF' : colors.text}
-              onPress={() => setConfirmingClose(true)}
-            />
+            <View
+              style={[styles.storySafeContent, { left: insets.left, right: insets.right }]}
+              testID="monthly-recap-safe-content"
+            >
+              {progress ? <StoryProgress completed={progress} /> : null}
+              <CloseButton
+                color={!isDark && step === 'share' ? '#FFFFFF' : colors.text}
+                onPress={() => setConfirmingClose(true)}
+              />
 
-            {step === 'loading' ? loadError ? <RecapLoadError onRetry={() => setLoadAttempt((value) => value + 1)} /> : <LoadingScreen month={recap?.month} /> : null}
-            {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
-            {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
-            {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
-            {step === 'placeResult' && recap ? <PlaceResultScreen count={recap.placesVisited} places={recapPlaces(recap)} onNext={() => setStep('areaGuess')} /> : null}
-            {step === 'areaGuess' ? (
-              <AreaGuessScreen favoriteArea={recap?.favoriteArea || 'Belgravia'} onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
-            ) : null}
-            {step === 'areaResult' ? (
-              <AreaResultScreen areas={recap?.areasExplored ?? 0} favoriteArea={recap?.favoriteArea || 'Belgravia'} guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
-            ) : null}
-            {step === 'ratingGuess' ? (
-              <RatingGuessScreen selected={ratingGuess} onChange={setRatingGuess} onSelect={() => setStep('ratingFeedback')} />
-            ) : null}
-            {step === 'ratingFeedback' ? <RatingFeedbackScreen correct={ratingGuess === 1} /> : null}
-            {step === 'ranking' && recap ? <RankingScreen places={recapPlaces(recap)} onNext={() => setStep('favorites')} /> : null}
-            {step === 'favorites' && recap ? <FavoritesScreen dishes={recap.topDishes} onNext={() => setStep('followers')} /> : null}
-            {step === 'followers' && recap ? <FollowersScreen count={recap.followersGained} month={recap.month} onNext={() => setStep('comparison')} /> : null}
-            {step === 'comparison' && recap ? <ComparisonScreen recap={recap} onNext={() => setStep('share')} /> : null}
-            {step === 'share' && recap ? <ShareCard recap={recap} user={user} onShare={shareRecap} /> : null}
+              {step === 'loading' ? loadError ? <RecapLoadError onRetry={() => setLoadAttempt((value) => value + 1)} /> : <LoadingScreen month={recap?.month} /> : null}
+              {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
+              {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
+              {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
+              {step === 'placeResult' && recap ? <PlaceResultScreen count={recap.placesVisited} places={recapPlaces(recap)} onNext={() => setStep('areaGuess')} /> : null}
+              {step === 'areaGuess' ? (
+                <AreaGuessScreen favoriteArea={recap?.favoriteArea || 'Belgravia'} onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
+              ) : null}
+              {step === 'areaResult' ? (
+                <AreaResultScreen areas={recap?.areasExplored ?? 0} favoriteArea={recap?.favoriteArea || 'Belgravia'} guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
+              ) : null}
+              {step === 'ratingGuess' ? (
+                <RatingGuessScreen selected={ratingGuess} onChange={setRatingGuess} onSelect={() => setStep('ratingFeedback')} />
+              ) : null}
+              {step === 'ratingFeedback' ? <RatingFeedbackScreen correct={ratingGuess === 1} /> : null}
+              {step === 'ranking' && recap ? <RankingScreen places={recapPlaces(recap)} onNext={() => setStep('favorites')} /> : null}
+              {step === 'favorites' && recap ? <FavoritesScreen dishes={recap.topDishes} onNext={() => setStep('followers')} /> : null}
+              {step === 'followers' && recap ? <FollowersScreen count={recap.followersGained} month={recap.month} onNext={() => setStep('comparison')} /> : null}
+              {step === 'comparison' && recap ? <ComparisonScreen recap={recap} onNext={() => setStep('share')} /> : null}
+              {step === 'share' && recap ? <ShareCard recap={recap} user={user} onShare={shareRecap} /> : null}
+            </View>
           </ImageBackground>
         </View>
       </ScrollView>
@@ -774,6 +781,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   screen: { flex: 1, backgroundColor: isDark ? '#080808' : '#F2EFEA' },
   storyScroll: { flex: 1 },
   storyCanvas: { flex: 1, width: '100%', overflow: 'hidden' },
+  storySafeContent: { position: 'absolute', top: 0, bottom: 0 },
   pattern: { opacity: isDark ? 0.18 : 0.04 },
   starsPattern: { opacity: isDark ? 0.18 : 0.25 },
   closeButton: {

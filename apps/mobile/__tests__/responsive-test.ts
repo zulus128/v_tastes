@@ -50,12 +50,12 @@ describe('responsive layout metrics', () => {
   it('keeps two phone cards on one row despite pixel rounding', () => {
     const scale = responsiveMetrics(375, 667).scale;
     const grid = responsiveWrapMetrics(375, scale, 179, 4, 16, 10);
-    expect((grid.itemWidth * 2) + 30 + 9.5).toBe(375);
+    expect((grid * 2) + 30 + 9.5).toBe(375);
   });
 
   it('keeps orphaned cards at the same width as a complete row', () => {
     const layout = responsiveWrapMetrics(1024, responsiveMetrics(1024, 600).scale, 280, 2, 16, 10);
-    expect(layout.itemWidth).toBeLessThan(1024 - 32);
+    expect(layout).toBeLessThan(1024 - 32);
   });
 });
 

@@ -3,7 +3,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithCustomToken, updateProfile } from 'firebase/auth';
-import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -32,7 +32,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
-import { BackButton, PatternScreen as PatternBackground, PrimaryButton } from './components';
+import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
 import { toE164PhoneNumber } from './phone-number';
@@ -74,14 +74,6 @@ function useOnboardingStyles() {
   const compact = height <= 700 || width <= 340;
   const bottomGutter = Math.max(compact ? 12 : 24, insets.bottom / scale);
   return useMemo(() => createStyles(colors, compact, bottomGutter), [colors, compact, bottomGutter]);
-}
-
-function PatternScreen({ children }: PropsWithChildren) {
-  return <PatternBackground>
-    <SafeAreaView edges={['left', 'right']} style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>{children}</View>
-    </SafeAreaView>
-  </PatternBackground>;
 }
 
 function useAuthScrollLayout(styles: ReturnType<typeof useOnboardingStyles>) {

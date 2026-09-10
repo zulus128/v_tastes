@@ -87,10 +87,6 @@ export interface ResponsiveMetrics {
   width: number;
 }
 
-export interface ResponsiveWrapMetrics {
-  itemWidth: number;
-}
-
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -142,6 +138,16 @@ export function useResponsiveMetrics() {
   return { width, height, scale: stableAvailableScale() };
 }
 
+/**
+ * Uses the physical Android screen for orientation so the software keyboard
+ * cannot make a portrait device look landscape. Other platforms keep the live
+ * window dimensions required by resizable iPad and macOS windows.
+ */
+export function useOrientationDimensions() {
+  const windowDimensions = useWindowDimensions();
+  return Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+}
+
 export function responsiveValue(value: number, scale: number) {
   if (value === 0) return 0;
   return PixelRatio.roundToNearestPixel(value * scale);
@@ -160,7 +166,7 @@ export function responsiveWrapMetrics(
   maximumColumns: number,
   horizontalPadding: number,
   gap: number,
-): ResponsiveWrapMetrics {
+): number {
   const scaledPadding = responsiveValue(horizontalPadding, scale);
   const scaledGap = responsiveValue(gap, scale);
   const scaledMinimum = responsiveValue(minimumItemWidth, scale);
@@ -170,9 +176,7 @@ export function responsiveWrapMetrics(
     1,
     maximumColumns,
   );
-  return {
-    itemWidth: (availableWidth - (scaledGap * (columns - 1))) / columns,
-  };
+  return (availableWidth - (scaledGap * (columns - 1))) / columns;
 }
 
 /** Scales numeric component props (most often SVG width/height) like styles. */
