@@ -115,13 +115,13 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   if (detailChips.length === 0) detailChips.push((place.venue.distanceKm ?? 0).toFixed(1) + ' km');
   const hero = <View style={styles.hero}>
     <PlacePhotoPager activeIndex={activePhoto} imageStyle={styles.heroImage} onChange={setActivePhoto} sources={photos.map(placeImage)} width={width} />
-    <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
-    <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
+    <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} pointerEvents="none" style={styles.topShade} />
+    <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} pointerEvents="none" style={styles.bottomShade} />
     <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable>
     <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + responsiveSize(12) }]}>
       {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={responsiveSize(18)} width={responsiveSize(18)} />}
     </Pressable>
-    <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
+    <View pointerEvents="none" style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
     <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
   </View>;
   const intro = <View style={[styles.content, { paddingBottom: contentBottom }, tab === 'reviews' && styles.reviewsContent]}>

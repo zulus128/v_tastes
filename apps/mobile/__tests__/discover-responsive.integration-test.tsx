@@ -4,6 +4,7 @@ import { DiscoverScreen } from '../src/features/discover/DiscoverScreen';
 import { responsiveSize } from '../src/ui/responsive';
 
 const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
+let mockCarouselCount = 0;
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
@@ -29,7 +30,13 @@ jest.mock('react-native-maps', () => {
 jest.mock('../src/features/discover/api', () => ({
   useDiscoverFeed: () => ({
     data: {
-      trending: [], newSpots: [], forYou: [], hiddenGems: [], popularReviews: [],
+      trending: Array.from({ length: mockCarouselCount }, (_, index) => ({
+        id: `trending-${index}`, name: `Trending place ${index}`, city: 'Istanbul',
+      })),
+      forYou: Array.from({ length: mockCarouselCount }, (_, index) => ({
+        id: `for-you-${index}`, name: `For you place ${index}`, city: 'Istanbul',
+      })),
+      newSpots: [], hiddenGems: [], popularReviews: [],
       mostReviewed: Array.from({ length: 5 }, (_, index) => ({
         id: `venue-${index}`, name: `Place ${index}`, city: 'Istanbul',
       })),
@@ -53,6 +60,7 @@ describe('Discover responsive content', () => {
   afterEach(async () => {
     await act(() => Dimensions.set({ window: initialWindow, screen: initialScreen }));
     mockInsets.top = 0;
+    mockCarouselCount = 0;
     jest.restoreAllMocks();
   });
 
@@ -76,6 +84,47 @@ describe('Discover responsive content', () => {
     expect(columns).toBeGreaterThan(1);
     expect(columns * cardStyle.width + (columns - 1) * rowStyle.gap + 2 * rowStyle.paddingHorizontal).toBeCloseTo(contentWidth);
     expect(lastCardStyle.width).toBe(cardStyle.width);
+  });
+
+  it.each([2, 3])('fills wide carousel rows with %i cards and restores scrolling on a phone', async (count) => {
+    mockCarouselCount = count;
+    resize(1376, 1032);
+    await render(<DiscoverScreen {...props} />);
+
+    const carousels = [
+      { title: 'Trending place 0', designWidth: 200, designHeight: 200 },
+      { title: 'For you place 0', designWidth: 240, designHeight: 280 },
+    ];
+    carousels.forEach(({ title, designWidth, designHeight }) => {
+      const card = screen.getByText(title).parent!.parent!;
+      const cardStyle = StyleSheet.flatten(card.props.style);
+      const rowStyle = StyleSheet.flatten(card.parent!.parent!.props.contentContainerStyle);
+      const occupiedWidth = cardStyle.width * count + rowStyle.gap * (count - 1) + rowStyle.paddingHorizontal * 2;
+      expect(occupiedWidth).toBeCloseTo(1376 - mockInsets.left - mockInsets.right);
+      expect(cardStyle.width).toBeGreaterThan(responsiveSize(designWidth));
+      expect(cardStyle.height).toBe(responsiveSize(designHeight));
+    });
+
+    await act(() => resize(402, 874));
+
+    carousels.forEach(({ title, designWidth, designHeight }) => {
+      const cardStyle = StyleSheet.flatten(screen.getByText(title).parent!.parent!.props.style);
+      expect(cardStyle.width).toBe(responsiveSize(designWidth));
+      expect(cardStyle.height).toBe(responsiveSize(designHeight));
+      expect(cardStyle.width * count).toBeGreaterThan(402 - mockInsets.left - mockInsets.right);
+    });
+  });
+
+  it('restores regular card widths when a wide carousel has only one result', async () => {
+    mockCarouselCount = 3;
+    resize(1376, 1032);
+    const view = await render(<DiscoverScreen {...props} />);
+
+    mockCarouselCount = 1;
+    await view.rerender(<DiscoverScreen {...props} />);
+
+    expect(StyleSheet.flatten(screen.getByText('Trending place 0').parent!.parent!.props.style).width).toBe(responsiveSize(200));
+    expect(StyleSheet.flatten(screen.getByText('For you place 0').parent!.parent!.props.style).width).toBe(responsiveSize(240));
   });
 
   it.each([[667, 375], [1024, 600]])('keeps the map beside its list at %ix%i', async (width, height) => {

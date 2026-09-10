@@ -20,6 +20,7 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import apple from '../../../assets/onboarding/apple.png';
@@ -81,6 +82,26 @@ function PatternScreen({ children }: PropsWithChildren) {
       <View style={{ flex: 1 }}>{children}</View>
     </SafeAreaView>
   </PatternBackground>;
+}
+
+function useAuthScrollLayout(styles: ReturnType<typeof useOnboardingStyles>) {
+  const { scale } = useResponsiveMetrics();
+  const insets = useSafeAreaInsets();
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  // KeyboardAvoidingView can leave much less space than the window height.
+  // Spend that space on the form before retaining the Figma top whitespace.
+  const paddingTop = viewportHeight > 0 && contentHeight > 0
+    ? Math.max(
+      insets.top + responsiveValue(8, scale),
+      Math.min(styles.authScrollContent.paddingTop, viewportHeight - contentHeight - styles.authScrollContent.paddingBottom),
+    )
+    : styles.authScrollContent.paddingTop;
+  return {
+    contentContainerStyle: [styles.authScrollContent, { paddingTop }],
+    onViewportLayout: (event: LayoutChangeEvent) => setViewportHeight(event.nativeEvent.layout.height),
+    onContentLayout: (event: LayoutChangeEvent) => setContentHeight(event.nativeEvent.layout.height),
+  };
 }
 
 export function OnboardingFlow({ initialScreen, visualAudit = false }: { initialScreen?: OnboardingScreen; visualAudit?: boolean } = {}) {
@@ -432,6 +453,7 @@ function PhoneScreen(props: {
 }) {
   const { colors } = useAppTheme();
   const styles = useOnboardingStyles();
+  const scrollLayout = useAuthScrollLayout(styles);
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
       <PatternScreen>
@@ -439,12 +461,14 @@ function PhoneScreen(props: {
         <View style={styles.authKeyboardLayout}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={styles.authScrollContent}
+            contentContainerStyle={scrollLayout.contentContainerStyle}
             keyboardShouldPersistTaps="handled"
+            onLayout={scrollLayout.onViewportLayout}
             showsVerticalScrollIndicator={false}
             style={styles.authScroll}
+            testID="onboarding-phone-scroll"
           >
-            <View style={styles.authContent}>
+            <View onLayout={scrollLayout.onContentLayout} style={styles.authContent} testID="onboarding-phone-content">
               <Text style={styles.authTitle}>Your phone number</Text>
               <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
               <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
@@ -528,6 +552,7 @@ function OtpScreen(props: {
   onResend: () => void;
 }) {
   const styles = useOnboardingStyles();
+  const scrollLayout = useAuthScrollLayout(styles);
   const error = props.state === 'incorrect'
     ? 'Incorrect code. Try again.'
     : props.state === 'expired'
@@ -547,12 +572,14 @@ function OtpScreen(props: {
         <View style={styles.authKeyboardLayout}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={styles.authScrollContent}
+            contentContainerStyle={scrollLayout.contentContainerStyle}
             keyboardShouldPersistTaps="handled"
+            onLayout={scrollLayout.onViewportLayout}
             showsVerticalScrollIndicator={false}
             style={styles.authScroll}
+            testID="onboarding-otp-scroll"
           >
-            <Pressable onPress={() => props.inputRef.current?.focus()} style={styles.otpContent}>
+            <Pressable onLayout={scrollLayout.onContentLayout} onPress={() => props.inputRef.current?.focus()} style={styles.otpContent} testID="onboarding-otp-content">
               <Text style={styles.authTitle}>Enter code</Text>
               <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
               <View style={styles.otpRow}>

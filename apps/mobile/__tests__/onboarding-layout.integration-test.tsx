@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { OnboardingFlow } from '../src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from '../src/features/onboarding/PostSignupOnboardingFlow';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
 
@@ -17,8 +18,11 @@ jest.mock('react-native-safe-area-context', () =>
 jest.mock('../src/infrastructure/firebase', () => ({ auth: { currentUser: null }, storage: {} }));
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: (error: Error) => error.message }));
 jest.mock('firebase/storage', () => ({ ref: jest.fn(), uploadBytes: jest.fn() }));
+jest.mock('firebase/auth', () => ({}));
 jest.mock('../src/session/SessionProvider', () => ({ useTastesApi: () => ({}) }));
 jest.mock('../src/infrastructure/pushNotifications', () => ({ syncPushNotifications: jest.fn() }));
+jest.mock('expo-auth-session/providers/google', () => ({ useIdTokenAuthRequest: () => [null, null, jest.fn()] }));
+jest.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: jest.fn() }));
 
 function Providers({ children }: PropsWithChildren) {
   return <SafeAreaProvider><ThemeProvider>{children}</ThemeProvider></SafeAreaProvider>;
@@ -39,6 +43,43 @@ describe('onboarding in resizable windows', () => {
 
   afterEach(async () => {
     await act(async () => Dimensions.set({ window: originalWindow, screen: originalScreen }));
+  });
+
+  it('fits the phone field above the action when a landscape keyboard shrinks the scroll viewport', async () => {
+    resize(667, 375);
+    await render(<OnboardingFlow initialScreen="phone" visualAudit />, { wrapper: Providers });
+    const scroll = screen.getByTestId('onboarding-phone-scroll');
+    const content = screen.getByTestId('onboarding-phone-content');
+    const measure = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 667, height } } });
+
+    await fireEvent(content, 'layout', measure(104));
+    await fireEvent(scroll, 'layout', measure(313));
+    const normalTop = StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop;
+    expect(normalTop).toBeGreaterThan(100);
+
+    // KAV resizes its children on iOS without changing useWindowDimensions.
+    await fireEvent(scroll, 'layout', measure(159));
+    const compressed = StyleSheet.flatten(scroll.props.contentContainerStyle);
+    expect(compressed.paddingTop + 104 + compressed.paddingBottom).toBeLessThanOrEqual(159);
+    expect(scroll).toContainElement(screen.getByPlaceholderText('Phone number'));
+    expect(scroll).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
+
+    await fireEvent(scroll, 'layout', measure(313));
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBe(normalTop);
+  });
+
+  it('removes surplus space above OTP cells while retaining scrolling for the remaining content', async () => {
+    resize(667, 375);
+    await render(<OnboardingFlow initialScreen="otp" visualAudit />, { wrapper: Providers });
+    const scroll = screen.getByTestId('onboarding-otp-scroll');
+    await fireEvent(screen.getByTestId('onboarding-otp-content'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 637, height: 190 } },
+    });
+    await fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 667, height: 159 } } });
+
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBeLessThan(10);
+    expect(scroll).toContainElement(screen.getByText('Resend code'));
+    expect(scroll).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
   });
 
   it.each([[393, 852], [667, 375], [800, 500], [600, 600], [1024, 600]])(

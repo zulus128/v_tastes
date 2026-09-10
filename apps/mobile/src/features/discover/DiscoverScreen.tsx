@@ -75,6 +75,7 @@ import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import {
   responsiveSize,
   responsiveStyleSheet,
+  responsiveValue,
   responsiveWrapMetrics,
   useResponsiveMetrics,
 } from '../../ui/responsive';
@@ -356,6 +357,16 @@ function TrendingLoading() {
   );
 }
 
+function carouselCardWidth(contentWidth: number, scale: number, designWidth: number, itemCount: number) {
+  const minimumWidth = responsiveValue(designWidth, scale);
+  if (itemCount < 2) return minimumWidth;
+  const availableWidth = contentWidth - 2 * responsiveValue(DISCOVER_GRID_PADDING, scale);
+  const gapsWidth = (itemCount - 1) * responsiveValue(DISCOVER_GRID_GAP, scale);
+  // A complete short carousel fills a wide row. Longer carousels retain their
+  // original card width and scroll, and a lone result never becomes a banner.
+  return Math.max(minimumWidth, (availableWidth - gapsWidth) / itemCount);
+}
+
 function TrendingFeed({
   feed,
   followPending,
@@ -386,12 +397,14 @@ function TrendingFeed({
   const insets = useSafeAreaInsets();
   const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
   const { scale: layoutScale } = useResponsiveMetrics();
-  const { gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth } = useMemo(() => ({
+  const { forYouCardWidth, gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth, trendingCardWidth } = useMemo(() => ({
+    forYouCardWidth: carouselCardWidth(contentWidth, layoutScale, 240, feed.forYou.length),
     gemCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
     gridCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 179, 4, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
     placeCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
     reviewCardWidth: responsiveWrapMetrics(contentWidth, layoutScale, 300, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
-  }), [contentWidth, layoutScale]);
+    trendingCardWidth: carouselCardWidth(contentWidth, layoutScale, 200, feed.trending.length),
+  }), [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -456,6 +469,7 @@ function TrendingFeed({
                 meta={`${venue.category ?? ''} · ${'$'.repeat(venue.priceLevel ?? 1)}`}
                 name={venue.name}
                 rating={(venue.rating ?? 0).toFixed(1)}
+                width={trendingCardWidth}
               />
             ))}
           </ScrollView>
@@ -547,6 +561,7 @@ function TrendingFeed({
                 onOpen={() => onOpenPlace(venue.id)}
                 place={venueToPlace(venue)}
                 reason={forYouReason(venue, index)}
+                width={forYouCardWidth}
               />
             ))}
           </ScrollView>
@@ -1443,11 +1458,11 @@ function RatingPill({ value }: { value: string }) {
   return <View style={styles.ratingPill}><Text style={styles.ratingText}>★ {value}</Text></View>;
 }
 
-function TrendingTile({ image, meta, name, onOpen, rating }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string }) {
+function TrendingTile({ image, meta, name, onOpen, rating, width }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.trendingTile}>
+    <Pressable onPress={onOpen} style={[styles.trendingTile, { width }]}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
       <View style={styles.tileRating}><RatingPill value={rating} /></View>
@@ -1606,11 +1621,11 @@ function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => vo
   );
 }
 
-function ForYouCard({ image, onOpen, place, reason }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string }) {
+function ForYouCard({ image, onOpen, place, reason, width }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.forYouCard}>
+    <Pressable onPress={onOpen} style={[styles.forYouCard, { width }]}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']} style={StyleSheet.absoluteFill} />
       <View style={styles.reasonChip}><Text style={styles.reasonText}>{reason}</Text></View>
