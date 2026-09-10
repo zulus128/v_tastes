@@ -26,9 +26,17 @@ describe("sensitive-file policy", () => {
   });
 
   it("rejects the iOS Firebase service configuration", () => {
-    expect(getBlockingReason("apps/mobile/GoogleService-Info.plist")).toBe(
+    expect(
+      getBlockingReason("apps/mobile/GoogleService-Info.plist"),
+    ).toBeNull();
+    expect(shouldSecretlint("apps/mobile/GoogleService-Info.plist")).toBe(
+      false,
+    );
+    expect(getBlockingReason("tmp/GoogleService-Info.plist")).toBe(
       "credential file",
     );
+    expect(getBlockingReason("apps/mobile/google-services.json")).toBeNull();
+    expect(shouldSecretlint("apps/mobile/google-services.json")).toBe(false);
   });
 
   it.each([
@@ -36,6 +44,12 @@ describe("sensitive-file policy", () => {
     "apps/desktop/release.provisionprofile",
   ])("rejects provisioning profile %s", (filePath) => {
     expect(getBlockingReason(filePath)).toBe("key or signing credential");
+  });
+
+  it("rejects PuTTY private keys by extension", () => {
+    expect(getBlockingReason("keys/production.ppk")).toBe(
+      "key or signing credential",
+    );
   });
 
   it.each(["id_rsa", "keys/id_dsa", "keys/id_ecdsa", "keys/id_ed25519"])(

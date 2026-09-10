@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 import console from "node:console";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -7,6 +9,13 @@ import { fileURLToPath } from "node:url";
 const allowedEnvironmentFiles = new Set([".env.example", ".xcode.env"]);
 const allowedCredentialPaths = new Set([
   "apps/mobile/android/app/debug.keystore",
+]);
+// Firebase mobile configuration contains public SDK identifiers and is
+// intentionally tracked because Expo consumes it during native builds.
+// Keep the allowlist exact so similarly named credential files remain blocked.
+const allowedPublicFirebaseConfigPaths = new Set([
+  "apps/mobile/GoogleService-Info.plist",
+  "apps/mobile/google-services.json",
 ]);
 const forbiddenExtensions = new Set([
   ".der",
@@ -18,6 +27,7 @@ const forbiddenExtensions = new Set([
   ".p8",
   ".pem",
   ".pfx",
+  ".ppk",
   ".provisionprofile",
 ]);
 const forbiddenCredentialNames = [
@@ -110,6 +120,7 @@ export function getBlockingReason(filePath) {
   }
 
   if (forbiddenCredentialNames.some((pattern) => pattern.test(fileName))) {
+    if (allowedPublicFirebaseConfigPaths.has(normalizedPath)) return null;
     return "credential file";
   }
 
@@ -117,6 +128,13 @@ export function getBlockingReason(filePath) {
 }
 
 export function shouldSecretlint(filePath) {
+  if (
+    allowedPublicFirebaseConfigPaths.has(
+      path.posix.normalize(filePath).replace(/^\.\//, ""),
+    )
+  ) {
+    return false;
+  }
   const fileName = path.posix.basename(filePath).toLowerCase();
   const extension = path.posix.extname(fileName);
   return (
@@ -129,6 +147,73 @@ export function shouldSecretlint(filePath) {
   );
 }
 
+function gitNamesForCommit(commit) {
+  return execFileSync(
+    "git",
+    [
+      "diff-tree",
+      "--root",
+      "--no-commit-id",
+      "--name-only",
+      "--diff-filter=ACMRT",
+      "-r",
+      "-z",
+      commit,
+    ],
+    { encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean);
+}
+
+function historyFiles(changedFrom) {
+  const commits = execFileSync("git", ["rev-list", `${changedFrom}..HEAD`], {
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean);
+  const files = new Set();
+  for (const commit of commits) {
+    for (const filePath of gitNamesForCommit(commit)) files.add(filePath);
+  }
+  return { commits, files: [...files] };
+}
+
+function materializeHistoricalTextFiles(commits, directory) {
+  const materialized = [];
+  let index = 0;
+  for (const commit of commits) {
+    const changedPaths = new Set(gitNamesForCommit(commit));
+    const entries = execFileSync("git", ["ls-tree", "-r", "-z", commit], {
+      encoding: "utf8",
+    })
+      .split("\0")
+      .filter(Boolean);
+    for (const entry of entries) {
+      const separator = entry.indexOf("\t");
+      if (separator < 0) continue;
+      const metadata = entry.slice(0, separator).split(" ");
+      const filePath = entry.slice(separator + 1);
+      if (
+        !changedPaths.has(filePath) ||
+        metadata[1] !== "blob" ||
+        !shouldSecretlint(filePath)
+      )
+        continue;
+      const target = path.join(
+        directory,
+        `${index++}-${path.posix.basename(filePath)}`,
+      );
+      writeFileSync(
+        target,
+        execFileSync("git", ["cat-file", "blob", metadata[2]]),
+      );
+      materialized.push(target);
+    }
+  }
+  return materialized;
+}
+
 function main() {
   const changedFromIndex = process.argv.indexOf("--changed-from");
   const changedFrom =
@@ -138,22 +223,18 @@ function main() {
   }
 
   const scanChangedFiles = changedFrom !== null;
-  const candidateFiles = execFileSync(
-    "git",
-    scanChangedFiles
-      ? [
-          "diff",
-          changedFrom,
-          "HEAD",
-          "--name-only",
-          "--diff-filter=ACMRT",
-          "-z",
-        ]
-      : ["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"],
-    { encoding: "utf8" },
-  )
-    .split("\0")
-    .filter(Boolean);
+  const history = scanChangedFiles
+    ? historyFiles(changedFrom)
+    : { commits: [], files: [] };
+  const candidateFiles = scanChangedFiles
+    ? history.files
+    : execFileSync(
+        "git",
+        ["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"],
+        { encoding: "utf8" },
+      )
+        .split("\0")
+        .filter(Boolean);
 
   const blockedFiles = candidateFiles
     .map((filePath) => ({ filePath, reason: getBlockingReason(filePath) }))
@@ -171,13 +252,32 @@ function main() {
   }
 
   if (process.argv.includes("--secretlint")) {
-    const filesToLint = candidateFiles.filter(shouldSecretlint);
-    if (filesToLint.length > 0) {
-      execFileSync(
-        "pnpm",
-        ["exec", "secretlint", "--no-glob", "--no-gitignore", ...filesToLint],
-        { stdio: "inherit" },
-      );
+    const filesToLint = candidateFiles.filter(
+      (filePath) => shouldSecretlint(filePath) && existsSync(filePath),
+    );
+    let historicalDirectory;
+    try {
+      let historicalFiles = [];
+      if (scanChangedFiles) {
+        historicalDirectory = mkdtempSync(
+          path.join(os.tmpdir(), "tastes-secretlint-"),
+        );
+        historicalFiles = materializeHistoricalTextFiles(
+          history.commits,
+          historicalDirectory,
+        );
+      }
+      const lintFiles = [...new Set([...filesToLint, ...historicalFiles])];
+      if (lintFiles.length > 0) {
+        execFileSync(
+          "pnpm",
+          ["exec", "secretlint", "--no-glob", "--no-gitignore", ...lintFiles],
+          { stdio: "inherit" },
+        );
+      }
+    } finally {
+      if (historicalDirectory)
+        rmSync(historicalDirectory, { recursive: true, force: true });
     }
   }
 

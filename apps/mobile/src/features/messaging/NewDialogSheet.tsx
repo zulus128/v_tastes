@@ -1,6 +1,6 @@
 import type { ActivityCandidate } from "@tastes/contracts";
 import { apiErrorMessage } from "@tastes/firebase-client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +58,12 @@ export function NewDialogSheet({
   const actionsTranslateY = responsiveSize(72);
   const actionsInitiallyVisible =
     windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
+  const actionsFit = useCallback(
+    (availableHeight: number) =>
+      availableHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+      minResultsHeight,
+    [fixedContentHeight, minResultsHeight],
+  );
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
@@ -124,15 +130,14 @@ export function NewDialogSheet({
           0,
           Math.min(windowHeight, event.endCoordinates.screenY - frameTop),
         );
-        const actionsVisible =
-          nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight >=
-          minResultsHeight;
+        const actionsVisible = actionsFit(nextKeyboardTop);
         animateLayout(nextKeyboardTop, actionsVisible, event.duration || 280);
       },
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      (event) => animateLayout(null, true, event.duration || 280),
+      (event) =>
+        animateLayout(null, actionsFit(windowHeight), event.duration || 280),
     );
     return () => {
       willShowSubscription.remove();
@@ -141,6 +146,7 @@ export function NewDialogSheet({
   }, [
     actionsVisibility,
     actionsTranslateY,
+    actionsFit,
     fixedContentHeight,
     minResultsHeight,
     physicalWindowHeight,
@@ -235,9 +241,7 @@ export function NewDialogSheet({
     sheetHeight.stopAnimation();
     sheetBottom.stopAnimation();
     keyboardTop.current = null;
-    const actionsVisible =
-      windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
-      minResultsHeight;
+    const actionsVisible = actionsFit(windowHeight);
     actionsVisibility.setValue(actionsVisible ? 1 : 0);
     sheetHeight.setValue(windowHeight * SHEET_HEIGHT_RATIO);
     sheetBottom.setValue(0);
