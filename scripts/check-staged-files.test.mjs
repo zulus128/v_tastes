@@ -22,6 +22,13 @@ describe("sensitive-file policy", () => {
     "terraform/production.tfvars.json.example",
   ])("allows documented Terraform variable example %s", (filePath) => {
     expect(getBlockingReason(filePath)).toBeNull();
+    expect(shouldSecretlint(filePath)).toBe(true);
+  });
+
+  it("rejects the iOS Firebase service configuration", () => {
+    expect(getBlockingReason("apps/mobile/GoogleService-Info.plist")).toBe(
+      "credential file",
+    );
   });
 
   it.each([

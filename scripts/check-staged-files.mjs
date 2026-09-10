@@ -24,6 +24,7 @@ const forbiddenCredentialNames = [
   /^application_default_credentials\.json$/i,
   /^credentials\.json$/i,
   /^firebase-adminsdk.*\.json$/i,
+  /^GoogleService-Info\.plist$/i,
   /^google-services\.json$/i,
   /^id_(?:dsa|ecdsa|ed25519|rsa)$/i,
   /^service[-_]?account.*\.json$/i,
@@ -120,6 +121,7 @@ export function shouldSecretlint(filePath) {
   return (
     fileName === ".env" ||
     fileName.startsWith(".env.") ||
+    isAllowedEnvironmentExample(fileName) ||
     packageManagerAuthFiles.has(fileName) ||
     extension === "" ||
     secretlintExtensions.has(extension)
