@@ -15,6 +15,7 @@ import {
   RefreshControl,
   Share,
   StyleSheet,
+  ScrollView,
   Text,
   TextInput,
   useWindowDimensions,
@@ -114,6 +115,9 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
 function MainReview({ onReact, reacting, review }: { onReact: () => void; reacting: boolean; review: CommentReview }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const dishModalHeight = Math.max(0, Math.min(responsiveSize(550), viewportHeight - insets.top));
   const [selectedDish, setSelectedDish] = useState<CommentReview['dishReviews'][number] | null>(null);
   return <View style={styles.mainReview}>
     <View style={styles.reviewAuthorRow}>
@@ -130,9 +134,11 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
         <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
-        <View style={styles.dishModal}>
+        <View style={[styles.dishModal, { height: dishModalHeight, paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
           <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
-          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          <ScrollView contentContainerStyle={styles.dishModalContent} showsVerticalScrollIndicator={false}>
+            {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -458,8 +464,9 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   dishTitle: { position: 'absolute', top: 10, left: 10, right: 10, color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   dishRating: { position: 'absolute', left: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, borderTopRightRadius: 12, color: '#fff', fontSize: 13, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)' },
   dishModalScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
-  dishModal: { minHeight: 550, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
+  dishModal: { padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
   dishModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center' },
+  dishModalContent: { paddingBottom: 8 },
   dishModalTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' },
   dishModalClose: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   dishModalCloseText: { color: colors.text, fontSize: 20, lineHeight: 21 },
