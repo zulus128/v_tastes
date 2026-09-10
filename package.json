@@ -52,6 +52,12 @@
     ],
     "**/{.npmrc,.yarnrc,.yarnrc.yml,.pnpmrc,bunfig.toml}": [
       "secretlint --no-glob --no-gitignore"
+    ],
+    "**/*.{txt,text,log,csv}": [
+      "secretlint --no-glob --no-gitignore"
+    ],
+    "**/!(*.*)": [
+      "secretlint --no-glob --no-gitignore"
     ]
   },
   "devDependencies": {

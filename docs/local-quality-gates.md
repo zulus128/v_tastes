@@ -32,9 +32,9 @@ Run it manually with:
 pnpm run prepush
 ```
 
-Accepted audit findings must have a narrow, documented entry in `pnpm-workspace.yaml`. The current
-`image-size` exceptions are limited to Metro's build-time parsing of repository-owned assets because
-the React Native toolchain does not yet accept the patched major version.
+Audit findings are never hidden from this gate. The currently unpatched `image-size` advisories are
+documented in [ADR 0008](adr/0008-dependency-security-exceptions.md) and intentionally remain
+release-blocking until a compatible patched version is available.
 
 Git hooks can be bypassed with `--no-verify`. CI remains the authoritative gate: it rejects
 forbidden credential files in the submitted diff, scans supported changed text files with

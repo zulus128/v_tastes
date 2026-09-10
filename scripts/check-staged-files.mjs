@@ -5,6 +5,9 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const allowedEnvironmentFiles = new Set([".env.example", ".xcode.env"]);
+const allowedCredentialPaths = new Set([
+  "apps/mobile/android/app/debug.keystore",
+]);
 const forbiddenExtensions = new Set([
   ".der",
   ".jks",
@@ -30,6 +33,7 @@ const secretlintExtensions = new Set([
   ".cjs",
   ".conf",
   ".config",
+  ".csv",
   ".env",
   ".gradle",
   ".ini",
@@ -37,6 +41,7 @@ const secretlintExtensions = new Set([
   ".json",
   ".jsonc",
   ".jsx",
+  ".log",
   ".md",
   ".mjs",
   ".plist",
@@ -48,6 +53,8 @@ const secretlintExtensions = new Set([
   ".toml",
   ".ts",
   ".tsx",
+  ".text",
+  ".txt",
   ".xml",
   ".yaml",
   ".yml",
@@ -72,6 +79,10 @@ function isAllowedEnvironmentExample(fileName) {
 export function getBlockingReason(filePath) {
   const fileName = path.posix.basename(filePath);
   const normalizedName = fileName.toLowerCase();
+  const normalizedPath = path.posix
+    .normalize(filePath)
+    .replace(/^\.\//, "")
+    .toLowerCase();
 
   if (
     (normalizedName === ".env" ||
@@ -91,7 +102,7 @@ export function getBlockingReason(filePath) {
 
   if (
     forbiddenExtensions.has(path.posix.extname(normalizedName)) &&
-    normalizedName !== "debug.keystore"
+    !allowedCredentialPaths.has(normalizedPath)
   ) {
     return "key or signing credential";
   }
@@ -105,11 +116,13 @@ export function getBlockingReason(filePath) {
 
 export function shouldSecretlint(filePath) {
   const fileName = path.posix.basename(filePath).toLowerCase();
+  const extension = path.posix.extname(fileName);
   return (
     fileName === ".env" ||
     fileName.startsWith(".env.") ||
     packageManagerAuthFiles.has(fileName) ||
-    secretlintExtensions.has(path.posix.extname(fileName))
+    extension === "" ||
+    secretlintExtensions.has(extension)
   );
 }
 

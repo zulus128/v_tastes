@@ -42,6 +42,33 @@ describe("sensitive-file policy", () => {
     expect(getBlockingReason("keys/id_ed25519.pub")).toBeNull();
   });
 
+  it("allows only the repository Android development keystore path", () => {
+    expect(
+      getBlockingReason("apps/mobile/android/app/debug.keystore"),
+    ).toBeNull();
+    expect(getBlockingReason("release/debug.keystore")).toBe(
+      "key or signing credential",
+    );
+    expect(getBlockingReason("debug.keystore")).toBe(
+      "key or signing credential",
+    );
+  });
+
+  it.each([
+    "notes.txt",
+    "secrets.text",
+    "logs/build.log",
+    "exports/users.csv",
+    "Dockerfile",
+    "config/README",
+  ])("routes ordinary plaintext file %s through secretlint", (filePath) => {
+    expect(shouldSecretlint(filePath)).toBe(true);
+  });
+
+  it("does not route a binary asset through secretlint", () => {
+    expect(shouldSecretlint("assets/photo.png")).toBe(false);
+  });
+
   it.each([".npmrc", "packages/mobile/.npmrc", ".yarnrc.yml", "bunfig.toml"])(
     "routes package-manager auth config %s through secretlint",
     (filePath) => {

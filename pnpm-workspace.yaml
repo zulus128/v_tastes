@@ -29,10 +29,3 @@ overrides:
   qs: 6.16.0
   sharp: 0.35.4
   "uuid@<11.1.1": 11.1.1
-
-auditConfig:
-  ignoreGhsas:
-    # Metro parses repository-owned image assets during local/build tooling; no compatible patched
-    # image-size release exists in the current React Native toolchain.
-    - GHSA-5p2g-fcmc-qvqq
-    - GHSA-w3rx-r6r6-pgpr
