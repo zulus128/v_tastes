@@ -615,6 +615,10 @@ function PlacesMap({
   const insets = useSafeAreaInsets();
   const contentWidth = Math.max(0, windowDimensions.width - insets.left - insets.right);
   const splitLayout = orientationDimensions.width > orientationDimensions.height && windowDimensions.width >= 600;
+  // Once a resizable landscape window is wide enough, a bottom sheet leaves
+  // an unnecessarily large map area above a narrow list. Switch to a stable
+  // side panel so the list and map use the available width together.
+  const sidePanelLayout = splitLayout && contentWidth >= 1000;
   const sheetRight = splitLayout ? contentWidth * 0.48 : 0;
   const [mapHeight, setMapHeight] = useState(0);
   const [keyboardAvoidanceActive, setKeyboardAvoidanceActive] = useState(false);
@@ -985,22 +989,29 @@ function PlacesMap({
       ) : null}
       <Animated.View
         pointerEvents="none"
-        style={[styles.mapSheetUnderlay, { height: sheetHeight, right: sheetRight }]}
+        style={[
+          styles.mapSheetUnderlay,
+          sidePanelLayout ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }] : { height: sheetHeight, right: sheetRight },
+        ]}
       />
       <Animated.View
         style={[
           styles.mapSheet,
-          { height: sheetHeight, right: sheetRight, transform: [{ translateY: sheetKeyboardTranslate }] },
+          sidePanelLayout
+            ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }]
+            : { height: sheetHeight, right: sheetRight, transform: [{ translateY: sheetKeyboardTranslate }] },
         ]}
       >
-        <Pressable
-          accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
-          onPress={() => settleSheet(!sheetExpanded)}
-          style={styles.sheetDragArea}
-          {...sheetPanResponder.panHandlers}
-        >
-          <View style={styles.sheetHandle} />
-        </Pressable>
+        {sidePanelLayout ? null : (
+          <Pressable
+            accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
+            onPress={() => settleSheet(!sheetExpanded)}
+            style={styles.sheetDragArea}
+            {...sheetPanResponder.panHandlers}
+          >
+            <View style={styles.sheetHandle} />
+          </Pressable>
+        )}
         <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
             <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} />
@@ -1044,7 +1055,7 @@ function PlacesMap({
             );
           })}
         </ScrollView>
-        {sheetExpanded ? (
+        {sheetExpanded || sidePanelLayout ? (
           <View style={styles.mapResultsMeta}>
             <Text style={styles.mapResultsCount}>{filtered.length} places</Text>
             <Pressable
@@ -2042,6 +2053,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
   mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapSheetSidePanel: { top: 0, bottom: 0, borderTopWidth: 0, borderRightWidth: 1, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
   mapSheetUnderlay: { position: 'absolute', zIndex: 7, elevation: 7, right: 0, bottom: 0, left: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
