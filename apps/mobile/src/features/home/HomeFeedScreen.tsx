@@ -176,6 +176,7 @@ function FeedCard({
   onOpenMenu: () => void;
 }) {
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(null);
@@ -331,7 +332,7 @@ function FeedCard({
             onPress={() => setSelectedDishIndex(null)}
             style={StyleSheet.absoluteFill}
           />
-          <View style={overlayStyles.dishReviewSheet}>
+          <View style={[overlayStyles.dishReviewSheet, { paddingBottom: Math.max(30, insets.bottom) }]}>
             <View style={overlayStyles.dishReviewHeader}>
               <Text style={overlayStyles.dishReviewTitle}>Dish Review</Text>
               <Pressable
@@ -344,7 +345,7 @@ function FeedCard({
               </Pressable>
             </View>
             {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
-              <>
+              <ScrollView bounces={false} contentContainerStyle={overlayStyles.dishReviewContent} showsVerticalScrollIndicator={false} style={overlayStyles.dishReviewScroll}>
                 <View style={overlayStyles.dishReviewPhoto}>
                   <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} photoUrl={dishReviews[selectedDishIndex].photoUrl} />
                   {dishReviews.length > 1 ? (
@@ -373,7 +374,7 @@ function FeedCard({
                   </View>
                   <Text style={overlayStyles.dishReviewName}>{dishReviews[selectedDishIndex].title}</Text>
                 </View>
-              </>
+              </ScrollView>
             ) : null}
           </View>
         </View>
@@ -926,7 +927,9 @@ const overlayStyles = responsiveStyleSheet({
   sentDone: { position: 'absolute', left: 36, right: 36, bottom: 34, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
   sentDoneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   dishReviewScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
-  dishReviewSheet: { paddingBottom: 30, borderTopWidth: 1, borderColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+  dishReviewSheet: { maxHeight: '100%', borderTopWidth: 1, borderColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+  dishReviewScroll: { flexShrink: 1 },
+  dishReviewContent: { flexGrow: 1 },
   dishReviewHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dishReviewTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
   dishReviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
