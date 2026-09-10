@@ -69,6 +69,13 @@ it('allows modals to rotate and lets the native presentation determine their bou
   expect(await screen.findByText('Modal content')).toBeOnTheScreen();
 });
 
+it('can inset full-screen modal content on every safe-area edge', async () => {
+  await render(<ResponsiveModal insetContent visible><Text>Inset content</Text></ResponsiveModal>, { wrapper: Providers });
+
+  const content = await screen.findByText('Inset content');
+  expect(content.parent?.props.edges).toEqual({ top: 'additive', right: 'additive', bottom: 'additive', left: 'additive' });
+});
+
 it('does not restart an open side sheet on resize and closes using the latest width', async () => {
   const timing = jest.spyOn(Animated, 'timing');
   const onRequestClose = jest.fn();

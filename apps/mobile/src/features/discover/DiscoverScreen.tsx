@@ -1405,7 +1405,7 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
           ) : null}
         </>
       )}
-      <Modal animationType="slide" visible={seeMore} onRequestClose={() => setSeeMore(false)}>
+      <Modal animationType="slide" insetContent visible={seeMore} onRequestClose={() => setSeeMore(false)}>
         <View style={styles.screen}>
           <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
             <Pressable onPress={() => setSeeMore(false)} style={styles.headerAction}>
@@ -1449,7 +1449,7 @@ function SectionLabel({ onSeeAll, subtitle, title }: { onSeeAll?: () => void; su
 function SeeAllPlacesModal({ onClose, onOpenPlace, onSave, savedVenueIds, venues }: { onClose: () => void; onOpenPlace: (id: string) => void; onSave: (place: SaveablePlace) => void; savedVenueIds: Set<string>; venues: Venue[] | null }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]); const [query, setQuery] = useState('');
   const visible = (venues ?? []).filter((venue) => venue.name.toLowerCase().includes(query.toLowerCase()));
-  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}><PeopleSearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: responsiveSize(16), paddingBottom: responsiveSize(30), gap: responsiveSize(10) }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
+  return <Modal animationType="slide" insetContent visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}><PeopleSearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: responsiveSize(16), paddingBottom: responsiveSize(30), gap: responsiveSize(10) }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
 }
 
 function RatingPill({ value }: { value: string }) {
