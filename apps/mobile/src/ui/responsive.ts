@@ -157,6 +157,19 @@ export function responsiveValue(value: number, scale: number) {
 }
 
 /**
+ * Keeps fixed-position flows reachable when a freely resizable window is
+ * shorter than the design canvas. The viewport can still shrink; callers can
+ * expose the remaining canvas through scrolling.
+ */
+export function responsiveContentHeight(
+  viewportHeight: number,
+  scale: number,
+  designHeight = DESIGN_VIEWPORT.height,
+) {
+  return Math.max(viewportHeight, responsiveValue(designHeight, scale));
+}
+
+/**
  * Fits wrapped cards to the exact available row width. Computing the item
  * width from the already-rounded padding and gap avoids half-pixel overflow on
  * narrow phones, while a fixed column count keeps an orphaned final card from

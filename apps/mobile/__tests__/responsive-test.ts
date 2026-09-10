@@ -1,5 +1,6 @@
 import {
   DESIGN_VIEWPORT,
+  responsiveContentHeight,
   responsiveMetrics,
   responsiveViewport,
   responsiveWrapMetrics,
@@ -52,6 +53,13 @@ describe('responsive layout metrics', () => {
     const layout = responsiveWrapMetrics(1024, responsiveMetrics(1024, 600).scale, 280, 2);
     expect(layout.columns).toBe(2);
     expect(layout.itemWidth).toBeLessThan(1024 - 32);
+  });
+
+  it('provides a scrollable design canvas in a short landscape window', () => {
+    const scale = responsiveMetrics(667, 375).scale;
+    const contentHeight = responsiveContentHeight(375, scale);
+    expect(contentHeight).toBeGreaterThan(375);
+    expect(contentHeight).toBeCloseTo(DESIGN_VIEWPORT.height * scale, 0);
   });
 });
 

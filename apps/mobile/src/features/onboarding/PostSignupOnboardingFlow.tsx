@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type PropsWithChildren } from 'react';
 import {
   Alert,
   Image,
@@ -72,7 +72,13 @@ import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { DESIGN_VIEWPORT, responsiveStyleSheet, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
+import {
+  DESIGN_VIEWPORT,
+  responsiveContentHeight,
+  responsiveStyleSheet,
+  useResponsiveMetrics,
+  useResponsiveViewport,
+} from '../../ui/responsive';
 
 export type PostSignupScreen =
   | 'profile'
@@ -194,11 +200,28 @@ function StepHeader({ step, title, subtitle }: { step: number; title: string; su
   </View>;
 }
 
+function ScrollablePatternScreen({ children }: PropsWithChildren) {
+  const { height: viewportHeight } = useResponsiveViewport();
+  const { scale } = useResponsiveMetrics();
+  const contentHeight = responsiveContentHeight(viewportHeight, scale);
+
+  return (
+    <ScrollView
+      bounces={false}
+      contentContainerStyle={{ minHeight: contentHeight }}
+      showsVerticalScrollIndicator={false}
+      style={{ flex: 1 }}
+    >
+      <PatternScreen style={{ minHeight: contentHeight }}>{children}</PatternScreen>
+    </ScrollView>
+  );
+}
+
 function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
   icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
 }) {
   const styles = useOnboardingStyles();
-  return <PatternScreen>
+  return <ScrollablePatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
     <View style={styles.permissionContent}>
       <Image source={icon} style={styles.permissionIcon} />
@@ -206,7 +229,7 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
     </View>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
-  </PatternScreen>;
+  </ScrollablePatternScreen>;
 }
 
 export function PostSignupOnboardingFlow({
@@ -221,6 +244,7 @@ export function PostSignupOnboardingFlow({
   const styles = useOnboardingStyles();
   const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));
   const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
+  const contentHeight = responsiveContentHeight(viewportHeight, layoutScale);
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useTastesApi();
@@ -492,10 +516,10 @@ export function PostSignupOnboardingFlow({
   const invitedCount = contacts.filter((item) => item.invited).length;
 
   if (screen === 'city') {
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} />
       <CityPicker onSelect={(name, flag) => { setCity(name); setCityFlag(flag); back(); }} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'profile') {
@@ -539,7 +563,7 @@ export function PostSignupOnboardingFlow({
   }
 
   if (screen === 'dish') {
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
       <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
       <ScrollView
@@ -552,7 +576,7 @@ export function PostSignupOnboardingFlow({
       </ScrollView>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'location') return <PermissionScreen icon={permissionLocation} title="Discover places near you" subtitle="Allow location access so Tastes can show the best spots around you." button="Allow Location" onBack={back} onSkip={enterPlaces} onPress={requestLocation} />;
@@ -570,7 +594,7 @@ export function PostSignupOnboardingFlow({
       return queryMatches && categoryMatches && trendingMatches;
     });
     const noResults = !placeLoading && filteredPlaces.length === 0;
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} onSkip={() => navigate('style')} />
       <StepHeader step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
       <View style={[styles.placesCard, usesNarrowPlaceLayout && styles.placesCardNarrow]}>
@@ -655,11 +679,11 @@ export function PostSignupOnboardingFlow({
         style={styles.placeFooterGradient}
       />
       <PrimaryButton label="Continue" disabled={!place} onPress={() => navigate('style')} style={styles.bottomButton} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'style') {
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} onSkip={() => navigate('contactsPermission')} />
       <StepHeader step={3} title="Choose Your Style" subtitle="Switch between dark and light mode anytime" />
       <View style={styles.styleCard}>
@@ -681,13 +705,13 @@ export function PostSignupOnboardingFlow({
         }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
       </View>
       <PrimaryButton label="Continue" onPress={() => navigate('contactsPermission')} style={styles.bottomButton} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'contactsPermission') return <PermissionScreen icon={permissionContacts} title="Find your friends" subtitle="Connect your contacts to find people you know already on Tastes." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts} />;
 
   if (screen === 'contacts') {
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} onSkip={() => navigate('invite')} />
       <View style={styles.listPage}><Text style={styles.listTitle}>Friends from contacts</Text><Text style={styles.listSubtitle}>Follow people already on Tastes or invite the rest.</Text>
         <ScrollView>{contacts.map((contact, index) => <View key={contact.id} style={styles.contactRow}>
@@ -696,28 +720,30 @@ export function PostSignupOnboardingFlow({
           <Pressable onPress={() => inviteContact(contact)} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.userId ? contact.invited ? 'Following' : 'Follow' : contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
         </View>)}</ScrollView>
       </View><PrimaryButton label="Done" onPress={() => navigate('invite')} style={styles.bottomButton} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'invite') {
-    return <PatternScreen>
+    return <ScrollablePatternScreen>
       <Header onBack={back} onSkip={() => navigate('notifications')} />
       <View style={styles.invitePage}><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
         {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
         <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
       </View><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
-    </PatternScreen>;
+    </ScrollablePatternScreen>;
   }
 
   if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
-  return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
-    <View style={styles.readyContent}>
-      <Image source={readyCollage} resizeMode="contain" style={{ height: collageHeight, width: collageWidth }} />
-      <View style={styles.readyCopy}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
-      <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
-    </View>
-  </LinearGradient>;
+  return <ScrollView bounces={false} contentContainerStyle={{ minHeight: contentHeight }} showsVerticalScrollIndicator={false} style={styles.ready}>
+    <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={[styles.ready, { minHeight: contentHeight }]}>
+      <View style={styles.readyContent}>
+        <Image source={readyCollage} resizeMode="contain" style={{ height: collageHeight, width: collageWidth }} />
+        <View style={styles.readyCopy}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
+        <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
+      </View>
+    </LinearGradient>
+  </ScrollView>;
 }
 
 const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
