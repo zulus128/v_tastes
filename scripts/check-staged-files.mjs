@@ -153,6 +153,7 @@ function gitNamesForCommit(commit) {
     [
       "diff-tree",
       "--root",
+      "-m",
       "--no-commit-id",
       "--name-only",
       "--diff-filter=ACMRT",
@@ -271,7 +272,14 @@ function main() {
       if (lintFiles.length > 0) {
         execFileSync(
           "pnpm",
-          ["exec", "secretlint", "--no-glob", "--no-gitignore", ...lintFiles],
+          [
+            "exec",
+            "secretlint",
+            "--no-glob",
+            "--no-gitignore",
+            "--",
+            ...lintFiles,
+          ],
           { stdio: "inherit" },
         );
       }

@@ -54,15 +54,18 @@ export function NewDialogSheet({
   const { height: physicalWindowHeight } = useWindowDimensions();
   const actionsHeight = responsiveSize(ACTIONS_HEIGHT);
   const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
+  const actionsBottomPadding = Math.max(insets.bottom, 20);
+  const fixedContentWithPadding = fixedContentHeight + actionsBottomPadding;
   const minResultsHeight = responsiveSize(MIN_RESULTS_HEIGHT);
   const actionsTranslateY = responsiveSize(72);
   const actionsInitiallyVisible =
-    windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
+    windowHeight * SHEET_HEIGHT_RATIO - fixedContentWithPadding >=
+    minResultsHeight;
   const actionsFit = useCallback(
     (availableHeight: number) =>
-      availableHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+      availableHeight * SHEET_HEIGHT_RATIO - fixedContentWithPadding >=
       minResultsHeight,
-    [fixedContentHeight, minResultsHeight],
+    [fixedContentWithPadding, minResultsHeight],
   );
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
@@ -147,7 +150,7 @@ export function NewDialogSheet({
     actionsVisibility,
     actionsTranslateY,
     actionsFit,
-    fixedContentHeight,
+    fixedContentWithPadding,
     minResultsHeight,
     physicalWindowHeight,
     sheetBottom,
@@ -158,7 +161,7 @@ export function NewDialogSheet({
   useEffect(() => {
     const availableHeight = keyboardTop.current ?? windowHeight;
     const actionsVisible =
-      availableHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+      availableHeight * SHEET_HEIGHT_RATIO - fixedContentWithPadding >=
       minResultsHeight;
     setActionsHidden(!actionsVisible);
     actionsVisibility.setValue(actionsVisible ? 1 : 0);
@@ -175,7 +178,7 @@ export function NewDialogSheet({
     );
   }, [
     actionsVisibility,
-    fixedContentHeight,
+    fixedContentWithPadding,
     minResultsHeight,
     sheetBottom,
     sheetHeight,
@@ -288,7 +291,7 @@ export function NewDialogSheet({
             {
               height: sheetHeight,
               marginBottom: sheetBottom,
-              paddingBottom: Math.max(insets.bottom, 20),
+              paddingBottom: actionsBottomPadding,
             },
           ]}
         >
