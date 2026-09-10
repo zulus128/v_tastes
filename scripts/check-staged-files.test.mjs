@@ -25,7 +25,7 @@ describe("sensitive-file policy", () => {
     expect(shouldSecretlint(filePath)).toBe(true);
   });
 
-  it("rejects the iOS Firebase service configuration", () => {
+  it("allows tracked public Firebase configs but rejects untracked copies", () => {
     expect(
       getBlockingReason("apps/mobile/GoogleService-Info.plist"),
     ).toBeNull();
