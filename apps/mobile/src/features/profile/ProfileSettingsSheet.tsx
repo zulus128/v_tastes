@@ -12,6 +12,7 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -91,6 +92,8 @@ export function ProfileSettingsSheet({
   const { profile } = useProfile(userId, fallbackName);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
   const buildVersion = Application.nativeBuildVersion;
+  const otaRevision = String(Constants.expoConfig?.extra?.otaRevision ?? '0');
+  const updateId = Updates.updateId ? Updates.updateId.slice(0, 8) : null;
   const [favoritePlace, setFavoritePlace] = useState('Select a place');
   const [editing, setEditing] = useState<EditableField | null>(null);
   const [draft, setDraft] = useState('');
@@ -353,8 +356,8 @@ export function ProfileSettingsSheet({
             </ScrollView>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}>
-          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
-            Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
+          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''} OTA ${otaRevision}`} style={styles.version}>
+            Version {appVersion}{buildVersion ? ` (${buildVersion}` : ''}{buildVersion ? ` · OTA ${otaRevision})` : ` (OTA ${otaRevision})`}{updateId ? ` · ${updateId}` : ''}
           </Text>
           <LinearGradient
             colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
