@@ -261,7 +261,7 @@ export function SaveToFolderSheet({
   }
 
   return (
-    <Modal animationType="slide" insetContent onRequestClose={onClose} visible={visible}>
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.addScreen}

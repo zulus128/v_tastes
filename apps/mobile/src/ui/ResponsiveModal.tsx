@@ -18,7 +18,9 @@ export function ResponsiveModal({ children, insetContent = false, transparent, .
           { backgroundColor: transparent ? 'transparent' : colors.background },
         ]}
       >
-        {insetContent
+        {transparent
+          ? <View style={styles.frame}>{children}</View>
+          : insetContent
           ? <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.frame}>{children}</SafeAreaView>
           : <View style={styles.frame}>{children}</View>}
       </SafeAreaProvider>

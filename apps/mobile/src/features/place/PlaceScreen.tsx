@@ -274,7 +274,7 @@ function Hours({ close, hours, styles, visible }: { close: () => void; hours: Ar
   </Pressable></Pressable></Modal>;
 }
 function Gallery({ close, photos, styles, visible }: { close: () => void; photos: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
-  return <Modal animationType="slide" insetContent visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable accessibilityLabel="Close gallery" onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
+  return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable accessibilityLabel="Close gallery" onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
 }
 function GalleryImage({ index, styles, url }: { index: number; styles: ReturnType<typeof createStyles>; url: string }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
