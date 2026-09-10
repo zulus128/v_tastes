@@ -89,7 +89,10 @@ export function NewDialogSheet({
     );
     const hideSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      (event) => animateLayout(null, true, event.duration || 280),
+      (event) => {
+        const actionsVisible = windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
+        animateLayout(null, actionsVisible, event.duration || 280);
+      },
     );
     return () => {
       willShowSubscription.remove();

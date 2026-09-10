@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -36,7 +35,7 @@ import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/component
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 
@@ -195,7 +194,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const windowDimensions = useWindowDimensions();
-  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const { height, width } = useOrientationDimensions();
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
   const headerSafeStyle = {
     height: responsiveSize(102 - 54) + headerTop,
@@ -421,7 +420,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={styles.reportSheet}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></View></View></Modal>
+      <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={[styles.reportSheet, { maxHeight: Math.max(0, windowDimensions.height - insets.top - responsiveSize(12)) }]}><ScrollView contentContainerStyle={styles.reportContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></ScrollView></View></View></Modal>
       <Modal animationType="fade" onRequestClose={() => setReportSent(false)} visible={reportSent}><View style={styles.sent}><View style={styles.sentIcon}><Text style={styles.sentCheck}>✓</Text></View><Text style={styles.sentTitle}>Report sent</Text><Text style={styles.sentCopy}>Thanks for helping keep Tastes safe. Our team will review this shortly.</Text><Pressable onPress={() => setReportSent(false)} style={styles.sentDone}><Text style={styles.sentDoneText}>Done</Text></Pressable></View></Modal>
     </Screen>
   );
@@ -508,7 +507,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   input: { flex: 1, height: 40, paddingHorizontal: 14, borderRadius: theme.radius.pill, color: colors.text, backgroundColor: colors.surfaceRaised },
   send: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   reportScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
-  reportSheet: { padding: 18, paddingBottom: 28, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
+  reportSheet: { overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
+  reportContent: { padding: 18, paddingBottom: 28 },
   reportTitle: { marginBottom: 8, color: colors.text, fontSize: 20, fontWeight: '700' },
   reportRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   reportLabel: { color: colors.text, fontSize: 15 },

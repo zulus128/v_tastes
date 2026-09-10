@@ -2,7 +2,6 @@ import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -14,7 +13,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,7 +38,7 @@ import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons'
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
@@ -492,8 +490,7 @@ export function HomeFeedScreen({
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
-  const windowDimensions = useWindowDimensions();
-  const { height, width } = Platform.OS === 'android' ? Dimensions.get('screen') : windowDimensions;
+  const { height, width } = useOrientationDimensions();
   const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
   const headerHeight = responsiveSize(157 - 54) + headerTop;
   const headerSafeStyle = {
