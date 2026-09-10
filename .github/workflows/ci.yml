@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -24,6 +26,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check:changed-files "${{ github.event.pull_request.base.sha || github.event.before }}" --secretlint
+      - run: pnpm audit --prod
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm typecheck

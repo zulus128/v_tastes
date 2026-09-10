@@ -32,6 +32,7 @@
     "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore,storage \"vitest run services/backend/tests/rules\"",
     "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run services/backend/tests/auth\"",
     "check:staged-files": "node scripts/check-staged-files.mjs",
+    "check:changed-files": "node scripts/check-staged-files.mjs --changed-from",
     "prepush": "pnpm build && pnpm lint && pnpm typecheck && pnpm test && pnpm audit --prod",
     "prepare": "husky"
   },
@@ -43,10 +44,13 @@
     "!(*lock*).{json,jsonc,md,yml,yaml}": [
       "prettier --write"
     ],
-    "**/*.{js,cjs,mjs,jsx,ts,tsx,json,jsonc,md,yml,yaml,env,ini,conf,config,properties,xml,plist,gradle,tf,tfvars,sh,bash,zsh,sql}": [
+    "**/*.{js,cjs,mjs,jsx,ts,tsx,json,jsonc,md,yml,yaml,env,ini,conf,config,properties,xml,plist,gradle,tf,tfvars,sh,bash,zsh,sql,toml}": [
       "secretlint --no-glob --no-gitignore"
     ],
     "**/.env*": [
+      "secretlint --no-glob --no-gitignore"
+    ],
+    "**/{.npmrc,.yarnrc,.yarnrc.yml,.pnpmrc,bunfig.toml}": [
       "secretlint --no-glob --no-gitignore"
     ]
   },

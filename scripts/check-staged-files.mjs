@@ -2,14 +2,7 @@ import { execFileSync } from "node:child_process";
 import console from "node:console";
 import path from "node:path";
 import process from "node:process";
-
-const stagedFiles = execFileSync(
-  "git",
-  ["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"],
-  { encoding: "utf8" },
-)
-  .split("\0")
-  .filter(Boolean);
+import { fileURLToPath } from "node:url";
 
 const allowedEnvironmentFiles = new Set([".env.example", ".xcode.env"]);
 const forbiddenExtensions = new Set([
@@ -18,6 +11,7 @@ const forbiddenExtensions = new Set([
   ".key",
   ".keystore",
   ".p12",
+  ".p8",
   ".pem",
   ".pfx",
 ]);
@@ -28,6 +22,41 @@ const forbiddenCredentialNames = [
   /^google-services\.json$/i,
   /^service[-_]?account.*\.json$/i,
 ];
+const secretlintExtensions = new Set([
+  ".bash",
+  ".cjs",
+  ".conf",
+  ".config",
+  ".env",
+  ".gradle",
+  ".ini",
+  ".js",
+  ".json",
+  ".jsonc",
+  ".jsx",
+  ".md",
+  ".mjs",
+  ".plist",
+  ".properties",
+  ".sh",
+  ".sql",
+  ".tf",
+  ".tfvars",
+  ".toml",
+  ".ts",
+  ".tsx",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".zsh",
+]);
+const packageManagerAuthFiles = new Set([
+  ".npmrc",
+  ".pnpmrc",
+  ".yarnrc",
+  ".yarnrc.yml",
+  "bunfig.toml",
+]);
 
 function isAllowedEnvironmentExample(fileName) {
   return (
@@ -37,7 +66,7 @@ function isAllowedEnvironmentExample(fileName) {
   );
 }
 
-function getBlockingReason(filePath) {
+export function getBlockingReason(filePath) {
   const fileName = path.posix.basename(filePath);
   const normalizedName = fileName.toLowerCase();
 
@@ -64,19 +93,73 @@ function getBlockingReason(filePath) {
   return null;
 }
 
-const blockedFiles = stagedFiles
-  .map((filePath) => ({ filePath, reason: getBlockingReason(filePath) }))
-  .filter(({ reason }) => reason !== null);
-
-if (blockedFiles.length > 0) {
-  console.error("Commit blocked: sensitive files are staged:");
-  for (const { filePath, reason } of blockedFiles) {
-    console.error(`  - ${filePath} (${reason})`);
-  }
-  console.error("\nUnstage these files and store secrets outside Git.");
-  process.exit(1);
+export function shouldSecretlint(filePath) {
+  const fileName = path.posix.basename(filePath).toLowerCase();
+  return (
+    fileName === ".env" ||
+    fileName.startsWith(".env.") ||
+    packageManagerAuthFiles.has(fileName) ||
+    secretlintExtensions.has(path.posix.extname(fileName))
+  );
 }
 
-console.log(
-  `Staged-file guard passed (${stagedFiles.length} file(s) checked).`,
-);
+function main() {
+  const changedFromIndex = process.argv.indexOf("--changed-from");
+  const changedFrom =
+    changedFromIndex >= 0 ? process.argv[changedFromIndex + 1] : null;
+  if (changedFromIndex >= 0 && !changedFrom) {
+    throw new Error("--changed-from requires a Git revision");
+  }
+
+  const scanChangedFiles = changedFrom !== null;
+  const candidateFiles = execFileSync(
+    "git",
+    scanChangedFiles
+      ? [
+          "diff",
+          changedFrom,
+          "HEAD",
+          "--name-only",
+          "--diff-filter=ACMRT",
+          "-z",
+        ]
+      : ["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"],
+    { encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean);
+
+  const blockedFiles = candidateFiles
+    .map((filePath) => ({ filePath, reason: getBlockingReason(filePath) }))
+    .filter(({ reason }) => reason !== null);
+
+  if (blockedFiles.length > 0) {
+    console.error(
+      `${scanChangedFiles ? "CI check" : "Commit"} blocked: sensitive files are ${scanChangedFiles ? "changed" : "staged"}:`,
+    );
+    for (const { filePath, reason } of blockedFiles) {
+      console.error(`  - ${filePath} (${reason})`);
+    }
+    console.error("\nRemove these files and store secrets outside Git.");
+    process.exit(1);
+  }
+
+  if (process.argv.includes("--secretlint")) {
+    const filesToLint = candidateFiles.filter(shouldSecretlint);
+    if (filesToLint.length > 0) {
+      execFileSync(
+        "pnpm",
+        ["exec", "secretlint", "--no-glob", "--no-gitignore", ...filesToLint],
+        { stdio: "inherit" },
+      );
+    }
+  }
+
+  console.log(
+    `${scanChangedFiles ? "Changed" : "Staged"}-file guard passed (${candidateFiles.length} file(s) checked).`,
+  );
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

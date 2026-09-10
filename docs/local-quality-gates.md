@@ -9,7 +9,8 @@ The pre-commit hook:
 1. blocks staged environment-specific files, credentials, private keys, production signing files,
    and Firebase client configuration files;
 2. runs ESLint and Prettier fixes through lint-staged;
-3. scans supported staged text files with secretlint's recommended credential rules.
+3. scans supported staged text files, including package-manager auth configuration such as
+   `.npmrc`, with secretlint's recommended credential rules.
 
 Environment templates such as `.env.example` and development-only `debug.keystore` are allowed.
 Secret values must never be added to those templates.
@@ -35,4 +36,6 @@ Accepted audit findings must have a narrow, documented entry in `pnpm-workspace.
 `image-size` exceptions are limited to Metro's build-time parsing of repository-owned assets because
 the React Native toolchain does not yet accept the patched major version.
 
-Git hooks can be bypassed with `--no-verify`; CI remains the authoritative gate.
+Git hooks can be bypassed with `--no-verify`. CI remains the authoritative gate: it rejects
+forbidden credential files in the submitted diff, scans supported changed text files with
+secretlint, and audits production dependencies before running the build and test suite.
