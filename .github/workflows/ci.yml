@@ -26,9 +26,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check:changed-files "${{ github.event.pull_request.base.sha || github.event.before }}" --secretlint
+      - name: Check changed files
+        env:
+          BEFORE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            BEFORE_SHA="$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)"
+          fi
+          pnpm check:changed-files "$BEFORE_SHA" --secretlint
       - run: pnpm audit --prod
       - run: pnpm build
+      - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
