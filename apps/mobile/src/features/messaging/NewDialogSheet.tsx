@@ -1,14 +1,33 @@
-import type { ActivityCandidate } from '@tastes/contracts';
-import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
-import SearchIcon from '../../../assets/profile/search.svg';
-import { useTastesApi } from '../../session/SessionProvider';
-import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import type { ActivityCandidate } from "@tastes/contracts";
+import { apiErrorMessage } from "@tastes/firebase-client";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  FlatList,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle, Path } from "react-native-svg";
+import SearchIcon from "../../../assets/profile/search.svg";
+import { useTastesApi } from "../../session/SessionProvider";
+import { type ThemeColors, useAppTheme } from "../../ui/ThemeProvider";
+import { ResponsiveModal as Modal } from "../../ui/ResponsiveModal";
+import {
+  responsiveSize,
+  responsiveStyleSheet,
+  useResponsiveViewport,
+} from "../../ui/responsive";
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -37,19 +56,25 @@ export function NewDialogSheet({
   const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
   const minResultsHeight = responsiveSize(MIN_RESULTS_HEIGHT);
   const actionsTranslateY = responsiveSize(72);
+  const actionsInitiallyVisible =
+    windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [actionsHidden, setActionsHidden] = useState(false);
-  const actionsVisibility = useRef(new Animated.Value(1)).current;
+  const [search, setSearch] = useState("");
+  const [actionsHidden, setActionsHidden] = useState(!actionsInitiallyVisible);
+  const actionsVisibility = useRef(
+    new Animated.Value(actionsInitiallyVisible ? 1 : 0),
+  ).current;
   const closing = useRef(false);
   const keyboardTop = useRef<number | null>(null);
   const searchInputRef = useRef<TextInput | null>(null);
   const sheetBottom = useRef(new Animated.Value(0)).current;
-  const sheetHeight = useRef(new Animated.Value(windowHeight * SHEET_HEIGHT_RATIO)).current;
+  const sheetHeight = useRef(
+    new Animated.Value(windowHeight * SHEET_HEIGHT_RATIO),
+  ).current;
 
   useEffect(() => {
     const animationConfig = (duration: number) => ({
@@ -57,18 +82,34 @@ export function NewDialogSheet({
       easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: false as const,
     });
-    const animateLayout = (nextKeyboardTop: number | null, actionsVisible: boolean, duration = 280) => {
+    const animateLayout = (
+      nextKeyboardTop: number | null,
+      actionsVisible: boolean,
+      duration = 280,
+    ) => {
       keyboardTop.current = nextKeyboardTop;
       const availableHeight = nextKeyboardTop ?? windowHeight;
-      const nextHeight = Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO);
-      const nextBottom = nextKeyboardTop === null ? 0 : Math.max(0, windowHeight - nextKeyboardTop);
+      const nextHeight = Math.min(
+        windowHeight * SHEET_HEIGHT_RATIO,
+        availableHeight * SHEET_HEIGHT_RATIO,
+      );
+      const nextBottom =
+        nextKeyboardTop === null
+          ? 0
+          : Math.max(0, windowHeight - nextKeyboardTop);
       actionsVisibility.stopAnimation();
       sheetHeight.stopAnimation();
       sheetBottom.stopAnimation();
       setActionsHidden(!actionsVisible);
       Animated.parallel([
-        Animated.timing(sheetHeight, { ...animationConfig(duration), toValue: nextHeight }),
-        Animated.timing(sheetBottom, { ...animationConfig(duration), toValue: nextBottom }),
+        Animated.timing(sheetHeight, {
+          ...animationConfig(duration),
+          toValue: nextHeight,
+        }),
+        Animated.timing(sheetBottom, {
+          ...animationConfig(duration),
+          toValue: nextBottom,
+        }),
         Animated.timing(actionsVisibility, {
           ...animationConfig(duration),
           toValue: actionsVisible ? 1 : 0,
@@ -76,43 +117,84 @@ export function NewDialogSheet({
       ]).start();
     };
     const willShowSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (event) => {
         const frameTop = Math.max(0, (physicalWindowHeight - windowHeight) / 2);
-        const nextKeyboardTop = Math.max(0, Math.min(windowHeight, event.endCoordinates.screenY - frameTop));
-        const resultsHeight = nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight;
-        animateLayout(
-          nextKeyboardTop,
-          resultsHeight >= minResultsHeight,
-          event.duration || 280,
+        const nextKeyboardTop = Math.max(
+          0,
+          Math.min(windowHeight, event.endCoordinates.screenY - frameTop),
         );
+        const actionsVisible =
+          nextKeyboardTop * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+          minResultsHeight;
+        animateLayout(nextKeyboardTop, actionsVisible, event.duration || 280);
       },
     );
     const hideSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       (event) => animateLayout(null, true, event.duration || 280),
     );
     return () => {
       willShowSubscription.remove();
       hideSubscription.remove();
     };
-  }, [actionsVisibility, actionsTranslateY, fixedContentHeight, minResultsHeight, physicalWindowHeight, sheetBottom, sheetHeight, windowHeight]);
+  }, [
+    actionsVisibility,
+    actionsTranslateY,
+    fixedContentHeight,
+    minResultsHeight,
+    physicalWindowHeight,
+    sheetBottom,
+    sheetHeight,
+    windowHeight,
+  ]);
 
   useEffect(() => {
     const availableHeight = keyboardTop.current ?? windowHeight;
-    sheetHeight.setValue(Math.min(windowHeight * SHEET_HEIGHT_RATIO, availableHeight * SHEET_HEIGHT_RATIO));
-    sheetBottom.setValue(keyboardTop.current === null ? 0 : Math.max(0, windowHeight - keyboardTop.current));
-  }, [sheetBottom, sheetHeight, windowHeight]);
+    const actionsVisible =
+      availableHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+      minResultsHeight;
+    setActionsHidden(!actionsVisible);
+    actionsVisibility.setValue(actionsVisible ? 1 : 0);
+    sheetHeight.setValue(
+      Math.min(
+        windowHeight * SHEET_HEIGHT_RATIO,
+        availableHeight * SHEET_HEIGHT_RATIO,
+      ),
+    );
+    sheetBottom.setValue(
+      keyboardTop.current === null
+        ? 0
+        : Math.max(0, windowHeight - keyboardTop.current),
+    );
+  }, [
+    actionsVisibility,
+    fixedContentHeight,
+    minResultsHeight,
+    sheetBottom,
+    sheetHeight,
+    windowHeight,
+  ]);
 
   useEffect(() => {
     if (!visible) return;
     let active = true;
     setLoading(true);
-    void api.listActivityCandidates()
-      .then((result) => { if (active) setCandidates(result.data); })
-      .catch((error) => { if (active) Alert.alert('Could not load friends', apiErrorMessage(error)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    void api
+      .listActivityCandidates()
+      .then((result) => {
+        if (active) setCandidates(result.data);
+      })
+      .catch((error) => {
+        if (active)
+          Alert.alert("Could not load friends", apiErrorMessage(error));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [api, visible]);
 
   async function dismissKeyboard(): Promise<void> {
@@ -129,7 +211,7 @@ export function NewDialogSheet({
         subscription.remove();
         resolve();
       };
-      const subscription = Keyboard.addListener('keyboardDidHide', finish);
+      const subscription = Keyboard.addListener("keyboardDidHide", finish);
       const timeout = setTimeout(finish, 450);
       searchInputRef.current?.blur();
       Keyboard.dismiss();
@@ -153,35 +235,47 @@ export function NewDialogSheet({
     sheetHeight.stopAnimation();
     sheetBottom.stopAnimation();
     keyboardTop.current = null;
-    actionsVisibility.setValue(1);
+    const actionsVisible =
+      windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >=
+      minResultsHeight;
+    actionsVisibility.setValue(actionsVisible ? 1 : 0);
     sheetHeight.setValue(windowHeight * SHEET_HEIGHT_RATIO);
     sheetBottom.setValue(0);
-    setActionsHidden(false);
+    setActionsHidden(!actionsVisible);
   }
 
   async function openConversation(candidate: ActivityCandidate) {
     if (openingId) return;
     setOpeningId(candidate.userId);
     try {
-      const result = await api.createConversation({ targetUserId: candidate.userId });
+      const result = await api.createConversation({
+        targetUserId: candidate.userId,
+      });
       await closeSheet();
       onOpenConversation(result.data.id);
     } catch (error) {
-      Alert.alert('Could not start dialog', apiErrorMessage(error));
+      Alert.alert("Could not start dialog", apiErrorMessage(error));
     } finally {
       setOpeningId(null);
     }
   }
 
   const query = search.trim().toLowerCase();
-  const filtered = candidates.filter((candidate) => (
-    !query
-    || candidate.displayName.toLowerCase().includes(query)
-    || candidate.username?.toLowerCase().includes(query)
-  ));
+  const filtered = candidates.filter(
+    (candidate) =>
+      !query ||
+      candidate.displayName.toLowerCase().includes(query) ||
+      candidate.username?.toLowerCase().includes(query),
+  );
 
   return (
-    <Modal animationType="slide" onDismiss={resetSheetAfterDismiss} onRequestClose={() => void closeSheet()} transparent visible={visible}>
+    <Modal
+      animationType="slide"
+      onDismiss={resetSheetAfterDismiss}
+      onRequestClose={() => void closeSheet()}
+      transparent
+      visible={visible}
+    >
       <Pressable onPress={() => void closeSheet()} style={styles.backdrop}>
         <AnimatedPressable
           onPress={(event) => event.stopPropagation()}
@@ -194,52 +288,133 @@ export function NewDialogSheet({
             },
           ]}
         >
-            <View style={styles.header}>
-              <Text style={styles.title}>New Dialog</Text>
-              <Pressable accessibilityLabel="Close" onPress={() => void closeSheet()} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
-            </View>
-            <View style={styles.searchBox}><SearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput ref={searchInputRef} autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>
-            <Animated.View
-              accessibilityElementsHidden={actionsHidden}
-              importantForAccessibility={actionsHidden ? 'no-hide-descendants' : 'auto'}
-              pointerEvents={actionsHidden ? 'none' : 'auto'}
-              style={[
-                styles.actions,
-                {
-                  height: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, actionsHeight] }),
-                  opacity: actionsVisibility,
-                  transform: [
-                    { translateY: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [-actionsTranslateY, 0] }) },
-                    { scale: actionsVisibility.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
-                  ],
-                },
-              ]}
+          <View style={styles.header}>
+            <Text style={styles.title}>New Dialog</Text>
+            <Pressable
+              accessibilityLabel="Close"
+              onPress={() => void closeSheet()}
+              style={styles.close}
             >
-              <Pressable onPress={() => void closeSheet(onNewGroup)} style={[styles.action, styles.groupAction]}>
-                <GroupIcon color={colors.text} /><Text style={styles.actionText}>New group</Text>
-              </Pressable>
-              <Pressable onPress={() => void closeSheet(onNewActivity)} style={[styles.action, styles.activityAction]}>
-                <BellIcon color="#FFFFFF" /><Text style={styles.actionText}>New activity</Text>
-              </Pressable>
-            </Animated.View>
-            <Text style={styles.section}>COMMUNICATE OFTEN</Text>
-            {loading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-              <FlatList
-                data={filtered}
-                keyExtractor={(item) => item.userId}
-                keyboardDismissMode="interactive"
-                keyboardShouldPersistTaps="always"
-                ListEmptyComponent={<Text style={styles.empty}>{query ? 'No matching contacts.' : 'Mutual followers will appear here.'}</Text>}
-                renderItem={({ item }) => (
-                  <Pressable disabled={openingId !== null} onPress={() => void openConversation(item)} style={({ pressed }) => [styles.person, pressed && styles.personPressed]}>
-                    {item.photoUrl ? <Image source={{ uri: item.photoUrl }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View>}
-                    <View style={styles.copy}><Text style={styles.name}>{item.displayName}</Text><Text style={styles.handle}>{item.username ? `@${item.username}` : 'Mutual follower'}</Text></View>
-                    {openingId === item.userId ? <ActivityIndicator color={colors.primary} /> : null}
-                  </Pressable>
-                )}
-                style={styles.results}
-              />
-            )}
+              <Text style={styles.closeText}>×</Text>
+            </Pressable>
+          </View>
+          <View style={styles.searchBox}>
+            <SearchIcon
+              color={colors.text}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+            <TextInput
+              ref={searchInputRef}
+              autoCapitalize="none"
+              autoCorrect={false}
+              blurOnSubmit
+              onChangeText={setSearch}
+              onSubmitEditing={Keyboard.dismiss}
+              placeholder="Search"
+              placeholderTextColor={colors.placeholder}
+              returnKeyType="done"
+              style={styles.searchInput}
+              value={search}
+            />
+          </View>
+          <Animated.View
+            accessibilityElementsHidden={actionsHidden}
+            importantForAccessibility={
+              actionsHidden ? "no-hide-descendants" : "auto"
+            }
+            pointerEvents={actionsHidden ? "none" : "auto"}
+            style={[
+              styles.actions,
+              {
+                height: actionsVisibility.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, actionsHeight],
+                }),
+                opacity: actionsVisibility,
+                transform: [
+                  {
+                    translateY: actionsVisibility.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-actionsTranslateY, 0],
+                    }),
+                  },
+                  {
+                    scale: actionsVisibility.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.94, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Pressable
+              onPress={() => void closeSheet(onNewGroup)}
+              style={[styles.action, styles.groupAction]}
+            >
+              <GroupIcon color={colors.text} />
+              <Text style={styles.actionText}>New group</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void closeSheet(onNewActivity)}
+              style={[styles.action, styles.activityAction]}
+            >
+              <BellIcon color="#FFFFFF" />
+              <Text style={styles.actionText}>New activity</Text>
+            </Pressable>
+          </Animated.View>
+          <Text style={styles.section}>COMMUNICATE OFTEN</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loader} />
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.userId}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="always"
+              ListEmptyComponent={
+                <Text style={styles.empty}>
+                  {query
+                    ? "No matching contacts."
+                    : "Mutual followers will appear here."}
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  disabled={openingId !== null}
+                  onPress={() => void openConversation(item)}
+                  style={({ pressed }) => [
+                    styles.person,
+                    pressed && styles.personPressed,
+                  ]}
+                >
+                  {item.photoUrl ? (
+                    <Image
+                      source={{ uri: item.photoUrl }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarInitial}>
+                        {item.displayName.slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.copy}>
+                    <Text style={styles.name}>{item.displayName}</Text>
+                    <Text style={styles.handle}>
+                      {item.username ? `@${item.username}` : "Mutual follower"}
+                    </Text>
+                  </View>
+                  {openingId === item.userId ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : null}
+                </Pressable>
+              )}
+              style={styles.results}
+            />
+          )}
         </AnimatedPressable>
       </Pressable>
     </Modal>
@@ -247,23 +422,147 @@ export function NewDialogSheet({
 }
 
 function GroupIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 18 18" width={responsiveSize(18)}><Circle cx={6.25} cy={6} r={2.4} stroke={color} strokeWidth={1.5} /><Circle cx={12.25} cy={6.75} r={1.8} stroke={color} strokeWidth={1.4} /><Path d="M1.8 14.5c.35-3 2-4.5 4.45-4.5s4.1 1.5 4.45 4.5H1.8ZM10.5 10.7c2.7-.7 4.75.7 5 3.15h-3.4" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /></Svg>;
+  return (
+    <Svg
+      fill="none"
+      height={responsiveSize(18)}
+      viewBox="0 0 18 18"
+      width={responsiveSize(18)}
+    >
+      <Circle cx={6.25} cy={6} r={2.4} stroke={color} strokeWidth={1.5} />
+      <Circle cx={12.25} cy={6.75} r={1.8} stroke={color} strokeWidth={1.4} />
+      <Path
+        d="M1.8 14.5c.35-3 2-4.5 4.45-4.5s4.1 1.5 4.45 4.5H1.8ZM10.5 10.7c2.7-.7 4.75.7 5 3.15h-3.4"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+      />
+    </Svg>
+  );
 }
 
 function BellIcon({ color }: { color: string }) {
-  return <Svg fill="none" height={responsiveSize(18)} viewBox="0 0 18 18" width={responsiveSize(18)}><Path d="M4.3 12.2h9.4l-1.05-1.45V7.5A3.65 3.65 0 0 0 9 3.85 3.65 3.65 0 0 0 5.35 7.5v3.25L4.3 12.2Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} /><Path d="M7.4 14.1a1.8 1.8 0 0 0 3.2 0" stroke={color} strokeLinecap="round" strokeWidth={1.5} /></Svg>;
+  return (
+    <Svg
+      fill="none"
+      height={responsiveSize(18)}
+      viewBox="0 0 18 18"
+      width={responsiveSize(18)}
+    >
+      <Path
+        d="M4.3 12.2h9.4l-1.05-1.45V7.5A3.65 3.65 0 0 0 9 3.85 3.65 3.65 0 0 0 5.35 7.5v3.25L4.3 12.2Z"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+      />
+      <Path
+        d="M7.4 14.1a1.8 1.8 0 0 0 3.2 0"
+        stroke={color}
+        strokeLinecap="round"
+        strokeWidth={1.5}
+      />
+    </Svg>
+  );
 }
 
 function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
-    backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
-    sheet: { paddingHorizontal: 16, overflow: 'hidden', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
-    header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
-    searchBox: { height: 40, paddingLeft: 10, paddingRight: 8, borderRadius: 22, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-    actions: { overflow: 'hidden' },
-    action: { height: 50, marginTop: 12, borderRadius: 25, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' }, groupAction: { borderWidth: 1, borderColor: colors.primary }, activityAction: { backgroundColor: colors.primary }, actionText: { color: colors.text, fontSize: 16 },
-    section: { color: colors.textMuted, marginTop: 25, marginBottom: 10, fontSize: 12 }, loader: { marginTop: 35 }, empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
+    backdrop: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(0,0,0,0.72)",
+    },
+    sheet: {
+      paddingHorizontal: 16,
+      overflow: "hidden",
+      borderTopWidth: 1,
+      borderColor: colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      backgroundColor: colors.canvas,
+    },
+    header: {
+      height: 64,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    title: { color: colors.text, fontSize: 20, fontWeight: "700" },
+    close: {
+      width: 28,
+      height: 28,
+      borderWidth: 2,
+      borderColor: colors.text,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
+    searchBox: {
+      height: 40,
+      paddingLeft: 10,
+      paddingRight: 8,
+      borderRadius: 22,
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "center",
+      backgroundColor: colors.surfaceRaised,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      paddingVertical: 0,
+    },
+    actions: { overflow: "hidden" },
+    action: {
+      height: 50,
+      marginTop: 12,
+      borderRadius: 25,
+      flexDirection: "row",
+      gap: 7,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    groupAction: { borderWidth: 1, borderColor: colors.primary },
+    activityAction: { backgroundColor: colors.primary },
+    actionText: { color: colors.text, fontSize: 16 },
+    section: {
+      color: colors.textMuted,
+      marginTop: 25,
+      marginBottom: 10,
+      fontSize: 12,
+    },
+    loader: { marginTop: 35 },
+    empty: { color: colors.textMuted, marginTop: 35, textAlign: "center" },
     results: { flex: 1 },
-    person: { height: 76, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' }, personPressed: { opacity: 0.7 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.skeleton }, avatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' }, copy: { flex: 1, marginLeft: 10 }, name: { color: colors.text, fontSize: 15, fontWeight: '600' }, handle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
+    person: {
+      height: 76,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    personPressed: { opacity: 0.7 },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.skeleton,
+    },
+    avatarFallback: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primary,
+    },
+    avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: "700" },
+    copy: { flex: 1, marginLeft: 10 },
+    name: { color: colors.text, fontSize: 15, fontWeight: "600" },
+    handle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
   });
 }

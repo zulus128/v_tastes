@@ -44,23 +44,8 @@
     "!(*lock*).{json,jsonc,md,yml,yaml}": [
       "prettier --write"
     ],
-    "**/*.{js,cjs,mjs,jsx,ts,tsx,json,jsonc,md,yml,yaml,env,ini,conf,config,properties,xml,plist,gradle,tf,tfvars,sh,bash,zsh,sql,toml}": [
-      "secretlint --no-glob --no-gitignore"
-    ],
-    "**/{*.tfvars.example,*.tfvars.json.example}": [
-      "secretlint --no-glob --no-gitignore"
-    ],
-    "**/.env*": [
-      "secretlint --no-glob --no-gitignore"
-    ],
-    "**/{.npmrc,.yarnrc,.yarnrc.yml,.pnpmrc,bunfig.toml}": [
-      "secretlint --no-glob --no-gitignore"
-    ],
-    "**/*.{txt,text,log,csv}": [
-      "secretlint --no-glob --no-gitignore"
-    ],
-    "**/!(*.*)": [
-      "secretlint --no-glob --no-gitignore"
+    "**/*": [
+      "node scripts/check-staged-files.mjs --secretlint"
     ]
   },
   "devDependencies": {

@@ -63,7 +63,9 @@ describe("sensitive-file policy", () => {
 
   it.each([
     "notes.txt",
+    "notes.TXT",
     "secrets.text",
+    "config/SECRETS.JSON",
     "logs/build.log",
     "exports/users.csv",
     "Dockerfile",
