@@ -35,6 +35,7 @@ const secretlintExtensions = new Set([
   ".conf",
   ".config",
   ".csv",
+  ".css",
   ".env",
   ".gradle",
   ".ini",
@@ -42,13 +43,16 @@ const secretlintExtensions = new Set([
   ".json",
   ".jsonc",
   ".jsx",
+  ".lock",
   ".log",
   ".md",
   ".mjs",
   ".plist",
   ".properties",
+  ".rules",
   ".sh",
   ".sql",
+  ".svg",
   ".tf",
   ".tfvars",
   ".toml",
@@ -80,10 +84,7 @@ function isAllowedEnvironmentExample(fileName) {
 export function getBlockingReason(filePath) {
   const fileName = path.posix.basename(filePath);
   const normalizedName = fileName.toLowerCase();
-  const normalizedPath = path.posix
-    .normalize(filePath)
-    .replace(/^\.\//, "")
-    .toLowerCase();
+  const normalizedPath = path.posix.normalize(filePath).replace(/^\.\//, "");
 
   if (
     (normalizedName === ".env" ||

@@ -59,6 +59,9 @@ describe("sensitive-file policy", () => {
     expect(getBlockingReason("debug.keystore")).toBe(
       "key or signing credential",
     );
+    expect(getBlockingReason("apps/mobile/android/App/debug.keystore")).toBe(
+      "key or signing credential",
+    );
   });
 
   it.each([
@@ -68,6 +71,10 @@ describe("sensitive-file policy", () => {
     "config/SECRETS.JSON",
     "logs/build.log",
     "exports/users.csv",
+    "styles/app.css",
+    "firestore.rules",
+    "assets/icon.svg",
+    "generated/dependencies.lock",
     "Dockerfile",
     "config/README",
   ])("routes ordinary plaintext file %s through secretlint", (filePath) => {
