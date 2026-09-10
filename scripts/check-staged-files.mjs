@@ -10,16 +10,19 @@ const forbiddenExtensions = new Set([
   ".jks",
   ".key",
   ".keystore",
+  ".mobileprovision",
   ".p12",
   ".p8",
   ".pem",
   ".pfx",
+  ".provisionprofile",
 ]);
 const forbiddenCredentialNames = [
   /^application_default_credentials\.json$/i,
   /^credentials\.json$/i,
   /^firebase-adminsdk.*\.json$/i,
   /^google-services\.json$/i,
+  /^id_(?:dsa|ecdsa|ed25519|rsa)$/i,
   /^service[-_]?account.*\.json$/i,
 ];
 const secretlintExtensions = new Set([
@@ -62,7 +65,7 @@ function isAllowedEnvironmentExample(fileName) {
   return (
     allowedEnvironmentFiles.has(fileName) ||
     /^\.env(?:\..+)?\.example$/i.test(fileName) ||
-    /\.tfvars\.example$/i.test(fileName)
+    /\.tfvars(?:\.json)?\.example$/i.test(fileName)
   );
 }
 
@@ -77,6 +80,13 @@ export function getBlockingReason(filePath) {
     !isAllowedEnvironmentExample(normalizedName)
   ) {
     return "environment-specific file";
+  }
+
+  if (
+    /\.tfvars(?:\.json)?$/i.test(normalizedName) &&
+    !isAllowedEnvironmentExample(normalizedName)
+  ) {
+    return "environment-specific Terraform variables";
   }
 
   if (
