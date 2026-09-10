@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState, type PropsWithChildren } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -19,6 +19,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -74,10 +75,8 @@ import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import {
   DESIGN_VIEWPORT,
-  responsiveContentHeight,
   responsiveStyleSheet,
   useResponsiveMetrics,
-  useResponsiveViewport,
 } from '../../ui/responsive';
 
 export type PostSignupScreen =
@@ -191,37 +190,20 @@ function StepDots({ step }: { step: number }) {
   </View>;
 }
 
-function StepHeader({ step, title, subtitle }: { step: number; title: string; subtitle: string }) {
+function StepHeader({ landscape = false, step, title, subtitle }: { landscape?: boolean; step: number; title: string; subtitle: string }) {
   const styles = useOnboardingStyles();
-  return <View style={styles.stepHeader}>
+  return <View style={[styles.stepHeader, landscape && styles.stepHeaderLandscape]}>
     <View style={styles.stepRow}><Text style={styles.stepLabel}>Step {step}</Text><StepDots step={step} /></View>
     <Text style={[styles.title, styles.stepTitle]}>{title}</Text>
     <Text style={[styles.subtitle, styles.stepSubtitle]}>{subtitle}</Text>
   </View>;
 }
 
-function ScrollablePatternScreen({ children }: PropsWithChildren) {
-  const { height: viewportHeight } = useResponsiveViewport();
-  const { scale } = useResponsiveMetrics();
-  const contentHeight = responsiveContentHeight(viewportHeight, scale);
-
-  return (
-    <ScrollView
-      bounces={false}
-      contentContainerStyle={{ minHeight: contentHeight }}
-      showsVerticalScrollIndicator={false}
-      style={{ flex: 1 }}
-    >
-      <PatternScreen style={{ minHeight: contentHeight }}>{children}</PatternScreen>
-    </ScrollView>
-  );
-}
-
 function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
   icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
 }) {
   const styles = useOnboardingStyles();
-  return <ScrollablePatternScreen>
+  return <PatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
     <View style={styles.permissionContent}>
       <Image source={icon} style={styles.permissionIcon} />
@@ -229,7 +211,7 @@ function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPre
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
     </View>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
-  </ScrollablePatternScreen>;
+  </PatternScreen>;
 }
 
 export function PostSignupOnboardingFlow({
@@ -239,12 +221,12 @@ export function PostSignupOnboardingFlow({
   visualAudit = false,
 }: PostSignupOnboardingFlowProps) {
   const { colors, preference, resolvedTheme, setPreference } = useAppTheme();
-  const { height: viewportHeight, width: viewportWidth } = useResponsiveViewport();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const collageWidth = Math.max(0, Math.min(DESIGN_VIEWPORT.width * layoutScale, viewportWidth));
   const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
-  const contentHeight = responsiveContentHeight(viewportHeight, layoutScale);
+  const landscape = viewportWidth > viewportHeight;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useTastesApi();
@@ -516,10 +498,10 @@ export function PostSignupOnboardingFlow({
   const invitedCount = contacts.filter((item) => item.invited).length;
 
   if (screen === 'city') {
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} />
       <CityPicker onSelect={(name, flag) => { setCity(name); setCityFlag(flag); back(); }} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'profile') {
@@ -563,20 +545,20 @@ export function PostSignupOnboardingFlow({
   }
 
   if (screen === 'dish') {
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
-      <StepHeader step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
+      <StepHeader landscape={landscape} step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
       <ScrollView
         bounces={false}
         contentContainerStyle={styles.pills}
         showsVerticalScrollIndicator={false}
-        style={[styles.pillsPanel, usesCompactDishLayout && styles.pillsPanelCompact]}
+        style={[styles.pillsPanel, usesCompactDishLayout && styles.pillsPanelCompact, landscape && styles.pillsPanelLandscape]}
       >
         {dishes.map((item) => <Pressable key={item.label} onPress={() => setDish(item.label)} style={[styles.pill, dish === item.label && styles.pillSelected]}><View style={styles.pillContent}><Text style={[styles.pillText, dish === item.label && styles.pillTextSelected]}>{item.label}</Text><Image source={item.icon} style={[styles.dishIcon, dish !== item.label && styles.dishIconDimmed]} /></View></Pressable>)}
       </ScrollView>
       {!dish ? <Text style={styles.helper}>Select at least one to continue</Text> : null}
       <PrimaryButton label="Continue" disabled={!dish} onPress={() => navigate('location')} style={styles.bottomButton} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'location') return <PermissionScreen icon={permissionLocation} title="Discover places near you" subtitle="Allow location access so Tastes can show the best spots around you." button="Allow Location" onBack={back} onSkip={enterPlaces} onPress={requestLocation} />;
@@ -594,10 +576,10 @@ export function PostSignupOnboardingFlow({
       return queryMatches && categoryMatches && trendingMatches;
     });
     const noResults = !placeLoading && filteredPlaces.length === 0;
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('style')} />
-      <StepHeader step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
-      <View style={[styles.placesCard, usesNarrowPlaceLayout && styles.placesCardNarrow]}>
+      <StepHeader landscape={landscape} step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
+      <View style={[styles.placesCard, usesNarrowPlaceLayout && styles.placesCardNarrow, landscape && styles.placesCardLandscape]}>
         <View style={styles.placeHeader}>
           <View style={styles.placeSearchRow}>
             <View style={styles.placeSearch}>
@@ -679,14 +661,14 @@ export function PostSignupOnboardingFlow({
         style={styles.placeFooterGradient}
       />
       <PrimaryButton label="Continue" disabled={!place} onPress={() => navigate('style')} style={styles.bottomButton} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'style') {
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('contactsPermission')} />
-      <StepHeader step={3} title="Choose Your Style" subtitle="Switch between dark and light mode anytime" />
-      <View style={styles.styleCard}>
+      <StepHeader landscape={landscape} step={3} title="Choose Your Style" subtitle="Switch between dark and light mode anytime" />
+      <ScrollView contentContainerStyle={styles.styleCardContent} showsVerticalScrollIndicator={false} style={[styles.styleCard, landscape && styles.styleCardLandscape]}>
         <View style={styles.previews}>
           {[false, true].map((dark) => <Pressable key={String(dark)} onPress={() => {
             setDarkMode(dark);
@@ -703,15 +685,15 @@ export function PostSignupOnboardingFlow({
           setDarkMode(currentIsDark);
           void setPreference(value ? 'system' : (currentIsDark ? 'dark' : 'light'));
         }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
-      </View>
+      </ScrollView>
       <PrimaryButton label="Continue" onPress={() => navigate('contactsPermission')} style={styles.bottomButton} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'contactsPermission') return <PermissionScreen icon={permissionContacts} title="Find your friends" subtitle="Connect your contacts to find people you know already on Tastes." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts} />;
 
   if (screen === 'contacts') {
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('invite')} />
       <View style={styles.listPage}><Text style={styles.listTitle}>Friends from contacts</Text><Text style={styles.listSubtitle}>Follow people already on Tastes or invite the rest.</Text>
         <ScrollView>{contacts.map((contact, index) => <View key={contact.id} style={styles.contactRow}>
@@ -720,30 +702,35 @@ export function PostSignupOnboardingFlow({
           <Pressable onPress={() => inviteContact(contact)} disabled={contact.invited} style={[styles.inviteButton, contact.invited && styles.invitedButton]}><Text style={styles.inviteText}>{contact.userId ? contact.invited ? 'Following' : 'Follow' : contact.invited ? 'Invited' : 'Invite'}</Text></Pressable>
         </View>)}</ScrollView>
       </View><PrimaryButton label="Done" onPress={() => navigate('invite')} style={styles.bottomButton} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'invite') {
-    return <ScrollablePatternScreen>
+    return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('notifications')} />
       <View style={styles.invitePage}><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
         {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
         <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
       </View><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
-    </ScrollablePatternScreen>;
+    </PatternScreen>;
   }
 
   if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
 
-  return <ScrollView bounces={false} contentContainerStyle={{ minHeight: contentHeight }} showsVerticalScrollIndicator={false} style={styles.ready}>
-    <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={[styles.ready, { minHeight: contentHeight }]}>
-      <View style={styles.readyContent}>
-        <Image source={readyCollage} resizeMode="contain" style={{ height: collageHeight, width: collageWidth }} />
-        <View style={styles.readyCopy}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
-        <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={styles.readyButton} />
+  const landscapeCollageHeight = Math.max(0, Math.min(collageHeight, viewportHeight - 32));
+  const landscapeCollageWidth = DESIGN_VIEWPORT.width * (landscapeCollageHeight / 288);
+  return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
+    <View style={[styles.readyContent, landscape && styles.readyContentLandscape]}>
+      <Image source={readyCollage} resizeMode="contain" style={{
+        height: landscape ? landscapeCollageHeight : collageHeight,
+        width: landscape ? landscapeCollageWidth : collageWidth,
+      }} />
+      <View style={landscape ? styles.readyActionsLandscape : undefined}>
+        <View style={[styles.readyCopy, landscape && styles.readyCopyLandscape]}><Text style={styles.readyTitle}>You’re ready!</Text><Text style={styles.readySubtitle}>Write your first 3 reviews to unlock personalized recommendations</Text></View>
+        <PrimaryButton contentGap={8} icon={startRating} iconSize={24} label="Start rating" loading={busy} onPress={finishOnboarding} style={[styles.readyButton, landscape && styles.readyButtonLandscape]} />
       </View>
-    </LinearGradient>
-  </ScrollView>;
+    </View>
+  </LinearGradient>;
 }
 
 const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
@@ -753,6 +740,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   bottomButton: { position: 'absolute', left: 36, right: 36, bottom: Platform.OS === 'ios' ? 24 : 18 },
   stepHeader: { position: 'absolute', top: 118, left: 16, right: 16, alignItems: 'center' },
+  stepHeaderLandscape: { top: 42 },
   stepRow: { height: 17, flexDirection: 'row', gap: 7, alignItems: 'center' },
   stepLabel: { color: colors.text, fontSize: 14, lineHeight: 17, fontWeight: '400', letterSpacing: 0.6 },
   stepDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -798,6 +786,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   cityCountry: { color: colors.textMuted, fontSize: 13 },
   pillsPanel: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 110 },
   pillsPanelCompact: { top: 205, bottom: 105 },
+  pillsPanelLandscape: { top: 126, bottom: 84 },
   pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
@@ -809,6 +798,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   helper: { position: 'absolute', bottom: 90, alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
   placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   placesCardNarrow: { top: 241 },
+  placesCardLandscape: { top: 126 },
   placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.canvas },
   placeSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeSearch: { flex: 1, height: 39, borderRadius: 22, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
@@ -860,7 +850,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   emptyTitle: { color: colors.text, fontWeight: '600', fontSize: 16, marginTop: 12 },
   emptyText: { color: colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 7 },
   retryText: { color: colors.primary, fontSize: 14, fontWeight: '600', marginTop: 14 },
-  styleCard: { position: 'absolute', top: 196, left: 16, right: 16, backgroundColor: colors.surface, borderRadius: 17, padding: 20 },
+  styleCard: { position: 'absolute', top: 196, left: 16, right: 16, backgroundColor: colors.surface, borderRadius: 17 },
+  styleCardLandscape: { top: 126, bottom: 84 },
+  styleCardContent: { padding: 20 },
   previews: { flexDirection: 'row', gap: 18 },
   previewChoice: { flex: 1, alignItems: 'center' },
   phonePreview: { width: 104, height: 176, borderRadius: 12, borderWidth: 3, overflow: 'hidden' },
@@ -893,8 +885,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
   readyContent: { position: 'absolute', top: 170, left: 0, right: 0, alignItems: 'center' },
+  readyContentLandscape: { top: 0, bottom: 0, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'center', gap: 28 },
+  readyActionsLandscape: { flex: 1, maxWidth: 330, alignItems: 'center' },
   readyCopy: { width: '100%', maxWidth: 370, height: 72, alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24, paddingHorizontal: 16 },
+  readyCopyLandscape: { marginTop: 0 },
   readyTitle: { width: '100%', color: '#FFFFFF', fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   readySubtitle: { width: '100%', color: '#AAB2C5', fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center' },
   readyButton: { width: 330, marginTop: 24 },
+  readyButtonLandscape: { width: '100%' },
 });

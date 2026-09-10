@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import apple from '../../../assets/onboarding/apple.png';
@@ -28,7 +29,7 @@ import { auth } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
@@ -65,7 +66,7 @@ function displayPhone(country: Country, digits: string): string {
 
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
   const compact = height <= 700 || width <= 340;
   return useMemo(() => createStyles(colors, compact), [colors, compact]);
 }
@@ -320,7 +321,7 @@ function EntryScreen() {
 
 function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; onApple: () => void; onGoogle: () => void; onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;

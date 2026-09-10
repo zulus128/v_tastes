@@ -1,22 +1,25 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as Application from 'expo-application';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Updates from 'expo-updates';
 import { StatusBar } from 'expo-status-bar';
 import { type PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { useState } from 'react';
-import { Linking, Platform, Pressable, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { useVisualAuditCase, VisualAuditScreen } from './src/dev/VisualAuditScreen';
 import { OnboardingFlow } from './src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from './src/features/onboarding/PostSignupOnboardingFlow';
 import { queryClient, queryPersister, shouldPersistQuery } from './src/infrastructure/query';
+import { queryCacheBuster } from './src/infrastructure/queryCacheBuster';
 import { configureObservability } from './src/infrastructure/observability';
 import { ProductNavigator } from './src/navigation/ProductNavigator';
 import { rememberPendingDeepLink } from './src/navigation/pendingDeepLink';
 import { SessionProvider, useSession } from './src/session/SessionProvider';
 import { ThemeProvider, useAppTheme } from './src/ui/ThemeProvider';
 import { ResponsiveModal as Modal } from './src/ui/ResponsiveModal';
-import { responsiveStyleSheet, useResponsiveViewport } from './src/ui/responsive';
+import { responsiveStyleSheet } from './src/ui/responsive';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
@@ -157,27 +160,35 @@ function UpdatePrompt({ onClose, onUpdate, visible }: { onClose: () => void; onU
 }
 
 export default function App() {
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
+  const cacheBuster = queryCacheBuster({
+    nativeBuildVersion: Application.nativeBuildVersion,
+    runtimeVersion: Updates.runtimeVersion,
+    updateId: Updates.updateId,
+  });
+
   return (
-    <ThemeProvider>
-      <ResponsiveAppFrame height={height} width={width}>
-        <AppErrorBoundary>
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{
-              buster: Application.nativeBuildVersion ?? 'development',
-              dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
-              maxAge: 24 * 60 * 60_000,
-              persister: queryPersister,
-            }}
-          >
-            <SessionProvider>
-              <AppGate />
-            </SessionProvider>
-          </PersistQueryClientProvider>
-        </AppErrorBoundary>
-      </ResponsiveAppFrame>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <ResponsiveAppFrame height={height} width={width}>
+          <AppErrorBoundary>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                buster: cacheBuster,
+                dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+                maxAge: 24 * 60 * 60_000,
+                persister: queryPersister,
+              }}
+            >
+              <SessionProvider>
+                <AppGate />
+              </SessionProvider>
+            </PersistQueryClientProvider>
+          </AppErrorBoundary>
+        </ResponsiveAppFrame>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 

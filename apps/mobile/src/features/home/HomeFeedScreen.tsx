@@ -13,8 +13,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -488,6 +490,15 @@ export function HomeFeedScreen({
   const { profile } = useProfile(userId, state.user?.displayName ?? 'Tastes member');
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerSafeStyle = {
+    height: responsiveSize(157 - 54) + headerTop,
+    paddingLeft: Math.max(insets.left, responsiveSize(16)),
+    paddingRight: Math.max(insets.right, responsiveSize(16)),
+    paddingTop: headerTop,
+  };
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
@@ -619,7 +630,7 @@ export function HomeFeedScreen({
 
   return (
     <Screen background="homeFeed">
-      <View style={styles.header}>
+      <View style={[styles.header, headerSafeStyle]}>
         <View style={styles.headerTop}>
           <Pressable
             accessibilityLabel="Open leaderboard"

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef, type PropsWithChildren } from 'react';
-import { Animated } from 'react-native';
+import { Animated, useWindowDimensions } from 'react-native';
 import { ResponsiveModal as Modal } from './ResponsiveModal';
-import { responsiveStyleSheet, useResponsiveViewport } from './responsive';
+import { responsiveStyleSheet } from './responsive';
 
 export interface SideSlideScreenHandle {
   close: (afterClose?: () => void) => void;
@@ -12,7 +12,8 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
   onRequestClose,
   visible,
 }, ref) {
-  const { width: frameWidth } = useResponsiveViewport();
+  const { width: frameWidth } = useWindowDimensions();
+  const frameWidthRef = useRef(frameWidth);
   const translateX = useRef(new Animated.Value(frameWidth)).current;
   const closing = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,25 +39,31 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
     closeTimer.current = setTimeout(finishClose, 300);
     Animated.timing(translateX, {
       duration: 240,
-      toValue: frameWidth,
+      toValue: frameWidthRef.current,
       useNativeDriver: true,
     }).start(finishClose);
-  }, [finishClose, frameWidth, translateX]);
+  }, [finishClose, translateX]);
 
   useImperativeHandle(ref, () => ({ close }), [close]);
 
   useLayoutEffect(() => {
+    frameWidthRef.current = frameWidth;
     if (!visible) {
       closing.current = false;
       if (closeTimer.current) clearTimeout(closeTimer.current);
       closeTimer.current = null;
       afterClose.current = undefined;
       translateX.setValue(frameWidth);
-      return;
+      return undefined;
     }
+    return undefined;
+  }, [frameWidth, translateX, visible]);
+
+  useLayoutEffect(() => {
+    if (!visible) return undefined;
     closing.current = false;
     translateX.stopAnimation();
-    translateX.setValue(frameWidth);
+    translateX.setValue(frameWidthRef.current);
     const animation = Animated.timing(translateX, {
       duration: 280,
       toValue: 0,
@@ -68,7 +75,7 @@ export const SideSlideScreen = forwardRef<SideSlideScreenHandle, PropsWithChildr
       if (closeTimer.current) clearTimeout(closeTimer.current);
       closeTimer.current = null;
     };
-  }, [frameWidth, translateX, visible]);
+  }, [translateX, visible]);
 
   return (
     <Modal animationType="none" onRequestClose={() => close()} presentationStyle="overFullScreen" transparent visible={visible}>

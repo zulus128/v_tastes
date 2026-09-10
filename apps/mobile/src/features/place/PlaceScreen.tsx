@@ -1,7 +1,7 @@
 import type { PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, FlatList, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
@@ -25,7 +25,7 @@ import { usePlace, usePlaceReviews } from '../discover/api';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -48,7 +48,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useResponsiveViewport();
+  const { width } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<'overview' | 'reviews'>('overview');
   const [sort, setSort] = useState<PlaceReviewSort>('recent');

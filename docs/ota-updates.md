@@ -7,13 +7,14 @@ without creating a new native binary.
 
 | Build profile | OTA channel | Purpose |
 | --- | --- | --- |
-| `testflight-layout` | `layout-preview` | Resizable layout testing in TestFlight on Apple silicon Macs |
+| `layout-preview` | `layout-preview` | Internal resizable-layout builds |
 | `preview` | `preview` | Internal preview builds |
 | `production` | `production` | App Store and production builds |
 
-Channels are embedded in a native build. Do not promote a
-`testflight-layout` binary to the App Store: it continues to receive
-`layout-preview` updates after promotion.
+Channels are embedded in a native build. The `layout-preview` profile produces
+an internal-distribution binary, so it cannot be promoted through the
+production App Store submission profile. Existing TestFlight build 45 keeps
+its embedded `layout-preview` channel for OTA layout testing.
 
 ## Publish a layout preview
 

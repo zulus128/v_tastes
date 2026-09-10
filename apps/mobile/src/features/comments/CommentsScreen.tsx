@@ -16,8 +16,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
@@ -184,6 +186,15 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const currentUserId = useAuthenticatedUserId();
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerSafeStyle = {
+    height: responsiveSize(102 - 54) + headerTop,
+    paddingLeft: Math.max(insets.left, responsiveSize(16)),
+    paddingRight: Math.max(insets.right, responsiveSize(16)),
+    paddingTop: headerTop,
+  };
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
   const connectorX = responsiveSize(36);
   const connectorArmX = responsiveSize(63);
@@ -328,7 +339,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   return (
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoiding}>
-        <View style={styles.header}>
+        <View style={[styles.header, headerSafeStyle]}>
           <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
           <Text style={styles.title}>Comments</Text>
           <View style={styles.back} />

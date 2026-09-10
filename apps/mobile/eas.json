@@ -1,5 +1,6 @@
 {
   "cli": {
+    "version": "23.2.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -53,9 +54,14 @@
         "distribution": "store"
       }
     },
-    "testflight-layout": {
+    "layout-preview": {
       "extends": "production",
-      "channel": "layout-preview"
+      "channel": "layout-preview",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "ios": {
+        "distribution": "internal"
+      }
     }
   },
   "submit": {

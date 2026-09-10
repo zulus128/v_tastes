@@ -19,10 +19,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import MapFavouriteIcon from '../../../assets/discover/map-favourite.svg';
@@ -74,7 +76,6 @@ import {
   responsiveStyleSheet,
   responsiveWrapMetrics,
   useResponsiveMetrics,
-  useResponsiveViewport,
 } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
@@ -94,6 +95,8 @@ const placeSortOptions: Array<{ label: string; value: PlaceSort }> = [
 ];
 
 const DISCOVER_HEADER_HEIGHT = 106;
+const DISCOVER_GRID_GAP = 10;
+const DISCOVER_GRID_PADDING = 16;
 const KEYBOARD_SEARCH_GAP = 8;
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
@@ -208,6 +211,16 @@ export function DiscoverScreen({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerHeight = responsiveSize(DISCOVER_HEADER_HEIGHT - 54) + headerTop;
+  const headerSafeStyle = {
+    height: headerHeight,
+    paddingLeft: Math.max(insets.left, responsiveSize(DISCOVER_GRID_PADDING)),
+    paddingRight: Math.max(insets.right, responsiveSize(DISCOVER_GRID_PADDING)),
+    paddingTop: headerTop,
+  };
   const [tab, setTab] = useState<DiscoverTab>('trending');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
@@ -238,7 +251,7 @@ export function DiscoverScreen({
 
   return (
     <View style={[styles.screen, mapMode && styles.mapDiscoverScreen]}>
-      <View style={[styles.header, mapMode && styles.mapHeader]}>
+      <View style={[styles.header, headerSafeStyle, mapMode && styles.mapHeader]}>
         <View style={styles.switcher}>
           {(['trending', 'places', 'people'] as const).map((value) => (
             <Pressable
@@ -286,6 +299,7 @@ export function DiscoverScreen({
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
+          headerHeight={headerHeight}
           onOpenFavourites={() => setFavouritesOpen(true)}
           onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
@@ -367,11 +381,14 @@ function TrendingFeed({
   const { colors } = useAppTheme();
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { width: viewportWidth } = useResponsiveViewport();
+  const { width: viewportWidth } = useWindowDimensions();
   const { scale: layoutScale } = useResponsiveMetrics();
-  const placeCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2).itemWidth;
-  const gridCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 179, 4).itemWidth;
-  const reviewCardWidth = responsiveWrapMetrics(viewportWidth, layoutScale, 300, 2).itemWidth;
+  const { gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth } = useMemo(() => ({
+    gemCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    gridCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 179, 4, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    placeCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 280, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+    reviewCardWidth: responsiveWrapMetrics(viewportWidth, layoutScale, 300, 2, DISCOVER_GRID_PADDING, DISCOVER_GRID_GAP).itemWidth,
+  }), [layoutScale, viewportWidth]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -537,7 +554,7 @@ function TrendingFeed({
         <>
           <SectionLabel title="Hidden gems" subtitle="High ratings, low review counts" />
           <View style={styles.gemList}>
-            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gemCardWidth} />)}
           </View>
         </>
       ) : null}
@@ -547,6 +564,7 @@ function TrendingFeed({
 
 function PlacesMap({
   appliedFilters,
+  headerHeight,
   onOpenFavourites,
   onOpenFilters,
   onOpenPlace,
@@ -555,6 +573,7 @@ function PlacesMap({
   userId,
 }: {
   appliedFilters: string[];
+  headerHeight: number;
   onOpenFavourites: () => void;
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
@@ -564,7 +583,6 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const discoverHeaderHeight = responsiveSize(DISCOVER_HEADER_HEIGHT);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -787,7 +805,7 @@ function PlacesMap({
 
   function handleMapLayout(height: number) {
     const availableHeight = Math.max(0, height - 8);
-    const expanded = Math.max(0, availableHeight - discoverHeaderHeight);
+    const expanded = Math.max(0, availableHeight - headerHeight);
     const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(height * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
@@ -1594,11 +1612,11 @@ function ForYouCard({ image, onOpen, place, reason }: { image: ImageSourcePropTy
   );
 }
 
-function HiddenGem({ onOpen, place }: { onOpen: () => void; place: Place }) {
+function HiddenGem({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.gemCard}>
+    <Pressable onPress={onOpen} style={[styles.gemCard, { width }]}>
       <Image source={place.image} style={styles.gemImage} />
       <View style={styles.gemCopy}>
         <View style={styles.gemTop}><Text style={styles.gemBadge}>💎 GEM</Text><Text style={styles.gemReviews}>only {place.reviews}</Text></View>
@@ -1911,7 +1929,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   tileCopy: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 3 },
   tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  placeRows: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  placeRows: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
   newChip: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 7, borderRadius: 9, backgroundColor: '#E63946', justifyContent: 'center' },
@@ -1923,13 +1941,13 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   infoChip: { height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   infoChipText: { color: colors.text, fontSize: 13 },
-  grid: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   gridCard: { height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
   gridImage: { width: '100%', height: 90, resizeMode: 'cover' },
   gridBody: { height: 61, padding: 9, gap: 4 },
   gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gridMeta: { color: colors.textSecondary, fontSize: 12 },
-  reviewList: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  reviewList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   reviewCard: { height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
   reviewImage: { width: 110, height: 121, resizeMode: 'cover' },
   reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
@@ -1964,8 +1982,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   forYouCopy: { position: 'absolute', left: 12, right: 12, bottom: 12, gap: 5 },
   forYouTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 20, fontWeight: '700' },
   forYouMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  gemList: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gemCard: { flexGrow: 1, flexBasis: 280, height: 94, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.surface },
+  gemList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
+  gemCard: { height: 94, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.surface },
   gemImage: { width: 70, height: 70, borderRadius: 8, resizeMode: 'cover' },
   gemCopy: { flex: 1, minWidth: 0, gap: 4 },
   gemTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },

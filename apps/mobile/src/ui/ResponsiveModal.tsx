@@ -1,11 +1,10 @@
-import { Modal as NativeModal, StyleSheet, View, type ModalProps } from 'react-native';
+import { Modal as NativeModal, StyleSheet, useWindowDimensions, View, type ModalProps } from 'react-native';
 import { useAppTheme } from './ThemeProvider';
-import { useResponsiveViewport } from './responsive';
 
 /** Keeps native React Native modals on the same proportional canvas as the app. */
 export function ResponsiveModal({ children, transparent, ...props }: ModalProps) {
   const { colors } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
 
   return (
     <NativeModal transparent={transparent} {...props}>

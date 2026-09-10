@@ -15,7 +15,6 @@ export const DESIGN_VIEWPORT = {
 } as const;
 
 const MIN_LAYOUT_SCALE = 0.82;
-const MIN_TABLET_LAYOUT_SCALE = 0.68;
 const MAX_PHONE_LAYOUT_SCALE = 1.12;
 const MAX_TABLET_LAYOUT_SCALE = 2;
 const LARGE_WINDOW_SCALE_START = 480;
@@ -87,7 +86,6 @@ export interface ResponsiveMetrics {
 }
 
 export interface ResponsiveWrapMetrics {
-  columns: number;
   itemWidth: number;
 }
 
@@ -110,7 +108,7 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
       Math.sqrt(
         (width / DESIGN_VIEWPORT.width) * (height / DESIGN_VIEWPORT.height),
       ),
-      MIN_TABLET_LAYOUT_SCALE,
+      MIN_LAYOUT_SCALE,
       MAX_TABLET_LAYOUT_SCALE,
     ),
   );
@@ -119,7 +117,14 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
     0,
     1,
   );
-  const scale = phoneScale + ((areaScale - phoneScale) * largeWindowProgress);
+  const heightConstrainedScale = Math.min(areaScale, height / DESIGN_VIEWPORT.height);
+  // Large resizable windows still use their full width, but fixed-position
+  // screens must fit vertically. Phone landscape keeps the readable phone
+  // scale and uses screen-specific reflow where necessary.
+  const isWideResizableWindow = width > height && shortEdge >= LARGE_WINDOW_SCALE_START;
+  const scale = isWideResizableWindow
+    ? heightConstrainedScale
+    : phoneScale + ((heightConstrainedScale - phoneScale) * largeWindowProgress);
   return {
     height,
     scale,
@@ -136,37 +141,9 @@ export function useResponsiveMetrics() {
   return { ...responsiveMetrics(width, height), scale: stableAvailableScale() };
 }
 
-/**
- * Layout always follows the usable native window. Visual measurements still
- * scale from the 402x874 design viewport, but the application canvas itself
- * must not preserve the phone aspect ratio: iPad split view and resizable Mac
- * windows can be substantially wider or shorter than a phone.
- */
-export function responsiveViewport(width: number, height: number) {
-  return { height, width };
-}
-
-export function useResponsiveViewport() {
-  const { width, height } = useWindowDimensions();
-  return responsiveViewport(width, height);
-}
-
 export function responsiveValue(value: number, scale: number) {
   if (value === 0) return 0;
   return PixelRatio.roundToNearestPixel(value * scale);
-}
-
-/**
- * Keeps fixed-position flows reachable when a freely resizable window is
- * shorter than the design canvas. The viewport can still shrink; callers can
- * expose the remaining canvas through scrolling.
- */
-export function responsiveContentHeight(
-  viewportHeight: number,
-  scale: number,
-  designHeight = DESIGN_VIEWPORT.height,
-) {
-  return Math.max(viewportHeight, responsiveValue(designHeight, scale));
 }
 
 /**
@@ -180,8 +157,8 @@ export function responsiveWrapMetrics(
   scale: number,
   minimumItemWidth: number,
   maximumColumns: number,
-  horizontalPadding = 16,
-  gap = 10,
+  horizontalPadding: number,
+  gap: number,
 ): ResponsiveWrapMetrics {
   const scaledPadding = responsiveValue(horizontalPadding, scale);
   const scaledGap = responsiveValue(gap, scale);
@@ -193,7 +170,6 @@ export function responsiveWrapMetrics(
     maximumColumns,
   );
   return {
-    columns,
     itemWidth: (availableWidth - (scaledGap * (columns - 1))) / columns,
   };
 }

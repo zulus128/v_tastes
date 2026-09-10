@@ -1,8 +1,6 @@
 import {
   DESIGN_VIEWPORT,
-  responsiveContentHeight,
   responsiveMetrics,
-  responsiveViewport,
   responsiveWrapMetrics,
   scaleNamedStyles,
 } from '../src/ui/responsive';
@@ -17,49 +15,37 @@ describe('responsive layout metrics', () => {
   });
 
   it('balances both dimensions on larger resizable windows and caps extremes', () => {
-    expect(responsiveMetrics(768, 1024).scale).toBeCloseTo(
-      Math.sqrt((768 / DESIGN_VIEWPORT.width) * (1024 / DESIGN_VIEWPORT.height)),
-    );
-    expect(responsiveMetrics(1024, 600).scale).toBeCloseTo(
-      Math.sqrt((1024 / DESIGN_VIEWPORT.width) * (600 / DESIGN_VIEWPORT.height)),
-    );
+    expect(responsiveMetrics(768, 1024).scale).toBeCloseTo(1024 / DESIGN_VIEWPORT.height);
+    expect(responsiveMetrics(1024, 600).scale).toBeCloseTo(600 / DESIGN_VIEWPORT.height);
     expect(responsiveMetrics(1600, 2200).scale).toBe(2);
     expect(responsiveMetrics(280, 653).scale).toBe(0.82);
   });
 
   it('transitions smoothly between phone and large-window scaling', () => {
     const before = responsiveMetrics(479, 900).scale;
+    const afterBoundary = responsiveMetrics(481, 900).scale;
     const during = responsiveMetrics(540, 900).scale;
     const after = responsiveMetrics(600, 900).scale;
-    expect(during).toBeGreaterThanOrEqual(before);
-    expect(during).toBeLessThanOrEqual(after);
+    expect(Math.abs(afterBoundary - before)).toBeLessThan(0.01);
+    expect(during).toBeLessThanOrEqual(Math.max(before, after));
+    expect(during).toBeGreaterThanOrEqual(Math.min(before, after));
   });
 
-  it('uses the complete native window at every aspect ratio', () => {
-    expect(responsiveViewport(402, 874)).toEqual({ width: 402, height: 874 });
-    expect(responsiveViewport(1032, 1376)).toEqual({ width: 1032, height: 1376 });
-    expect(responsiveViewport(1024, 600)).toEqual({ width: 1024, height: 600 });
-    expect(responsiveViewport(1600, 500)).toEqual({ width: 1600, height: 500 });
+  it('keeps a scaled design canvas within large resizable window height', () => {
+    for (const [width, height] of [[768, 1024], [1024, 600], [1600, 500]]) {
+      expect(DESIGN_VIEWPORT.height * responsiveMetrics(width, height).scale).toBeLessThanOrEqual(height + 0.001);
+    }
   });
 
   it('keeps two phone cards on one row despite pixel rounding', () => {
     const scale = responsiveMetrics(375, 667).scale;
-    const grid = responsiveWrapMetrics(375, scale, 179, 4);
-    expect(grid.columns).toBe(2);
+    const grid = responsiveWrapMetrics(375, scale, 179, 4, 16, 10);
     expect((grid.itemWidth * 2) + 30 + 9.5).toBe(375);
   });
 
   it('keeps orphaned cards at the same width as a complete row', () => {
-    const layout = responsiveWrapMetrics(1024, responsiveMetrics(1024, 600).scale, 280, 2);
-    expect(layout.columns).toBe(2);
+    const layout = responsiveWrapMetrics(1024, responsiveMetrics(1024, 600).scale, 280, 2, 16, 10);
     expect(layout.itemWidth).toBeLessThan(1024 - 32);
-  });
-
-  it('provides a scrollable design canvas in a short landscape window', () => {
-    const scale = responsiveMetrics(667, 375).scale;
-    const contentHeight = responsiveContentHeight(375, scale);
-    expect(contentHeight).toBeGreaterThan(375);
-    expect(contentHeight).toBeCloseTo(DESIGN_VIEWPORT.height * scale, 0);
   });
 });
 

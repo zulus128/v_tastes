@@ -27,6 +27,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +43,7 @@ import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideS
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
@@ -81,7 +82,7 @@ export function ProfileSettingsSheet({
   const visualAudit = useIsVisualAudit();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { width: viewportWidth } = useResponsiveViewport();
+  const { width: viewportWidth } = useWindowDimensions();
   const settingsScale = 1;
   const styles = useMemo(
     () => createStyles(colors, isDark, settingsScale),
