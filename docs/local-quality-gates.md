@@ -32,9 +32,9 @@ Run it manually with:
 pnpm run prepush
 ```
 
-Audit findings are never hidden from this gate. The currently unpatched `image-size` advisories are
-documented in [ADR 0008](adr/0008-dependency-security-exceptions.md) and intentionally remain
-release-blocking until a compatible patched version is available.
+The two currently unpatched `image-size` advisories are explicitly ignored by `pnpm audit` and
+documented in [ADR 0008](adr/0008-dependency-security-exceptions.md). All other audit findings
+remain release-blocking until resolved or separately reviewed.
 
 Git hooks can be bypassed with `--no-verify`. CI remains the authoritative gate: it rejects
 forbidden credential files in the submitted diff, scans supported changed text files with

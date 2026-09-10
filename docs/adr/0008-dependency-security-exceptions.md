@@ -1,6 +1,6 @@
 # ADR 0008: Temporary dependency security exception
 
-Status: temporary, release-blocking review required
+Status: temporary, explicitly accepted exception; review required
 
 ## Resolved advisories
 
@@ -24,7 +24,7 @@ This reduces current exposure but does not make the advisory resolved.
 
 ## Exit criteria
 
-- Replace the override-free transitive dependency with `image-size` 2.0.3 or
+- Remove the two `audit.ignore` entries and replace the transitive dependency with `image-size` 2.0.3 or
   a later compatible version as soon as it is published by updating Expo /
   React Native / Metro or adding a workspace override.
 - Re-run `pnpm audit --prod`, the complete test suite, and both native builds.
