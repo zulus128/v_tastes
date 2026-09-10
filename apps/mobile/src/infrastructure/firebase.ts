@@ -22,7 +22,12 @@ import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'fireba
 import { Platform } from 'react-native';
 
 const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'demo-tastes';
-const useEmulators = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false';
+const emulatorFlag = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS;
+// Local development keeps the emulator-friendly default, but a release/OTA
+// bundle must never fall back to localhost when its EAS environment is
+// incomplete. Production Firebase is therefore the safe default outside dev.
+const useEmulators = emulatorFlag === 'true'
+  || (typeof __DEV__ !== 'undefined' && __DEV__ && emulatorFlag !== 'false');
 const firestoreDatabaseId =
   process.env.EXPO_PUBLIC_FIRESTORE_DATABASE_ID ?? (useEmulators ? '(default)' : 'tastes-eu');
 const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'demo-api-key';
