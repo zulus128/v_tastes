@@ -1,5 +1,6 @@
 {
   "cli": {
+    "version": "23.2.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -14,6 +15,7 @@
       }
     },
     "preview": {
+      "channel": "preview",
       "environment": "preview",
       "distribution": "internal",
       "android": {
@@ -33,6 +35,7 @@
       }
     },
     "production": {
+      "channel": "production",
       "environment": "production",
       "autoIncrement": true,
       "env": {
@@ -47,6 +50,24 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "254210443804-e3muulkchn7b0qs9l20p3nfj3k1dol8b.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "254210443804-q8145t68ejlu9urqb98dn41enu0iu9u4.apps.googleusercontent.com"
       },
+      "ios": {
+        "distribution": "store"
+      }
+    },
+    "layout-preview": {
+      "extends": "production",
+      "channel": "layout-preview",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "ios": {
+        "distribution": "internal"
+      }
+    },
+    "testflight-layout": {
+      "extends": "production",
+      "channel": "layout-preview",
+      "distribution": "store",
+      "autoIncrement": true,
       "ios": {
         "distribution": "store"
       }

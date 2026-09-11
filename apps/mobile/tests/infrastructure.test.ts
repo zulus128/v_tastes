@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createIdempotencyKey } from '../src/infrastructure/idempotency';
 import { formatDisplayDate } from '../src/infrastructure/date';
+import { queryCacheBuster } from '../src/infrastructure/queryCacheBuster';
 import {
   consumePendingDeepLink,
   rememberPendingDeepLink,
@@ -40,5 +41,17 @@ describe('mobile infrastructure boundaries', () => {
 
   it('formats display dates independently of the device locale', () => {
     expect(formatDisplayDate('2026-08-15T12:00:00.000Z')).toBe('Aug 15, 2026');
+  });
+
+  it('invalidates persisted queries for each OTA update', () => {
+    expect(queryCacheBuster({
+      nativeBuildVersion: '45',
+      runtimeVersion: '1.0.0',
+      updateId: 'update-a',
+    })).not.toBe(queryCacheBuster({
+      nativeBuildVersion: '45',
+      runtimeVersion: '1.0.0',
+      updateId: 'update-b',
+    }));
   });
 });

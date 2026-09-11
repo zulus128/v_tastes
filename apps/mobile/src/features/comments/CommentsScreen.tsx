@@ -14,10 +14,13 @@ import {
   RefreshControl,
   Share,
   StyleSheet,
+  ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
@@ -32,7 +35,7 @@ import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/component
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
 
@@ -111,6 +114,9 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
 function MainReview({ onReact, reacting, review }: { onReact: () => void; reacting: boolean; review: CommentReview }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const dishModalHeight = Math.max(0, Math.min(responsiveSize(550), viewportHeight - insets.top));
   const [selectedDish, setSelectedDish] = useState<CommentReview['dishReviews'][number] | null>(null);
   return <View style={styles.mainReview}>
     <View style={styles.reviewAuthorRow}>
@@ -127,9 +133,11 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
     <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
         <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
-        <View style={styles.dishModal}>
+        <View style={[styles.dishModal, { height: dishModalHeight, paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
           <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
-          {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          <ScrollView contentContainerStyle={styles.dishModalContent} showsVerticalScrollIndicator={false}>
+            {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -184,6 +192,16 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const currentUserId = useAuthenticatedUserId();
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const windowDimensions = useWindowDimensions();
+  const { height, width } = useOrientationDimensions();
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerSafeStyle = {
+    height: responsiveSize(102 - 54) + headerTop,
+    paddingTop: headerTop,
+  };
+  const composerBottom = Math.max(insets.bottom, responsiveSize(16));
+  const composerSafeStyle = { height: responsiveSize(56) + composerBottom, paddingBottom: composerBottom };
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
   const connectorX = responsiveSize(36);
   const connectorArmX = responsiveSize(63);
@@ -326,9 +344,9 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   }
 
   return (
-    <Screen>
+    <Screen style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoiding}>
-        <View style={styles.header}>
+        <View style={[styles.header, headerSafeStyle]}>
           <Pressable onPress={onBack} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
           <Text style={styles.title}>Comments</Text>
           <View style={styles.back} />
@@ -382,7 +400,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
             }}
           />
         )}
-        <View style={styles.composer}>
+        <View style={[styles.composer, composerSafeStyle]}>
           {replyTarget ? <View style={styles.replyBanner}><Text numberOfLines={1} style={styles.replyBannerText}>Replying to {replyTarget.authorDisplayName}</Text><Pressable onPress={() => setReplyTarget(null)}><Text style={styles.replyClose}>×</Text></Pressable></View> : null}
           <TextInput
             editable={!mutation.isPending}
@@ -402,7 +420,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={styles.reportSheet}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></View></View></Modal>
+      <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={[styles.reportSheet, { maxHeight: Math.max(0, windowDimensions.height - insets.top - responsiveSize(12)) }]}><ScrollView contentContainerStyle={styles.reportContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></ScrollView></View></View></Modal>
       <Modal animationType="fade" onRequestClose={() => setReportSent(false)} visible={reportSent}><View style={styles.sent}><View style={styles.sentIcon}><Text style={styles.sentCheck}>✓</Text></View><Text style={styles.sentTitle}>Report sent</Text><Text style={styles.sentCopy}>Thanks for helping keep Tastes safe. Our team will review this shortly.</Text><Pressable onPress={() => setReportSent(false)} style={styles.sentDone}><Text style={styles.sentDoneText}>Done</Text></Pressable></View></Modal>
     </Screen>
   );
@@ -445,8 +463,9 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   dishTitle: { position: 'absolute', top: 10, left: 10, right: 10, color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   dishRating: { position: 'absolute', left: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, borderTopRightRadius: 12, color: '#fff', fontSize: 13, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)' },
   dishModalScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
-  dishModal: { minHeight: 550, padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
+  dishModal: { padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
   dishModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center' },
+  dishModalContent: { paddingBottom: 8 },
   dishModalTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' },
   dishModalClose: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   dishModalCloseText: { color: colors.text, fontSize: 20, lineHeight: 21 },
@@ -488,7 +507,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   input: { flex: 1, height: 40, paddingHorizontal: 14, borderRadius: theme.radius.pill, color: colors.text, backgroundColor: colors.surfaceRaised },
   send: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   reportScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
-  reportSheet: { padding: 18, paddingBottom: 28, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
+  reportSheet: { overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
+  reportContent: { padding: 18, paddingBottom: 28 },
   reportTitle: { marginBottom: 8, color: colors.text, fontSize: 20, fontWeight: '700' },
   reportRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   reportLabel: { color: colors.text, fontSize: 15 },

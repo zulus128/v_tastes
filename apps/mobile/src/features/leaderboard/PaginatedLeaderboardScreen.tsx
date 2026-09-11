@@ -7,8 +7,10 @@ import {
   ImageBackground,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -251,9 +253,10 @@ function LeaderboardLoadingState({ styles }: { styles: ReturnType<typeof createS
   );
 }
 
-function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, safeTop, styles }: { audience: 'friends' | 'local'; onAddFriends: () => void; onEditProfile: () => void; safeTop: number; styles: ReturnType<typeof createStyles> }) {
+function LeaderboardEmptyState({ audience, availableHeight, onAddFriends, onEditProfile, safeBottom, safeTop, styles }: { audience: 'friends' | 'local'; availableHeight: number; onAddFriends: () => void; onEditProfile: () => void; safeBottom: number; safeTop: number; styles: ReturnType<typeof createStyles> }) {
+  const compact = availableHeight < responsiveSize(520);
   return (
-    <View style={[styles.emptyState, { top: responsiveSize(246) + safeTop }]}>
+    <ScrollView contentContainerStyle={styles.emptyStateContent} showsVerticalScrollIndicator={false} style={[styles.emptyState, { bottom: safeBottom + 16, top: (compact ? responsiveSize(80) : responsiveSize(246)) + safeTop }]}>
       <Image source={emptyFriendsIcon} resizeMode="contain" style={styles.emptyIcon} />
       <Text style={styles.emptyTitle}>{audience === 'friends' ? 'No friends ranked yet' : 'No local rankings yet'}</Text>
       <Text style={styles.emptyCopy}>{audience === 'friends' ? "Add friends to see who's topping the Tastes charts this week." : 'Set your city in your profile to join the local leaderboard.'}</Text>
@@ -264,13 +267,14 @@ function LeaderboardEmptyState({ audience, onAddFriends, onEditProfile, safeTop,
       >
         <Text style={styles.addFriendsText}>{audience === 'friends' ? 'Add friends' : 'Edit profile'}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile }: { onAddFriends: () => void; onBack: () => void; onEditProfile: () => void }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const currentUserId = useAuthenticatedUserId();
   const [period, setPeriod] = useState<Period>('month');
@@ -318,7 +322,7 @@ export function PaginatedLeaderboardScreen({ onAddFriends, onBack, onEditProfile
           </Pressable>
         </View>
       ) : items.length === 0 ? (
-        <LeaderboardEmptyState audience={audience} onAddFriends={onAddFriends} onEditProfile={onEditProfile} safeTop={insets.top} styles={styles} />
+        <LeaderboardEmptyState audience={audience} availableHeight={windowHeight} onAddFriends={onAddFriends} onEditProfile={onEditProfile} safeBottom={insets.bottom} safeTop={insets.top} styles={styles} />
       ) : (
         <>
           <View style={styles.podium}>
@@ -486,11 +490,13 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   skeletonLineShort: { width: 70, height: 10, borderRadius: 5, backgroundColor: colors.skeletonMuted },
   emptyState: {
     position: 'absolute',
-    top: 246,
     left: 31,
     right: 31,
+  },
+  emptyStateContent: {
     alignItems: 'center',
     gap: 14,
+    paddingBottom: 16,
   },
   emptyIcon: { width: 60, height: 60, tintColor: colors.text },
   emptyTitle: { width: '100%', color: colors.text, fontSize: 22, fontWeight: '700', textAlign: 'center' },

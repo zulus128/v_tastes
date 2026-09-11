@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
@@ -37,7 +38,7 @@ import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons'
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
   useFeed,
@@ -175,6 +176,7 @@ function FeedCard({
   onOpenMenu: () => void;
 }) {
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(null);
@@ -330,7 +332,7 @@ function FeedCard({
             onPress={() => setSelectedDishIndex(null)}
             style={StyleSheet.absoluteFill}
           />
-          <View style={overlayStyles.dishReviewSheet}>
+          <View style={[overlayStyles.dishReviewSheet, { paddingBottom: Math.max(30, insets.bottom) }]}>
             <View style={overlayStyles.dishReviewHeader}>
               <Text style={overlayStyles.dishReviewTitle}>Dish Review</Text>
               <Pressable
@@ -343,7 +345,7 @@ function FeedCard({
               </Pressable>
             </View>
             {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
-              <>
+              <ScrollView bounces={false} contentContainerStyle={overlayStyles.dishReviewContent} showsVerticalScrollIndicator={false} style={overlayStyles.dishReviewScroll}>
                 <View style={overlayStyles.dishReviewPhoto}>
                   <DishPhoto photoPath={dishReviews[selectedDishIndex].photoPath} photoUrl={dishReviews[selectedDishIndex].photoUrl} />
                   {dishReviews.length > 1 ? (
@@ -372,7 +374,7 @@ function FeedCard({
                   </View>
                   <Text style={overlayStyles.dishReviewName}>{dishReviews[selectedDishIndex].title}</Text>
                 </View>
-              </>
+              </ScrollView>
             ) : null}
           </View>
         </View>
@@ -488,6 +490,14 @@ export function HomeFeedScreen({
   const { profile } = useProfile(userId, state.user?.displayName ?? 'Tastes member');
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useOrientationDimensions();
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerHeight = responsiveSize(157 - 54) + headerTop;
+  const headerSafeStyle = {
+    height: headerHeight,
+    paddingTop: headerTop,
+  };
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
@@ -618,8 +628,8 @@ export function HomeFeedScreen({
   );
 
   return (
-    <Screen background="homeFeed">
-      <View style={styles.header}>
+    <Screen background="homeFeed" style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+      <View style={[styles.header, headerSafeStyle]}>
         <View style={styles.headerTop}>
           <Pressable
             accessibilityLabel="Open leaderboard"
@@ -657,7 +667,7 @@ export function HomeFeedScreen({
         </View>
       </View>
       {hasNewPosts ? (
-        <Pressable onPress={() => { void handleRefreshNewPosts(); }} style={styles.newPostsBanner}>
+        <Pressable onPress={() => { void handleRefreshNewPosts(); }} style={[styles.newPostsBanner, { top: headerHeight - responsiveSize(5), left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}>
           <Text style={styles.newPostsText}>↑ New posts</Text>
         </Pressable>
       ) : null}
@@ -917,7 +927,9 @@ const overlayStyles = responsiveStyleSheet({
   sentDone: { position: 'absolute', left: 36, right: 36, bottom: 34, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },
   sentDoneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   dishReviewScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.64)' },
-  dishReviewSheet: { paddingBottom: 30, borderTopWidth: 1, borderColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+  dishReviewSheet: { maxHeight: '100%', borderTopWidth: 1, borderColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+  dishReviewScroll: { flexShrink: 1 },
+  dishReviewContent: { flexGrow: 1 },
   dishReviewHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dishReviewTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '600', letterSpacing: -0.45 },
   dishReviewClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },

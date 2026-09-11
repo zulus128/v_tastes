@@ -1,6 +1,9 @@
+import { useRef } from 'react';
 import {
   Dimensions,
+  Keyboard,
   PixelRatio,
+  Platform,
   useWindowDimensions,
   type ImageStyle,
   type TextStyle,
@@ -14,10 +17,12 @@ export const DESIGN_VIEWPORT = {
 } as const;
 
 const MIN_LAYOUT_SCALE = 0.82;
-const MIN_TABLET_LAYOUT_SCALE = 0.68;
 const MAX_PHONE_LAYOUT_SCALE = 1.12;
-const MAX_TABLET_LAYOUT_SCALE = 1.6;
-const TABLET_MIN_EDGE = 600;
+const MAX_TABLET_LAYOUT_SCALE = 2;
+const LARGE_WINDOW_SCALE_START = DESIGN_VIEWPORT.width;
+const LARGE_WINDOW_SCALE_END = 480;
+const WIDE_WINDOW_SCALE_START = 840;
+const WIDE_WINDOW_SCALE_END = 1024;
 
 type NamedStyle = ViewStyle | TextStyle | ImageStyle;
 type NamedStyles = Record<string, NamedStyle>;
@@ -29,6 +34,7 @@ const scalableProperties = new Set([
   'minHeight',
   'maxWidth',
   'maxHeight',
+  'flexBasis',
   'top',
   'right',
   'bottom',
@@ -89,18 +95,39 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 /**
  * Phones scale from their short edge so a short 16:9 display does not make all
- * controls tiny. Tablets use a contain scale, preserving the complete 402x874
- * artboard while taking advantage of the available height.
+ * controls tiny. Larger, freely resizable windows use both dimensions: the
+ * area-based scale is capped by height. Both transitions are continuous, even
+ * when a window crosses a square aspect ratio or a short-edge breakpoint.
  */
 export function responsiveMetrics(width: number, height: number): ResponsiveMetrics {
   const shortEdge = Math.min(width, height);
-  const scale = shortEdge >= TABLET_MIN_EDGE
-    ? clamp(
-      Math.min(width / DESIGN_VIEWPORT.width, height / DESIGN_VIEWPORT.height),
-      MIN_TABLET_LAYOUT_SCALE,
+  const phoneScale = clamp(shortEdge / DESIGN_VIEWPORT.width, MIN_LAYOUT_SCALE, MAX_PHONE_LAYOUT_SCALE);
+  const areaScale = Math.max(
+    phoneScale,
+    clamp(
+      Math.sqrt(
+        (width / DESIGN_VIEWPORT.width) * (height / DESIGN_VIEWPORT.height),
+      ),
+      MIN_LAYOUT_SCALE,
       MAX_TABLET_LAYOUT_SCALE,
-    )
-    : clamp(shortEdge / DESIGN_VIEWPORT.width, MIN_LAYOUT_SCALE, MAX_PHONE_LAYOUT_SCALE);
+    ),
+  );
+  const shortEdgeProgress = clamp(
+    (shortEdge - LARGE_WINDOW_SCALE_START) / (LARGE_WINDOW_SCALE_END - LARGE_WINDOW_SCALE_START),
+    0,
+    1,
+  );
+  const heightConstrainedScale = Math.min(areaScale, height / DESIGN_VIEWPORT.height);
+  // Large resizable windows still use their full width, but fixed-position
+  // screens must fit vertically. Smaller phone windows keep the width-based
+  // scale; larger windows gradually gain a height cap and use screen reflow.
+  const wideWindowProgress = clamp(
+    (width - WIDE_WINDOW_SCALE_START) / (WIDE_WINDOW_SCALE_END - WIDE_WINDOW_SCALE_START),
+    0,
+    1,
+  );
+  const largeWindowProgress = Math.max(shortEdgeProgress, wideWindowProgress);
+  const scale = phoneScale + ((heightConstrainedScale - phoneScale) * largeWindowProgress);
   return {
     height,
     scale,
@@ -109,41 +136,54 @@ export function responsiveMetrics(width: number, height: number): ResponsiveMetr
 }
 
 export function useResponsiveMetrics() {
-  // `window` height shrinks on Android while the resize-style keyboard is open.
-  // Use it only as a subscription to orientation/window changes; scale itself
-  // comes from stable physical screen dimensions.
-  useWindowDimensions();
-  const { width, height } = Dimensions.get('screen');
-  return { ...responsiveMetrics(width, height), scale: stableAvailableScale() };
+  const { width, height } = useWindowDimensions();
+  return { width, height, scale: stableAvailableScale() };
 }
 
 /**
- * Keeps the app on a phone-proportioned canvas on tablets. The surrounding
- * area remains native tablet UI, while every product screen receives the same
- * maximum viewport its scaled 402x874 design was authored for.
+ * Uses the physical Android screen for orientation so the software keyboard
+ * cannot make a portrait device look landscape. Other platforms keep the live
+ * window dimensions required by resizable iPad and macOS windows.
  */
-export function responsiveViewport(width: number, height: number) {
-  if (Math.min(width, height) < TABLET_MIN_EDGE) return { height, width };
-  const { scale } = responsiveMetrics(width, height);
-  return {
-    height: Math.min(height, DESIGN_VIEWPORT.height * scale),
-    width: Math.min(width, DESIGN_VIEWPORT.width * scale),
-  };
-}
-
-export function useResponsiveViewport() {
-  const { width, height } = useWindowDimensions();
-  const screen = Dimensions.get('screen');
-  if (Math.min(screen.width, screen.height) < TABLET_MIN_EDGE) return { height, width };
-  return {
-    height: Math.min(height, DESIGN_VIEWPORT.height * stableAvailableScale()),
-    width: Math.min(width, DESIGN_VIEWPORT.width * stableAvailableScale()),
-  };
+export function useOrientationDimensions() {
+  const windowDimensions = useWindowDimensions();
+  const keyboardVisible = Platform.OS === 'android'
+    && typeof Keyboard.isVisible === 'function'
+    && Keyboard.isVisible();
+  const stableWindowDimensions = useRef(windowDimensions);
+  if (!keyboardVisible) stableWindowDimensions.current = windowDimensions;
+  return keyboardVisible ? stableWindowDimensions.current : windowDimensions;
 }
 
 export function responsiveValue(value: number, scale: number) {
   if (value === 0) return 0;
   return PixelRatio.roundToNearestPixel(value * scale);
+}
+
+/**
+ * Fits wrapped cards to the exact available row width. Computing the item
+ * width from the already-rounded padding and gap avoids half-pixel overflow on
+ * narrow phones, while a fixed column count keeps an orphaned final card from
+ * growing across the row.
+ */
+export function responsiveWrapMetrics(
+  viewportWidth: number,
+  scale: number,
+  minimumItemWidth: number,
+  maximumColumns: number,
+  horizontalPadding: number,
+  gap: number,
+): number {
+  const scaledPadding = responsiveValue(horizontalPadding, scale);
+  const scaledGap = responsiveValue(gap, scale);
+  const scaledMinimum = responsiveValue(minimumItemWidth, scale);
+  const availableWidth = Math.max(0, viewportWidth - (scaledPadding * 2));
+  const columns = clamp(
+    Math.floor((availableWidth + scaledGap) / (scaledMinimum + scaledGap)),
+    1,
+    maximumColumns,
+  );
+  return (availableWidth - (scaledGap * (columns - 1))) / columns;
 }
 
 /** Scales numeric component props (most often SVG width/height) like styles. */
@@ -178,7 +218,7 @@ export function scaleStyle(style: NamedStyle, scale: number): NamedStyle {
     if (scalableProperties.has(property) && typeof value === 'number') {
       // 999 is the conventional fully-rounded sentinel and must remain larger
       // than every possible control after scaling.
-      result[property] = value >= 900 ? value : responsiveValue(value, scale);
+      result[property] = /^border.*Radius$/.test(property) && value >= 900 ? value : responsiveValue(value, scale);
     } else if (property === 'transform') {
       result[property] = scaleTransform(value, scale);
     } else if (property === 'shadowOffset' || property === 'textShadowOffset') {
@@ -204,13 +244,11 @@ const stableAvailableScale: ResponsiveScaleResolver = () => {
   // the available viewport changes, never the control scale mid-edit.
   const screen = Dimensions.get('screen');
   const window = Dimensions.get('window');
-  // Android's resize-style keyboard changes window height but not its width.
-  // Cap the stable physical-screen scale by the current window width so a
-  // tablet/foldable split window never receives oversized tablet controls.
-  return Math.min(
-    responsiveMetrics(screen.width, screen.height).scale,
-    responsiveMetrics(window.width, screen.height).scale,
-  );
+  // Only Android's resize-style keyboard needs the stable physical height.
+  // Other platforms must follow both live window dimensions so a resizable
+  // iPad/Mac window updates typography, icons, and imagery in both directions.
+  const availableHeight = Platform.OS === 'android' ? screen.height : window.height;
+  return responsiveMetrics(window.width, availableHeight).scale;
 };
 
 /**
@@ -222,8 +260,8 @@ export function responsiveStyleSheet<T extends NamedStyles>(styles: T, resolveSc
   // `useWindowDimensions` causes the owning screen to render again when a
   // window is resized; resolving the scale when the named style is read keeps
   // those rerenders in sync with the stable device frame without requiring
-  // every screen to recreate its styles manually. responsiveViewport handles
-  // the separately-changing usable window in split-view and keyboard states.
+  // every screen to recreate its styles manually. The native layout viewport
+  // separately follows split-view, window resize, and keyboard changes.
   let cachedScale: number | null = null;
   const cache = new Map<PropertyKey, unknown>();
   return new Proxy(styles as object, {

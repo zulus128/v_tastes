@@ -18,8 +18,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
@@ -28,7 +31,7 @@ import { auth } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
-import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
 import { countries, defaultCountry, type Country } from './countries';
 import { verificationFailureState } from './otp-errors';
@@ -65,9 +68,32 @@ function displayPhone(country: Country, digits: string): string {
 
 function useOnboardingStyles() {
   const { colors } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
+  const { scale } = useResponsiveMetrics();
+  const insets = useSafeAreaInsets();
   const compact = height <= 700 || width <= 340;
-  return useMemo(() => createStyles(colors, compact), [colors, compact]);
+  const bottomGutter = Math.max(compact ? 12 : 24, insets.bottom / scale);
+  return useMemo(() => createStyles(colors, compact, bottomGutter), [colors, compact, bottomGutter]);
+}
+
+function useAuthScrollLayout(styles: ReturnType<typeof useOnboardingStyles>) {
+  const { scale } = useResponsiveMetrics();
+  const insets = useSafeAreaInsets();
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  // KeyboardAvoidingView can leave much less space than the window height.
+  // Spend that space on the form before retaining the Figma top whitespace.
+  const paddingTop = viewportHeight > 0 && contentHeight > 0
+    ? Math.max(
+      insets.top + responsiveValue(8, scale),
+      Math.min(styles.authScrollContent.paddingTop, viewportHeight - contentHeight - styles.authScrollContent.paddingBottom),
+    )
+    : styles.authScrollContent.paddingTop;
+  return {
+    contentContainerStyle: [styles.authScrollContent, { paddingTop }],
+    onViewportLayout: (event: LayoutChangeEvent) => setViewportHeight(event.nativeEvent.layout.height),
+    onContentLayout: (event: LayoutChangeEvent) => setContentHeight(event.nativeEvent.layout.height),
+  };
 }
 
 export function OnboardingFlow({ initialScreen, visualAudit = false }: { initialScreen?: OnboardingScreen; visualAudit?: boolean } = {}) {
@@ -320,33 +346,38 @@ function EntryScreen() {
 
 function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; onApple: () => void; onGoogle: () => void; onPhone: () => void }) {
   const { colors, isDark } = useAppTheme();
-  const { height, width } = useResponsiveViewport();
+  const { height, width } = useWindowDimensions();
   const { scale: layoutScale } = useResponsiveMetrics();
   const styles = useOnboardingStyles();
   const compact = height <= 700 || width <= 340;
-  const panelHeight = responsiveValue(compact ? 390 : 414, layoutScale);
-  const heroHeight = height - panelHeight;
+  const landscape = width > height;
+  const heroWidth = landscape
+    ? Math.min(width * 0.46, Math.max(width * 0.38, responsiveValue(220, layoutScale)))
+    : width;
+  const panelWidth = width - heroWidth;
+  const panelHeight = landscape ? height : Math.min(height, responsiveValue(compact ? 390 : 414, layoutScale));
+  const heroHeight = landscape ? height : height - panelHeight;
   const heroOverflow = responsiveValue(48, layoutScale);
-  const heroScale = Math.min(1, heroHeight / responsiveValue(387, layoutScale));
+  const heroScale = Math.max(0, Math.min(1, heroHeight / responsiveValue(387, layoutScale)));
   const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
     - (1 - heroScale) * responsiveValue(34, layoutScale)
     - heroOverflow / 2;
   const pinPositions = [
-    { left: width * 0.17, top: pinTop(109) },
-    { left: width * 0.70, top: pinTop(121) },
-    { left: width * 0.31, top: pinTop(287) },
-    { left: width * 0.81, top: pinTop(319) },
+    { left: heroWidth * 0.17, top: pinTop(109) },
+    { left: heroWidth * 0.70, top: pinTop(121) },
+    { left: heroWidth * 0.31, top: pinTop(287) },
+    { left: heroWidth * 0.81, top: pinTop(319) },
   ];
   return (
     <View style={styles.fullScreen}>
-      <View style={[styles.heroLayer, { height: heroHeight }]}>
+      <View style={[styles.heroLayer, landscape ? { bottom: 0, right: undefined, width: heroWidth } : null, { height: heroHeight }]}>
         <Image source={hero} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
         <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
         <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
         <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
         <RatingPin label="3.5" scale={heroScale} style={pinPositions[3]} />
       </View>
-      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, { height: panelHeight }]}>
+      <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, landscape ? styles.consentPanelLandscape : null, landscape ? { left: heroWidth, width: panelWidth } : null, { height: panelHeight }]}>
         {/* pattern.png is dark linework on transparent, so on the dark theme's
             near-black gradient it has to be tinted white to be visible at all —
             same treatment EntryScreen gives it. */}
@@ -356,6 +387,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
           imageStyle={isDark ? styles.panelPatternDark : styles.panelPattern}
           style={styles.consentPanelBackground}
         >
+          <SafeAreaView edges={landscape ? ['right', 'bottom'] : ['left', 'right', 'bottom']} style={styles.consentPanelBackground}>
           <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.consentPrimary}>
               <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
@@ -378,6 +410,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
               <Text style={styles.legal}>By continuing you agree to our <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/terms')} style={styles.legalLink}>Terms of Service</Text> & <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/privacy')} style={styles.legalLink}>Privacy Policy</Text></Text>
             </View>
           </ScrollView>
+          </SafeAreaView>
         </ImageBackground>
       </LinearGradient>
     </View>
@@ -412,6 +445,7 @@ function PhoneScreen(props: {
 }) {
   const { colors } = useAppTheme();
   const styles = useOnboardingStyles();
+  const scrollLayout = useAuthScrollLayout(styles);
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
       <PatternScreen>
@@ -419,12 +453,14 @@ function PhoneScreen(props: {
         <View style={styles.authKeyboardLayout}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={styles.authScrollContent}
+            contentContainerStyle={scrollLayout.contentContainerStyle}
             keyboardShouldPersistTaps="handled"
+            onLayout={scrollLayout.onViewportLayout}
             showsVerticalScrollIndicator={false}
             style={styles.authScroll}
+            testID="onboarding-phone-scroll"
           >
-            <View style={styles.authContent}>
+            <View onLayout={scrollLayout.onContentLayout} style={styles.authContent} testID="onboarding-phone-content">
               <Text style={styles.authTitle}>Your phone number</Text>
               <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
               <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
@@ -508,6 +544,7 @@ function OtpScreen(props: {
   onResend: () => void;
 }) {
   const styles = useOnboardingStyles();
+  const scrollLayout = useAuthScrollLayout(styles);
   const error = props.state === 'incorrect'
     ? 'Incorrect code. Try again.'
     : props.state === 'expired'
@@ -527,12 +564,14 @@ function OtpScreen(props: {
         <View style={styles.authKeyboardLayout}>
           <ScrollView
             bounces={false}
-            contentContainerStyle={styles.authScrollContent}
+            contentContainerStyle={scrollLayout.contentContainerStyle}
             keyboardShouldPersistTaps="handled"
+            onLayout={scrollLayout.onViewportLayout}
             showsVerticalScrollIndicator={false}
             style={styles.authScroll}
+            testID="onboarding-otp-scroll"
           >
-            <Pressable onPress={() => props.inputRef.current?.focus()} style={styles.otpContent}>
+            <Pressable onLayout={scrollLayout.onContentLayout} onPress={() => props.inputRef.current?.focus()} style={styles.otpContent} testID="onboarding-otp-content">
               <Text style={styles.authTitle}>Enter code</Text>
               <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
               <View style={styles.otpRow}>
@@ -563,7 +602,7 @@ function OtpScreen(props: {
   );
 }
 
-const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleSheet({
+const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: number) => responsiveStyleSheet({
   fullScreen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
@@ -574,6 +613,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleS
   ratingPointer: { width: 12, height: 12, backgroundColor: colors.primary, borderRightWidth: 1.2, borderBottomWidth: 1.2, borderColor: colors.onPrimary, transform: [{ rotate: '45deg' }], marginTop: -7 },
   ratingStar: { color: colors.onPrimary, fontSize: 10, marginTop: 3 },
   consentPanel: { position: 'absolute', zIndex: 1, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  consentPanelLandscape: { top: 0, right: undefined, borderTopRightRadius: 0, borderBottomLeftRadius: 24, borderTopWidth: 0, borderLeftWidth: 1 },
   consentPanelBackground: { flex: 1 },
   consentScrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: compact ? 14 : 24, justifyContent: 'space-between' },
   panelPattern: { opacity: 0.06 },
@@ -613,7 +653,7 @@ const createStyles = (colors: ThemeColors, compact: boolean) => responsiveStyleS
   phoneInput: { flex: 1, color: colors.text, fontSize: 17, paddingVertical: 0 },
   errorText: { color: colors.danger, fontSize: 12, marginTop: 6, textAlign: 'center' },
   phoneErrorText: { width: '100%', textAlign: 'left' },
-  authButtonArea: { paddingHorizontal: 36, paddingBottom: compact ? 12 : 24 },
+  authButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter },
   countryContent: { flex: 1, paddingTop: compact ? 100 : 130, paddingHorizontal: 16 },
   countryTitle: { color: colors.text, fontSize: 24, fontWeight: '700' },
   search: { height: 44, marginTop: 19, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },

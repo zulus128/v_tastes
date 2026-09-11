@@ -19,10 +19,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import MapFavouriteIcon from '../../../assets/discover/map-favourite.svg';
@@ -69,7 +71,14 @@ import {
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import {
+  responsiveSize,
+  responsiveStyleSheet,
+  responsiveValue,
+  responsiveWrapMetrics,
+  useOrientationDimensions,
+  useResponsiveMetrics,
+} from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { matchesPlaceFilters } from './placeFilters';
@@ -88,6 +97,8 @@ const placeSortOptions: Array<{ label: string; value: PlaceSort }> = [
 ];
 
 const DISCOVER_HEADER_HEIGHT = 106;
+const DISCOVER_GRID_GAP = 10;
+const DISCOVER_GRID_PADDING = 16;
 const KEYBOARD_SEARCH_GAP = 8;
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
@@ -202,6 +213,15 @@ export function DiscoverScreen({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useOrientationDimensions();
+  const safeContentStyle = { paddingLeft: insets.left, paddingRight: insets.right };
+  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const headerHeight = responsiveSize(DISCOVER_HEADER_HEIGHT - 54) + headerTop;
+  const headerSafeStyle = {
+    height: headerHeight,
+    paddingTop: headerTop,
+  };
   const [tab, setTab] = useState<DiscoverTab>('trending');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
@@ -231,8 +251,8 @@ export function DiscoverScreen({
   }
 
   return (
-    <View style={[styles.screen, mapMode && styles.mapDiscoverScreen]}>
-      <View style={[styles.header, mapMode && styles.mapHeader]}>
+    <View style={[styles.screen, safeContentStyle, mapMode && styles.mapDiscoverScreen]}>
+      <View style={[styles.header, headerSafeStyle, mapMode && styles.mapHeader, mapMode && { left: insets.left, right: insets.right }]}>
         <View style={styles.switcher}>
           {(['trending', 'places', 'people'] as const).map((value) => (
             <Pressable
@@ -280,6 +300,7 @@ export function DiscoverScreen({
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
+          headerHeight={headerHeight}
           onOpenFavourites={() => setFavouritesOpen(true)}
           onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
@@ -295,7 +316,7 @@ export function DiscoverScreen({
         userId={userId}
         visible={saveTarget !== null}
       />
-      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={styles.aiFab}>
+      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={[styles.aiFab, { right: insets.right + responsiveSize(16) }]}>
         <View style={styles.aiFabMark}>
           <AiMouthPink height={responsiveSize(10)} style={styles.aiFabMarkPink} width={responsiveSize(13)} />
           <AiMouthOutline color={colors.text} height={responsiveSize(13)} style={styles.aiFabMarkOutline} width={responsiveSize(18)} />
@@ -335,6 +356,16 @@ function TrendingLoading() {
   );
 }
 
+function carouselCardWidth(contentWidth: number, scale: number, designWidth: number, itemCount: number) {
+  const minimumWidth = responsiveValue(designWidth, scale);
+  if (itemCount < 2) return minimumWidth;
+  const availableWidth = contentWidth - 2 * responsiveValue(DISCOVER_GRID_PADDING, scale);
+  const gapsWidth = (itemCount - 1) * responsiveValue(DISCOVER_GRID_GAP, scale);
+  // A complete short carousel fills a wide row. Longer carousels retain their
+  // original card width and scroll, and a lone result never becomes a banner.
+  return Math.max(minimumWidth, (availableWidth - gapsWidth) / itemCount);
+}
+
 function TrendingFeed({
   feed,
   followPending,
@@ -361,6 +392,28 @@ function TrendingFeed({
   const { colors } = useAppTheme();
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
+  const { scale: layoutScale } = useResponsiveMetrics();
+  const { forYouCardWidth, gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth, trendingCardWidth } = useMemo(() => {
+    const wrapWidth = (minimumWidth: number, maximumColumns: number) => responsiveWrapMetrics(
+      contentWidth,
+      layoutScale,
+      minimumWidth,
+      maximumColumns,
+      DISCOVER_GRID_PADDING,
+      DISCOVER_GRID_GAP,
+    );
+    return {
+      forYouCardWidth: carouselCardWidth(contentWidth, layoutScale, 240, feed.forYou.length),
+      gemCardWidth: wrapWidth(280, 2),
+      gridCardWidth: wrapWidth(179, 4),
+      placeCardWidth: wrapWidth(280, 2),
+      reviewCardWidth: wrapWidth(300, 2),
+      trendingCardWidth: carouselCardWidth(contentWidth, layoutScale, 200, feed.trending.length),
+    };
+  }, [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const { hero, topReviewer } = feed;
@@ -425,6 +478,7 @@ function TrendingFeed({
                 meta={`${venue.category ?? ''} · ${'$'.repeat(venue.priceLevel ?? 1)}`}
                 name={venue.name}
                 rating={(venue.rating ?? 0).toFixed(1)}
+                width={trendingCardWidth}
               />
             ))}
           </ScrollView>
@@ -442,6 +496,7 @@ function TrendingFeed({
                 onSave={() => onSave({ venueId: venue.id, name: venue.name })}
                 place={venueToPlace(venue)}
                 saved={savedVenueIds.has(venue.id)}
+                width={placeCardWidth}
               />
             ))}
           </View>
@@ -452,7 +507,7 @@ function TrendingFeed({
         <>
           <SectionLabel title="Most reviewed" subtitle="What everyone's talking about" />
           <View style={styles.grid}>
-            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gridCardWidth} />)}
           </View>
         </>
       ) : null}
@@ -481,6 +536,7 @@ function TrendingFeed({
                 text={review.text}
                 time={timeAgo(review.createdAt)}
                 commentCount={review.commentCount}
+                width={reviewCardWidth}
               />
             ))}
           </View>
@@ -514,6 +570,7 @@ function TrendingFeed({
                 onOpen={() => onOpenPlace(venue.id)}
                 place={venueToPlace(venue)}
                 reason={forYouReason(venue, index)}
+                width={forYouCardWidth}
               />
             ))}
           </ScrollView>
@@ -524,7 +581,7 @@ function TrendingFeed({
         <>
           <SectionLabel title="Hidden gems" subtitle="High ratings, low review counts" />
           <View style={styles.gemList}>
-            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} />)}
+            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gemCardWidth} />)}
           </View>
         </>
       ) : null}
@@ -534,6 +591,7 @@ function TrendingFeed({
 
 function PlacesMap({
   appliedFilters,
+  headerHeight,
   onOpenFavourites,
   onOpenFilters,
   onOpenPlace,
@@ -542,6 +600,7 @@ function PlacesMap({
   userId,
 }: {
   appliedFilters: string[];
+  headerHeight: number;
   onOpenFavourites: () => void;
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
@@ -551,7 +610,19 @@ function PlacesMap({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const discoverHeaderHeight = responsiveSize(DISCOVER_HEADER_HEIGHT);
+  const windowDimensions = useWindowDimensions();
+  const orientationDimensions = useOrientationDimensions();
+  const insets = useSafeAreaInsets();
+  const contentWidth = Math.max(0, windowDimensions.width - insets.left - insets.right);
+  const splitLayout = orientationDimensions.width > orientationDimensions.height && windowDimensions.width >= 600;
+  // Once a resizable landscape window is wide enough, a bottom sheet leaves
+  // an unnecessarily large map area above a narrow list. Switch to a stable
+  // side panel so the list and map use the available width together.
+  const sidePanelLayout = splitLayout && contentWidth >= 1000;
+  const sheetRight = splitLayout ? contentWidth * 0.48 : 0;
+  const [mapHeight, setMapHeight] = useState(0);
+  const [keyboardAvoidanceActive, setKeyboardAvoidanceActive] = useState(false);
+  const keyboardVisibleRef = useRef(false);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -573,9 +644,6 @@ function PlacesMap({
   const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
-  const keyboardVisibleRef = useRef(false);
-  const keyboardTransitionRef = useRef(false);
-  const keyboardAdjustedRef = useRef(false);
   const venueFilter = activeFilter
     ? { category: activeFilter.category, tag: activeFilter.tag }
     : {};
@@ -653,11 +721,9 @@ function PlacesMap({
         // locking. Reset our keyboard-driven layout before the app is
         // suspended so the map container can measure at its full height.
         Keyboard.dismiss();
-        keyboardVisibleRef.current = false;
-        keyboardAdjustedRef.current = false;
-        keyboardTransitionRef.current = false;
         sheetKeyboardTranslate.stopAnimation();
         sheetKeyboardTranslate.setValue(0);
+        setKeyboardAvoidanceActive(false);
         return;
       }
       if (!resumed) return;
@@ -686,7 +752,7 @@ function PlacesMap({
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const animateKeyboardOffset = (translateY: number, duration?: number) => {
+    const animateKeyboardOffset = (translateY: number, duration?: number, onFinish?: () => void) => {
       sheetKeyboardTranslate.stopAnimation();
       const animationDuration = duration && duration > 0 ? duration : 250;
       Animated.timing(sheetKeyboardTranslate, {
@@ -695,33 +761,26 @@ function PlacesMap({
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: false,
       }).start(({ finished }) => {
-        if (finished) keyboardTransitionRef.current = false;
+        if (finished) onFinish?.();
       });
     };
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       keyboardVisibleRef.current = true;
+      setKeyboardAvoidanceActive(true);
       setSortOpen(false);
       searchRowRef.current?.measureInWindow((_x, y, _width, height) => {
         const keyboardOverlap = Math.max(
           0,
           y + height + KEYBOARD_SEARCH_GAP - event.endCoordinates.screenY,
         );
-        keyboardAdjustedRef.current = keyboardOverlap > 0;
-        keyboardTransitionRef.current = keyboardAdjustedRef.current;
-        if (keyboardAdjustedRef.current) {
+        if (keyboardOverlap > 0) {
           animateKeyboardOffset(-keyboardOverlap, event.duration);
         }
       });
     });
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
       keyboardVisibleRef.current = false;
-      if (!keyboardAdjustedRef.current) {
-        keyboardTransitionRef.current = false;
-        return;
-      }
-      keyboardAdjustedRef.current = false;
-      keyboardTransitionRef.current = true;
-      animateKeyboardOffset(0, event.duration);
+      animateKeyboardOffset(0, event.duration, () => setKeyboardAvoidanceActive(false));
     });
     return () => {
       showSubscription.remove();
@@ -772,10 +831,11 @@ function PlacesMap({
     },
   })).current;
 
-  function handleMapLayout(height: number) {
-    const availableHeight = Math.max(0, height - 8);
-    const expanded = Math.max(0, availableHeight - discoverHeaderHeight);
-    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(height * 0.53)));
+  useEffect(() => {
+    if (mapHeight <= 0 || keyboardAvoidanceActive) return;
+    const availableHeight = Math.max(0, mapHeight - responsiveSize(8));
+    const expanded = Math.max(0, availableHeight - headerHeight);
+    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
       sheetBounds.current = { collapsed, expanded };
@@ -783,21 +843,21 @@ function PlacesMap({
       sheetHeight.setValue(collapsed);
       return;
     }
-    if (keyboardVisibleRef.current || keyboardTransitionRef.current) return;
-
     sheetBounds.current = { collapsed, expanded };
 
     // Animate orientation and container-size changes without jumping.
     sheetHeight.stopAnimation();
     const nextHeight = sheetExpandedRef.current ? expanded : collapsed;
     currentSheetHeight.current = nextHeight;
-    Animated.timing(sheetHeight, {
+    const animation = Animated.timing(sheetHeight, {
       toValue: nextHeight,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
-  }
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [headerHeight, keyboardAvoidanceActive, mapHeight, sheetHeight]);
 
   function zoom(multiplier: number) {
     const next = {
@@ -844,7 +904,7 @@ function PlacesMap({
   }
 
   return (
-    <View onLayout={(event) => handleMapLayout(event.nativeEvent.layout.height)} style={styles.mapScreen}>
+    <View onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)} style={styles.mapScreen}>
       <MapView
         key={mapInstanceKey}
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
@@ -898,7 +958,7 @@ function PlacesMap({
         pointerEvents="none"
         style={[styles.mapToneOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.19)' }]}
       />
-      <View style={styles.mapControls}>
+      <View style={[styles.mapControls, { top: headerHeight + responsiveSize(18) }, splitLayout && styles.mapControlsLandscape]}>
         <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.55)} style={styles.mapControlButton}>
           <Text style={styles.mapControlGlyph}>+</Text>
         </Pressable>
@@ -923,7 +983,7 @@ function PlacesMap({
         </Pressable>
       </View>
       {layersOpen ? (
-        <View style={styles.layersMenu}>
+        <View style={[styles.layersMenu, { top: headerHeight + responsiveSize(splitLayout ? 76 : 18) }, splitLayout && { right: responsiveSize(16) }]}>
           <Text style={styles.layersTitle}>Show on map</Text>
           <MapLayerToggle active={mapLayers.friends} label="Friends" onPress={() => toggleMapLayer('friends')} styles={styles} />
           <MapLayerToggle active={mapLayers.saved} label="Saved" onPress={() => toggleMapLayer('saved')} styles={styles} />
@@ -932,22 +992,29 @@ function PlacesMap({
       ) : null}
       <Animated.View
         pointerEvents="none"
-        style={[styles.mapSheetUnderlay, { height: sheetHeight }]}
+        style={[
+          styles.mapSheetUnderlay,
+          sidePanelLayout ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }] : { height: sheetHeight, right: sheetRight },
+        ]}
       />
       <Animated.View
         style={[
           styles.mapSheet,
-          { height: sheetHeight, transform: [{ translateY: sheetKeyboardTranslate }] },
+          sidePanelLayout
+            ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }]
+            : { height: sheetHeight, right: sheetRight, transform: [{ translateY: sheetKeyboardTranslate }] },
         ]}
       >
-        <Pressable
-          accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
-          onPress={() => settleSheet(!sheetExpanded)}
-          style={styles.sheetDragArea}
-          {...sheetPanResponder.panHandlers}
-        >
-          <View style={styles.sheetHandle} />
-        </Pressable>
+        {sidePanelLayout ? null : (
+          <Pressable
+            accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
+            onPress={() => settleSheet(!sheetExpanded)}
+            style={styles.sheetDragArea}
+            {...sheetPanResponder.panHandlers}
+          >
+            <View style={styles.sheetHandle} />
+          </Pressable>
+        )}
         <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
             <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} />
@@ -991,7 +1058,7 @@ function PlacesMap({
             );
           })}
         </ScrollView>
-        {sheetExpanded ? (
+        {sheetExpanded || sidePanelLayout ? (
           <View style={styles.mapResultsMeta}>
             <Text style={styles.mapResultsCount}>{filtered.length} places</Text>
             <Pressable
@@ -1401,11 +1468,11 @@ function RatingPill({ value }: { value: string }) {
   return <View style={styles.ratingPill}><Text style={styles.ratingText}>★ {value}</Text></View>;
 }
 
-function TrendingTile({ image, meta, name, onOpen, rating }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string }) {
+function TrendingTile({ image, meta, name, onOpen, rating, width }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.trendingTile}>
+    <Pressable onPress={onOpen} style={[styles.trendingTile, { width }]}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
       <View style={styles.tileRating}><RatingPill value={rating} /></View>
@@ -1417,11 +1484,11 @@ function TrendingTile({ image, meta, name, onOpen, rating }: { image: ImageSourc
   );
 }
 
-function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean }) {
+function PlaceRow({ onOpen, onSave, place, saved, width }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean; width?: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.placeRow}>
+    <View style={[styles.placeRow, { width: width ?? '100%' }]}>
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
         <View style={styles.newChip}><Text style={styles.newChipText}>Popular</Text></View>
@@ -1446,11 +1513,11 @@ function PlaceRow({ onOpen, onSave, place, saved }: { onOpen: () => void; onSave
   );
 }
 
-function GridPlace({ onOpen, place }: { onOpen: () => void; place: Place }) {
+function GridPlace({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.gridCard}>
+    <Pressable onPress={onOpen} style={[styles.gridCard, { width }]}>
       <Image source={place.image} style={styles.gridImage} />
       <View style={styles.gridBody}>
         <Text numberOfLines={1} style={styles.gridTitle}>{place.name}</Text>
@@ -1478,6 +1545,7 @@ function ReviewCard({
   onShare,
   onOpen,
   reacted,
+  width,
 }: {
   author: string;
   avatarUrl: string | null;
@@ -1493,11 +1561,12 @@ function ReviewCard({
   onShare: () => void;
   onOpen: () => void;
   reacted: boolean;
+  width: number;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.reviewCard}>
+    <Pressable onPress={onOpen} style={[styles.reviewCard, { width }]}>
       <Image source={image} style={styles.reviewImage} />
       <View style={styles.reviewBody}>
         <View style={styles.reviewHead}>
@@ -1562,11 +1631,11 @@ function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => vo
   );
 }
 
-function ForYouCard({ image, onOpen, place, reason }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string }) {
+function ForYouCard({ image, onOpen, place, reason, width }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.forYouCard}>
+    <Pressable onPress={onOpen} style={[styles.forYouCard, { width }]}>
       <Image source={image} style={styles.coverImage} />
       <LinearGradient colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']} style={StyleSheet.absoluteFill} />
       <View style={styles.reasonChip}><Text style={styles.reasonText}>{reason}</Text></View>
@@ -1579,11 +1648,11 @@ function ForYouCard({ image, onOpen, place, reason }: { image: ImageSourcePropTy
   );
 }
 
-function HiddenGem({ onOpen, place }: { onOpen: () => void; place: Place }) {
+function HiddenGem({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onOpen} style={styles.gemCard}>
+    <Pressable onPress={onOpen} style={[styles.gemCard, { width }]}>
       <Image source={place.image} style={styles.gemImage} />
       <View style={styles.gemCopy}>
         <View style={styles.gemTop}><Text style={styles.gemBadge}>💎 GEM</Text><Text style={styles.gemReviews}>only {place.reviews}</Text></View>
@@ -1896,7 +1965,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   tileCopy: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 3 },
   tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  placeRows: { paddingHorizontal: 16, gap: 10 },
+  placeRows: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
   newChip: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 7, borderRadius: 9, backgroundColor: '#E63946', justifyContent: 'center' },
@@ -1908,13 +1977,13 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   infoChip: { height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   infoChipText: { color: colors.text, fontSize: 13 },
-  grid: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridCard: { width: '48.5%', height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
+  grid: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
+  gridCard: { height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
   gridImage: { width: '100%', height: 90, resizeMode: 'cover' },
   gridBody: { height: 61, padding: 9, gap: 4 },
   gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gridMeta: { color: colors.textSecondary, fontSize: 12 },
-  reviewList: { paddingHorizontal: 16, gap: 10 },
+  reviewList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   reviewCard: { height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
   reviewImage: { width: 110, height: 121, resizeMode: 'cover' },
   reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
@@ -1949,7 +2018,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   forYouCopy: { position: 'absolute', left: 12, right: 12, bottom: 12, gap: 5 },
   forYouTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 20, fontWeight: '700' },
   forYouMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  gemList: { paddingHorizontal: 16, gap: 10 },
+  gemList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
   gemCard: { height: 94, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.surface },
   gemImage: { width: 70, height: 70, borderRadius: 8, resizeMode: 'cover' },
   gemCopy: { flex: 1, minWidth: 0, gap: 4 },
@@ -1973,11 +2042,12 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
   mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-  mapControls: { position: 'absolute', zIndex: 5, top: 124, right: 16, gap: 10 },
+  mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
+  mapControlsLandscape: { flexDirection: 'row', gap: 6 },
   mapControlButton: { width: 48, height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   mapControlButtonActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.9)' },
   mapControlGlyph: { color: colors.text, fontSize: 22, lineHeight: 26, fontWeight: '700' },
-  layersMenu: { position: 'absolute', zIndex: 6, top: 124, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  layersMenu: { position: 'absolute', zIndex: 6, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
   layersTitle: { marginBottom: 4, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   layerOptionText: { color: colors.text, fontSize: 15 },
@@ -1986,6 +2056,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
   layerSwitchThumbActive: { alignSelf: 'flex-end' },
   mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
+  mapSheetSidePanel: { top: 0, bottom: 0, borderTopWidth: 0, borderRightWidth: 1, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
   mapSheetUnderlay: { position: 'absolute', zIndex: 7, elevation: 7, right: 0, bottom: 0, left: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
