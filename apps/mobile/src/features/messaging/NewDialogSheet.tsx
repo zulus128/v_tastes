@@ -173,7 +173,7 @@ export function NewDialogSheet({
       await closeSheet();
       onOpenConversation(result.data.id);
     } catch (error) {
-      Alert.alert('Could not start dialog', apiErrorMessage(error));
+      Alert.alert('Could not start chat', apiErrorMessage(error));
     } finally {
       setOpeningId(null);
     }
@@ -201,7 +201,7 @@ export function NewDialogSheet({
           ]}
         >
             <View style={styles.header}>
-              <Text style={styles.title}>New Dialog</Text>
+              <Text style={styles.title}>New Chat</Text>
               <Pressable accessibilityLabel="Close" onPress={() => void closeSheet()} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
             </View>
             <View style={styles.searchBox}><SearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput ref={searchInputRef} autoCapitalize="none" autoCorrect={false} blurOnSubmit onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} placeholder="Search" placeholderTextColor={colors.placeholder} returnKeyType="done" style={styles.searchInput} value={search} /></View>

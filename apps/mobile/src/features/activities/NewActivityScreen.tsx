@@ -113,7 +113,7 @@ export function NewActivityScreen({
       });
       setIdempotencyKey(createIdempotencyKey('activity'));
       Alert.alert('Activity created', `${venue.name} · ${startsAt.toLocaleString()}`, [
-        { text: 'Open dialog', onPress: () => onCreated(created.data.id) },
+        { text: 'Open chat', onPress: () => onCreated(created.data.id) },
       ]);
     } catch (error) {
       Alert.alert('Could not create activity', apiErrorMessage(error));
