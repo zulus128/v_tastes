@@ -8,7 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, useWindowDimensions } from 'react-native';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
@@ -126,6 +126,9 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 }
 
 export function useAppTheme() {
+  // Themed screens consume live responsive styles and numeric icon sizes.
+  // Navigation can memoize them, so an App-level resize alone is insufficient.
+  useWindowDimensions();
   const value = useContext(ThemeContext);
   if (!value) throw new Error('useAppTheme must be used inside ThemeProvider');
   return value;

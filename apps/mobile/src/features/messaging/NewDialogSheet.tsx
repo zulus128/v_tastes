@@ -23,11 +23,7 @@ import SearchIcon from '../../../assets/profile/search.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import {
-  responsiveSize,
-  responsiveStyleSheet,
-  useResponsiveViewport,
-} from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -50,8 +46,7 @@ export function NewDialogSheet({
 }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useResponsiveViewport();
-  const { height: physicalWindowHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const actionsHeight = responsiveSize(ACTIONS_HEIGHT);
   const fixedContentHeight = responsiveSize(FIXED_CONTENT_HEIGHT);
   const actionsBottomPadding = Math.max(insets.bottom, 20);
@@ -128,10 +123,9 @@ export function NewDialogSheet({
     const willShowSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
-        const frameTop = Math.max(0, (physicalWindowHeight - windowHeight) / 2);
         const nextKeyboardTop = Math.max(
           0,
-          Math.min(windowHeight, event.endCoordinates.screenY - frameTop),
+          Math.min(windowHeight, event.endCoordinates.screenY),
         );
         const actionsVisible = actionsFit(nextKeyboardTop);
         animateLayout(nextKeyboardTop, actionsVisible, event.duration || 280);
@@ -152,7 +146,6 @@ export function NewDialogSheet({
     actionsFit,
     fixedContentWithPadding,
     minResultsHeight,
-    physicalWindowHeight,
     sheetBottom,
     sheetHeight,
     windowHeight,

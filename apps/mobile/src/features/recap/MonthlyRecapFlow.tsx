@@ -15,9 +15,11 @@ import {
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import areasIcon from '../../../assets/recap/areas.png';
 import arrowIcon from '../../../assets/recap/arrow.png';
@@ -139,6 +141,8 @@ const progressByStep: Partial<Record<RecapStep, number>> = {
 export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, mode = 'ready', onClose, user }: MonthlyRecapFlowProps) {
   const api = useTastesApi();
   const { colors, isDark } = useAppTheme();
+  const { height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [step, setStep] = useState<RecapStep>(initialStep ?? 'loading');
   const [confirmingClose, setConfirmingClose] = useState(initialConfirmingClose);
@@ -195,44 +199,62 @@ export function MonthlyRecapFlow({ initialConfirmingClose = false, initialStep, 
   const backgroundGradient = isDark
     ? (['#560E0B', '#260706', '#080808'] as const)
     : (['#F2EFEA', '#F2EFEA', '#F2EFEA'] as const);
+  const storyCanvasHeight = Math.max(viewportHeight, responsiveValue(DESIGN_VIEWPORT.height, recapScale()));
 
   return (
     <View style={styles.screen}>
       <StatusBar style={isDark || step === 'share' ? 'light' : 'dark'} />
-      <LinearGradient colors={backgroundGradient} locations={[0, 0.52, 1]} style={StyleSheet.absoluteFill} />
-      <ImageBackground
-        source={storyBackground}
-        resizeMode="cover"
-        imageStyle={[styles.pattern, usesStarsBackground && styles.starsPattern]}
-        style={StyleSheet.absoluteFill}
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={{ height: storyCanvasHeight }}
+        key={step}
+        scrollEnabled={storyCanvasHeight > viewportHeight}
+        showsVerticalScrollIndicator={false}
+        style={styles.storyScroll}
+        testID="monthly-recap-scroll"
       >
-        {progress ? <StoryProgress completed={progress} /> : null}
-        <CloseButton
-          color={!isDark && step === 'share' ? '#FFFFFF' : colors.text}
-          onPress={() => setConfirmingClose(true)}
-        />
+        <View style={styles.storyCanvas}>
+          <LinearGradient colors={backgroundGradient} locations={[0, 0.52, 1]} style={StyleSheet.absoluteFill} />
+          <ImageBackground
+            source={storyBackground}
+            resizeMode="cover"
+            imageStyle={[styles.pattern, usesStarsBackground && styles.starsPattern]}
+            style={StyleSheet.absoluteFill}
+          >
+            <View
+              style={[styles.storySafeContent, { left: insets.left, right: insets.right }]}
+              testID="monthly-recap-safe-content"
+            >
+              {progress ? <StoryProgress completed={progress} /> : null}
+              <CloseButton
+                color={!isDark && step === 'share' ? '#FFFFFF' : colors.text}
+                onPress={() => setConfirmingClose(true)}
+              />
 
-        {step === 'loading' ? loadError ? <RecapLoadError onRetry={() => setLoadAttempt((value) => value + 1)} /> : <LoadingScreen month={recap?.month} /> : null}
-        {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
-        {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
-        {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
-        {step === 'placeResult' && recap ? <PlaceResultScreen count={recap.placesVisited} places={recapPlaces(recap)} onNext={() => setStep('areaGuess')} /> : null}
-        {step === 'areaGuess' ? (
-          <AreaGuessScreen favoriteArea={recap?.favoriteArea || 'Belgravia'} onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
-        ) : null}
-        {step === 'areaResult' ? (
-          <AreaResultScreen areas={recap?.areasExplored ?? 0} favoriteArea={recap?.favoriteArea || 'Belgravia'} guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
-        ) : null}
-        {step === 'ratingGuess' ? (
-          <RatingGuessScreen selected={ratingGuess} onChange={setRatingGuess} onSelect={() => setStep('ratingFeedback')} />
-        ) : null}
-        {step === 'ratingFeedback' ? <RatingFeedbackScreen correct={ratingGuess === 1} /> : null}
-        {step === 'ranking' && recap ? <RankingScreen places={recapPlaces(recap)} onNext={() => setStep('favorites')} /> : null}
-        {step === 'favorites' && recap ? <FavoritesScreen dishes={recap.topDishes} onNext={() => setStep('followers')} /> : null}
-        {step === 'followers' && recap ? <FollowersScreen count={recap.followersGained} month={recap.month} onNext={() => setStep('comparison')} /> : null}
-        {step === 'comparison' && recap ? <ComparisonScreen recap={recap} onNext={() => setStep('share')} /> : null}
-        {step === 'share' && recap ? <ShareCard recap={recap} user={user} onShare={shareRecap} /> : null}
-      </ImageBackground>
+              {step === 'loading' ? loadError ? <RecapLoadError onRetry={() => setLoadAttempt((value) => value + 1)} /> : <LoadingScreen month={recap?.month} /> : null}
+              {step === 'lowData' ? <LowDataScreen month={recap?.month} onExplore={onClose} /> : null}
+              {step === 'intro' ? <IntroScreen onNext={() => setStep('placeGuess')} /> : null}
+              {step === 'placeGuess' && recap ? <PlaceGuessScreen actual={recap.placesVisited} selected={placeGuess} onSelect={setPlaceGuess} /> : null}
+              {step === 'placeResult' && recap ? <PlaceResultScreen count={recap.placesVisited} places={recapPlaces(recap)} onNext={() => setStep('areaGuess')} /> : null}
+              {step === 'areaGuess' ? (
+                <AreaGuessScreen favoriteArea={recap?.favoriteArea || 'Belgravia'} onSelect={(value) => { setAreaGuess(value); setStep('areaResult'); }} />
+              ) : null}
+              {step === 'areaResult' ? (
+                <AreaResultScreen areas={recap?.areasExplored ?? 0} favoriteArea={recap?.favoriteArea || 'Belgravia'} guessed={areaGuess ?? 'Mayfair'} onNext={() => setStep('ratingGuess')} />
+              ) : null}
+              {step === 'ratingGuess' ? (
+                <RatingGuessScreen selected={ratingGuess} onChange={setRatingGuess} onSelect={() => setStep('ratingFeedback')} />
+              ) : null}
+              {step === 'ratingFeedback' ? <RatingFeedbackScreen correct={ratingGuess === 1} /> : null}
+              {step === 'ranking' && recap ? <RankingScreen places={recapPlaces(recap)} onNext={() => setStep('favorites')} /> : null}
+              {step === 'favorites' && recap ? <FavoritesScreen dishes={recap.topDishes} onNext={() => setStep('followers')} /> : null}
+              {step === 'followers' && recap ? <FollowersScreen count={recap.followersGained} month={recap.month} onNext={() => setStep('comparison')} /> : null}
+              {step === 'comparison' && recap ? <ComparisonScreen recap={recap} onNext={() => setStep('share')} /> : null}
+              {step === 'share' && recap ? <ShareCard recap={recap} user={user} onShare={shareRecap} /> : null}
+            </View>
+          </ImageBackground>
+        </View>
+      </ScrollView>
 
       <CloseConfirmation
         month={recap?.month}
@@ -757,6 +779,9 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
 
   return responsiveStyleSheet({
   screen: { flex: 1, backgroundColor: isDark ? '#080808' : '#F2EFEA' },
+  storyScroll: { flex: 1 },
+  storyCanvas: { flex: 1, width: '100%', overflow: 'hidden' },
+  storySafeContent: { position: 'absolute', top: 0, bottom: 0 },
   pattern: { opacity: isDark ? 0.18 : 0.04 },
   starsPattern: { opacity: isDark ? 0.18 : 0.25 },
   closeButton: {

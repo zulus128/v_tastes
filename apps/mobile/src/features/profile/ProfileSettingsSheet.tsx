@@ -12,6 +12,7 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -27,6 +28,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,11 +40,11 @@ import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
-import { SideSlideScreen, type SideSlideScreenHandle } from '../../ui/SideSlideScreen';
+import { SideSlideScreen, type SideSlideScreenHandle, useSideSlideTransition } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
@@ -81,7 +83,7 @@ export function ProfileSettingsSheet({
   const visualAudit = useIsVisualAudit();
   const { colors, isDark, preference, setPreference } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { width: viewportWidth } = useResponsiveViewport();
+  const { width: viewportWidth } = useWindowDimensions();
   const settingsScale = 1;
   const styles = useMemo(
     () => createStyles(colors, isDark, settingsScale),
@@ -90,6 +92,8 @@ export function ProfileSettingsSheet({
   const { profile } = useProfile(userId, fallbackName);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
   const buildVersion = Application.nativeBuildVersion;
+  const otaRevision = String(Constants.expoConfig?.extra?.otaRevision ?? '0');
+  const updateId = Updates.updateId ? Updates.updateId.slice(0, 8) : null;
   const [favoritePlace, setFavoritePlace] = useState('Select a place');
   const [editing, setEditing] = useState<EditableField | null>(null);
   const [draft, setDraft] = useState('');
@@ -104,29 +108,25 @@ export function ProfileSettingsSheet({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  const appearanceTranslateX = useRef(new Animated.Value(viewportWidth)).current;
-  const appearanceClosing = useRef(false);
-  const appearanceCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notificationTranslateX = useRef(new Animated.Value(viewportWidth)).current;
-  const notificationClosing = useRef(false);
-  const notificationCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { close: closeAppearance, translateX: appearanceTranslateX } = useSideSlideTransition({
+    frameWidth: viewportWidth,
+    onRequestClose: () => setAppearanceOpen(false),
+    visible: appearanceOpen,
+  });
+  const { close: closeNotifications, translateX: notificationTranslateX } = useSideSlideTransition({
+    frameWidth: viewportWidth,
+    onRequestClose: () => setNotificationsOpen(false),
+    visible: notificationsOpen,
+  });
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
   const citySlide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
     if (visible) return;
-    appearanceClosing.current = false;
-    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-    appearanceCloseTimer.current = null;
-    notificationClosing.current = false;
-    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-    notificationCloseTimer.current = null;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
-    appearanceTranslateX.setValue(viewportWidth);
-    notificationTranslateX.setValue(viewportWidth);
-  }, [appearanceTranslateX, notificationTranslateX, viewportWidth, visible]);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -265,49 +265,11 @@ export function ProfileSettingsSheet({
   }
 
   function openAppearance() {
-    appearanceClosing.current = false;
-    if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-    appearanceCloseTimer.current = null;
-    appearanceTranslateX.stopAnimation();
     setAppearanceOpen(true);
-    appearanceTranslateX.setValue(viewportWidth);
-    Animated.timing(appearanceTranslateX, {
-      duration: 280,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  function closeAppearance() {
-    if (appearanceClosing.current) return;
-    appearanceClosing.current = true;
-    const finish = () => {
-      if (!appearanceClosing.current) return;
-      appearanceClosing.current = false;
-      if (appearanceCloseTimer.current) clearTimeout(appearanceCloseTimer.current);
-      appearanceCloseTimer.current = null;
-      setAppearanceOpen(false);
-    };
-    appearanceCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(appearanceTranslateX, {
-      duration: 240,
-      toValue: viewportWidth,
-      useNativeDriver: true,
-    }).start(finish);
   }
 
   function openNotifications() {
-    notificationClosing.current = false;
-    if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-    notificationCloseTimer.current = null;
-    notificationTranslateX.stopAnimation();
     setNotificationsOpen(true);
-    notificationTranslateX.setValue(viewportWidth);
-    Animated.timing(notificationTranslateX, {
-      duration: 280,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
     setNotificationsLoading(true);
     void api.getProfileExtras({ targetUserId: userId })
       .then((result) => {
@@ -320,24 +282,6 @@ export function ProfileSettingsSheet({
       })
       .catch(() => Alert.alert('Could not load notification settings', 'Please try again.'))
       .finally(() => setNotificationsLoading(false));
-  }
-
-  function closeNotifications() {
-    if (notificationClosing.current) return;
-    notificationClosing.current = true;
-    const finish = () => {
-      if (!notificationClosing.current) return;
-      notificationClosing.current = false;
-      if (notificationCloseTimer.current) clearTimeout(notificationCloseTimer.current);
-      notificationCloseTimer.current = null;
-      setNotificationsOpen(false);
-    };
-    notificationCloseTimer.current = setTimeout(finish, 300);
-    Animated.timing(notificationTranslateX, {
-      duration: 240,
-      toValue: viewportWidth,
-      useNativeDriver: true,
-    }).start(finish);
   }
 
   function saveNotifications(next: NotificationPreferences) {
@@ -412,8 +356,8 @@ export function ProfileSettingsSheet({
             </ScrollView>
         )}
         <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}>
-          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''}`} style={styles.version}>
-            Version {appVersion}{buildVersion ? ` (${buildVersion})` : ''}
+          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''} OTA ${otaRevision}`} style={styles.version}>
+            Version {appVersion}{buildVersion ? ` (${buildVersion}` : ''}{buildVersion ? ` · OTA ${otaRevision})` : ` (OTA ${otaRevision})`}{updateId ? ` · ${updateId}` : ''}
           </Text>
           <LinearGradient
             colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
@@ -428,6 +372,7 @@ export function ProfileSettingsSheet({
           </LinearGradient>
         </LinearGradient>
         <Animated.View
+          testID="notification-settings-pane"
           pointerEvents={notificationsOpen ? 'auto' : 'none'}
           style={[styles.notificationsScreen, { transform: [{ translateX: notificationTranslateX }] }]}
         >
@@ -435,7 +380,7 @@ export function ProfileSettingsSheet({
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
             <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeNotifications} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeNotifications()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Notifications</Text>
               <View style={styles.headerButton} />
             </View>
@@ -464,6 +409,7 @@ export function ProfileSettingsSheet({
           </ImageBackground>
         </Animated.View>
         <Animated.View
+          testID="appearance-settings-pane"
           pointerEvents={appearanceOpen ? 'auto' : 'none'}
           style={[styles.notificationsScreen, { transform: [{ translateX: appearanceTranslateX }] }]}
         >
@@ -471,7 +417,7 @@ export function ProfileSettingsSheet({
             {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
             <PatternBackgroundLift />
             <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={closeAppearance} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
+              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeAppearance()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
               <Text style={styles.title}>Appearance</Text>
               <View style={styles.headerButton} />
             </View>

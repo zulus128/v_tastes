@@ -320,7 +320,7 @@ export function ChatScreen({
         keyboardVerticalOffset={0}
         style={styles.screen}
       >
-      <View style={[styles.header, { minHeight: responsiveSize(64) + insets.top, paddingTop: responsiveSize(8) + insets.top }]}>
+      <View style={[styles.header, { minHeight: responsiveSize(64) + insets.top, paddingTop: responsiveSize(8) + insets.top, paddingLeft: responsiveSize(14) + insets.left, paddingRight: responsiveSize(14) + insets.right }] }>
         <Pressable accessibilityLabel="Back" hitSlop={12} onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
@@ -409,7 +409,7 @@ export function ChatScreen({
         )}
       </ImageBackground>
 
-      <View style={[styles.composer, { minHeight: responsiveSize(62) + insets.bottom, paddingBottom: Math.max(responsiveSize(8), insets.bottom) }]}>
+      <View style={[styles.composer, { minHeight: responsiveSize(62) + insets.bottom, paddingBottom: Math.max(responsiveSize(8), insets.bottom), paddingLeft: responsiveSize(12) + insets.left, paddingRight: responsiveSize(12) + insets.right }] }>
         <TextInput
           blurOnSubmit={false}
           editable={!sending && !conversationError}

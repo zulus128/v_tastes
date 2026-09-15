@@ -7,7 +7,9 @@ import {
   Image,
   ImageBackground,
   Pressable,
+  ScrollView,
   Text,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -77,6 +79,7 @@ export function ActivityInviteModal({
   visible: boolean;
 }) {
   const api = useTastesApi();
+  const { height: viewportHeight } = useWindowDimensions();
   const [details, setDetails] = useState<Details | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -183,89 +186,102 @@ export function ActivityInviteModal({
     minute: '2-digit',
   }) ?? '', [details?.startsAt]);
   const pending = details?.invitationStatus === 'pending';
+  const compactSheet = viewportHeight < responsiveSize(572);
 
   return (
-    <Modal animationType="fade" onRequestClose={pending ? undefined : onClose} transparent visible={visible}>
+    <Modal insetContent animationType="fade" onRequestClose={pending ? undefined : onClose} transparent visible={visible}>
       <View style={styles.overlay}>
-        <ImageBackground imageStyle={styles.patternImage} source={pattern} style={styles.sheet}>
+        <ImageBackground
+          imageStyle={styles.patternImage}
+          source={pattern}
+          style={[styles.sheet, compactSheet && styles.compactSheet]}
+        >
           <PatternBackgroundLift />
-          {loadError ? (
-            <View style={styles.errorState}>
-              <Text style={styles.errorTitle}>Could not load activity</Text>
-              <Text style={styles.errorCopy}>{loadError}</Text>
-              <Pressable onPress={onClose} style={[styles.button, styles.closeButton]}>
-                <Text style={styles.buttonText}>Close</Text>
-              </Pressable>
-            </View>
-          ) : loading || !details ? <ActivityIndicator color="#B82F29" size="large" /> : (
-            <>
-              <View style={styles.identity}>
-                <Avatar person={details.organizer} size={responsiveSize(100)} />
-                <Text style={styles.organizer}>{details.organizer.displayName}</Text>
-                <Text style={styles.inviteCopy}>
-                  {pending ? `Invite you in “${details.venue.name}” restaurant` : `Activity in “${details.venue.name}” restaurant`}
-                </Text>
-              </View>
-
-              <View style={styles.dateRow}>
-                <CalendarIcon height={responsiveSize(20)} width={responsiveSize(20)} />
-                <Text style={styles.date}>{date}</Text>
-              </View>
-
-              <View style={styles.placeCard}>
-                <View style={styles.placeTop}>
-                  <View>
-                    <Image source={venueImage(details.venue.imageUrl)} style={styles.venueImage} />
-                    <Text style={styles.popular}>Popular</Text>
-                  </View>
-                  <View style={styles.placeCopy}>
-                    <Text numberOfLines={1} style={styles.placeName}>{details.venue.name}</Text>
-                    <Text numberOfLines={2} style={styles.address}>{details.venue.address}</Text>
-                    <View style={styles.ratingRow}>
-                      <Text style={styles.rating}>★ {details.venue.rating.toFixed(1)}</Text>
-                      <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={styles.reviews}>{details.venue.reviewCount} reviews</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.tags}>
-                  {(details.venue.placeTags.length ? details.venue.placeTags : [details.venue.category]).map((tag) => (
-                    <Text key={tag} style={styles.tag}>{tag}</Text>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.peopleRow}>
-                <View style={styles.avatarStack}>
-                  {details.members.slice(0, 3).map((person, index) => (
-                    <View key={person.id} style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : responsiveSize(-14) }]}>
-                      <Avatar person={person} size={responsiveSize(38)} />
-                    </View>
-                  ))}
-                </View>
-                <Text style={styles.peopleCopy}>{details.members.length} people invited</Text>
-              </View>
-
-              {pending ? (
-                <View style={styles.actions}>
-                  <Pressable disabled={responding} onPress={() => void respond('declined')} style={[styles.button, styles.skipButton]}>
-                    <Text style={styles.buttonText}>Skip</Text>
-                  </Pressable>
-                  <Pressable disabled={responding} onPress={() => void respond('accepted')} style={[styles.button, styles.takeButton]}>
-                    {responding ? <ActivityIndicator color="#FFFFFF" /> : (
-                      <View style={styles.takePartContent}>
-                        <CheckIcon height={responsiveSize(15)} width={responsiveSize(20)} />
-                        <Text style={styles.buttonText}>Take part</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                </View>
-              ) : (
+          <ScrollView
+            bounces={false}
+            contentContainerStyle={styles.sheetContent}
+            showsVerticalScrollIndicator={false}
+            style={styles.sheetScroll}
+            testID="activity-invite-scroll"
+          >
+            {loadError ? (
+              <View style={styles.errorState}>
+                <Text style={styles.errorTitle}>Could not load activity</Text>
+                <Text style={styles.errorCopy}>{loadError}</Text>
                 <Pressable onPress={onClose} style={[styles.button, styles.closeButton]}>
                   <Text style={styles.buttonText}>Close</Text>
                 </Pressable>
-              )}
-            </>
-          )}
+              </View>
+            ) : loading || !details ? <ActivityIndicator color="#B82F29" size="large" /> : (
+              <>
+                <View style={styles.identity}>
+                  <Avatar person={details.organizer} size={responsiveSize(100)} />
+                  <Text style={styles.organizer}>{details.organizer.displayName}</Text>
+                  <Text style={styles.inviteCopy}>
+                    {pending ? `Invite you in “${details.venue.name}” restaurant` : `Activity in “${details.venue.name}” restaurant`}
+                  </Text>
+                </View>
+
+                <View style={styles.dateRow}>
+                  <CalendarIcon height={responsiveSize(20)} width={responsiveSize(20)} />
+                  <Text style={styles.date}>{date}</Text>
+                </View>
+
+                <View style={styles.placeCard}>
+                  <View style={styles.placeTop}>
+                    <View>
+                      <Image source={venueImage(details.venue.imageUrl)} style={styles.venueImage} />
+                      <Text style={styles.popular}>Popular</Text>
+                    </View>
+                    <View style={styles.placeCopy}>
+                      <Text numberOfLines={1} style={styles.placeName}>{details.venue.name}</Text>
+                      <Text numberOfLines={2} style={styles.address}>{details.venue.address}</Text>
+                      <View style={styles.ratingRow}>
+                        <Text style={styles.rating}>★ {details.venue.rating.toFixed(1)}</Text>
+                        <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={styles.reviews}>{details.venue.reviewCount} reviews</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.tags}>
+                    {(details.venue.placeTags.length ? details.venue.placeTags : [details.venue.category]).map((tag) => (
+                      <Text key={tag} style={styles.tag}>{tag}</Text>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.peopleRow}>
+                  <View style={styles.avatarStack}>
+                    {details.members.slice(0, 3).map((person, index) => (
+                      <View key={person.id} style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : responsiveSize(-14) }]}>
+                        <Avatar person={person} size={responsiveSize(38)} />
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.peopleCopy}>{details.members.length} people invited</Text>
+                </View>
+
+                {pending ? (
+                  <View style={styles.actions}>
+                    <Pressable disabled={responding} onPress={() => void respond('declined')} style={[styles.button, styles.skipButton]}>
+                      <Text style={styles.buttonText}>Skip</Text>
+                    </Pressable>
+                    <Pressable disabled={responding} onPress={() => void respond('accepted')} style={[styles.button, styles.takeButton]}>
+                      {responding ? <ActivityIndicator color="#FFFFFF" /> : (
+                        <View style={styles.takePartContent}>
+                          <CheckIcon height={responsiveSize(15)} width={responsiveSize(20)} />
+                          <Text style={styles.buttonText}>Take part</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable onPress={onClose} style={[styles.button, styles.closeButton]}>
+                    <Text style={styles.buttonText}>Close</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </ScrollView>
         </ImageBackground>
       </View>
     </Modal>
@@ -273,8 +289,11 @@ export function ActivityInviteModal({
 }
 
 const styles = responsiveStyleSheet({
-  overlay: { flex: 1, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' },
-  sheet: { width: '100%', maxWidth: 370, minHeight: 540, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, borderWidth: 1, borderColor: '#45474B', borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#080808' },
+  overlay: { flex: 1, paddingHorizontal: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' },
+  sheet: { width: '100%', maxWidth: 370, maxHeight: '100%', minHeight: 540, borderWidth: 1, borderColor: '#45474B', borderRadius: 24, overflow: 'hidden', backgroundColor: '#080808' },
+  compactSheet: { minHeight: 0 },
+  sheetScroll: { width: '100%' },
+  sheetContent: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, alignItems: 'center', justifyContent: 'center' },
   patternImage: { opacity: 0.18, resizeMode: 'repeat' },
   identity: { width: 270, alignItems: 'center' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#B82F29' },

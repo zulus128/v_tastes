@@ -1,7 +1,7 @@
 import type { PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, FlatList, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
@@ -25,11 +25,12 @@ import { usePlace, usePlaceReviews } from '../discover/api';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet, useResponsiveViewport } from '../../ui/responsive';
+import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { UserAvatar } from '../profile/avatar';
+import { PlacePhotoPager } from './PlacePhotoPager';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -48,7 +49,11 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const api = useTastesApi();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useResponsiveViewport();
+  const { width: windowWidth } = useWindowDimensions();
+  const width = Math.max(0, windowWidth - insets.left - insets.right);
+  const safeScreenStyle = { paddingLeft: insets.left, paddingRight: insets.right };
+  const reviewButtonBottom = Math.max(insets.bottom, responsiveSize(18));
+  const contentBottom = reviewButtonBottom + responsiveSize(77);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<'overview' | 'reviews'>('overview');
   const [sort, setSort] = useState<PlaceReviewSort>('recent');
@@ -109,19 +114,17 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     .slice(0, 2);
   if (detailChips.length === 0) detailChips.push((place.venue.distanceKm ?? 0).toFixed(1) + ' km');
   const hero = <View style={styles.hero}>
-    <ScrollView horizontal onMomentumScrollEnd={(event) => setActivePhoto(Math.round(event.nativeEvent.contentOffset.x / width))} pagingEnabled showsHorizontalScrollIndicator={false}>
-      {photos.map((key, index) => <Image key={key + String(index)} source={placeImage(key)} style={[styles.heroImage, { width }]} />)}
-    </ScrollView>
-    <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} style={styles.topShade} />
-    <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={styles.bottomShade} />
+    <PlacePhotoPager activeIndex={activePhoto} imageStyle={styles.heroImage} onChange={setActivePhoto} sources={photos.map(placeImage)} width={width} />
+    <LinearGradient colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0)']} locations={[0, 0.55, 1]} pointerEvents="none" style={styles.topShade} />
+    <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} pointerEvents="none" style={styles.bottomShade} />
     <Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable>
     <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} onPress={toggleSave} style={[styles.navButton, styles.save, { top: insets.top + responsiveSize(12) }]}>
       {busy ? <ActivityIndicator color="#fff" size="small" /> : <BookmarkIcon color="#fff" height={responsiveSize(18)} width={responsiveSize(18)} />}
     </Pressable>
-    <View style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
+    <View pointerEvents="none" style={styles.photoDots}>{photos.map((key, index) => <View key={key + String(index)} style={[styles.photoDot, index === activePhoto && styles.photoDotActive]} />)}</View>
     <Pressable onPress={() => setSheet('photos')} style={styles.photoCount}><Text style={styles.photoCountText}>{photoCount} photos ›</Text></Pressable>
   </View>;
-  const intro = <View style={[styles.content, tab === 'reviews' && styles.reviewsContent]}>
+  const intro = <View style={[styles.content, { paddingBottom: contentBottom }, tab === 'reviews' && styles.reviewsContent]}>
     <View style={styles.badges}><Text style={styles.primaryBadge}>Popular</Text><Text style={styles.primaryBadge}>★ {place.venue.rating?.toFixed(1) ?? '–'}</Text><Text style={styles.count}>{place.venue.reviewCount ?? 0} reviews</Text></View>
     <Text style={styles.title}>{place.venue.name}</Text>
     <Text style={styles.address}>{place.venue.address ?? place.venue.city}</Text>
@@ -138,8 +141,9 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
       : <ReviewsHeader error={reviews.isError ? apiErrorMessage(reviews.error) : null} loading={reviews.isPending} openSort={() => setSheet('sort')} retry={() => void reviews.refetch()} scope={reviewScope} setScope={setReviewScope} sort={sort} styles={styles} />}
   </View>;
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, safeScreenStyle]}>
       {tab === 'overview' ? <ScrollView showsVerticalScrollIndicator={false}>{hero}{intro}</ScrollView> : <FlatList
+        contentContainerStyle={{ paddingBottom: contentBottom }}
         data={reviews.data ?? []}
         initialNumToRender={8}
         keyExtractor={(review) => review.id}
@@ -153,8 +157,8 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
         renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}/comments` })} reacted={reactedReviews.has(review.id)} reactingId={reactingId} styles={styles} />}
         showsVerticalScrollIndicator={false}
       />}
-      <Pressable onPress={onWriteReview} style={styles.reviewButton}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
-      {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
+      <Pressable onPress={onWriteReview} style={[styles.reviewButton, { bottom: reviewButtonBottom, left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
+      {toast ? <View style={[styles.toast, { bottom: reviewButtonBottom + responsiveSize(58) }]}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
       <Hours visible={sheet === 'hours'} close={() => setSheet(null)} hours={place.openingHours} styles={styles} />
       <Gallery visible={sheet === 'photos'} close={() => setSheet(null)} photos={photos} styles={styles} />
       <Sort visible={sheet === 'sort'} close={() => setSheet(null)} selected={sort} select={setSort} styles={styles} />
@@ -245,11 +249,13 @@ function Loading({ onBack }: { onBack: () => void }) {
     animation.start();
     return () => animation.stop();
   }, [pulse]);
-  return <View style={styles.screen}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
+  return <View style={[styles.screen, { paddingLeft: insets.left, paddingRight: insets.right }]}><Animated.View style={[styles.loadingHero, { opacity: pulse }]}><Pressable accessibilityLabel="Go back" hitSlop={14} onPress={onBack} style={[styles.navButton, { top: insets.top + responsiveSize(12) }]}><Text style={styles.back}>‹</Text></Pressable></Animated.View><View style={styles.content}><Animated.View style={[styles.skeleton, { opacity: pulse }]} /><Animated.View style={[styles.skeleton, styles.short, { opacity: pulse }]} /><Animated.View style={[styles.skeletonTabs, { opacity: pulse }]} />{[1, 2, 3].map((key) => <Animated.View key={key} style={[styles.skeletonRow, { opacity: pulse }]} />)}</View></View>;
 }
 function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => void; retry: () => void }) {
   const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]);
-  return <View style={[styles.screen, styles.errorPage]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
+  const insets = useSafeAreaInsets();
+  const safePadding = { paddingLeft: insets.left + responsiveSize(28), paddingRight: insets.right + responsiveSize(28), paddingTop: Math.max(insets.top, responsiveSize(28)), paddingBottom: Math.max(insets.bottom, responsiveSize(28)) };
+  return <View style={[styles.screen, styles.errorPage, safePadding]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
 }
 function Hours({ close, hours, styles, visible }: { close: () => void; hours: Array<{ day: string; hours: string }>; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   const today = todayHours(hours)?.day;
@@ -259,14 +265,16 @@ function Hours({ close, hours, styles, visible }: { close: () => void; hours: Ar
       <Text style={styles.sheetTitle}>Opening hours</Text>
       <CloseButton onPress={close} styles={styles} />
     </View>
-    {hours.map((item, index) => <View key={item.day} style={[styles.hours, index > 0 && styles.hoursDivided, item.day === today && styles.hoursToday]}>
-      <Text style={[styles.day, item.day === today && styles.today]}>{item.day}</Text>
-      <Text style={[styles.hour, item.day === today && styles.today]}>{item.hours}</Text>
-    </View>)}
+    <ScrollView contentContainerStyle={styles.hoursContent} showsVerticalScrollIndicator={false}>
+      {hours.map((item, index) => <View key={item.day} style={[styles.hours, index > 0 && styles.hoursDivided, item.day === today && styles.hoursToday]}>
+        <Text style={[styles.day, item.day === today && styles.today]}>{item.day}</Text>
+        <Text style={[styles.hour, item.day === today && styles.today]}>{item.hours}</Text>
+      </View>)}
+    </ScrollView>
   </Pressable></Pressable></Modal>;
 }
 function Gallery({ close, photos, styles, visible }: { close: () => void; photos: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
-  return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
+  return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable accessibilityLabel="Close gallery" onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
 }
 function GalleryImage({ index, styles, url }: { index: number; styles: ReturnType<typeof createStyles>; url: string }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -298,7 +306,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { width: '100%', maxHeight: '82%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, hoursContent: { flexGrow: 1 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },
   hours: { minHeight: 52, marginHorizontal: -16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderColor: colors.border }, hoursDivided: { borderTopWidth: StyleSheet.hairlineWidth }, hoursToday: { borderTopWidth: 0, backgroundColor: colors.surfaceRaised }, day: { flex: 1, color: colors.textSecondary, fontSize: 15 }, hour: { color: colors.textSecondary, fontSize: 15 }, today: { color: colors.text, fontWeight: '700' },
   sortSheet: { margin: 18, borderRadius: 24, padding: 16, paddingTop: 20, backgroundColor: colors.surface }, sortTitle: { paddingBottom: 12, color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' }, sortRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, sortOption: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' }, radio: { width: 22, height: 22, borderWidth: 1.5, borderRadius: 11, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, radioSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, cancel: { height: 48, marginTop: 12, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised }, cancelText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   gallery: { flex: 1, paddingTop: 52, backgroundColor: colors.canvas }, galleryHead: { height: 42, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, galleryBack: { color: colors.text, fontSize: 34, lineHeight: 34 }, galleryTitle: { flex: 1, color: colors.text, fontWeight: '700', textAlign: 'center' }, spacer: { width: 24 }, grid: { padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }, gridImage: { width: '32.4%', aspectRatio: 1, borderRadius: 5, overflow: 'hidden', backgroundColor: colors.surfaceRaised }, galleryPhoto: { width: '100%', height: '100%', resizeMode: 'cover' }, hiddenPhoto: { opacity: 0 }, galleryLoading: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }, galleryError: { position: 'absolute', inset: 0, zIndex: 2, alignItems: 'center', justifyContent: 'center', gap: 3 }, galleryErrorIcon: { color: colors.primary, fontSize: 24, fontWeight: '700' }, galleryErrorText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },

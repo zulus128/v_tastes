@@ -12,6 +12,7 @@ import {
   type ImageSourcePropType,
   type ViewStyle,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import backIcon from '../../../assets/onboarding/back.png';
 import patternDark from '../../../assets/onboarding/pattern-screen.png';
 import patternLight from '../../../assets/figma-backgrounds/home-feed-pattern.png';
@@ -39,7 +40,9 @@ export function PatternScreen({ children, style }: PropsWithChildren<{ style?: S
           </View>
         ) : null}
         <PatternBackgroundLift />
-        {children}
+        <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
+          <View style={styles.screenContent}>{children}</View>
+        </SafeAreaView>
       </ImageBackground>
     </View>
   );
@@ -111,6 +114,8 @@ export function PrimaryButton({
 const styles = responsiveStyleSheet({
   screen: { flex: 1 },
   pattern: { flex: 1 },
+  safeArea: { flex: 1 },
+  screenContent: { flex: 1 },
   darkPatternBoost: {
     width: '100%',
     height: '100%',

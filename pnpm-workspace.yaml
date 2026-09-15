@@ -5,6 +5,7 @@ packages:
 
 allowBuilds:
   '@firebase/util': true
+  dtrace-provider: false
   esbuild: true
   node: true
   protobufjs: true
