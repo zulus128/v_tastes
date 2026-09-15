@@ -397,6 +397,7 @@ export function ProductNavigator({
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Dialog' });
               }}
+              onOpenActivityDetails={(activityId) => navigation.navigate('ActivityDetails', { activityId })}
               onOpenGroupDetails={(groupId) => navigation.navigate('GroupDetails', { groupId })}
               userId={user.uid}
             />
