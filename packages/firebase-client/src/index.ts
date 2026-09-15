@@ -7,6 +7,7 @@ import type {
   CommentsPage,
   Comment,
   CompleteOnboardingInput,
+  CheckUsernameAvailabilityInput,
   ConversationSummary,
   CreateActivityInput,
   CreateConversationInput,
@@ -93,6 +94,7 @@ import type {
   MonthlyRecapResult,
   VerifyPhoneOtpInput,
   VerifyPhoneOtpResult,
+  UsernameAvailabilityResult,
 } from '@tastes/contracts';
 import type { Functions } from 'firebase/functions';
 import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
@@ -104,6 +106,7 @@ export const callableOperationNames = [
   'getSessionStatus',
   'completeOnboarding',
   'createUserProfile',
+  'checkUsernameAvailability',
   'updateProfileSettings',
   'updateProfilePhoto',
   'followUser',
@@ -298,6 +301,8 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
       invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
     createUserProfile: (input: CreateUserProfileInput) =>
       invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
+    checkUsernameAvailability: (input: CheckUsernameAvailabilityInput) =>
+      invoke<CheckUsernameAvailabilityInput, UsernameAvailabilityResult>('checkUsernameAvailability', input),
     updateProfileSettings: (input: UpdateProfileSettingsInput) =>
       invoke<UpdateProfileSettingsInput, IdResult>('updateProfileSettings', input),
     updateProfilePhoto: (input: UpdateProfilePhotoInput) =>

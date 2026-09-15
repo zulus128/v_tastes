@@ -1,5 +1,6 @@
 import {
   completeOnboardingInputSchema,
+  checkUsernameAvailabilityInputSchema,
   createUserProfileInputSchema,
   getLeaderboardInputSchema,
   updateProfilePhotoInputSchema,
@@ -24,6 +25,19 @@ const CURRENT_ONBOARDING_VERSION = 1;
 const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
 // Raise this alongside an iOS release when older builds need to be nudged to update.
 const MINIMUM_SUPPORTED_IOS_BUILD = 43;
+
+export const checkUsernameAvailability = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(checkUsernameAvailabilityInputSchema, request.data);
+  const username = normalizeUsername(input.username);
+  const [claim, legacyOwners] = await Promise.all([
+    usernameReference(username).get(),
+    db.collection('users').where('searchTokens', 'array-contains', `p:${username}`).limit(2).get(),
+  ]);
+  const claimedByOtherUser = claim.exists && claim.get('uid') !== uid;
+  const legacyOwnerExists = legacyOwners.docs.some((document) => document.id !== uid && normalizeUsername(String(document.get('username') ?? '')) === username);
+  return { available: !claimedByOtherUser && !legacyOwnerExists };
+});
 
 export const getSessionStatus = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);

@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
   Image,
@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import addPhoto from '../../../assets/onboarding/add-photo.png';
+import tastesAppIcon from '../../../assets/icon.png';
 import chevronRight from '../../../assets/onboarding/chevron-right.png';
 import dishBurgers from '../../../assets/onboarding/dish-burgers.png';
 import dishCurry from '../../../assets/onboarding/dish-curry.png';
@@ -37,13 +38,7 @@ import dishSteak from '../../../assets/onboarding/dish-steak.png';
 import dishSushi from '../../../assets/onboarding/dish-sushi.png';
 import dishTacos from '../../../assets/onboarding/dish-tacos.png';
 import emptySearch from '../../../assets/onboarding/empty-search.png';
-import filterBar from '../../../assets/onboarding/filter-bar.png';
-import filterCafe from '../../../assets/onboarding/filter-cafe.png';
-import filterFriends from '../../../assets/onboarding/filter-friends.png';
-import filterRestaurant from '../../../assets/onboarding/filter-restaurant.png';
-import filterReviews from '../../../assets/onboarding/filter-reviews.png';
-import filterTrending from '../../../assets/onboarding/filter-trending.png';
-import flagUk from '../../../assets/onboarding/flag-uk.png';
+import flagMonaco from '../../../assets/onboarding/flag-monaco.png';
 import inviteContacts from '../../../assets/onboarding/invite-contacts.png';
 import inviteMessage from '../../../assets/onboarding/invite-message.png';
 import invitePeople from '../../../assets/onboarding/invite-people.png';
@@ -57,15 +52,10 @@ import placeSelected from '../../../assets/onboarding/place-selected.png';
 import placeUnselected from '../../../assets/onboarding/place-unselected.png';
 import placeWasabi from '../../../assets/onboarding/place-wasabi.png';
 import PlaceSearchIcon from '../../../assets/onboarding/place-search.svg';
-import PlaceTuningIcon from '../../../assets/onboarding/place-tuning.svg';
 import ratingStar from '../../../assets/onboarding/rating-star.png';
 import readyCollage from '../../../assets/onboarding/ready-collage.png';
 import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
-import styleDark from '../../../assets/onboarding/style-dark.png';
-import styleLight from '../../../assets/onboarding/style-light.png';
-import styleSelected from '../../../assets/onboarding/style-selected.png';
-import styleUnselected from '../../../assets/onboarding/style-unselected.png';
 import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -102,19 +92,6 @@ interface PostSignupOnboardingFlowProps {
   visualAudit?: boolean;
 }
 
-function suggestedUsername(displayName: string | null | undefined, email: string | null | undefined): string {
-  const normalize = (value: string): string => value
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9._]+/g, '.')
-    .replace(/[._]{2,}/g, '.')
-    .replace(/^[._]+|[._]+$/g, '')
-    .slice(0, 40);
-
-  return normalize(displayName ?? '')
-    || normalize(email?.split('@')[0] ?? '')
-    || 'tastesuser';
-}
-
 function isUnauthenticated(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const { code, message } = error as { code?: unknown; message?: unknown };
@@ -144,13 +121,6 @@ const dishes = [
   { label: 'Steak', icon: dishSteak },
   { label: 'Fish', icon: dishFish },
   { label: 'Curry', icon: dishCurry },
-] as const;
-const placeFilters = [
-  { icon: filterTrending, label: 'Trending' },
-  { icon: filterRestaurant, label: 'Restaurant' },
-  { icon: filterCafe, label: 'Cafe' },
-  { icon: filterBar, label: 'Bar' },
-  { icon: filterReviews, label: 'My Reviews' },
 ] as const;
 type PlaceCandidate = {
   id: string;
@@ -190,11 +160,11 @@ function Header({ onBack, onSkip }: { onBack: () => void; onSkip?: () => void })
   return <View pointerEvents="box-none" style={styles.header}><BackButton onPress={onBack} />{onSkip ? <Pressable onPress={onSkip} style={styles.skip}><Text style={styles.skipText}>Skip</Text></Pressable> : null}</View>;
 }
 
-function StepDots({ step }: { step: number }) {
+function StepProgress({ complete = false, overlay = false, step }: { complete?: boolean; overlay?: boolean; step: number }) {
   const styles = useOnboardingStyles();
-  return <View style={styles.stepDots}>
-    {[1, 2, 3].map((index) => (
-      <View key={index} style={index === step ? styles.stepDotActive : styles.stepDotInactive} />
+  return <View accessibilityLabel={complete ? 'Onboarding complete' : `Step ${step} of 7`} style={[styles.stepProgress, overlay && styles.stepProgressOverlay]}>
+    {[1, 2, 3, 4, 5, 6, 7].map((index) => (
+      <View key={index} style={[styles.stepSegment, complete || index < step ? styles.stepSegmentDone : index === step ? styles.stepSegmentCurrent : styles.stepSegmentUpcoming]} />
     ))}
   </View>;
 }
@@ -202,25 +172,55 @@ function StepDots({ step }: { step: number }) {
 function StepHeader({ landscape = false, step, title, subtitle }: { landscape?: boolean; step: number; title: string; subtitle: string }) {
   const styles = useOnboardingStyles();
   return <View style={[styles.stepHeader, landscape && styles.stepHeaderLandscape]}>
-    <View style={styles.stepRow}><Text style={styles.stepLabel}>Step {step}</Text><StepDots step={step} /></View>
+    <StepProgress step={step} />
     <Text style={[styles.title, styles.stepTitle]}>{title}</Text>
     <Text style={[styles.subtitle, styles.stepSubtitle]}>{subtitle}</Text>
   </View>;
 }
 
-function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
-  icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
+function PermissionScreen({ button, children, footnote, icon, onBack, onPress, onSkip, step, subtitle, title }: {
+  button: string; children?: ReactNode; footnote?: string; icon: ImageSourcePropType; onBack: () => void; onPress: () => void; onSkip: () => void; step: number; subtitle: string; title: string;
 }) {
   const styles = useOnboardingStyles();
   return <PatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
+    <StepProgress overlay step={step} />
     <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={styles.permissionScroll} testID="onboarding-permission-scroll">
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={[styles.title, styles.permissionTitle]}>{title}</Text>
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
+      {children}
     </ScrollView>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
+    {footnote ? <Text style={styles.permissionFootnote}>{footnote}</Text> : null}
   </PatternScreen>;
+}
+
+function PeopleYouKnowTeaser({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return <View style={styles.peopleTeaser}>
+    <Text style={styles.peopleTeaserTitle}>People you know</Text>
+    <Text style={styles.peopleTeaserCount}>3 of your contacts are on Tastes</Text>
+    {['Amara Miller', 'Sofia Reyes', 'Yas Hale'].map((name, index) => <View accessibilityElementsHidden key={name} style={styles.teaserPerson}>
+      <View style={styles.teaserAvatar} />
+      <View style={styles.teaserCopy}><Text style={styles.teaserBlurred}>{name}</Text><Text style={styles.teaserBlurredSmall}>@tastesfriend</Text></View>
+      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={styles.teaserBlurredSmall}>{index === 0 ? 'Following' : 'Follow'}</Text></View>
+    </View>)}
+  </View>;
+}
+
+function NotificationExamples({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return <View style={styles.notificationExamples}>
+    <NotificationExample detail="“The seabass. Go.”" meta="now" styles={styles} title="Amara rated Sabor ★ 4.9" />
+    <NotificationExample detail="You have 2 mutual friends" meta="2m ago" styles={styles} title="Marco started following you" />
+  </View>;
+}
+
+function NotificationExample({ detail, meta, styles, title }: { detail: string; meta: string; styles: ReturnType<typeof createStyles>; title: string }) {
+  return <View style={styles.notificationCard}>
+    <Image source={tastesAppIcon} style={styles.notificationIcon} />
+    <View style={styles.notificationCopy}><Text style={styles.notificationApp}>TASTES</Text><Text numberOfLines={1} style={styles.notificationTitle}>{title}</Text><Text numberOfLines={1} style={styles.notificationDetail}>{detail}</Text></View>
+    <Text style={styles.notificationMeta}>{meta}</Text>
+  </View>;
 }
 
 export function PostSignupOnboardingFlow({
@@ -245,40 +245,52 @@ export function PostSignupOnboardingFlow({
   const [screen, setScreen] = useState<PostSignupScreen>(initialScreen ?? 'profile');
   const [history, setHistory] = useState<PostSignupScreen[]>([]);
   const [displayName, setDisplayName] = useState(() => visualAudit ? 'Alex Morgan' : auth.currentUser?.displayName?.trim() ?? '');
-  const [username, setUsername] = useState(() => visualAudit ? 'alex.morgan' : suggestedUsername(auth.currentUser?.displayName, auth.currentUser?.email));
-  const [city, setCity] = useState('London');
-  const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
+  const [username, setUsername] = useState(() => visualAudit ? 'alex.morgan' : '');
+  const [usernameTouched, setUsernameTouched] = useState(visualAudit);
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>(visualAudit ? 'available' : 'idle');
+  const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
+  const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
+  const [bio, setBio] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState('');
-  const [placeFilterSet, setPlaceFilterSet] = useState<Set<string>>(new Set(['trending']));
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>(() => visualAudit ? [
-    { id: 'gemini', name: 'Gemini', address: '38 Beauchamp Place, London', image: placeGeminiPopular, rating: '4.8', reviews: '243 reviews', popular: true, category: 'Restaurant', price: '$$$', distance: '0.4 km' },
-    { id: 'wasabi', name: 'Wasabi', address: '19 Kensington High St, London', image: placeWasabi, rating: '4.6', reviews: '187 reviews', popular: true, category: 'Japanese', price: '$$', distance: '0.7 km' },
-    { id: 'terrace', name: 'The Terrace', address: '11 Motcomb Street, London', image: placeGemini, rating: '4.5', reviews: '128 reviews', popular: false, category: 'Cafe', price: '$$', distance: '1.1 km' },
+    { id: 'gemini', name: 'Gemini', address: '7 Rue Princesse Caroline, Monaco', image: placeGeminiPopular, rating: '4.8', reviews: '243 reviews', popular: true, category: 'Restaurant', price: '$$$', distance: '0.4 km' },
+    { id: 'wasabi', name: 'Wasabi', address: '14 Avenue de la Costa, Monaco', image: placeWasabi, rating: '4.6', reviews: '187 reviews', popular: true, category: 'Japanese', price: '$$', distance: '0.7 km' },
+    { id: 'terrace', name: 'The Terrace', address: '2 Avenue de Monte-Carlo, Monaco', image: placeGemini, rating: '4.5', reviews: '128 reviews', popular: false, category: 'Cafe', price: '$$', distance: '1.1 km' },
   ] : []);
   const [darkMode, setDarkMode] = useState(resolvedTheme === 'dark');
   const [automatic, setAutomatic] = useState(preference === 'system');
   const [contacts, setContacts] = useState<ContactCandidate[]>(() => visualAudit ? [
     { id: 'contact-1', name: 'Maya Thompson', handle: '@mayat', phoneNumber: null, invited: false, userId: 'maya', following: false },
     { id: 'contact-2', name: 'Oliver Smith', handle: '@olivers', phoneNumber: null, invited: true, userId: 'oliver', following: true },
-    { id: 'contact-3', name: 'Sofia Rossi', handle: '+44 7700 900123', phoneNumber: '+447700900123', invited: false },
+    { id: 'contact-3', name: 'Sofia Rossi', handle: '+377 6 12 34 56 78', phoneNumber: '+377612345678', invited: false },
   ] : []);
   const [busy, setBusy] = useState(false);
 
-  function togglePlaceFilter(label: string) {
-    const key = label.toLowerCase();
-    setPlaceFilterSet((current) => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  }
+  useEffect(() => {
+    const value = username.trim();
+    if (!usernameTouched || value.length < 2) {
+      setUsernameStatus('idle');
+      return undefined;
+    }
+    if (visualAudit) {
+      setUsernameStatus('available');
+      return undefined;
+    }
+    setUsernameStatus('checking');
+    let active = true;
+    const timeout = setTimeout(() => {
+      void api.checkUsernameAvailability({ username: value }).then((response) => {
+        if (active) setUsernameStatus(response.data.available ? 'available' : 'taken');
+      }).catch(() => { if (active) setUsernameStatus('idle'); });
+    }, 350);
+    return () => { active = false; clearTimeout(timeout); };
+  }, [api, username, usernameTouched, visualAudit]);
 
   function navigate(next: PostSignupScreen) {
     setHistory((items) => [...items, screen]);
@@ -316,7 +328,8 @@ export function PostSignupOnboardingFlow({
     const input = {
       displayName: displayName.trim(),
       username: username.trim(),
-      city,
+      ...(city ? { city } : {}),
+      bio: bio.trim(),
     };
     const validation = createUserProfileInputSchema.safeParse(input);
     if (!validation.success) {
@@ -350,8 +363,8 @@ export function PostSignupOnboardingFlow({
 
   async function requestLocation() {
     if (visualAudit) {
-      setCity('London');
-      setCityFlag(flagUk);
+      setCity('Monaco');
+      setCityFlag(flagMonaco);
       enterPlaces();
       return;
     }
@@ -527,17 +540,33 @@ export function PostSignupOnboardingFlow({
             showsVerticalScrollIndicator={false}
             style={styles.profileScroll}
           >
-            <Text style={styles.title}>Create your profile</Text>
-            <Text style={[styles.subtitle, styles.profileSubtitle]}>Choose a username and add a photo so others can recognize you</Text>
+            <StepProgress step={1} />
+            <Text style={[styles.title, styles.profileTitle]}>Create your profile</Text>
+            <Text style={[styles.subtitle, styles.profileSubtitle]}>This is how friends find you.</Text>
             <Pressable accessibilityLabel="Add profile photo" onPress={() => setPhotoSheet(true)} style={styles.photo}>
               {photoUri ? <Image source={{ uri: photoUri }} style={styles.photoImage} /> : <Image source={addPhoto} style={styles.addPhotoIcon} />}
+              {photoUri ? <View style={styles.photoAddBadge}><Text style={styles.photoAddBadgeText}>+</Text></View> : null}
             </Pressable>
-            <TextInput value={displayName} onChangeText={setDisplayName} placeholder="Your Name" placeholderTextColor={colors.placeholder} style={styles.field} />
-            <TextInput value={username} autoCapitalize="none" onChangeText={setUsername} placeholder="Username" placeholderTextColor={colors.placeholder} style={styles.field} />
-            <Pressable onPress={() => navigate('city')} style={styles.fieldRow}><Text style={styles.locationLabel}>Location</Text><View style={styles.locationSelection}><Text style={styles.locationValue}>{city}</Text><Image source={cityFlag} style={styles.locationFlag} /><Image source={chevronRight} style={styles.locationChevron} /></View></Pressable>
+            <Text style={styles.profileIdentity}>{displayName || 'Your name'}  {username ? `@${username}` : '@username'}</Text>
+            <View style={styles.profileFieldsCard}>
+              <View style={styles.profileField}><Text style={styles.profileFieldLabel}>Name</Text><TextInput value={displayName} onChangeText={setDisplayName} placeholder="What your friends call you" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} /></View>
+              <View style={styles.profileSeparator} />
+              <View style={styles.profileField}><Text style={styles.profileFieldLabel}>Username</Text><TextInput value={username} autoCapitalize="none" onChangeText={(value) => { setUsername(value); setUsernameTouched(true); }} placeholder="@yourname" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
+                {usernameStatus === 'checking' ? <Text style={styles.usernameChecking}>Checking…</Text> : null}
+                {usernameStatus === 'available' ? <Text style={styles.usernameAvailable}>✓ This name is available</Text> : null}
+                {usernameStatus === 'taken' ? <Text style={styles.usernameTaken}>✗ That name is taken</Text> : null}
+              </View>
+              <View style={styles.profileSeparator} />
+              <Pressable onPress={() => navigate('city')} style={styles.profileField}><Text style={styles.profileFieldLabel}>Location</Text><View style={styles.locationSelection}><Text style={[styles.profileFieldInput, !city && styles.profilePlaceholder]}>{city || 'Select your city'}</Text>{city ? <Image source={cityFlag} style={styles.locationFlag} /> : null}<Image source={chevronRight} style={styles.locationChevron} /></View></Pressable>
+              <View style={styles.profileSeparator} />
+              <View style={styles.profileField}><View style={styles.profileLabelRow}><Text style={styles.profileFieldLabel}>Bio</Text><Text style={styles.bioCounter}>{bio.length}/80</Text></View><TextInput maxLength={80} value={bio} onChangeText={setBio} placeholder="What do you always order?" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
+                <View style={styles.bioSuggestions}>{['Ramen obsessive', 'Natural wine person', 'Will queue for a pastry'].map((suggestion) => <Pressable key={suggestion} onPress={() => setBio(suggestion)} style={styles.bioSuggestion}><Text style={styles.bioSuggestionText}>{suggestion}</Text></Pressable>)}</View>
+              </View>
+            </View>
           </ScrollView>
           <View style={styles.profileButtonArea}>
-            <PrimaryButton label="Continue" loading={busy} onPress={saveProfile} />
+            <PrimaryButton disabled={usernameStatus === 'checking' || usernameStatus === 'taken'} label="Continue" loading={busy} onPress={saveProfile} />
+            <Text style={styles.changeLater}>You can change all of this later.</Text>
           </View>
         </View>
         <Modal animationType="slide" transparent visible={photoSheet} onRequestClose={() => setPhotoSheet(false)}>
@@ -559,7 +588,7 @@ export function PostSignupOnboardingFlow({
   if (screen === 'dish') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('location')} />
-      <StepHeader landscape={landscape} step={1} title="Your favourite dish!" subtitle={commonSubtitle} />
+      <StepHeader landscape={landscape} step={2} title="Your favourite dish!" subtitle={commonSubtitle} />
       <ScrollView
         bounces={false}
         contentContainerStyle={styles.pills}
@@ -573,49 +602,27 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'location') return <PermissionScreen icon={permissionLocation} title="Discover places near you" subtitle="Allow location access so Tastes can show the best spots around you." button="Allow Location" onBack={back} onSkip={enterPlaces} onPress={requestLocation} />;
-  if (screen === 'locationDenied') return <PermissionScreen icon={permissionLocation} title="Location is off" subtitle="Turn on location in Settings to discover places and friends near you." button="Open Settings" onBack={back} onSkip={enterPlaces} onPress={() => Linking.openSettings()} />;
+  if (screen === 'location') return <PermissionScreen step={3} icon={permissionLocation} title="See what’s good near you" subtitle="Tastes shows the spots your friends rate, within walking distance." button="Allow Location" onBack={back} onSkip={enterPlaces} onPress={requestLocation} />;
+  if (screen === 'locationDenied') return <PermissionScreen step={3} icon={permissionLocation} title="Location is off" subtitle="Turn on location in Settings to discover places and friends near you." button="Open Settings" onBack={back} onSkip={enterPlaces} onPress={() => Linking.openSettings()} />;
 
   if (screen === 'place') {
     const normalizedPlaceQuery = placeQuery.trim().toLowerCase();
     const filteredPlaces = availablePlaces.filter((candidate) => {
-      const queryMatches = !normalizedPlaceQuery
+      return !normalizedPlaceQuery
         || candidate.name.toLowerCase().includes(normalizedPlaceQuery)
         || candidate.category?.toLowerCase().includes(normalizedPlaceQuery);
-      const categoryFilters = [...placeFilterSet].filter((value) => !['trending', 'friends', 'my reviews'].includes(value));
-      const categoryMatches = categoryFilters.length === 0 || categoryFilters.some((value) => candidate.category?.toLowerCase().includes(value));
-      const trendingMatches = !placeFilterSet.has('trending') || candidate.popular;
-      return queryMatches && categoryMatches && trendingMatches;
     });
     const noResults = !placeLoading && filteredPlaces.length === 0;
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('style')} />
-      <StepHeader landscape={landscape} step={2} title="Choose your favourite place" subtitle={commonSubtitle} />
+      <StepHeader landscape={landscape} step={4} title="Choose your favourite place" subtitle={commonSubtitle} />
       <View style={[styles.placesCard, usesNarrowPlaceLayout && styles.placesCardNarrow, landscape && styles.placesCardLandscape]}>
         <View style={styles.placeHeader}>
-          <View style={styles.placeSearchRow}>
-            <View style={styles.placeSearch}>
-              <PlaceSearchIcon color={colors.text} style={styles.placeSearchIcon} />
-              <TextInput value={placeQuery} onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.placeholder} style={styles.placeSearchInput} />
-              {placeQuery.length > 0 ? <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={() => setPlaceQuery('')} style={styles.placeClear}><Image source={searchClose} style={styles.placeClearIcon} /></Pressable> : <View style={styles.placeClearSpacer} />}
-            </View>
-            <Pressable accessibilityLabel="Toggle place filters" accessibilityRole="button" onPress={() => setFiltersExpanded((value) => !value)}>
-              <PlaceTuningIcon color={colors.text} style={styles.tuningIcon} />
-            </Pressable>
+          <View style={styles.placeSearch}>
+            <PlaceSearchIcon color={colors.text} style={styles.placeSearchIcon} />
+            <TextInput value={placeQuery} onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.placeholder} style={styles.placeSearchInput} />
+            {placeQuery.length > 0 ? <Pressable accessibilityLabel="Clear search" hitSlop={8} onPress={() => setPlaceQuery('')} style={styles.placeClear}><Image source={searchClose} style={styles.placeClearIcon} /></Pressable> : <View style={styles.placeClearSpacer} />}
           </View>
-          {filtersExpanded ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-            {placeFilters.map(({ icon, label }) => {
-              const active = placeFilterSet.has(label.toLowerCase());
-              return <Pressable accessibilityRole="button" key={label} onPress={() => togglePlaceFilter(label)} style={[styles.filter, active && styles.filterActive]}>
-                <Image source={icon} style={[styles.filterIcon, !active && styles.filterDimmed]} />
-                <Text style={[styles.filterText, !active && styles.filterDimmed]}>{label}</Text>
-              </Pressable>;
-            })}
-            <Pressable accessibilityRole="button" onPress={() => togglePlaceFilter('Friends')} style={[styles.filter, placeFilterSet.has('friends') && styles.filterActive]}>
-              <Image source={filterFriends} style={[styles.filterIcon, !placeFilterSet.has('friends') && styles.filterDimmed]} />
-              <Text style={[styles.filterText, !placeFilterSet.has('friends') && styles.filterDimmed]}>Friends</Text>
-            </Pressable>
-          </ScrollView> : null}
         </View>
         {placeLoading ? (
           <ScrollView contentContainerStyle={styles.placeListContent} style={styles.placeList} showsVerticalScrollIndicator={false}>
@@ -679,36 +686,44 @@ export function PostSignupOnboardingFlow({
   if (screen === 'style') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('contactsPermission')} />
-      <StepHeader landscape={landscape} step={3} title="Choose Your Style" subtitle="Switch between dark and light mode anytime" />
+      <StepHeader landscape={landscape} step={5} title="Pick your look" subtitle="Switch anytime in Settings." />
       <View style={[styles.styleCardViewport, landscape && styles.styleCardLandscape]} testID="onboarding-appearance-viewport">
-        <ScrollView contentContainerStyle={styles.styleCardContent} showsVerticalScrollIndicator={false} style={styles.styleCard} testID="onboarding-appearance-scroll">
+        <ScrollView contentContainerStyle={styles.styleCardContent} showsVerticalScrollIndicator={false} testID="onboarding-appearance-scroll">
           <View style={styles.previews}>
             {[false, true].map((dark) => <Pressable key={String(dark)} onPress={() => {
               setDarkMode(dark);
               setAutomatic(false);
               void setPreference(dark ? 'dark' : 'light');
-            }} style={styles.previewChoice}>
-              <View style={[styles.phonePreview, dark ? styles.previewDark : styles.previewLight]}><Image source={dark ? styleDark : styleLight} resizeMode="cover" style={styles.phonePreviewImage} /></View>
-              <Text style={styles.previewLabel}>{dark ? 'Dark' : 'Light'}</Text><Image source={(automatic ? resolvedTheme === 'dark' : darkMode) === dark ? styleSelected : styleUnselected} style={styles.styleSelection} />
+            }} style={[styles.previewChoice, !automatic && darkMode === dark && styles.previewChoiceSelected]}>
+              <View style={[styles.abstractPreview, dark ? styles.previewDark : styles.previewLight]}>
+                <View style={styles.previewTopRow}><View style={styles.previewBarShort} /><View style={styles.previewDotAccent} /></View>
+                <View style={styles.previewDotPurple} /><View style={styles.previewBar} />
+                <LinearGradient colors={['#FFAB2E', '#FF5A43']} style={styles.previewGradient} />
+                <Text style={styles.previewStars}>★★★★★</Text>
+                <View style={styles.previewBar} /><View style={styles.previewBarShort} />
+              </View>
+              <View style={styles.previewLabelRow}><View style={[styles.radio, !automatic && darkMode === dark && styles.radioSelected]}>{!automatic && darkMode === dark ? <Text style={styles.radioCheck}>✓</Text> : null}</View><Text style={styles.previewLabel}>{dark ? 'Dark' : 'Light'}</Text></View>
             </Pressable>)}
           </View>
-          <View style={styles.automaticRow}><Text style={styles.automaticText}>Automatic</Text><Switch value={automatic} onValueChange={(value) => {
+          <View style={styles.automaticRow}><View><Text style={styles.automaticText}>Match my device</Text><Text style={styles.automaticSubtitle}>Follows your phone’s light/dark setting</Text></View><Switch value={automatic} onValueChange={(value) => {
             setAutomatic(value);
             const currentIsDark = resolvedTheme === 'dark';
             setDarkMode(currentIsDark);
             void setPreference(value ? 'system' : (currentIsDark ? 'dark' : 'light'));
           }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
+          <Text style={styles.livePreviewCaption}>Live preview — the whole app changes as you tap.</Text>
         </ScrollView>
       </View>
       <PrimaryButton label="Continue" onPress={() => navigate('contactsPermission')} style={styles.bottomButton} />
     </PatternScreen>;
   }
 
-  if (screen === 'contactsPermission') return <PermissionScreen icon={permissionContacts} title="Find your friends" subtitle="Connect your contacts to find people you know already on Tastes." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts} />;
+  if (screen === 'contactsPermission') return <PermissionScreen step={6} icon={permissionContacts} title="Find your people" subtitle="Your feed is only as good as who you follow." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts}><PeopleYouKnowTeaser styles={styles} /></PermissionScreen>;
 
   if (screen === 'contacts') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('invite')} />
+      <StepProgress overlay step={6} />
       <View style={styles.listPage}><Text style={styles.listTitle}>Friends from contacts</Text><Text style={styles.listSubtitle}>Follow people already on Tastes or invite the rest.</Text>
         <ScrollView>{contacts.map((contact, index) => <View key={contact.id} style={styles.contactRow}>
           <View style={[styles.avatar, { backgroundColor: ['#263854', '#24504c', '#4b315d', '#5a4427', '#2f5438'][index % 5] }]}><Text style={styles.avatarText}>{initials(contact.name)}</Text></View>
@@ -722,6 +737,7 @@ export function PostSignupOnboardingFlow({
   if (screen === 'invite') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('notifications')} />
+      <StepProgress overlay step={6} />
       <ScrollView contentContainerStyle={styles.invitePage} showsVerticalScrollIndicator={false} style={styles.inviteScroll} testID="onboarding-invite-scroll"><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
         {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
         <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
@@ -729,7 +745,7 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
+  if (screen === 'notifications') return <PermissionScreen step={7} icon={permissionNotifications} title="Stay in the loop" subtitle="Only the good stuff — when friends rate, follow, or reply." button="Turn on Notifications" footnote="Change these anytime in Settings." onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications}><NotificationExamples styles={styles} /></PermissionScreen>;
 
   // Reserve at least half the row for the copy and action, including in a
   // nearly square window. The whole page can scroll if its height is limited.
@@ -737,6 +753,7 @@ export function PostSignupOnboardingFlow({
   const landscapeCollageHeight = 288 * (landscapeCollageWidth / DESIGN_VIEWPORT.width);
   return <LinearGradient colors={resolvedTheme === 'dark' ? ['#560E0B', '#080808'] : ['#F7E8E4', colors.canvas]} style={styles.ready}>
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.ready}>
+    <StepProgress complete overlay step={7} />
     <ScrollView contentContainerStyle={[styles.readyContent, landscape && styles.readyContentLandscape]} showsVerticalScrollIndicator={false} testID="onboarding-ready-scroll">
       <Image source={readyCollage} resizeMode="contain" testID="onboarding-ready-collage" style={{
         height: landscape ? landscapeCollageHeight : collageHeight,
@@ -758,14 +775,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   bottomButton: { position: 'absolute', left: 36, right: 36, bottom: bottomGutter },
-  stepHeader: { position: 'absolute', top: 118, left: 16, right: 16, alignItems: 'center' },
+  stepHeader: { position: 'absolute', top: 66, left: 16, right: 16, alignItems: 'center' },
   stepHeaderLandscape: { top: 64 },
-  stepRow: { height: 17, flexDirection: 'row', gap: 7, alignItems: 'center' },
-  stepLabel: { color: colors.text, fontSize: 14, lineHeight: 17, fontWeight: '400', letterSpacing: 0.6 },
-  stepDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.text },
-  stepDotInactive: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.5 },
-  stepTitle: { marginTop: 7, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
+  stepProgress: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stepProgressOverlay: { position: 'absolute', top: 66, left: 0, right: 0, zIndex: 4, justifyContent: 'center' },
+  stepSegment: { width: 26, height: 4, borderRadius: 2 },
+  stepSegmentDone: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  stepSegmentCurrent: { backgroundColor: '#FF4757' },
+  stepSegmentUpcoming: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  stepTitle: { marginTop: 44, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionScroll: { position: 'absolute', top: landscape ? 80 : 132, left: 26, right: 26, bottom: Math.max(94, bottomGutter + 70) },
   permissionContent: { alignItems: 'center', paddingBottom: 16 },
@@ -773,15 +791,35 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   permissionTitle: { fontSize: 24, lineHeight: 29 },
   permissionSubtitle: { width: '100%', marginTop: 7, fontSize: 15, lineHeight: 18, textAlign: 'center' },
   permissionBodyText: { color: colors.textMuted },
+  permissionFootnote: { position: 'absolute', left: 36, right: 36, bottom: 4, color: colors.textMuted, fontSize: 11, textAlign: 'center' },
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },
   profileScroll: { flex: 1 },
-  profilePage: { flexGrow: 1, paddingHorizontal: 20, paddingTop: landscape ? 24 : 126, paddingBottom: 16, alignItems: 'center' },
-  profileButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter },
+  profilePage: { flexGrow: 1, paddingHorizontal: 16, paddingTop: landscape ? 24 : 66, paddingBottom: 16, alignItems: 'center' },
+  profileButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter, gap: 7 },
   profileSubtitle: { marginTop: 8, width: 285 },
-  photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, marginTop: 22, marginBottom: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  profileTitle: { marginTop: 44 },
+  photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, marginTop: 18, marginBottom: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   photoImage: { width: '100%', height: '100%', borderRadius: 59 },
+  photoAddBadge: { position: 'absolute', right: 3, bottom: 3, width: 28, height: 28, borderRadius: 14, backgroundColor: '#E63946', alignItems: 'center', justifyContent: 'center' },
+  photoAddBadgeText: { color: '#FFFFFF', fontSize: 20, lineHeight: 22, fontWeight: '700' },
   addPhotoIcon: { width: 28, height: 28 },
+  profileIdentity: { color: colors.textMuted, fontSize: 15, marginBottom: 18 },
+  profileFieldsCard: { width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#161616' },
+  profileField: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
+  profileFieldLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '500' },
+  profileFieldInput: { flex: 1, minHeight: 22, padding: 0, color: colors.text, fontSize: 16 },
+  profilePlaceholder: { color: colors.placeholder },
+  profileSeparator: { height: 1, backgroundColor: '#2A2A2A' },
+  profileLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  bioCounter: { color: colors.placeholder, fontSize: 12 },
+  usernameChecking: { color: colors.textMuted, fontSize: 12 },
+  usernameAvailable: { color: '#3DDC97', fontSize: 12 },
+  usernameTaken: { color: '#E63946', fontSize: 12 },
+  bioSuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  bioSuggestion: { height: 30, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 15, backgroundColor: '#1F1F22', justifyContent: 'center' },
+  bioSuggestionText: { color: colors.text, fontSize: 13 },
+  changeLater: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
   field: { width: '100%', height: 53, borderBottomWidth: 1, borderBottomColor: colors.hairline, color: colors.text, fontSize: 15, paddingHorizontal: 4 },
   fieldRow: { width: '100%', height: 53, borderBottomWidth: 1, borderBottomColor: colors.hairline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   locationLabel: { color: colors.placeholder, fontSize: 15 },
@@ -810,16 +848,16 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   pills: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
   pill: { height: 45, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pillSelected: { backgroundColor: colors.primary },
-  pillText: { color: colors.textMuted, fontSize: 15, fontWeight: '400' },
+  pillText: { color: colors.text, fontSize: 15, fontWeight: '400' },
   pillTextSelected: { color: colors.onPrimary },
   pillContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dishIcon: { width: 18, height: 18 },
-  dishIconDimmed: { opacity: 0.5 },
+  dishIconDimmed: { opacity: 1 },
   helper: { position: 'absolute', bottom: Math.max(90, bottomGutter + 66), alignSelf: 'center', color: colors.textMuted, fontSize: 12 },
   placesCard: { position: 'absolute', top: 212, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   placesCardNarrow: { top: 241 },
   placesCardLandscape: { top: 148 },
-  placeHeader: { height: 105, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, gap: 12, backgroundColor: colors.canvas },
+  placeHeader: { height: 65, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 16, backgroundColor: colors.canvas },
   placeSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
   placeSearch: { flex: 1, height: 39, borderRadius: 22, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
   placeSearchIcon: { width: 24, height: 24 },
@@ -871,19 +909,48 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   emptyText: { color: colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 7 },
   retryText: { color: colors.primary, fontSize: 14, fontWeight: '600', marginTop: 14 },
   styleCardViewport: { position: 'absolute', top: 196, left: 16, right: 16, bottom: Math.max(94, bottomGutter + 70) },
-  styleCard: { flexGrow: 0, flexShrink: 1, backgroundColor: colors.surface, borderRadius: 17 },
   styleCardLandscape: { top: 148 },
-  styleCardContent: { padding: 20 },
-  previews: { flexDirection: 'row', gap: 18 },
-  previewChoice: { flex: 1, alignItems: 'center' },
-  phonePreview: { width: 104, height: 176, borderRadius: 12, borderWidth: 3, overflow: 'hidden' },
-  previewLight: { backgroundColor: '#efefed', borderColor: '#bbb' },
-  previewDark: { backgroundColor: '#090909', borderColor: '#4b4b4b' },
-  phonePreviewImage: { width: '100%', height: '100%', borderRadius: 8 },
-  previewLabel: { color: colors.text, fontSize: 13, marginTop: 10 },
-  styleSelection: { width: 24, height: 24, marginTop: 8 },
-  automaticRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, marginTop: 20, paddingTop: 13 },
+  styleCardContent: { paddingTop: 20 },
+  previews: { flexDirection: 'row', gap: 12 },
+  previewChoice: { flex: 1, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 17, backgroundColor: colors.surface, alignItems: 'center' },
+  previewChoiceSelected: { borderWidth: 2, borderColor: '#FF4757' },
+  abstractPreview: { width: '100%', height: 200, padding: 12, borderRadius: 12, gap: 8 },
+  previewLight: { backgroundColor: '#F2F2F0' },
+  previewDark: { backgroundColor: '#202020' },
+  previewTopRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  previewBar: { width: '62%', height: 6, borderRadius: 3, backgroundColor: '#777777', opacity: 0.35 },
+  previewBarShort: { width: '34%', height: 6, borderRadius: 3, backgroundColor: '#777777', opacity: 0.35 },
+  previewDotAccent: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#FF4757' },
+  previewDotPurple: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#C447F2' },
+  previewGradient: { height: 54, marginTop: 4, borderRadius: 9 },
+  previewStars: { color: '#FF4757', fontSize: 13, letterSpacing: 1 },
+  previewLabelRow: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewLabel: { color: colors.text, fontSize: 15 },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  radioSelected: { borderColor: '#FF4757', backgroundColor: '#D33B35' },
+  radioCheck: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  automaticRow: { minHeight: 64, marginTop: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   automaticText: { color: colors.text, fontSize: 15 },
+  automaticSubtitle: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+  livePreviewCaption: { marginTop: 34, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+  peopleTeaser: { width: '100%', marginTop: 42, padding: 16, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
+  peopleTeaserTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  peopleTeaserCount: { marginTop: 5, marginBottom: 10, color: colors.textSecondary, fontSize: 13 },
+  teaserPerson: { height: 62, flexDirection: 'row', alignItems: 'center', opacity: 0.38 },
+  teaserAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#777777' },
+  teaserCopy: { flex: 1, marginLeft: 12 },
+  teaserBlurred: { color: colors.text, fontSize: 14, fontWeight: '600', textShadowColor: colors.text, textShadowRadius: 6 },
+  teaserBlurredSmall: { color: colors.textSecondary, fontSize: 12, textShadowColor: colors.textSecondary, textShadowRadius: 6 },
+  teaserAction: { minWidth: 84, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  teaserActionMuted: { backgroundColor: colors.surfaceRaised },
+  notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
+  notificationCard: { minHeight: 78, padding: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1A1A1A' },
+  notificationIcon: { width: 36, height: 36, overflow: 'hidden', borderRadius: 10, backgroundColor: '#D33B35', alignItems: 'center', justifyContent: 'center' },
+  notificationCopy: { flex: 1, marginLeft: 12, gap: 3 },
+  notificationApp: { color: colors.textMuted, fontSize: 9 },
+  notificationTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  notificationDetail: { color: colors.textSecondary, fontSize: 13 },
+  notificationMeta: { alignSelf: 'flex-start', color: colors.textMuted, fontSize: 10 },
   contactRow: { height: 62, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontSize: 11, fontWeight: '600' },

@@ -36,6 +36,10 @@ export const createUserProfileInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512).optional(),
 });
 
+export const checkUsernameAvailabilityInputSchema = z.object({
+  username: z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
+});
+
 export const updateProfilePhotoInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512),
 });
@@ -446,6 +450,7 @@ export const healthCheckResultSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
+export type CheckUsernameAvailabilityInput = z.infer<typeof checkUsernameAvailabilityInputSchema>;
 export type UpdateProfilePhotoInput = z.infer<typeof updateProfilePhotoInputSchema>;
 export type UpdateProfileSettingsInput = z.infer<typeof updateProfileSettingsInputSchema>;
 export type SearchPeopleInput = z.infer<typeof searchPeopleInputSchema>;
@@ -743,6 +748,8 @@ export interface ProfilePhotoResult {
   photoPath: string;
   photoUrl: string;
 }
+
+export interface UsernameAvailabilityResult { available: boolean; }
 
 export interface ActivityCandidate {
   userId: string;
