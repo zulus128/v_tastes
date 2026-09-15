@@ -8,6 +8,7 @@ import {
   updateGroupMembersInputSchema,
   updateNotificationPreferencesInputSchema,
   profileExtrasInputSchema,
+  setUserBlockedInputSchema,
   defaultNotificationPreferences,
   isNotificationType,
   notificationCatalog,
@@ -404,11 +405,12 @@ export const getProfileExtras = onCall(
     const input = parseInput(profileExtrasInputSchema, request.data ?? {});
     const profileId = input.targetUserId ?? viewerId;
     const userRef = db.collection('users').doc(profileId);
-    const [profile, followers, following, viewerFollowing] = await Promise.all([
+    const [profile, followers, following, viewerFollowing, blocked] = await Promise.all([
       userRef.get(),
       userRef.collection('followers').limit(100).get(),
       userRef.collection('following').limit(100).get(),
       db.collection('users').doc(viewerId).collection('following').get(),
+      db.collection('users').doc(viewerId).collection('blocked').doc(profileId).get(),
     ]);
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
@@ -427,6 +429,7 @@ export const getProfileExtras = onCall(
 
     const xp = Math.max(0, Number(profile.get('xp') ?? 0));
     return {
+      blocked: blocked.exists,
       followers: followerProfiles.map((follower) => ({
         userId: follower.id,
         displayName: String(follower.get('displayName') ?? 'Tastes user'),
@@ -447,6 +450,47 @@ export const getProfileExtras = onCall(
     };
   },
 );
+
+export const setUserBlocked = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(setUserBlockedInputSchema, request.data);
+  if (uid === input.targetUserId) throw new HttpsError('failed-precondition', 'You cannot block yourself.');
+  const userRef = db.collection('users').doc(uid);
+  const targetRef = db.collection('users').doc(input.targetUserId);
+  const blockedRef = userRef.collection('blocked').doc(input.targetUserId);
+
+  await db.runTransaction(async (transaction) => {
+    const [user, target, currentBlock, userFollowsTarget, targetFollowsUser] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(targetRef),
+      transaction.get(blockedRef),
+      transaction.get(userRef.collection('following').doc(input.targetUserId)),
+      transaction.get(targetRef.collection('following').doc(uid)),
+    ]);
+    if (!user.exists || user.get('status') !== 'active') throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    if (!target.exists || target.get('status') !== 'active') throw new HttpsError('not-found', 'The user was not found.');
+    if (input.blocked === currentBlock.exists) return;
+    const now = FieldValue.serverTimestamp();
+    if (!input.blocked) {
+      transaction.delete(blockedRef);
+      return;
+    }
+    transaction.set(blockedRef, { userId: input.targetUserId, createdAt: now });
+    if (userFollowsTarget.exists) {
+      transaction.delete(userFollowsTarget.ref);
+      transaction.delete(targetRef.collection('followers').doc(uid));
+      transaction.update(userRef, { followingCount: FieldValue.increment(-1), updatedAt: now });
+      transaction.update(targetRef, { followerCount: FieldValue.increment(-1), updatedAt: now });
+    }
+    if (targetFollowsUser.exists) {
+      transaction.delete(targetFollowsUser.ref);
+      transaction.delete(userRef.collection('followers').doc(input.targetUserId));
+      transaction.update(targetRef, { followingCount: FieldValue.increment(-1), updatedAt: now });
+      transaction.update(userRef, { followerCount: FieldValue.increment(-1), updatedAt: now });
+    }
+  });
+  return { blocked: input.blocked };
+});
 
 export const updateNotificationPreferences = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);

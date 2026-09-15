@@ -101,6 +101,7 @@ function visualAuditData(operation: string): unknown {
       } satisfies PlaceDetails;
     case 'getProfileExtras':
       return {
+        blocked: false,
         followers: [],
         following: [],
         level: 3,

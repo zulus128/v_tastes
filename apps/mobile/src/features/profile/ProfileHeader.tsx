@@ -26,6 +26,7 @@ function Stat({ label, onPress, value }: { label: string; onPress?: () => void; 
 }
 
 export function ProfileHeader({
+  blocked,
   followPending,
   following,
   onAvatarPress,
@@ -39,6 +40,7 @@ export function ProfileHeader({
   tasteHighlights,
   uploadingPhoto,
 }: {
+  blocked: boolean;
   followPending: boolean;
   following: boolean;
   onAvatarPress: () => void;
@@ -76,6 +78,7 @@ export function ProfileHeader({
           <Image source={cityFlag(profile.city)} style={styles.cityFlag} />
         </View>
       ) : null}
+      {!blocked ? <>
       <View style={styles.stats}>
         <Stat label="Reviews" value={profile.reviewCount || reviewCount} />
         <View style={styles.statDivider} />
@@ -109,17 +112,20 @@ export function ProfileHeader({
           </Pressable>
         </View>
       ) : null}
-      <Text style={styles.highlightsTitle}>Taste highlights</Text>
       <View style={styles.highlights}>
-        {tasteHighlights.map((highlight, index) => (
-          <View key={highlight.id} style={[styles.highlight, index < tasteHighlights.length - 1 && styles.highlightDivider]}>
-            <Text style={styles.highlightEmoji}>{highlight.emoji}</Text>
-            <Text numberOfLines={1} style={styles.highlightLabel}>{highlight.label}</Text>
-            <Text numberOfLines={1} style={styles.highlightValue}>{highlight.value}</Text>
-            <Text numberOfLines={1} style={styles.highlightMeta}>{highlight.meta}</Text>
-          </View>
-        ))}
+        <Text style={styles.highlightsTitle}>Taste highlights</Text>
+        <View style={styles.highlightTiles}>
+          {tasteHighlights.map((highlight) => (
+            <View key={highlight.id} style={styles.highlight}>
+              <View style={styles.highlightIcon}><Text style={styles.highlightEmoji}>{highlight.emoji}</Text></View>
+              <Text numberOfLines={1} style={styles.highlightLabel}>{highlight.label}</Text>
+              <Text numberOfLines={1} style={styles.highlightValue}>{highlight.value}</Text>
+              <Text numberOfLines={1} style={styles.highlightMeta}>{highlight.meta}</Text>
+            </View>
+          ))}
+        </View>
       </View>
+      </> : null}
     </ImageBackground>
   );
 }
@@ -193,11 +199,12 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   followActionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.7 },
   messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   messageActionText: { fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
-  highlightsTitle: { marginTop: 18, marginHorizontal: 16, color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '600' },
-  highlights: { minHeight: 118, marginTop: 10, marginHorizontal: 16, paddingVertical: 14, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
-  highlight: { flex: 1, minWidth: 0, paddingHorizontal: 7, alignItems: 'center' },
-  highlightDivider: { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-  highlightEmoji: { fontSize: 24, lineHeight: 29 },
+  highlights: { minHeight: 166, marginTop: 14, marginHorizontal: 16, paddingTop: 16, paddingBottom: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
+  highlightsTitle: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '600', textAlign: 'center' },
+  highlightTiles: { marginTop: 14, paddingHorizontal: 10, flexDirection: 'row', gap: 6 },
+  highlight: { flex: 1, minWidth: 0, alignItems: 'center' },
+  highlightIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.surfaceRaised },
+  highlightEmoji: { fontSize: 18, lineHeight: 22 },
   highlightLabel: { marginTop: 6, color: colors.textSecondary, fontSize: 9, lineHeight: 12, textAlign: 'center' },
   highlightValue: { marginTop: 2, color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
   highlightMeta: { marginTop: 2, color: colors.textMuted, fontSize: 8, lineHeight: 10, textAlign: 'center' },
