@@ -537,6 +537,7 @@ function ReviewTagPill({
   styles: ReturnType<typeof createStyles>;
 }) {
   const selection = useRef(new Animated.Value(selected ? 1 : 0)).current;
+  const pressFlash = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const animation = Animated.timing(selection, {
@@ -549,11 +550,34 @@ function ReviewTagPill({
     return () => animation.stop();
   }, [reduceMotion, selected, selection]);
 
+  useEffect(() => () => pressFlash.stopAnimation(), [pressFlash]);
+
+  const flashBorder = () => {
+    pressFlash.stopAnimation();
+    pressFlash.setValue(0);
+    if (reduceMotion) return;
+    Animated.sequence([
+      Animated.timing(pressFlash, {
+        duration: 35,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pressFlash, {
+        duration: 75,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   return (
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
+      onPressIn={flashBorder}
       style={styles.tagPressable}
     >
       <Animated.View
@@ -579,6 +603,10 @@ function ReviewTagPill({
             }),
           }]}
         >{label}</Animated.Text>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.tagPressFlash, { opacity: pressFlash }]}
+        />
       </Animated.View>
     </Pressable>
   );
@@ -1338,6 +1366,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18, alignItems: 'center' },
   tagPressable: { height: 34, borderRadius: 999, alignSelf: 'center' },
   tag: { height: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 999, alignItems: 'center', alignSelf: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  tagPressFlash: { position: 'absolute', top: -1, right: -1, bottom: -1, left: -1, borderWidth: 2, borderColor: 'rgba(255,255,255,0.95)', borderRadius: 999 },
   tagEmoji: { fontSize: 14, lineHeight: 18 },
   tagText: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.23 },
   footer: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingHorizontal: 36 },
