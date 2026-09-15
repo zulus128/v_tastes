@@ -18,8 +18,6 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
-import CloseCircle from '../../../assets/recap/story/close-circle.svg';
-import CloseX from '../../../assets/recap/story/close-x.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
@@ -223,13 +221,6 @@ function DetailRow({ icon, label, onPress, styles }: { icon: ReactNode; label: s
     {icon}
     <Text numberOfLines={1} style={styles.detailText}>{label}</Text>
     <ArrowUpRightIcon color={styles.detailIcon.color} height={responsiveSize(20)} style={styles.detailArrow} width={responsiveSize(20)} />
-  </Pressable>;
-}
-
-function CloseButton({ onPress, styles }: { onPress: () => void; styles: ReturnType<typeof createStyles> }) {
-  return <Pressable accessibilityLabel="Close" hitSlop={12} onPress={onPress} style={styles.closeButton}>
-    <CloseCircle color={styles.closeIcon.color} height={responsiveSize(24)} width={responsiveSize(24)} />
-    <CloseX color={styles.closeIcon.color} height={responsiveSize(8)} style={styles.closeX} width={responsiveSize(8)} />
   </Pressable>;
 }
 
