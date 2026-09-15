@@ -1,17 +1,20 @@
 import type { ActivityCandidate, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -287,17 +290,51 @@ function PlaceSelector({ dark, onClose, onSelect, styles, userId, visible }: { d
 function MemberSelector({ candidates, onClose, onConfirm, selectedIds, styles, visible }: { candidates: ActivityCandidate[]; onClose: () => void; onConfirm: (ids: string[]) => void; selectedIds: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState(selectedIds);
-  useEffect(() => { if (visible) setDraft(selectedIds); }, [selectedIds, visible]);
+  const { height: viewportHeight } = useWindowDimensions();
+  const collapsedHeight = responsiveSize(250);
+  const expandedHeight = Math.max(collapsedHeight, viewportHeight - responsiveSize(86));
+  const sheetHeight = useRef(new Animated.Value(collapsedHeight)).current;
+  const dragStartHeight = useRef(collapsedHeight);
+  useEffect(() => {
+    if (visible) {
+      setDraft(selectedIds);
+      sheetHeight.setValue(collapsedHeight);
+    }
+  }, [collapsedHeight, selectedIds, sheetHeight, visible]);
+  const drag = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > responsiveSize(4),
+    onPanResponderGrant: () => {
+      sheetHeight.stopAnimation((value) => { dragStartHeight.current = value; });
+    },
+    onPanResponderMove: (_, gesture) => {
+      sheetHeight.setValue(Math.max(collapsedHeight, Math.min(expandedHeight, dragStartHeight.current - gesture.dy)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy > responsiveSize(90) && dragStartHeight.current <= collapsedHeight + responsiveSize(8)) {
+        onClose();
+        return;
+      }
+      const expand = gesture.dy < responsiveSize(-32) || gesture.vy < -0.35;
+      Animated.spring(sheetHeight, {
+        damping: 24,
+        mass: 0.8,
+        stiffness: 230,
+        toValue: expand ? expandedHeight : collapsedHeight,
+        useNativeDriver: false,
+      }).start();
+    },
+  }), [collapsedHeight, expandedHeight, onClose, sheetHeight]);
   const query = search.trim().toLowerCase();
   const filtered = candidates.filter((item) => !query || item.displayName.toLowerCase().includes(query) || item.username?.toLowerCase().includes(query));
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.modalBackdrop}><View style={styles.sheet}>
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+      <View style={styles.modalBackdrop}><Animated.View style={[styles.sheet, { height: sheetHeight, maxHeight: expandedHeight }]}>
+        <View accessibilityLabel="Drag to resize member selector" style={styles.sheetGrabArea} {...drag.panHandlers}><View style={styles.sheetGrabber} /></View>
         <SheetHeader onClose={onClose} styles={styles} title="Select Members" />
         <View style={styles.sheetSearch}><Text style={styles.searchGlyph}>⌕</Text><TextInput onChangeText={setSearch} placeholder="Search friends" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} /></View>
         <FlatList data={filtered} keyExtractor={(item) => item.userId} ListEmptyComponent={<Text style={styles.emptyText}>Mutual followers will appear here.</Text>} renderItem={({ item }) => { const checked = draft.includes(item.userId); return <Pressable onPress={() => setDraft((current) => checked ? current.filter((id) => id !== item.userId) : [...current, item.userId])} style={styles.candidateRow}><Avatar member={item} styles={styles} /><View style={styles.memberCopy}><Text style={styles.memberName}>{item.displayName}</Text><Text style={styles.memberHandle}>{item.username ? `@${item.username}` : 'Mutual follower'}</Text></View><View style={[styles.radio, checked && styles.radioChecked]}><Text style={styles.check}>{checked ? '✓' : ''}</Text></View></Pressable>; }} />
         <View style={styles.sheetFooter}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable disabled={draft.length === 0} onPress={() => onConfirm(draft)} style={[styles.confirmButton, draft.length === 0 && styles.disabled]}><Text style={styles.confirmText}>✓  Confirm</Text></Pressable></View>
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }
@@ -332,7 +369,7 @@ function createStyles(colors: ThemeColors) {
     memberRow: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.skeleton }, avatarFallback: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' }, memberCopy: { flex: 1, marginLeft: 10 }, memberName: { color: colors.text, fontSize: 15, fontWeight: '600' }, memberHandle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 }, remove: { color: colors.text, fontSize: 25, padding: 10 },
     addMember: { width: 44, height: 44, marginLeft: 16, marginTop: 5, borderWidth: 1, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, addMemberText: { color: colors.text, fontSize: 28, fontWeight: '300' },
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 31, backgroundColor: colors.canvas }, createButton: { height: 54, borderWidth: 5, borderColor: colors.primaryBorder, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, createText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 }, disabled: { opacity: 0.45 },
-    modalBackdrop: { flex: 1, paddingTop: 86, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' }, sheet: { height: '91%', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, closeCircle: { width: 30, height: 30, borderWidth: 2, borderColor: colors.text, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
+    modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' }, sheet: { borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, sheetGrabArea: { height: 20, alignItems: 'center', justifyContent: 'center' }, sheetGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.textMuted }, sheetHeader: { height: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, closeCircle: { width: 30, height: 30, borderWidth: 2, borderColor: colors.text, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
     placeList: { flex: 1 },
     sheetSearchRow: { marginHorizontal: 16, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 12 },
     sheetSearch: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },

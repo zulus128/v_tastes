@@ -85,6 +85,8 @@ export const createActivity = onCall(callableOptions, async (request) => {
           organizerId: String(existing.get('organizerId') ?? uid),
           title: String(existing.get('venueName') ?? 'Activity'),
           imageUrl: existing.get('imageUrl') ? String(existing.get('imageUrl')) : null,
+          startsAt: existing.get('startsAt') ?? null,
+          venueId: existing.get('venueId') ?? null,
           participantIds,
           invitationStatuses: Object.fromEntries(participantIds.map((participantId) => [
             participantId,
@@ -97,6 +99,8 @@ export const createActivity = onCall(callableOptions, async (request) => {
           lastMessage: {
             id: `${activityRef.id}-created`,
             senderId: String(existing.get('organizerId') ?? uid),
+            senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
+            senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
             text: 'Activity created',
             createdAt: now,
           },
@@ -153,6 +157,9 @@ export const createActivity = onCall(callableOptions, async (request) => {
       organizerId: uid,
       title: String(venue.get('name') ?? ''),
       imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
+      startsAt: Timestamp.fromDate(startsAt),
+      venueId: venue.id,
+      address: venue.get('address') ? String(venue.get('address')) : String(venue.get('city') ?? ''),
       participantIds,
       invitationStatuses: {
         [uid]: 'accepted',
@@ -165,6 +172,8 @@ export const createActivity = onCall(callableOptions, async (request) => {
       lastMessage: {
         id: `${activityRef.id}-created`,
         senderId: uid,
+        senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
+        senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
         text: 'Activity created',
         createdAt: now,
       },

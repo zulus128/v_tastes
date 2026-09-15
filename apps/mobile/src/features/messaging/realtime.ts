@@ -101,9 +101,16 @@ function summaryFromDocument(
           ? 'declined'
           : 'accepted'
       : null,
+    activityStartsAt: data.kind === 'activity' && data.startsAt ? toIso(data.startsAt) : null,
+    activityAddress: data.kind === 'activity' && typeof data.address === 'string' ? data.address : null,
+    memberCount: data.kind === 'activity' && data.invitationStatuses && typeof data.invitationStatuses === 'object'
+      ? Object.values(data.invitationStatuses as Record<string, unknown>).filter((status) => status === 'accepted').length
+      : participantIds.length,
     lastMessage: rawLastMessage ? {
       id: String(rawLastMessage.id ?? ''),
       senderId: String(rawLastMessage.senderId ?? ''),
+      senderDisplayName: typeof rawLastMessage.senderDisplayName === 'string' ? rawLastMessage.senderDisplayName : null,
+      senderPhotoUrl: typeof rawLastMessage.senderPhotoUrl === 'string' ? rawLastMessage.senderPhotoUrl : null,
       text: String(rawLastMessage.text ?? ''),
       createdAt: toIso(rawLastMessage.createdAt),
     } : null,
@@ -143,6 +150,23 @@ export function useConversationInbox(userId: string): RealtimeState<Conversation
     );
     const unsubscribe = onSnapshot(inboxQuery, (snapshot) => {
       void Promise.all(snapshot.docs.filter((conversation) => isVisibleInInbox(conversation, userId)).map(async (conversation) => {
+        if (conversation.data().kind === 'activity') {
+          const summary = summaryFromDocument(conversation, userId, null);
+          if (summary.activityStartsAt && summary.activityAddress) return summary;
+          const activityId = summary.activityId ?? conversation.id;
+          const activity = await getDoc(doc(firestore, 'activities', activityId));
+          const activityData = activity.data();
+          const venueId = typeof activityData?.venueId === 'string' ? activityData.venueId : '';
+          const venue = venueId ? await getDoc(doc(firestore, 'venues', venueId)) : null;
+          const venueData = venue?.data();
+          return {
+            ...summary,
+            activityStartsAt: activityData?.startsAt ? toIso(activityData.startsAt) : summary.activityStartsAt,
+            activityAddress: typeof venueData?.address === 'string'
+              ? venueData.address
+              : typeof venueData?.city === 'string' ? venueData.city : summary.activityAddress,
+          };
+        }
         if (conversation.data().kind === 'group') {
           return summaryFromDocument(conversation, userId, null);
         }

@@ -1,7 +1,8 @@
 import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { doc, getDoc, onSnapshot, type DocumentData } from 'firebase/firestore';
 import {
   ActivityIndicator,
   Alert,
@@ -11,19 +12,21 @@ import {
   FlatList,
   Image,
   ImageBackground,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
+  type KeyboardEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SendIcon from '../../../assets/ai/send.svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
-import { ActivityInviteModal } from '../activities/ActivityInviteModal';
+import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -31,6 +34,71 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useProfile } from '../profile/api';
 import { subscribeConversationDetails, useConversationMessages } from './realtime';
+import { activitySchedule, activitySubtitle } from './presentation';
+
+type ActivityChatMember = Pick<ConversationParticipant, 'userId' | 'displayName' | 'photoUrl'>;
+
+type ActivityChatDetails = {
+  address: string;
+  imageUrl: string | null;
+  members: Map<string, ActivityChatMember>;
+  startsAt: string | null;
+  title: string;
+};
+
+function memberFromProfile(userId: string, profile: DocumentData | undefined): ActivityChatMember {
+  return {
+    userId,
+    displayName: typeof profile?.displayName === 'string' ? profile.displayName : 'Tastes user',
+    photoUrl: typeof profile?.photoUrl === 'string' ? profile.photoUrl : null,
+  };
+}
+
+function useActivityChatDetails(activityId: string | null): ActivityChatDetails | null {
+  const [details, setDetails] = useState<ActivityChatDetails | null>(null);
+  useEffect(() => {
+    setDetails(null);
+    if (!activityId) return undefined;
+    let active = true;
+    const unsubscribe = onSnapshot(doc(firestore, 'activities', activityId), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      const participantIds = Array.isArray(data.participantIds)
+        ? data.participantIds.filter((value): value is string => typeof value === 'string')
+        : [];
+      const venueId = typeof data.venueId === 'string' ? data.venueId : '';
+      const startsAt = data.startsAt && typeof data.startsAt.toDate === 'function'
+        ? data.startsAt.toDate().toISOString()
+        : typeof data.startsAt === 'string' ? data.startsAt : null;
+      void Promise.all([
+        venueId ? getDoc(doc(firestore, 'venues', venueId)) : Promise.resolve(null),
+        ...participantIds.map((id) => getDoc(doc(firestore, 'users', id))),
+      ]).then(([venue, ...profiles]) => {
+        if (!active) return;
+        const venueData = venue?.data();
+        setDetails({
+          address: typeof venueData?.address === 'string' ? venueData.address : typeof venueData?.city === 'string' ? venueData.city : '',
+          imageUrl: typeof venueData?.imageUrl === 'string' ? venueData.imageUrl : typeof data.imageUrl === 'string' ? data.imageUrl : null,
+          members: new Map(participantIds.map((id, index) => [id, memberFromProfile(id, profiles[index]?.data())])),
+          startsAt,
+          title: typeof venueData?.name === 'string' ? venueData.name : String(data.venueName ?? 'Activity'),
+        });
+      });
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [activityId]);
+  return details;
+}
+
+function keyboardEasing(event: KeyboardEvent) {
+  if (event.easing === 'easeIn') return Easing.in(Easing.ease);
+  if (event.easing === 'easeOut') return Easing.out(Easing.ease);
+  if (event.easing === 'linear') return Easing.linear;
+  return Easing.inOut(Easing.ease);
+}
 
 function messageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -152,16 +220,19 @@ type ChatListItem =
 export function ChatScreen({
   conversationId,
   onBack,
+  onOpenActivityDetails,
   onOpenGroupDetails,
   userId,
 }: {
   conversationId: string;
   onBack: () => void;
+  onOpenActivityDetails: (activityId: string) => void;
   onOpenGroupDetails: (groupId: string) => void;
   userId: string;
 }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const api = useTastesApi();
   const visualAudit = useIsVisualAudit();
@@ -188,16 +259,17 @@ export function ChatScreen({
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [readByCount, setReadByCount] = useState(0);
   const [someoneTyping, setSomeoneTyping] = useState(false);
-  const [activityPreviewOpen, setActivityPreviewOpen] = useState(false);
   const [conversationError, setConversationError] = useState<Error | null>(null);
   const [text, setText] = useState('');
+  const [inputHeight, setInputHeight] = useState(responsiveSize(44));
   const [sending, setSending] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(() => createIdempotencyKey('message'));
   const lastMarkedRead = useRef<string | null>(null);
   const typingActive = useRef(false);
   const typingStatusAvailable = useRef(true);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeActivityPreview = useCallback(() => setActivityPreviewOpen(false), []);
+  const listRef = useRef<FlatList<ChatListItem>>(null);
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
   const listItems = useMemo<ChatListItem[]>(() => [
     ...(someoneTyping ? [{ kind: 'typing' } as const] : []),
     ...messageItems.map((message) => ({ kind: 'message' as const, message })),
@@ -205,6 +277,23 @@ export function ChatScreen({
   const ownSender = currentUserProfile
     ? { displayName: currentUserProfile.displayName, photoUrl: currentUserProfile.photoUrl }
     : { displayName: 'You', photoUrl: null };
+  const activityDetails = useActivityChatDetails(activity?.id ?? null);
+  const chatMembers = activity ? activityDetails?.members ?? new Map() : groupMembers;
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return undefined;
+    const subscription = Keyboard.addListener('keyboardWillChangeFrame', (event) => {
+      const overlap = Math.max(0, windowHeight - event.endCoordinates.screenY);
+      Animated.timing(keyboardOffset, {
+        duration: event.duration || 250,
+        easing: keyboardEasing(event),
+        toValue: -overlap,
+        useNativeDriver: true,
+      }).start();
+      if (overlap > 0) requestAnimationFrame(() => listRef.current?.scrollToOffset({ animated: false, offset: 0 }));
+    });
+    return () => subscription.remove();
+  }, [keyboardOffset, windowHeight]);
 
   useEffect(() => subscribeConversationDetails(
     conversationId,
@@ -315,11 +404,6 @@ export function ChatScreen({
   const error = conversationError ?? realtimeMessages.error ?? messageHistory.error;
   return (
     <Screen style={styles.screen}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-        style={styles.screen}
-      >
       <View style={[styles.header, { minHeight: responsiveSize(64) + insets.top, paddingTop: responsiveSize(8) + insets.top, paddingLeft: responsiveSize(14) + insets.left, paddingRight: responsiveSize(14) + insets.right }] }>
         <Pressable accessibilityLabel="Back" hitSlop={12} onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>‹</Text>
@@ -332,15 +416,25 @@ export function ChatScreen({
               : undefined}
           disabled={!activity && !groupTitle}
           onPress={() => {
-            if (activity) setActivityPreviewOpen(true);
+            if (activity) onOpenActivityDetails(activity.id);
             else if (groupTitle) onOpenGroupDetails(conversationId);
           }}
           style={styles.headerIdentity}
         >
           <View style={styles.headerCopy}>
-            <Text numberOfLines={1} style={styles.headerName}>{activity?.title ?? groupTitle ?? participant?.displayName ?? 'Conversation'}</Text>
+            <Text numberOfLines={1} style={styles.headerName}>{activityDetails?.title ?? activity?.title ?? groupTitle ?? participant?.displayName ?? 'Conversation'}</Text>
+            {activity ? <Text numberOfLines={1} style={styles.headerMeta}>{activitySubtitle(activityDetails?.startsAt ?? null, activityDetails?.members.size ?? 0)}</Text> : null}
+            {groupTitle ? <Text numberOfLines={1} style={styles.headerMeta}>{groupMembers.size} members</Text> : null}
           </View>
-          {participant?.photoUrl ? (
+          {groupTitle && groupMembers.size > 0 ? (
+            <View style={styles.headerAvatarStack}>
+              {[...groupMembers.values()].slice(0, 2).map((member, index) => member.photoUrl ? (
+                <Image key={member.userId} source={{ uri: member.photoUrl }} style={[styles.headerStackedAvatar, { marginLeft: index ? responsiveSize(-10) : 0 }]} />
+              ) : (
+                <View key={member.userId} style={[styles.headerStackedAvatar, styles.headerAvatarFallback, { marginLeft: index ? responsiveSize(-10) : 0 }]}><Text style={styles.headerInitial}>{member.displayName.slice(0, 1).toUpperCase()}</Text></View>
+              ))}
+            </View>
+          ) : participant?.photoUrl ? (
             <Image source={{ uri: participant.photoUrl }} style={styles.headerAvatar} />
           ) : (
             <View style={styles.headerAvatarFallback}>
@@ -349,6 +443,19 @@ export function ChatScreen({
           )}
         </Pressable>
       </View>
+
+      <Animated.View style={[styles.chatBody, Platform.OS === 'ios' && { transform: [{ translateY: keyboardOffset }] }]}>
+      {activity && activityDetails ? (
+        <Pressable accessibilityLabel="Open activity details" onPress={() => onOpenActivityDetails(activity.id)} style={styles.activityCard}>
+          {activityDetails.imageUrl ? <Image source={{ uri: activityDetails.imageUrl }} style={styles.activityImage} /> : <View style={styles.activityImageFallback}><Text style={styles.activityImageInitial}>{activityDetails.title.slice(0, 1)}</Text></View>}
+          <View style={styles.activityCopy}>
+            <Text numberOfLines={1} style={styles.activityTitle}>{activityDetails.title}</Text>
+            {activitySchedule(activityDetails.startsAt) ? <Text numberOfLines={1} style={styles.activitySchedule}>{activitySchedule(activityDetails.startsAt)}</Text> : null}
+            <Text numberOfLines={1} style={styles.activityAddress}>{activityDetails.address}</Text>
+          </View>
+          <Text style={styles.goingChip}>{activityDetails.members.size} going</Text>
+        </Pressable>
+      ) : null}
 
       <ImageBackground
         imageStyle={{ opacity: isDark ? 1 : 0.08 }}
@@ -366,6 +473,7 @@ export function ChatScreen({
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             style={styles.messages}
             contentContainerStyle={[styles.messagesContent, listItems.length === 0 && styles.emptyMessages]}
             data={listItems}
@@ -397,9 +505,9 @@ export function ChatScreen({
                   item={item.message}
                   mine={item.message.senderId === userId}
                   read={item.message.senderId === userId && item.message.id === lastMessageId && readByCount > 0}
-                  sender={item.message.senderId === userId ? ownSender : groupMembers.get(item.message.senderId)}
-                  showAvatar={Boolean(groupTitle)}
-                  showSender={Boolean(groupTitle) && startsSenderGroup}
+                  sender={item.message.senderId === userId ? ownSender : chatMembers.get(item.message.senderId)}
+                  showAvatar={Boolean(groupTitle || activity) && item.message.senderId !== userId}
+                  showSender={Boolean(groupTitle || activity) && item.message.senderId !== userId && startsSenderGroup}
                   styles={styles}
                 />
               );
@@ -416,9 +524,11 @@ export function ChatScreen({
           maxLength={4_000}
           multiline
           onChangeText={updateText}
+          onContentSizeChange={(event) => setInputHeight(Math.max(responsiveSize(44), Math.min(responsiveSize(118), event.nativeEvent.contentSize.height)))}
           placeholder="Message"
           placeholderTextColor={colors.placeholder}
-          style={styles.input}
+          scrollEnabled={inputHeight >= responsiveSize(118)}
+          style={[styles.input, { height: inputHeight }]}
           value={text}
         />
         <Pressable
@@ -430,13 +540,7 @@ export function ChatScreen({
           {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
         </Pressable>
       </View>
-      <ActivityInviteModal
-        activityId={activity?.id ?? null}
-        onClose={closeActivityPreview}
-        userId={userId}
-        visible={activityPreviewOpen && Boolean(activity)}
-      />
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Screen>
   );
 }
@@ -444,6 +548,7 @@ export function ChatScreen({
 function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
+    chatBody: { flex: 1 },
     patternBody: { flex: 1 },
     header: { minHeight: 64, paddingTop: 8, paddingHorizontal: 14, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
     back: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -454,6 +559,18 @@ function createStyles(colors: ThemeColors) {
     headerInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },
     headerCopy: { flex: 1, marginLeft: 4, marginRight: 8, alignItems: 'center' },
     headerName: { color: colors.text, fontSize: 17, fontWeight: '500', textAlign: 'center' },
+    headerMeta: { color: colors.textSecondary, marginTop: 1, fontSize: 11, textAlign: 'center' },
+    headerAvatarStack: { minWidth: 44, flexDirection: 'row', justifyContent: 'flex-end' },
+    headerStackedAvatar: { width: 30, height: 30, borderWidth: 1.5, borderColor: colors.background, borderRadius: 15, backgroundColor: colors.skeleton },
+    activityCard: { minHeight: 72, marginHorizontal: 16, marginVertical: 8, padding: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface },
+    activityImage: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.skeleton },
+    activityImageFallback: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    activityImageInitial: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
+    activityCopy: { flex: 1, minWidth: 0, marginLeft: 10 },
+    activityTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    activitySchedule: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
+    activityAddress: { color: colors.textSecondary, marginTop: 3, fontSize: 12 },
+    goingChip: { marginLeft: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, overflow: 'hidden', color: colors.primary, backgroundColor: 'rgba(230,57,70,0.16)', fontSize: 11, fontWeight: '600' },
     messages: { flex: 1 },
     messagesContent: { paddingHorizontal: 14, paddingVertical: 12 },
     emptyMessages: { flexGrow: 1 },

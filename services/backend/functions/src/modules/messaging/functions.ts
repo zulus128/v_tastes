@@ -60,6 +60,8 @@ function lastMessage(document: DocumentSnapshot) {
   return {
     id: String(message.id ?? ''),
     senderId: String(message.senderId ?? ''),
+    senderDisplayName: message.senderDisplayName ? String(message.senderDisplayName) : null,
+    senderPhotoUrl: message.senderPhotoUrl ? String(message.senderPhotoUrl) : null,
     text: String(message.text ?? ''),
     createdAt: timestampToIso(message.createdAt),
   };
@@ -195,12 +197,30 @@ export const listConversations = onCall(callableOptions, async (request) => {
     ? await db.getAll(...profileIds.map((userId) => db.collection('users').doc(userId)))
     : [];
   const profiles = new Map(profileSnapshots.map((profile) => [profile.id, profile]));
+  const activityRows = rows.filter((row) => row.kind === 'activity');
+  const activitySnapshots = activityRows.length > 0
+    ? await db.getAll(...activityRows.map((row) => db.collection('activities').doc(String(row.document.get('activityId') ?? row.document.id))))
+    : [];
+  const activities = new Map(activitySnapshots.map((activity) => [activity.id, activity]));
+  const venueIds = [...new Set(activitySnapshots.map((activity) => String(activity.get('venueId') ?? '')).filter(Boolean))];
+  const venueSnapshots = venueIds.length > 0
+    ? await db.getAll(...venueIds.map((venueId) => db.collection('venues').doc(venueId)))
+    : [];
+  const venues = new Map(venueSnapshots.map((venue) => [venue.id, venue]));
   const last = sourceDocuments.at(-1);
 
   return {
     items: rows.map((row) => {
       const { document, participantIds, kind, otherUserId } = row;
       const profile = otherUserId ? profiles.get(otherUserId) : null;
+      const activityId = kind === 'activity' ? String(document.get('activityId') ?? document.id) : null;
+      const activity = activityId ? activities.get(activityId) : null;
+      const venueId = String(document.get('venueId') ?? activity?.get('venueId') ?? '');
+      const venue = venueId ? venues.get(venueId) : null;
+      const statuses = document.get('invitationStatuses');
+      const acceptedCount = statuses && typeof statuses === 'object'
+        ? Object.values(statuses as Record<string, unknown>).filter((status) => status === 'accepted').length
+        : participantIds.length;
       return {
         id: document.id,
         kind,
@@ -211,13 +231,20 @@ export const listConversations = onCall(callableOptions, async (request) => {
           username: profile?.get('username') ? String(profile.get('username')) : null,
           photoUrl: profile?.get('photoUrl') ? String(profile.get('photoUrl')) : null,
         } : null,
-        activityId: kind === 'activity' ? String(document.get('activityId') ?? document.id) : null,
+        activityId,
         title: kind === 'activity' || kind === 'group'
           ? String(document.get('title') ?? (kind === 'activity' ? 'Activity' : 'Group'))
           : null,
         imageUrl: (kind === 'activity' || kind === 'group') && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
         organizerId: kind === 'activity' ? String(document.get('organizerId') ?? '') : null,
         invitationStatus: kind === 'activity' ? invitationStatus(document, uid) : null,
+        activityStartsAt: kind === 'activity' && (document.get('startsAt') ?? activity?.get('startsAt'))
+          ? timestampToIso(document.get('startsAt') ?? activity?.get('startsAt'))
+          : null,
+        activityAddress: kind === 'activity'
+          ? String(document.get('address') ?? venue?.get('address') ?? venue?.get('city') ?? '') || null
+          : null,
+        memberCount: kind === 'activity' ? acceptedCount : participantIds.length,
         lastMessage: lastMessage(document),
         unreadCount: unreadCount(document, uid),
         createdAt: timestampToIso(document.get('createdAt')),
@@ -357,6 +384,8 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       'lastMessage', {
         id: messageRef.id,
         senderId: uid,
+        senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
+        senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
         text: input.text,
         createdAt: now,
       },
