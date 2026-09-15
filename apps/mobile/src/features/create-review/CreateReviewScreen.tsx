@@ -555,16 +555,16 @@ function ReviewTagPill({
   const flashBorder = () => {
     pressFlash.stopAnimation();
     pressFlash.setValue(0);
-    if (reduceMotion) return;
+    if (reduceMotion || !selected) return;
     Animated.sequence([
       Animated.timing(pressFlash, {
-        duration: 35,
+        duration: 8,
         easing: Easing.out(Easing.quad),
         toValue: 1,
         useNativeDriver: true,
       }),
       Animated.timing(pressFlash, {
-        duration: 75,
+        duration: 16,
         easing: Easing.out(Easing.cubic),
         toValue: 0,
         useNativeDriver: true,
