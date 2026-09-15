@@ -260,7 +260,11 @@ export const createGroup = onCall(callableOptions, async (request) => {
       kind: 'group', groupId: ref.id, title: input.name, organizerId: uid,
       participantIds: [uid], invitationStatuses, unreadCounts: { [uid]: 0 },
       lastReadAt: {}, lastReadMessageIds: {}, typing: {},
-      lastMessage: { id: `${ref.id}-created`, senderId: uid, text: 'Group created', createdAt: now },
+      lastMessage: {
+        id: `${ref.id}-created`, senderId: uid, senderDisplayName: ownerName,
+        senderPhotoUrl: owner.get('photoUrl') ? String(owner.get('photoUrl')) : null,
+        text: 'Group created', createdAt: now,
+      },
       messageCount: 0, status: 'active', createdAt: now, updatedAt: now,
     });
     for (const memberId of invitedIds) {

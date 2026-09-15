@@ -24,6 +24,7 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
+import { activitySubtitle, compareConversations, reservationCountdown } from './presentation';
 import { useTastesApi } from '../../session/SessionProvider';
 
 function relativeTime(iso: string): string {
@@ -53,11 +54,19 @@ function ConversationRow({
 }) {
   const participant = conversation.otherParticipant;
   const title = conversation.kind === 'activity'
-    ? participant?.displayName ?? 'Activity'
+    ? conversation.title ?? 'Activity'
     : conversation.kind === 'group'
-      ? conversation.title ?? 'Group'
+      ? `${conversation.title ?? 'Group'} · ${conversation.memberCount}`
       : participant?.displayName ?? 'Tastes user';
   const unread = conversation.unreadCount > 0;
+  const activity = conversation.kind === 'activity';
+  const group = conversation.kind === 'group';
+  const countdown = activity ? reservationCountdown(conversation.activityStartsAt) : null;
+  const senderPrefix = group && conversation.lastMessage?.senderDisplayName
+    ? `${conversation.lastMessage.senderDisplayName}: `
+    : conversation.kind === 'direct' && conversation.lastMessage && conversation.lastMessage.senderId !== participant?.userId
+      ? 'You: '
+      : '';
   const translateX = useMemo(() => new Animated.Value(0), []);
   const deleteActionWidth = responsiveSize(82);
   const deleteThreshold = responsiveSize(64);
@@ -89,22 +98,37 @@ function ConversationRow({
         </Pressable>
       </Animated.View>
       <Animated.View style={[styles.swipeContent, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
-        <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-          {participant?.photoUrl ? (
+        <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, activity && styles.activityRow, pressed && styles.rowPressed]}>
+          {activity || group ? (
+            <View style={styles.avatarStack}>
+              {conversation.imageUrl || conversation.lastMessage?.senderPhotoUrl ? (
+                <Image source={{ uri: conversation.imageUrl ?? conversation.lastMessage?.senderPhotoUrl ?? '' }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{title.slice(0, 1).toUpperCase()}</Text></View>
+              )}
+              <View style={styles.stackedAvatarFallback}>
+                <Text style={styles.stackedAvatarInitial}>{conversation.lastMessage?.senderDisplayName?.slice(0, 1).toUpperCase() ?? conversation.memberCount}</Text>
+              </View>
+            </View>
+          ) : participant?.photoUrl ? (
             <Image source={{ uri: participant.photoUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarFallback}>
               <Text style={styles.avatarInitial}>{conversation.kind === 'activity' ? '◷' : title.slice(0, 1).toUpperCase()}</Text>
             </View>
           )}
-          <View style={styles.rowCopy}>
+          <View style={[styles.rowCopy, activity && styles.activityRowCopy]}>
+            <View style={styles.rowHeading}>
+              {activity ? <Text style={styles.activityBadge}>ACTIVITY</Text> : null}
+            </View>
             <View style={styles.rowHeading}>
               <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{title}</Text>
-              <Text style={[styles.time, unread && styles.unreadTime]}>{relativeTime(conversation.updatedAt)}</Text>
+              <Text style={[styles.time, (unread || countdown) && styles.unreadTime]}>{countdown ?? relativeTime(conversation.updatedAt)}</Text>
             </View>
+            {activity ? <Text numberOfLines={1} style={styles.activityMeta}>{activitySubtitle(conversation.activityStartsAt, conversation.memberCount)}</Text> : null}
             <View style={styles.previewRow}>
               <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
-                {conversation.kind !== 'direct' || conversation.lastMessage?.senderId === participant?.userId ? '' : conversation.lastMessage ? 'You: ' : ''}
+                {senderPrefix}
                 {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : conversation.kind === 'group' ? 'Group created' : 'Conversation started')}
               </Text>
               {unread ? (
@@ -171,7 +195,7 @@ export function ConversationsScreen({
     const byId = new Map<string, ConversationSummary>();
     conversationHistory.data?.pages.flatMap((page) => page.items).forEach((conversation) => byId.set(conversation.id, conversation));
     inbox.data.forEach((conversation) => byId.set(conversation.id, conversation));
-    return [...byId.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    return [...byId.values()].sort((left, right) => compareConversations(left, right));
   }, [conversationHistory.data?.pages, inbox.data]);
   const pendingInvitation = inboxItems.find((conversation) => (
     conversation.kind === 'activity'
@@ -316,14 +340,21 @@ function createStyles(colors: ThemeColors) {
     deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     deleteIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 24 },
     deleteText: { marginTop: 2, color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-    row: { minHeight: 82, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' },
+    row: { minHeight: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+    activityRow: { minHeight: 101 },
     rowPressed: { backgroundColor: colors.surfaceRaised },
     avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.skeleton },
     avatarFallback: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     avatarInitial: { color: colors.onPrimary, fontSize: 21, fontWeight: '700' },
+    avatarStack: { width: 49, height: 57 },
+    stackedAvatarFallback: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderWidth: 2, borderColor: colors.canvas, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    stackedAvatarInitial: { color: colors.onPrimary, fontSize: 10, fontWeight: '700' },
     rowCopy: { flex: 1, height: 64, marginLeft: 13, justifyContent: 'center' },
+    activityRowCopy: { height: 86 },
     rowHeading: { flexDirection: 'row', alignItems: 'center' },
     name: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '600' },
+    activityBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', color: colors.primary, backgroundColor: 'rgba(230,57,70,0.16)', fontSize: 9, fontWeight: '700' },
+    activityMeta: { color: colors.textSecondary, marginTop: 2, fontSize: 13 },
     unreadName: { fontWeight: '800' },
     time: { color: colors.textMuted, marginLeft: 10, fontSize: 12 },
     unreadTime: { color: colors.primary, fontWeight: '700' },

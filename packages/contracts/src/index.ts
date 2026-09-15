@@ -661,9 +661,14 @@ export interface ConversationSummary {
   imageUrl: string | null;
   organizerId: string | null;
   invitationStatus: 'pending' | 'accepted' | 'declined' | null;
+  activityStartsAt: string | null;
+  activityAddress: string | null;
+  memberCount: number;
   lastMessage: {
     id: string;
     senderId: string;
+    senderDisplayName: string | null;
+    senderPhotoUrl: string | null;
     text: string;
     createdAt: string;
   } | null;
