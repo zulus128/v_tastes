@@ -26,6 +26,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import apple from '../../../assets/onboarding/apple.png';
 import google from '../../../assets/onboarding/google.png';
 import hero from '../../../assets/onboarding/hero.jpg';
+import heroRate from '../../../assets/onboarding/hero-rate.png';
+import heroFollow from '../../../assets/onboarding/hero-follow.png';
 import pattern from '../../../assets/onboarding/pattern.png';
 import { auth } from '../../infrastructure/firebase';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -368,53 +370,47 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
     { left: heroWidth * 0.31, top: pinTop(287) },
     { left: heroWidth * 0.81, top: pinTop(319) },
   ];
-  return (
-    <View style={styles.fullScreen}>
+  const slides = [
+    { image: hero, title: 'Discover the best places!', subtitle: 'Rate dishes and restaurants to get personalized\nrecommendations' },
+    { image: heroRate, title: 'Rate what you eat', subtitle: 'Score dishes and places in seconds — your taste profile builds itself.' },
+    { image: heroFollow, title: 'Follow people you trust', subtitle: 'Build a feed from people whose taste you know you can trust.' },
+  ];
+  return <ScrollView horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} style={styles.consentCarousel}>
+    {slides.map((slide, index) => <View key={slide.title} style={[styles.fullScreen, { width }]}>
       <View style={[styles.heroLayer, landscape ? { bottom: 0, right: undefined, width: heroWidth } : null, { height: heroHeight }]}>
-        <Image source={hero} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
+        <Image source={slide.image} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
         <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
         <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
         <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
         <RatingPin label="3.5" scale={heroScale} style={pinPositions[3]} />
       </View>
       <LinearGradient colors={isDark ? ['#560E0B', '#000000', '#000000'] : ['#F7E8E4', colors.canvas, colors.canvas]} locations={[0, 0.43, 1]} style={[styles.consentPanel, landscape ? styles.consentPanelLandscape : null, landscape ? { left: heroWidth, width: panelWidth } : null, { height: panelHeight }]}>
-        {/* pattern.png is dark linework on transparent, so on the dark theme's
-            near-black gradient it has to be tinted white to be visible at all —
-            same treatment EntryScreen gives it. */}
-        <ImageBackground
-          source={pattern}
-          resizeMode="cover"
-          imageStyle={isDark ? styles.panelPatternDark : styles.panelPattern}
-          style={styles.consentPanelBackground}
-        >
+        <ImageBackground source={pattern} resizeMode="cover" imageStyle={isDark ? styles.panelPatternDark : styles.panelPattern} style={styles.consentPanelBackground}>
           <SafeAreaView edges={landscape ? ['right', 'bottom'] : ['left', 'right', 'bottom']} style={styles.consentPanelBackground}>
-          <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.consentPrimary}>
-              <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
-              <View style={styles.consentCopy}>
-                <Text style={styles.consentTitle}>Discover the best places!</Text>
-                <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>
-                  Rate dishes and restaurants to get personalized{`\n`}recommendations
-                </Text>
-                <View style={styles.pager}><View style={styles.pagerActive} /><View style={styles.pagerDot} /><View style={styles.pagerDot} /></View>
+            <ScrollView bounces={false} contentContainerStyle={styles.consentScrollContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.consentPrimary}>
+                <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
+                <View style={styles.consentCopy}>
+                  <Text style={styles.consentTitle}>{slide.title}</Text>
+                  <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>{slide.subtitle}</Text>
+                  <View style={styles.pager}>{slides.map((_, dot) => <View key={dot} style={dot === index ? styles.pagerActive : styles.pagerDot} />)}</View>
+                </View>
+                <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
               </View>
-              <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
-            </View>
-            <View style={styles.socialSection}>
-              <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
-              <View style={styles.socialRow}>
-                <SocialButton icon={google} label="Google" onPress={busy ? () => undefined : onGoogle} />
-                {/* apple.png is a white silhouette; tint it so it's visible against the button's own surface color in either theme. */}
-                <SocialButton icon={apple} label="Apple" onPress={busy ? () => undefined : onApple} tint={colors.text} />
+              <View style={styles.socialSection}>
+                <View style={styles.orRow}><View style={styles.orLine} /><Text style={styles.orText}>or</Text><View style={styles.orLine} /></View>
+                <View style={styles.socialRow}>
+                  <SocialButton icon={google} label="Google" onPress={busy ? () => undefined : onGoogle} />
+                  <SocialButton icon={apple} label="Apple" onPress={busy ? () => undefined : onApple} tint={colors.text} />
+                </View>
+                <Text style={styles.legal}>By continuing you agree to our <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/terms')} style={styles.legalLink}>Terms of Service</Text> & <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/privacy')} style={styles.legalLink}>Privacy Policy</Text></Text>
               </View>
-              <Text style={styles.legal}>By continuing you agree to our <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/terms')} style={styles.legalLink}>Terms of Service</Text> & <Text accessibilityRole="link" onPress={() => void Linking.openURL('https://tastesapp.com/privacy')} style={styles.legalLink}>Privacy Policy</Text></Text>
-            </View>
-          </ScrollView>
+            </ScrollView>
           </SafeAreaView>
         </ImageBackground>
       </LinearGradient>
-    </View>
-  );
+    </View>)}
+  </ScrollView>;
 }
 
 function RatingPin({ label, scale, style }: { label: string; scale: number; style: { left: number; top: number } }) {
@@ -446,6 +442,7 @@ function PhoneScreen(props: {
   const { colors } = useAppTheme();
   const styles = useOnboardingStyles();
   const scrollLayout = useAuthScrollLayout(styles);
+  const [focused, setFocused] = useState(false);
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
       <PatternScreen>
@@ -463,7 +460,7 @@ function PhoneScreen(props: {
             <View onLayout={scrollLayout.onContentLayout} style={styles.authContent} testID="onboarding-phone-content">
               <Text style={styles.authTitle}>Your phone number</Text>
               <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
-              <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
+              <View style={[styles.phoneRow, (focused || props.digits) ? styles.phoneRowFocused : null, props.error ? styles.phoneRowError : null]}>
                 <Pressable onPress={props.onCountry} style={styles.countrySelector}>
                   <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
                 </Pressable>
@@ -472,6 +469,8 @@ function PhoneScreen(props: {
                   autoFocus
                   keyboardType="phone-pad"
                   onChangeText={props.onChange}
+                  onBlur={() => setFocused(false)}
+                  onFocus={() => setFocused(true)}
                   placeholder="Phone number"
                   placeholderTextColor={colors.placeholder}
                   style={styles.phoneInput}
@@ -604,6 +603,7 @@ function OtpScreen(props: {
 
 const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: number) => responsiveStyleSheet({
   fullScreen: { flex: 1, backgroundColor: colors.background },
+  consentCarousel: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroLayer: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
   hero: { position: 'absolute', left: 0, right: 0, width: '100%' },
@@ -643,8 +643,9 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   authTitle: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   authSubtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
   phoneSent: { color: colors.text },
-  phoneRow: { width: '100%', height: 44, marginTop: 17, borderBottomWidth: 1, borderBottomColor: colors.text, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  phoneRowError: { borderBottomColor: colors.danger },
+  phoneRow: { width: '100%', height: 60, marginTop: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: 16, backgroundColor: '#1A1A1C', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  phoneRowFocused: { borderWidth: 2, borderColor: '#E63946' },
+  phoneRowError: { borderWidth: 2, borderColor: '#E63946' },
   countrySelector: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flag: { color: colors.text, fontSize: 18 },
   callingCode: { color: colors.text, fontSize: 17 },
