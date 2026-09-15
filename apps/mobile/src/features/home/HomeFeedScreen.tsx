@@ -59,7 +59,10 @@ import { UserAvatar } from '../profile/avatar';
 import { useUnreadNotificationCount } from '../notifications/api';
 
 const tagInfo: Record<string, { label: string }> = {
+  'quick-bites': { label: '⚡ Quick bites' },
   casual: { label: 'Casual' },
+  fancy: { label: '🥂 Fancy' },
+  'night-out': { label: '🌙 Night out' },
   'date-night': { label: 'Date night' },
   birthday: { label: 'Birthday' },
   children: { label: 'With children' },

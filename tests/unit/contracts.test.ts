@@ -25,7 +25,7 @@ describe('public API contracts', () => {
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Great place',
-      tags: ['casual', 'date-night'],
+      tags: ['quick-bites'],
       dishReviews: [{
         id: 'dish-command-0001',
         title: 'Soup dumplings',
@@ -37,7 +37,7 @@ describe('public API contracts', () => {
       venueId: 'demo-cafe',
       rating: 5,
       text: 'Great place',
-      tags: ['casual', 'date-night'],
+      tags: ['quick-bites'],
       dishReviews: [{
         id: 'dish-command-0001',
         title: 'Soup dumplings',
@@ -45,6 +45,28 @@ describe('public API contracts', () => {
         photoPath: 'review-images/user-1/review-command-0001/dish-command-0001',
       }],
     });
+  });
+
+  it('accepts current review tags while preserving legacy review compatibility', () => {
+    for (const tag of ['quick-bites', 'casual', 'fancy', 'night-out']) {
+      expect(createReviewInputSchema.safeParse({
+        idempotencyKey: 'review-command-0001',
+        venueId: 'demo-cafe',
+        rating: 5,
+        text: 'Great place',
+        tags: [tag],
+        dishReviews: [],
+      }).success).toBe(true);
+    }
+
+    expect(createReviewInputSchema.safeParse({
+      idempotencyKey: 'review-command-0001',
+      venueId: 'demo-cafe',
+      rating: 5,
+      text: 'Existing review',
+      tags: ['date-night'],
+      dishReviews: [],
+    }).success).toBe(true);
   });
 
   it('rejects protected or malformed input', () => {

@@ -5,9 +5,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   ImageBackground,
@@ -36,9 +38,6 @@ import RatingScaleLight from '../../../assets/create-review/rating-scale-light.s
 import SaveCheck from '../../../assets/create-review/save-check.svg';
 import SelectPlaceCircle from '../../../assets/create-review/select-place-circle.svg';
 import SelectPlacePlus from '../../../assets/create-review/select-place-plus.svg';
-import TagBirthdayIcon from '../../../assets/create-review/tag-birthday.svg';
-import TagChildrenIcon from '../../../assets/create-review/tag-children.svg';
-import TagNightIcon from '../../../assets/create-review/tag-night.svg';
 import successGlow from '../../../assets/create-review/success-glow.png';
 import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
@@ -91,12 +90,13 @@ const dishRatingMarkers = [
   { value: 4.5, x: 310 },
   { value: 5, x: 352.313 },
 ] as const;
-const tagOptions: Array<{ label: string; value: ReviewTag }> = [
-  { label: 'Casual', value: 'casual' },
-  { label: 'Date night', value: 'date-night' },
-  { label: 'Birthday', value: 'birthday' },
-  { label: 'Children', value: 'children' },
+const tagOptions: Array<{ emoji: string; label: string; value: ReviewTag }> = [
+  { emoji: '⚡', label: 'Quick bites', value: 'quick-bites' },
+  { emoji: '🍽️', label: 'Casual', value: 'casual' },
+  { emoji: '🥂', label: 'Fancy', value: 'fancy' },
+  { emoji: '🌙', label: 'Night out', value: 'night-out' },
 ];
+const selectableReviewTags = new Set<ReviewTag>(tagOptions.map((tag) => tag.value));
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
 interface StoredReviewDraft {
@@ -142,6 +142,7 @@ export function CreateReviewScreen({
   const feedbackMaxHeight = responsiveSize(140);
   const [feedbackHeight, setFeedbackHeight] = useState(() => responsiveSize(50));
   const [tags, setTags] = useState<ReviewTag[]>([]);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
   const [placeSelectorOpen, setPlaceSelectorOpen] = useState(false);
   const [dishEditor, setDishEditor] = useState<DishReviewDraft | null>(null);
@@ -162,6 +163,18 @@ export function CreateReviewScreen({
   const hasDraftChanges = Boolean(
     venueId !== (initialVenueId ?? '') || rating > 0 || text.trim() || tags.length > 0 || dishes.length > 0,
   );
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -186,7 +199,9 @@ export function CreateReviewScreen({
         setSelectedVenue(draft.selectedVenue ?? null);
         setRating(draft.rating);
         setText(draft.text);
-        setTags(Array.isArray(draft.tags) ? draft.tags : []);
+        setTags(Array.isArray(draft.tags)
+          ? draft.tags.filter((tag): tag is ReviewTag => selectableReviewTags.has(tag)).slice(0, 1)
+          : []);
         setDishes(Array.isArray(draft.dishes) ? draft.dishes : []);
         if (typeof draft.idempotencyKey === 'string') setIdempotencyKey(draft.idempotencyKey);
       } catch {
@@ -361,7 +376,7 @@ export function CreateReviewScreen({
             )}
           </View>
 
-          <SectionLabel label="Your feedback" />
+          <SectionLabel label="Your review" />
           <TextInput
             maxLength={2_000}
             multiline
@@ -416,19 +431,17 @@ export function CreateReviewScreen({
             showsHorizontalScrollIndicator={false}
             style={styles.tagsScroll}
           >
-            {tagOptions.map((tag) => {
-              const selected = tags.includes(tag.value);
-              return (
-                <Pressable
-                  key={tag.value}
-                  onPress={() => setTags((items) => selected ? items.filter((item) => item !== tag.value) : [...items, tag.value])}
-                  style={[styles.tag, selected && styles.tagSelected]}
-                >
-                  <TagGlyph color={selected ? colors.onPrimary : colors.text} value={tag.value} />
-                  <Text maxFontSizeMultiplier={1.3} style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text>
-                </Pressable>
-              );
-            })}
+            {tagOptions.map((tag) => (
+              <ReviewTagPill
+                emoji={tag.emoji}
+                key={tag.value}
+                label={tag.label}
+                onPress={() => setTags((items) => items[0] === tag.value ? [] : [tag.value])}
+                reduceMotion={reduceMotion}
+                selected={tags[0] === tag.value}
+                styles={styles}
+              />
+            ))}
           </ScrollView>
         </ScrollView>
 
@@ -508,11 +521,67 @@ function SectionLabel({ label }: { label: string }) {
   return <Text maxFontSizeMultiplier={1.3} style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
 }
 
-function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
-  if (value === 'date-night') return <TagNightIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  if (value === 'birthday') return <TagBirthdayIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  if (value === 'children') return <TagChildrenIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  return null;
+function ReviewTagPill({
+  emoji,
+  label,
+  onPress,
+  reduceMotion,
+  selected,
+  styles,
+}: {
+  emoji: string;
+  label: string;
+  onPress: () => void;
+  reduceMotion: boolean;
+  selected: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const selection = useRef(new Animated.Value(selected ? 1 : 0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(selection, {
+      duration: reduceMotion ? 0 : 180,
+      easing: Easing.inOut(Easing.cubic),
+      toValue: selected ? 1 : 0,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, selected, selection]);
+
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={styles.tagPressable}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.tag, {
+          backgroundColor: selection.interpolate({
+            inputRange: [0, 1],
+            outputRange: [styles.tag.backgroundColor as string, '#B82F29'],
+          }),
+          borderColor: selection.interpolate({
+            inputRange: [0, 1],
+            outputRange: [styles.tag.borderColor as string, '#B82F29'],
+          }),
+        }]}
+      >
+        <Text allowFontScaling={false} style={styles.tagEmoji}>{emoji}</Text>
+        <Animated.Text
+          maxFontSizeMultiplier={1.3}
+          style={[styles.tagText, {
+            color: selection.interpolate({
+              inputRange: [0, 1],
+              outputRange: [styles.tagText.color as string, '#FFFFFF'],
+            }),
+          }]}
+        >{label}</Animated.Text>
+      </Animated.View>
+    </Pressable>
+  );
 }
 
 function RatingCurve({
@@ -538,6 +607,8 @@ function RatingCurve({
   // narrower screens (e.g. iPhone SE). Measure the space actually available
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
+  const [visualRating, setVisualRating] = useState(value);
+  const reduceMotion = useRef(false);
   const markerScale = scaleWidth / 359.903;
   const curvedLayout = !linear && heroWidth > 0 && heroHeight > 0
     ? concentricRatingLayout(
@@ -548,15 +619,17 @@ function RatingCurve({
     )
     : null;
   const arcGeometry = curvedLayout?.ratingArc;
-  const selectedPoint = value >= 1 ? ratingCurvePoint(value, arcGeometry) : null;
+  const selectedPoint = visualRating >= 1 ? ratingCurvePoint(visualRating, arcGeometry) : null;
   const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
   const pinPosition = useRef(new Animated.ValueXY({
     x: initialPinPoint.x - responsiveSize(22),
     y: initialPinPoint.y - responsiveSize(22),
   })).current;
   const dragging = useRef(false);
+  const settling = useRef(false);
   const dragStartRating = useRef(value);
-  const lastSnappedRating = useRef(value);
+  const currentDragRating = useRef(value);
+  const settleRating = useRef(new Animated.Value(value)).current;
   const interaction = useRef({ arcGeometry, onChange, value });
   interaction.current = { arcGeometry, onChange, value };
   const geometrySignature = [
@@ -575,6 +648,34 @@ function RatingCurve({
     });
   };
 
+  const setVisualPosition = (rating: number) => {
+    currentDragRating.current = rating;
+    setPinPosition(rating);
+    setVisualRating(rating);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) reduceMotion.current = enabled;
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      reduceMotion.current = enabled;
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const listener = settleRating.addListener(({ value: nextRating }) => setVisualPosition(nextRating));
+    return () => {
+      settleRating.stopAnimation();
+      settleRating.removeListener(listener);
+    };
+  }, [settleRating]);
+
   useEffect(() => {
     const geometryChanged = previousGeometrySignature.current !== geometrySignature;
     previousGeometrySignature.current = geometrySignature;
@@ -582,12 +683,43 @@ function RatingCurve({
       // A resize can interrupt delivery of the native release event. Explicitly
       // end the gesture so the old responder cannot keep the ScrollView locked.
       dragging.current = false;
-      lastSnappedRating.current = value;
+      settling.current = false;
+      settleRating.stopAnimation();
+      currentDragRating.current = value;
     }
-    if (value >= 1 && (!dragging.current || geometryChanged)) {
+    if (!dragging.current && !settling.current) {
+      setVisualRating(value);
+    }
+    if (value >= 1 && (!dragging.current || geometryChanged) && !settling.current) {
       setPinPosition(value, arcGeometry);
     }
-  }, [arcGeometry, geometrySignature, value, pinPosition]);
+  }, [arcGeometry, geometrySignature, value, pinPosition, settleRating]);
+
+  const settleToRating = (target: number) => {
+    dragging.current = false;
+    settling.current = true;
+    settleRating.stopAnimation();
+    settleRating.setValue(currentDragRating.current);
+    Animated.timing(settleRating, {
+      duration: reduceMotion.current ? 0 : 150,
+      easing: Easing.out(Easing.cubic),
+      toValue: target,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      settling.current = false;
+      if (!finished) return;
+      setVisualPosition(target);
+      interaction.current.onChange(target);
+    });
+  };
+
+  const selectRating = (rating: number) => {
+    settleRating.stopAnimation();
+    dragging.current = false;
+    settling.current = false;
+    setVisualPosition(rating);
+    interaction.current.onChange(rating);
+  };
 
   const pinPanResponder = useRef(PanResponder.create({
     // Claim immediately when the gesture starts on the pin. Waiting for a
@@ -598,8 +730,10 @@ function RatingCurve({
     onPanResponderGrant: () => {
       dragging.current = true;
       dragStartRating.current = interaction.current.value;
-      lastSnappedRating.current = interaction.current.value;
-      setPinPosition(interaction.current.value);
+      currentDragRating.current = interaction.current.value;
+      settleRating.stopAnimation();
+      settling.current = false;
+      setVisualPosition(interaction.current.value);
     },
     onPanResponderMove: (_event, gesture) => {
       if (!dragging.current) return;
@@ -609,21 +743,20 @@ function RatingCurve({
         start.y + gesture.dy,
         interaction.current.arcGeometry,
       );
-      setPinPosition(continuousRating);
-
-      const snappedRating = snapRating(continuousRating);
-      if (snappedRating !== lastSnappedRating.current) {
-        lastSnappedRating.current = snappedRating;
-        interaction.current.onChange(snappedRating);
-      }
+      setVisualPosition(continuousRating);
     },
-    onPanResponderRelease: () => {
-      dragging.current = false;
-      setPinPosition(lastSnappedRating.current);
+    onPanResponderRelease: (_event, gesture) => {
+      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
+      const coast = responsiveSize(18);
+      const projectedRating = ratingForCurvePoint(
+        start.x + gesture.dx + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vx * coast)),
+        start.y + gesture.dy + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vy * coast)),
+        interaction.current.arcGeometry,
+      );
+      settleToRating(snapRating(projectedRating));
     },
     onPanResponderTerminate: () => {
-      dragging.current = false;
-      setPinPosition(lastSnappedRating.current);
+      settleToRating(snapRating(currentDragRating.current));
     },
     onPanResponderTerminationRequest: () => false,
   })).current;
@@ -645,18 +778,18 @@ function RatingCurve({
       <Text
         allowFontScaling={false}
         style={[ratingStyles.value, curvedLayout && { top: innerBottom - responsiveSize(149) }]}
-      >{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
+      >{visualRating >= 1 ? visualRating.toFixed(Math.abs(visualRating - Math.round(visualRating)) < 0.03 ? 0 : 1) : '–'}</Text>
       <View style={[ratingStyles.stars, curvedLayout && { top: innerBottom - responsiveSize(106) }]}>
         {Array.from({ length: 5 }, (_, index) => {
           const star = index + 1;
-          const fill = Math.max(0, Math.min(1, value - index));
+          const fill = Math.max(0, Math.min(1, visualRating - index));
           return (
             <Pressable
               accessibilityLabel={`${star} stars`}
               accessibilityRole="button"
               hitSlop={4}
               key={star}
-              onPress={() => onChange(star)}
+              onPress={() => selectRating(star)}
               style={ratingStyles.starButton}
             >
               <View style={ratingStyles.starGlyph}>
@@ -774,14 +907,14 @@ function RatingCurve({
             ) : null}
           </Svg>
           {reviewRatingMarkers.map((marker) => {
-            const active = marker.value <= value;
+            const active = marker.value <= visualRating;
             const point = ratingCurvePoint(marker.value, arcGeometry);
             return (
               <Pressable
                 accessibilityLabel={`${marker.value} stars`}
                 accessibilityRole="button"
                 key={marker.value}
-                onPress={() => onChange(marker.value)}
+                onPress={() => selectRating(marker.value)}
                 style={[ratingStyles.pointHit, {
                   left: point.x - responsiveSize(22),
                   top: point.y - responsiveSize(22),
@@ -801,14 +934,14 @@ function RatingCurve({
               </Pressable>
             );
           })}
-          {value >= 1 ? (
+          {visualRating >= 1 ? (
             <Animated.View
               accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-              accessibilityLabel={`${value} stars. Swipe left or right to adjust.`}
+              accessibilityLabel={`${visualRating.toFixed(1)} stars. Swipe left or right to adjust.`}
               accessibilityRole="adjustable"
               onAccessibilityAction={({ nativeEvent }) => {
                 const delta = nativeEvent.actionName === 'increment' ? 0.5 : -0.5;
-                onChange(snapRating(value + delta));
+                selectRating(snapRating(visualRating + delta));
               }}
               style={[ratingStyles.pointHit, ratingStyles.dragPin, pinPosition.getLayout()]}
               {...pinPanResponder.panHandlers}
@@ -1203,12 +1336,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   addDishText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
   tagsScroll: { flexGrow: 0 },
   tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18, alignItems: 'center' },
-  tag: { height: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 999, alignItems: 'center', alignSelf: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  tagSelected: { borderColor: colors.primary, backgroundColor: '#D33B35' },
+  tagPressable: { height: 34, borderRadius: 999, alignSelf: 'center' },
+  tag: { height: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 999, alignItems: 'center', alignSelf: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  tagEmoji: { fontSize: 14, lineHeight: 18 },
   tagText: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.23 },
-  tagTextSelected: { color: '#fff' },
   footer: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingHorizontal: 36 },
-  post: { height: 58, borderWidth: 5, borderColor: isDark ? '#4C1816' : '#FFFFFF', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' },
+  post: { height: 54, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E63946', shadowColor: '#E53845', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 13, elevation: 10 },
   postDisabled: { opacity: 0.45 },
   postText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });
