@@ -243,6 +243,8 @@ function MainTabs({
         <Tabs.Screen
           name="Dialog"
           options={{
+            tabBarLabel: 'Chats',
+            title: 'Chats',
             tabBarBadge: unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
             tabBarBadgeStyle: {
               backgroundColor: colors.primary,

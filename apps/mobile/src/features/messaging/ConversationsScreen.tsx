@@ -220,7 +220,7 @@ export function ConversationsScreen({
       await api.hideConversation({ conversationId });
       await conversationHistory.refetch();
     } catch {
-      Alert.alert('Could not delete dialog', 'Please try again.');
+      Alert.alert('Could not delete chat', 'Please try again.');
     } finally {
       setDeletingId(null);
     }
@@ -231,8 +231,8 @@ export function ConversationsScreen({
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.titleRow}>
           <View style={styles.headerButton} />
-          <Text style={styles.title}>Dialog</Text>
-          <Pressable accessibilityLabel="New dialog" onPress={() => setNewDialogOpen(true)} style={styles.headerButton}>
+          <Text style={styles.title}>Chats</Text>
+          <Pressable accessibilityLabel="New chat" onPress={() => setNewDialogOpen(true)} style={styles.headerButton}>
             <View style={styles.addCircle}><Text style={styles.addText}>+</Text></View>
           </Pressable>
         </View>
