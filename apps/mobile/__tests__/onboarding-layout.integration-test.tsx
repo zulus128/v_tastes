@@ -82,6 +82,41 @@ describe('onboarding in resizable windows', () => {
     expect(scroll).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
   });
 
+  it('shows the Figma active and filled states while entering an OTP', async () => {
+    resize(402, 874);
+    await render(<OnboardingFlow initialScreen="otp" visualAudit />, { wrapper: Providers });
+    const input = screen.getByDisplayValue('');
+    const button = screen.getByRole('button', { name: 'Continue' });
+    const glow = StyleSheet.flatten(screen.getByTestId('onboarding-primary-button-glow').props.style);
+
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ backgroundColor: '#E63946' });
+    expect(glow).toMatchObject({
+      shadowColor: '#E53845',
+      shadowOpacity: 0.55,
+      shadowRadius: 13,
+    });
+
+    await fireEvent(input, 'focus');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+
+    await fireEvent.changeText(input, '13');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      backgroundColor: '#1A1A1C',
+      borderColor: '#FFFFFF',
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-2').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-3').props.style)).toMatchObject({
+      backgroundColor: '#141416',
+      borderColor: 'rgba(255,255,255,0.18)',
+    });
+  });
+
   it.each([[393, 852], [667, 375], [800, 500], [600, 600], [1024, 600]])(
     'keeps appearance choices scrollable above Continue at %sx%s',
     async (width, height) => {

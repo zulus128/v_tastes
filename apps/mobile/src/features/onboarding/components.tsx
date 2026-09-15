@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import type { PropsWithChildren } from 'react';
 import {
   ActivityIndicator,
@@ -82,17 +81,12 @@ export function PrimaryButton({
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
   const { scale } = useResponsiveMetrics();
-  // Figma stacks a white-to-pink gradient stroke on top of the button's base
-  // flat #4C1816 stroke only in the decorated variant; the plain variant (and
-  // every dark-theme instance) keeps the flat stroke with no gradient.
   return (
-    <LinearGradient
-      colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
-      end={{ x: 0.5, y: 1 }}
-      start={{ x: 0.5, y: 0 }}
-      style={[styles.primaryButtonRing, style]}
+    <View
+      style={[styles.primaryButtonGlow, (disabled || loading) && styles.disabled, style]}
+      testID="onboarding-primary-button-glow"
     >
       <Pressable
         accessibilityRole="button"
@@ -100,14 +94,12 @@ export function PrimaryButton({
         onPress={onPress}
         style={({ pressed }) => [
           styles.primaryButton,
-          { backgroundColor: colors.primary },
-          (disabled || loading) && styles.disabled,
           pressed && styles.pressed,
         ]}
       >
         {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={[styles.primaryContent, { gap: responsiveValue(contentGap, scale) }]}>{icon ? <Image source={icon} style={{ width: responsiveValue(iconSize, scale), height: responsiveValue(iconSize, scale) }} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
       </Pressable>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -133,16 +125,25 @@ const styles = responsiveStyleSheet({
     justifyContent: 'center',
   },
   backIcon: { width: 24, height: 24 },
-  primaryButtonRing: {
+  primaryButtonGlow: {
     height: 54,
     borderRadius: theme.radius.button,
-    padding: 5,
+    shadowColor: '#E53845',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 13,
+    elevation: 9,
   },
   primaryButton: {
     flex: 1,
     borderRadius: theme.radius.button,
+    backgroundColor: '#E63946',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#E53845',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 7,
   },
   primaryLabel: { fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   primaryContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },

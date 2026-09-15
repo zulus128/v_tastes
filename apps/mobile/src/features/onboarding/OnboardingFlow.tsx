@@ -544,6 +544,7 @@ function OtpScreen(props: {
 }) {
   const styles = useOnboardingStyles();
   const scrollLayout = useAuthScrollLayout(styles);
+  const [focused, setFocused] = useState(false);
   const error = props.state === 'incorrect'
     ? 'Incorrect code. Try again.'
     : props.state === 'expired'
@@ -574,7 +575,24 @@ function OtpScreen(props: {
               <Text style={styles.authTitle}>Enter code</Text>
               <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
               <View style={styles.otpRow}>
-                {[0, 1, 2, 3].map((index) => <View key={index} style={[styles.otpCell, error ? styles.otpCellError : null]}><Text style={styles.otpDigit}>{props.code[index] ?? ''}</Text></View>)}
+                {[0, 1, 2, 3].map((index) => {
+                  const digit = props.code[index] ?? '';
+                  const active = focused && !error && index === Math.min(props.code.length, 3);
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.otpCell,
+                        digit ? styles.otpCellFilled : styles.otpCellEmpty,
+                        active ? styles.otpCellActive : null,
+                        error ? styles.otpCellError : null,
+                      ]}
+                      testID={`onboarding-otp-cell-${index}`}
+                    >
+                      {active && !digit ? <View style={styles.otpCaret} /> : <Text style={styles.otpDigit}>{digit}</Text>}
+                    </View>
+                  );
+                })}
               </View>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               {props.resendSeconds > 0 && !error ? <Text style={styles.resendMuted}>Resend code in 0:{String(props.resendSeconds).padStart(2, '0')}</Text> : null}
@@ -585,7 +603,9 @@ function OtpScreen(props: {
                 caretHidden
                 keyboardType="number-pad"
                 maxLength={4}
+                onBlur={() => setFocused(false)}
                 onChangeText={props.onChange}
+                onFocus={() => setFocused(true)}
                 style={styles.hiddenOtpInput}
                 textContentType="oneTimeCode"
                 value={props.code}
@@ -666,9 +686,13 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   countryCode: { color: colors.textMuted, fontSize: 16 },
   otpContent: { width: '100%', minHeight: 190, alignItems: 'center' },
   otpRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  otpCellError: { borderColor: colors.danger },
-  otpDigit: { color: colors.text, fontSize: 17 },
+  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  otpCellEmpty: { borderColor: 'rgba(255,255,255,0.18)', backgroundColor: '#141416' },
+  otpCellFilled: { borderColor: '#FFFFFF', backgroundColor: '#1A1A1C' },
+  otpCellActive: { borderWidth: 2, borderColor: '#E63946', backgroundColor: '#1A1A1C' },
+  otpCellError: { borderWidth: 2, borderColor: colors.danger },
+  otpCaret: { width: 2, height: 20, borderRadius: 1, backgroundColor: '#E63946' },
+  otpDigit: { color: colors.text, fontSize: 17, lineHeight: 18, letterSpacing: -0.41 },
   resendMuted: { color: colors.textMuted, fontSize: 12, marginTop: 10 },
   resendLink: { color: colors.primary, fontSize: 12, marginTop: 8 },
   localCode: { color: colors.textSecondary, fontSize: 11, marginTop: 8 },
