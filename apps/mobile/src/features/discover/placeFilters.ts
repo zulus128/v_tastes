@@ -30,13 +30,6 @@ export function matchesPlaceFilters(place: FilterablePlace, filters: string[]) {
   const budgets = filters.filter((value) => /^\${1,3}\s/.test(value));
   if (budgets.length > 0 && !budgets.some((value) => value.startsWith('$'.repeat(place.priceLevel ?? 1)))) return false;
 
-  const coffee = filters.filter((value) => ['Matcha 🍵', 'Coffee ☕', 'Vegan coffee 🥛'].includes(value));
-  if (coffee.length > 0 && !coffee.some((value) => (
-    (value === 'Matcha 🍵' && category.includes('matcha'))
-    || (value === 'Coffee ☕' && (category.includes('coffee') || category.includes('cafe')))
-    || (value === 'Vegan coffee 🥛' && (category.includes('vegan') || category.includes('cafe')))
-  ))) return false;
-
   if (filters.includes('Vegetarian 🥦') && !/vegetarian|vegan/.test(category)) return false;
 
   const maximumDistance = Number.parseFloat(valueFor(filters, 'Distance') ?? '');
