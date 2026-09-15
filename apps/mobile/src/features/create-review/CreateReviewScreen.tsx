@@ -7,12 +7,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,10 +52,13 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
+import {
+  concentricRatingLayout,
+  ratingCurvePoint,
+  ratingForCurvePoint,
+  snapRating,
+} from './ratingCurveGeometry';
 
-const ratingCircle = { centerX: 169, centerY: -36.8226, radius: 167.8226 };
-const ratingCircleY = (x: number) => ratingCircle.centerY
-  + Math.sqrt((ratingCircle.radius ** 2) - ((x - ratingCircle.centerX) ** 2));
 // Figma (node 5978:18283, "Rectangle 9946") draws the hero card's rounded bottom as a plain
 // CSS corner-radius (210) on the full-width card, independent of the rating arc's own circle
 // (node 5700:5935, centerX/centerY/radius above) — so the gap between the arc and the card's
@@ -64,38 +69,16 @@ const ratingCircleY = (x: number) => ratingCircle.centerY
 // unchanged from the original 210-radius version (it already left ~31px under the arc's
 // deepest point; this just makes that clearance uniform instead of only happening at center).
 const heroCurveGap = 31;
-// The curve's own SVG is 338pt wide, but the selected-star pin (a 38pt badge, hit target 44pt)
-// sticks out ~22pt past the curve's drawn endpoints — so the widget actually needs ~382pt of
-// clear width to show the end pins in full (matches the ~21pt margin Figma itself leaves
-// around the pin within its 402pt-wide "rating" frame). Below that, shrink the whole curve
-// uniformly instead of letting the end pins get clipped by the hero card's edge.
-const curveDesignWidth = 382;
-const curveScaleFor = (availableWidth: number) => Math.min(1, availableWidth / curveDesignWidth);
-function heroCurveGeometry(heroWidth: number) {
-  // Hero has 16pt of padding on each side; that's the width actually available to the curve,
-  // so the background arc shrinks in lockstep with it and stays concentric.
-  const innerRadius = ratingCircle.radius * curveScaleFor(heroWidth - 32);
-  const outerRadius = innerRadius + heroCurveGap;
-  const halfWidth = heroWidth / 2;
-  // A circle can't span a chord wider than its own diameter — grow the radius just enough to
-  // still reach edge to edge on an unusually wide screen (flattening the curve slightly there)
-  // instead of leaving it too small, which would silently force the SVG arc below to scale up
-  // its own radius to close the path, leaving this computed height out of sync with what
-  // actually renders.
-  const radius = Math.max(outerRadius, halfWidth + 1);
-  const centerY = -Math.sqrt(Math.max(0, radius ** 2 - halfWidth ** 2));
-  return { height: radius + centerY, radius };
-}
 const reviewRatingMarkers = [
-  { kind: 'dot', value: 1, x: 7, y: ratingCircleY(7) },
-  { kind: 'tick', rotation: -30, value: 1.5, x: 25, y: ratingCircleY(25) },
-  { kind: 'dot', value: 2, x: 58, y: ratingCircleY(58) },
-  { kind: 'tick', rotation: -70, value: 2.5, x: 111, y: ratingCircleY(111) },
-  { kind: 'dot', value: 3, x: 169, y: ratingCircleY(169) },
-  { kind: 'tick', rotation: 70, value: 3.5, x: 227, y: ratingCircleY(227) },
-  { kind: 'dot', value: 4, x: 278, y: ratingCircleY(278) },
-  { kind: 'tick', rotation: 30, value: 4.5, x: 313, y: ratingCircleY(313) },
-  { kind: 'dot', value: 5, x: 331, y: ratingCircleY(331) },
+  { kind: 'dot', value: 1 },
+  { kind: 'tick', rotation: -30, value: 1.5 },
+  { kind: 'dot', value: 2 },
+  { kind: 'tick', rotation: -70, value: 2.5 },
+  { kind: 'dot', value: 3 },
+  { kind: 'tick', rotation: 70, value: 3.5 },
+  { kind: 'dot', value: 4 },
+  { kind: 'tick', rotation: 30, value: 4.5 },
+  { kind: 'dot', value: 5 },
 ] as const;
 const dishRatingMarkers = [
   { value: 1, x: 7.59038 },
@@ -150,6 +133,7 @@ export function CreateReviewScreen({
   // size — its bottom edge is drawn concentric with the rating arc (see heroCurveGeometry)
   // instead of an independently-radiused CSS corner, so the gap to the arc stays constant.
   const [heroSize, setHeroSize] = useState({ height: 0, width: 0 });
+  const [venueCardBottom, setVenueCardBottom] = useState(0);
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
@@ -327,6 +311,7 @@ export function CreateReviewScreen({
                 heroHeight={heroSize.height}
                 heroWidth={heroSize.width}
                 locations={[0, 0.65982, 1]}
+                minimumStraightBottom={venueCardBottom + responsiveSize(12)}
               />
             ) : null}
             <View style={styles.navigation}>
@@ -336,7 +321,11 @@ export function CreateReviewScreen({
             </View>
             {venue ? (
               <>
-                <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.venueCard}>
+                <Pressable
+                  onLayout={({ nativeEvent }) => setVenueCardBottom(nativeEvent.layout.y + nativeEvent.layout.height)}
+                  onPress={() => setPlaceSelectorOpen(true)}
+                  style={styles.venueCard}
+                >
                   <Image source={venueImage(venue.imageUrl)} style={styles.venueImage} />
                   <View style={styles.venueCopy}>
                     <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
@@ -349,7 +338,13 @@ export function CreateReviewScreen({
                 {/* Fixed-height card above the arc — the venue name/address are capped so a
                     larger accessibility text size can't grow the hero past its designed height
                     and pull the arc out of alignment with the card's rounded bottom. */}
-                <RatingCurve heroWidth={heroSize.width} onChange={setRating} value={rating} />
+                <RatingCurve
+                  heroHeight={heroSize.height}
+                  heroWidth={heroSize.width}
+                  minimumStraightBottom={venueCardBottom + responsiveSize(12)}
+                  onChange={setRating}
+                  value={rating}
+                />
               </>
             ) : (
               <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.selectPlace}>
@@ -516,13 +511,17 @@ function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
 }
 
 function RatingCurve({
+  heroHeight = 0,
   heroWidth = 0,
   linear = false,
+  minimumStraightBottom = 0,
   onChange,
   value,
 }: {
+  heroHeight?: number;
   heroWidth?: number;
   linear?: boolean;
+  minimumStraightBottom?: number;
   onChange: (value: number) => void;
   value: number;
 }) {
@@ -530,24 +529,98 @@ function RatingCurve({
   const accent = '#B82F29';
   const curveBase = isDark ? '#3D1A1C' : '#FFCBCE';
   const curvePoint = isDark ? '#120606' : '#FFFFFF';
-  const selectedMarker = reviewRatingMarkers.find((marker) => marker.value === value);
   // The scale asset is authored at a fixed 359.903pt canvas, which overflows
   // narrower screens (e.g. iPhone SE). Measure the space actually available
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
   const markerScale = scaleWidth / 359.903;
-  // Same idea for the curved scale: shrink the whole arc+pins as one unit (see
-  // curveDesignWidth) rather than let the end pins overflow the hero card's edge.
-  const curveScale = heroWidth > 0
-    ? Math.min(1, (heroWidth - 32) / responsiveSize(curveDesignWidth))
-    : 1;
+  const curvedLayout = !linear && heroWidth > 0 && heroHeight > 0
+    ? concentricRatingLayout(
+      heroWidth,
+      heroHeight,
+      minimumStraightBottom,
+      responsiveSize(heroCurveGap),
+    )
+    : null;
+  const arcGeometry = curvedLayout?.ratingArc;
+  const selectedPoint = value >= 1 ? ratingCurvePoint(value, arcGeometry) : null;
+  const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
+  const pinPosition = useRef(new Animated.ValueXY({
+    x: initialPinPoint.x - responsiveSize(22),
+    y: initialPinPoint.y - responsiveSize(22),
+  })).current;
+  const dragging = useRef(false);
+  const dragStartRating = useRef(value);
+  const lastSnappedRating = useRef(value);
+  const interaction = useRef({ arcGeometry, onChange, value });
+  interaction.current = { arcGeometry, onChange, value };
+
+  const setPinPosition = (rating: number, geometry = interaction.current.arcGeometry) => {
+    const point = ratingCurvePoint(rating, geometry);
+    pinPosition.setValue({
+      x: point.x - responsiveSize(22),
+      y: point.y - responsiveSize(22),
+    });
+  };
+
+  useEffect(() => {
+    if (value >= 1 && !dragging.current) setPinPosition(value, arcGeometry);
+  }, [arcGeometry, value, pinPosition]);
+
+  const pinPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      dragging.current = true;
+      dragStartRating.current = interaction.current.value;
+      lastSnappedRating.current = interaction.current.value;
+      setPinPosition(interaction.current.value);
+    },
+    onPanResponderMove: (_event, gesture) => {
+      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
+      const continuousRating = ratingForCurvePoint(
+        start.x + gesture.dx,
+        start.y + gesture.dy,
+        interaction.current.arcGeometry,
+      );
+      setPinPosition(continuousRating);
+
+      const snappedRating = snapRating(continuousRating);
+      if (snappedRating !== lastSnappedRating.current) {
+        lastSnappedRating.current = snappedRating;
+        interaction.current.onChange(snappedRating);
+      }
+    },
+    onPanResponderRelease: () => {
+      dragging.current = false;
+      setPinPosition(lastSnappedRating.current);
+    },
+    onPanResponderTerminate: () => {
+      dragging.current = false;
+      setPinPosition(lastSnappedRating.current);
+    },
+    onPanResponderTerminationRequest: () => false,
+  })).current;
+  const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (
-    <View style={ratingStyles.wrap}>
+    <View style={[
+      ratingStyles.wrap,
+      curvedLayout && {
+        bottom: 0,
+        height: curvedLayout.arcDepth,
+        left: 0,
+        position: 'absolute',
+        width: heroWidth,
+      },
+    ]}>
       {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt
           out of font scaling entirely rather than drifting out of alignment with it. Screen
           readers still get the rating via each star's accessibilityLabel. */}
-      <Text allowFontScaling={false} style={ratingStyles.value}>{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
-      <View style={ratingStyles.stars}>
+      <Text
+        allowFontScaling={false}
+        style={[ratingStyles.value, curvedLayout && { top: innerBottom - responsiveSize(149) }]}
+      >{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
+      <View style={[ratingStyles.stars, curvedLayout && { top: innerBottom - responsiveSize(106) }]}>
         {Array.from({ length: 5 }, (_, index) => {
           const star = index + 1;
           const fill = Math.max(0, Math.min(1, value - index));
@@ -635,41 +708,60 @@ function RatingCurve({
             </>
           ) : null}
         </View>
-      ) : (
-        <View style={[ratingStyles.curve, curveScale < 1 && { transform: [{ scale: curveScale }] }]}>
-          <Svg height={responsiveSize(139)} pointerEvents="none" viewBox="0 0 338 139" width={responsiveSize(338)} style={StyleSheet.absoluteFill}>
+      ) : curvedLayout && arcGeometry ? (
+        <View style={[ratingStyles.curve, { height: curvedLayout.arcDepth, width: heroWidth }]}>
+          <Svg
+            height={curvedLayout.arcDepth}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+            viewBox={`0 0 ${heroWidth} ${curvedLayout.arcDepth}`}
+            width={heroWidth}
+          >
             <Defs>
               <ClipPath id="review-rating-progress">
-                <Rect height={139} width={selectedMarker?.x ?? 0} x={0} y={0} />
+                <Rect height={curvedLayout.arcDepth} width={selectedPoint?.x ?? 0} x={0} y={0} />
               </ClipPath>
             </Defs>
-            <Path d="M7 7 A167.8226 167.8226 0 0 0 169 131" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
-            <Path d="M169 131 A167.8226 167.8226 0 0 0 331 7" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
-            {selectedMarker ? (
+            <Path
+              d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
+              fill="none"
+              stroke={curveBase}
+              strokeLinecap="round"
+              strokeWidth={responsiveSize(4)}
+            />
+            <Path
+              d={`M${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
+              fill="none"
+              stroke={curveBase}
+              strokeLinecap="round"
+              strokeWidth={responsiveSize(4)}
+            />
+            {selectedPoint ? (
               <Path
                 clipPath="url(#review-rating-progress)"
-                d="M7 7 A167.8226 167.8226 0 0 0 169 131 A167.8226 167.8226 0 0 0 331 7"
+                d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
                 fill="none"
                 stroke={accent}
                 strokeLinecap="round"
-                strokeWidth={4}
+                strokeWidth={responsiveSize(4)}
               />
             ) : null}
           </Svg>
           {reviewRatingMarkers.map((marker) => {
-            const selected = marker.value === value;
             const active = marker.value <= value;
+            const point = ratingCurvePoint(marker.value, arcGeometry);
             return (
               <Pressable
                 accessibilityLabel={`${marker.value} stars`}
                 accessibilityRole="button"
                 key={marker.value}
                 onPress={() => onChange(marker.value)}
-                style={[ratingStyles.pointHit, { left: responsiveSize(marker.x - 22), top: responsiveSize(marker.y - 22) }]}
+                style={[ratingStyles.pointHit, {
+                  left: point.x - responsiveSize(22),
+                  top: point.y - responsiveSize(22),
+                }]}
               >
-                {selected ? (
-                  <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
-                ) : marker.kind === 'dot' ? (
+                {marker.kind === 'dot' ? (
                   <View style={[ratingStyles.point, { backgroundColor: curvePoint, borderColor: active ? accent : curveBase }]} />
                 ) : (
                   <View
@@ -683,8 +775,23 @@ function RatingCurve({
               </Pressable>
             );
           })}
+          {value >= 1 ? (
+            <Animated.View
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              accessibilityLabel={`${value} stars. Swipe left or right to adjust.`}
+              accessibilityRole="adjustable"
+              onAccessibilityAction={({ nativeEvent }) => {
+                const delta = nativeEvent.actionName === 'increment' ? 0.5 : -0.5;
+                onChange(snapRating(value + delta));
+              }}
+              style={[ratingStyles.pointHit, ratingStyles.dragPin, pinPosition.getLayout()]}
+              {...pinPanResponder.panHandlers}
+            >
+              <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
+            </Animated.View>
+          ) : null}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -695,21 +802,36 @@ function RatingCurve({
 // the card's edge reads as constant all the way across instead of widening toward the
 // center, where a plain corner-radius would otherwise leave a mismatched pocket of empty
 // space under the arc's deepest point (visible as extra dark background there).
-function HeroBackground({ borderColor, colors, heroHeight, heroWidth, locations }: {
+function HeroBackground({
+  borderColor,
+  colors,
+  heroHeight,
+  heroWidth,
+  locations,
+  minimumStraightBottom,
+}: {
   borderColor: string;
   colors: string[];
   heroHeight: number;
   heroWidth: number;
   locations: number[];
+  minimumStraightBottom: number;
 }) {
-  const { height: arcDepth, radius } = heroCurveGeometry(heroWidth);
-  const straightBottom = Math.max(0, heroHeight - arcDepth);
+  const {
+    outerRadius,
+    straightBottom,
+  } = concentricRatingLayout(
+    heroWidth,
+    heroHeight,
+    minimumStraightBottom,
+    responsiveSize(heroCurveGap),
+  );
   const centerX = heroWidth / 2;
   // Traversal order matters for the sweep-flag below: this mirrors the rating arc's own two
   // segments (left-edge → center-bottom → right-edge, both "0 0" flags) exactly. Going the
   // other way around with the same flags picks the other/complementary circle and produces a
   // self-intersecting path — a sharp V instead of a smooth dip.
-  const d = `M0,${straightBottom} A${radius},${radius} 0 0 0 ${centerX},${heroHeight} A${radius},${radius} 0 0 0 ${heroWidth},${straightBottom} L${heroWidth},0 L0,0 Z`;
+  const d = `M0,${straightBottom} A${outerRadius},${outerRadius} 0 0 0 ${centerX},${heroHeight} A${outerRadius},${outerRadius} 0 0 0 ${heroWidth},${straightBottom} L${heroWidth},0 L0,0 Z`;
   return (
     <Svg height={heroHeight} pointerEvents="none" style={StyleSheet.absoluteFill} width={heroWidth}>
       <Defs>
@@ -1009,10 +1131,11 @@ const ratingStyles = responsiveStyleSheet({
   starOutline: { position: 'absolute', color: '#B82F29', opacity: 0.3, fontSize: 29, lineHeight: 30 },
   starFillClip: { position: 'absolute', height: 30, overflow: 'hidden' },
   starFill: { width: 26, color: '#B82F29', fontSize: 27, lineHeight: 30 },
-  curve: { position: 'absolute', top: 36, width: 338, height: 139 },
+  curve: { position: 'absolute', left: 0, top: 0 },
   scale: { position: 'absolute', top: 116, alignSelf: 'center', width: '100%', maxWidth: 359.903, height: 44, justifyContent: 'center' },
   linearProgress: { position: 'absolute', left: 0, top: 14.4096 },
   pointHit: { position: 'absolute', zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dragPin: { zIndex: 6 },
   linearPointHit: { position: 'absolute', top: 0, zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   point: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
   tick: { width: 12, height: 2, borderRadius: 1 },
