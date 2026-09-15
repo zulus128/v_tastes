@@ -117,7 +117,8 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     ? (userProfile.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string').map((value) => value.toLocaleLowerCase())
     : [];
   const favoriteDish = String((userProfile.get('tastePreferences') as { favoriteDish?: unknown } | undefined)?.favoriteDish ?? '').trim().toLocaleLowerCase();
-  const [trending, newSpots, mostReviewed, forYouCandidates, hiddenGems, reviewsSnapshot, topReviewerSnapshot] = await Promise.all([
+  const userRef = db.collection('users').doc(uid);
+  const [trending, newSpots, mostReviewed, forYouCandidates, hiddenGems, reviewsSnapshot, topReviewerSnapshot, ownReviews, savedVenues, following] = await Promise.all([
     fetchTaggedVenues('trending', 'rating', 'desc', 3),
     fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
     fetchTaggedVenues('most-reviewed', 'reviewCount', 'desc', 6),
@@ -125,17 +126,72 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
     db.collection('reviews').where('status', '==', 'published').orderBy('reactionCount', 'desc').limit(3).get(),
     db.collection('users').where('status', '==', 'active').orderBy('reviewCount', 'desc').limit(10).get(),
+    db.collection('reviews').where('authorId', '==', uid).where('status', '==', 'published').limit(100).get(),
+    userRef.collection('savedVenues').limit(100).get(),
+    userRef.collection('following').limit(50).get(),
   ]);
+  const preferenceVenueIds = [...new Set([
+    ...ownReviews.docs.map((review) => String(review.get('venueId') ?? '')),
+    ...savedVenues.docs.map((saved) => String(saved.get('venueId') ?? saved.id)),
+  ].filter(Boolean))];
+  const [preferenceVenues, followedProfiles] = await Promise.all([
+    preferenceVenueIds.length > 0
+      ? db.getAll(...preferenceVenueIds.map((id) => db.collection('venues').doc(id)))
+      : Promise.resolve([]),
+    following.docs.length > 0
+      ? db.getAll(...following.docs.map((edge) => db.collection('users').doc(edge.id)))
+      : Promise.resolve([]),
+  ]);
+  const categoryByVenue = new Map(preferenceVenues.map((venue) => [venue.id, String(venue.get('category') ?? '')]));
+  const cuisineWeights = new Map<string, number>();
+  favoriteCuisines.forEach((cuisine) => cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 1));
+  ownReviews.docs.forEach((review) => {
+    const cuisine = String(review.get('cuisine') ?? categoryByVenue.get(String(review.get('venueId') ?? '')) ?? '').trim().toLocaleLowerCase();
+    if (cuisine) cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 3);
+  });
+  savedVenues.docs.forEach((saved) => {
+    const cuisine = String(categoryByVenue.get(String(saved.get('venueId') ?? saved.id)) ?? '').trim().toLocaleLowerCase();
+    if (cuisine) cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 2);
+  });
+  const moodWeights = new Map<string, number>();
+  ownReviews.docs.forEach((review) => {
+    const tags = Array.isArray(review.get('tags')) ? review.get('tags') as unknown[] : [];
+    tags.filter((tag): tag is string => typeof tag === 'string').forEach((tag) => moodWeights.set(tag, (moodWeights.get(tag) ?? 0) + 1));
+  });
+  const friendTastes = followedProfiles.flatMap((profile) => {
+    const cuisines = Array.isArray(profile.get('favoriteCuisines'))
+      ? (profile.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string')
+      : [];
+    return cuisines.map((cuisine) => ({ cuisine: cuisine.toLocaleLowerCase(), name: String(profile.get('displayName') ?? 'A friend') }));
+  });
+  const rankedCuisines = [...cuisineWeights.entries()].sort((a, b) => b[1] - a[1]);
+  const rankedMoods = [...moodWeights.entries()].sort((a, b) => b[1] - a[1]);
   const forYou = forYouCandidates
     .filter(({ venue }) => !userCity || venue.city.trim().toLocaleLowerCase() === userCity)
     .map(({ venue, searchableText }) => {
-      const match = calculateRecommendationMatch({ favoriteCuisines, favoriteDish, rating: venue.rating, searchableText });
-      return { venue, match };
+      const match = calculateRecommendationMatch({ favoriteCuisines: rankedCuisines.map(([cuisine]) => cuisine), favoriteDish, rating: venue.rating, searchableText });
+      const normalized = searchableText.toLocaleLowerCase();
+      const cuisine = rankedCuisines.find(([value]) => normalized.includes(value));
+      const mood = rankedMoods.find(([value]) => normalized.includes(value.replace('-', ' ')) || normalized.includes(value));
+      const friend = friendTastes.find(({ cuisine: value }) => normalized.includes(value));
+      const preferenceScore = cuisine?.[1] ?? 0;
+      const moodScore = mood?.[1] ?? 0;
+      const friendScore = friend ? 1 : 0;
+      const recommendationReason = cuisine
+        ? `Because you ❤️ ${venue.category ?? cuisine[0]}`
+        : mood ? `Saved for ${mood[0].replace('-', ' ')}`
+          : friend ? `Matches ${friend.name}’s tastes`
+            : venue.category ? `Because you ❤️ ${venue.category}` : 'Popular near you';
+      return { venue, match, preferenceScore, moodScore, friendScore, recommendationReason };
     })
-    .filter(({ match }) => isRecommendation(match))
-    .sort((left, right) => right.match.matchPercent - left.match.matchPercent || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
+    .filter(({ match, preferenceScore, moodScore, friendScore }) => isRecommendation(match) || preferenceScore > 0 || moodScore > 0 || friendScore > 0)
+    .sort((left, right) => right.preferenceScore - left.preferenceScore
+      || right.moodScore - left.moodScore
+      || right.friendScore - left.friendScore
+      || right.match.matchPercent - left.match.matchPercent
+      || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
     .slice(0, 3)
-    .map(({ venue, match }) => ({ ...venue, matchPercent: match.matchPercent }));
+    .map(({ venue, match, recommendationReason }) => ({ ...venue, matchPercent: match.matchPercent, recommendationReason }));
 
   const reviewVenueIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('venueId'))))];
   const reviewAuthorIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('authorId'))))];
@@ -152,6 +208,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const venueDetailsById = new Map(
     reviewVenueDocs.map((document) => [document.id, {
       category: document.exists ? String(document.get('category') ?? '') : '',
+      city: document.exists ? String(document.get('city') ?? '') : '',
       imageUrl: document.exists && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
     }]),
   );
@@ -165,12 +222,15 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     authorPhotoUrl: photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
     venueId: String(document.get('venueId')),
     venueName: String(document.get('venueName')),
+    venueCity: venueDetailsById.get(String(document.get('venueId')))?.city ?? String(document.get('venueCity') ?? ''),
     venueCategory: venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
+    cuisine: String(document.get('cuisine') ?? venueDetailsById.get(String(document.get('venueId')))?.category ?? ''),
     venueImageUrl: venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
     rating: Number(document.get('rating')),
     text: String(document.get('text')),
     reactionCount: Number(document.get('reactionCount') ?? 0),
     commentCount: Number(document.get('commentCount') ?? 0),
+    tags: Array.isArray(document.get('tags')) ? document.get('tags') as DiscoverReview['tags'] : [],
     createdAt: timestampToIso(document.get('createdAt')),
   }));
 
@@ -410,6 +470,8 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
       authorDisplayName: String(document.get('authorDisplayName') ?? ''),
       authorUsername: author?.exists && author.get('username') ? String(author.get('username')) : null,
       authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
+      venueCity: String(document.get('venueCity') ?? venue.get('city') ?? ''),
+      cuisine: String(document.get('cuisine') ?? venue.get('category') ?? ''),
       rating: Number(document.get('rating') ?? 0),
       text: String(document.get('text') ?? ''),
       reactionCount: Number(document.get('reactionCount') ?? 0),

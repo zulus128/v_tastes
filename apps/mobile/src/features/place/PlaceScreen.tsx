@@ -9,6 +9,7 @@ import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
 import CalendarIcon from '../../../assets/place/calendar.svg';
+import MapPinIcon from '../../../assets/discover/map-rating-pin.svg';
 import PhoneIcon from '../../../assets/place/phone.svg';
 import PlanetIcon from '../../../assets/place/planet.svg';
 import SortIcon from '../../../assets/place/sort.svg';
@@ -30,6 +31,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { UserAvatar } from '../profile/avatar';
+import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { PlacePhotoPager } from './PlacePhotoPager';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
@@ -60,7 +62,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   const [reviewScope, setReviewScope] = useState<'all' | 'friends'>('all');
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactingId, setReactingId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'hours' | 'photos' | 'sort' | null>(null);
+  const [sheet, setSheet] = useState<'photos' | 'sort' | null>(null);
   const [toast, setToast] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
@@ -137,7 +139,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
     </View>
     <View style={styles.tabs}>{(['overview', 'reviews'] as const).map((value) => <Pressable key={value} onPress={() => setTab(value)} style={[styles.tab, tab === value && styles.tabActive]}><Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{value === 'overview' ? 'Overview' : 'Reviews'}</Text></Pressable>)}</View>
     {tab === 'overview'
-      ? <Overview details={place} openHours={() => setSheet('hours')} openPhotos={() => setSheet('photos')} styles={styles} />
+      ? <Overview details={place} openPhotos={() => setSheet('photos')} styles={styles} />
       : <ReviewsHeader error={reviews.isError ? apiErrorMessage(reviews.error) : null} loading={reviews.isPending} openSort={() => setSheet('sort')} retry={() => void reviews.refetch()} scope={reviewScope} setScope={setReviewScope} sort={sort} styles={styles} />}
   </View>;
   return (
@@ -159,7 +161,6 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
       />}
       <Pressable onPress={onWriteReview} style={[styles.reviewButton, { bottom: reviewButtonBottom, left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
       {toast ? <View style={[styles.toast, { bottom: reviewButtonBottom + responsiveSize(58) }]}><Text style={styles.toastText}>✓ Saved to your favourites</Text></View> : null}
-      <Hours visible={sheet === 'hours'} close={() => setSheet(null)} hours={place.openingHours} styles={styles} />
       <Gallery visible={sheet === 'photos'} close={() => setSheet(null)} photos={photos} styles={styles} />
       <Sort visible={sheet === 'sort'} close={() => setSheet(null)} selected={sort} select={setSort} styles={styles} />
       <SaveToFolderSheet
@@ -173,12 +174,44 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
   );
 }
 
-function Overview({ details, openHours, openPhotos, styles }: { details: NonNullable<ReturnType<typeof usePlace>['data']>; openHours: () => void; openPhotos: () => void; styles: ReturnType<typeof createStyles> }) {
+function Overview({ details, openPhotos, styles }: { details: NonNullable<ReturnType<typeof usePlace>['data']>; openPhotos: () => void; styles: ReturnType<typeof createStyles> }) {
   const iconColor = styles.detailIcon.color;
+  const [hoursExpanded, setHoursExpanded] = useState(false);
+  const hoursProgress = useRef(new Animated.Value(0)).current;
+  const today = todayHours(details.openingHours)?.day;
+  const hoursHeight = responsiveSize(64 + details.openingHours.length * 42);
+  function toggleHours() {
+    const next = !hoursExpanded;
+    setHoursExpanded(next);
+    Animated.timing(hoursProgress, {
+      duration: 220,
+      toValue: next ? 1 : 0,
+      useNativeDriver: false,
+    }).start();
+  }
   return <View style={styles.section}>
-    <DetailRow icon={<CalendarIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={todayHours(details.openingHours)?.hours ?? 'Opening hours'} onPress={openHours} styles={styles} />
+    <Animated.View style={[styles.hoursCard, { height: hoursProgress.interpolate({ inputRange: [0, 1], outputRange: [responsiveSize(64), hoursHeight] }) }]}>
+      <Pressable accessibilityState={{ expanded: hoursExpanded }} onPress={toggleHours} style={styles.hoursHeader}>
+        <CalendarIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />
+        <View style={styles.hoursHeaderCopy}>
+          <View style={styles.hoursTitleRow}><Text style={styles.hoursTitle}>Opening hours</Text><Text style={styles.openBadge}>OPEN</Text></View>
+          <Text style={styles.todayHours}>{todayHours(details.openingHours)?.hours ?? 'Hours unavailable'}</Text>
+        </View>
+        <Text style={[styles.hoursChevron, hoursExpanded && styles.hoursChevronExpanded]}>⌄</Text>
+      </Pressable>
+      <View style={styles.inlineHours}>
+        {details.openingHours.map((item) => {
+          const holiday = /holiday/i.test(`${item.day} ${item.hours}`);
+          return <View key={item.day} style={styles.inlineHoursRow}>
+            <Text style={[styles.inlineDay, item.day === today && styles.inlineToday, holiday && styles.inlineHoliday]}>{item.day}</Text>
+            <Text style={[styles.inlineHour, item.day === today && styles.inlineToday, holiday && styles.inlineHoliday]}>{item.hours}</Text>
+          </View>;
+        })}
+      </View>
+    </Animated.View>
     {details.phone ? <DetailRow icon={<PhoneIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={details.phone} onPress={() => void Linking.openURL(`tel:${details.phone!.replace(/[^+\d]/g, '')}`)} styles={styles} /> : null}
     {details.website ? <DetailRow icon={<PlanetIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={details.website} onPress={() => void Linking.openURL(/^https?:\/\//i.test(details.website!) ? details.website! : `https://${details.website}`)} styles={styles} /> : null}
+    <DetailRow icon={<MapPinIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />} label={details.venue.address ?? details.venue.city} onPress={() => void Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(details.venue.address ?? details.venue.city)}`)} styles={styles} />
     <Pressable onPress={openPhotos} style={styles.strip}>{details.photoUrls.slice(0, 3).map((url, index) => <Image key={url + String(index)} source={placeImage(url)} style={styles.stripImage} />)}<Text style={styles.seePhotos}>See all photos ›</Text></Pressable>
     <View style={styles.sectionTitleRow}><TopRatedDishesIcon color={styles.sectionTitleIcon.color} height={responsiveSize(22)} width={responsiveSize(24)} /><Text style={styles.sectionTitle}>Top rated dishes</Text></View>
     {details.popularDishes.map((dish, index) => <View key={dish.name} style={styles.dish}><Text style={styles.dishName}>{index + 1}. {dish.name}</Text><Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text></View>)}
@@ -230,9 +263,9 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
 function ReviewCard({ item: review, onComments, onReact, onShare, reacted, reactingId, styles }: { item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reacted: boolean; reactingId: string | null; styles: ReturnType<typeof createStyles> }) {
   const { colors } = useAppTheme();
   return <View style={[styles.review, styles.reviewListCard]}>
-      <View style={styles.reviewer}><UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
+      <View style={styles.reviewer}><UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><ReviewCityBadge city={review.venueCity} /><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
       <View style={styles.reviewBody}>
-        <RatingStars rating={review.rating} styles={styles} /><Text style={styles.reviewText}>{review.text}</Text>
+        <RatingStars rating={review.rating} styles={styles} /><Text style={styles.reviewText}>{review.text}</Text><ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} />
         {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
       </View>
   </View>;
@@ -256,22 +289,6 @@ function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => 
   const insets = useSafeAreaInsets();
   const safePadding = { paddingLeft: insets.left + responsiveSize(28), paddingRight: insets.right + responsiveSize(28), paddingTop: Math.max(insets.top, responsiveSize(28)), paddingBottom: Math.max(insets.bottom, responsiveSize(28)) };
   return <View style={[styles.screen, styles.errorPage, safePadding]}><Pressable onPress={onBack}><Text style={styles.retry}>‹ Back</Text></Pressable><Text style={styles.errorTitle}>Could not load place</Text><Text style={styles.errorCopy}>{message}</Text><Pressable onPress={retry} style={styles.errorButton}><Text style={styles.reviewButtonText}>Try again</Text></Pressable></View>;
-}
-function Hours({ close, hours, styles, visible }: { close: () => void; hours: Array<{ day: string; hours: string }>; styles: ReturnType<typeof createStyles>; visible: boolean }) {
-  const today = todayHours(hours)?.day;
-  return <Modal animationType="slide" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sheet}>
-    <View style={styles.sheetHead}>
-      <CalendarIcon color={styles.sheetIcon.color} height={responsiveSize(22)} width={responsiveSize(22)} />
-      <Text style={styles.sheetTitle}>Opening hours</Text>
-      <CloseButton onPress={close} styles={styles} />
-    </View>
-    <ScrollView contentContainerStyle={styles.hoursContent} showsVerticalScrollIndicator={false}>
-      {hours.map((item, index) => <View key={item.day} style={[styles.hours, index > 0 && styles.hoursDivided, item.day === today && styles.hoursToday]}>
-        <Text style={[styles.day, item.day === today && styles.today]}>{item.day}</Text>
-        <Text style={[styles.hour, item.day === today && styles.today]}>{item.hours}</Text>
-      </View>)}
-    </ScrollView>
-  </Pressable></Pressable></Modal>;
 }
 function Gallery({ close, photos, styles, visible }: { close: () => void; photos: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable accessibilityLabel="Close gallery" onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
@@ -301,9 +318,9 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(33,33,33,0.64)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 40, lineHeight: 40, marginTop: -4 }, photoDots: { position: 'absolute', zIndex: 2, bottom: 28, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }, photoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' }, photoDotActive: { backgroundColor: '#fff' }, photoCount: { position: 'absolute', zIndex: 2, right: 18, bottom: 18, borderRadius: 13, backgroundColor: 'rgba(66,66,66,0.72)', paddingHorizontal: 11, paddingVertical: 6 }, photoCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   content: { paddingHorizontal: 16, paddingBottom: 95 }, reviewsContent: { paddingBottom: 0 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, compoundChip: { height: 33, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, backgroundColor: colors.background }, chipDivider: { width: StyleSheet.hairlineWidth, height: 18, marginHorizontal: 8, backgroundColor: colors.border }, chipText: { color: colors.text, fontSize: 11, fontWeight: '600' }, chipSecondary: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' }, chip: { height: 33, color: colors.text, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, fontSize: 11, fontWeight: '600' },
   tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 10, paddingTop: 10 },
-  detail: { height: 50, paddingHorizontal: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 25, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailIcon: { color: colors.text }, detailText: { flexShrink: 1, color: colors.text, opacity: 0.6, fontSize: 14, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 }, detailArrow: { position: 'absolute', right: 10, top: 15, opacity: 0.5 }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitleIcon: { color: colors.text }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
+  detail: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailIcon: { color: colors.text }, detailText: { flex: 1, color: colors.text, opacity: 0.72, fontSize: 14, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 }, detailArrow: { opacity: 0.5 }, hoursCard: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised }, hoursHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, hoursHeaderCopy: { flex: 1 }, hoursTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, hoursTitle: { color: colors.text, fontSize: 14, fontWeight: '600' }, openBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, overflow: 'hidden', color: '#57C785', backgroundColor: 'rgba(87,199,133,0.14)', fontSize: 9, fontWeight: '700' }, todayHours: { marginTop: 3, color: colors.textSecondary, fontSize: 12 }, hoursChevron: { color: colors.textSecondary, fontSize: 20, transform: [{ rotate: '0deg' }] }, hoursChevronExpanded: { transform: [{ rotate: '180deg' }] }, inlineHours: { paddingHorizontal: 16, paddingBottom: 8 }, inlineHoursRow: { height: 42, flexDirection: 'row', alignItems: 'center' }, inlineDay: { flex: 1, color: colors.textMuted, fontSize: 13 }, inlineHour: { color: colors.textMuted, fontSize: 13 }, inlineToday: { color: colors.text, fontWeight: '600' }, inlineHoliday: { color: '#E63946' }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitleIcon: { color: colors.text }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
   reviewsHeader: { paddingTop: 10, paddingBottom: 10 }, reviewTools: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, scopeControl: { flex: 1, height: 34, padding: 3, flexDirection: 'row', borderRadius: 17, backgroundColor: colors.surfaceRaised }, scopeButton: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, scopeButtonActive: { backgroundColor: '#D9DDE5' }, scopeText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' }, scopeTextActive: { color: '#111' }, sortButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }, sort: { color: colors.text }, review: { overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewListCard: { marginHorizontal: 16, marginBottom: 12 }, reviewer: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted }, avatar: { width: 40, height: 40, borderRadius: 20 }, author: { flex: 1, gap: 3, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 15, fontWeight: '600' }, authorHandle: { color: colors.textSecondary, fontSize: 13 }, reviewDate: { color: colors.textMuted, fontSize: 12 }, reviewBody: { gap: 8, padding: 16 }, ratingStars: { flexDirection: 'row', gap: 1 }, ratingStarCell: { width: 16, height: 20, overflow: 'hidden' }, ratingStarFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' }, stars: { color: colors.primary, fontSize: 16 }, emptyStar: { color: colors.textMuted }, reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 }, dishes: { color: colors.text, fontSize: 12, fontWeight: '600' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 }, metrics: { color: colors.text, fontSize: 13 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
-  reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.58, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 10 }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { width: '100%', maxHeight: '82%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, hoursContent: { flexGrow: 1 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },

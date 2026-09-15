@@ -33,6 +33,7 @@ import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import BirthdayTagIcon from '../../../assets/create-review/tag-birthday.svg';
 import NightTagIcon from '../../../assets/create-review/tag-night.svg';
+import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
@@ -217,7 +218,7 @@ function FeedCard({
       </View>
 
       <View style={styles.venueSection}>
-        <Text style={styles.venue}>{item.venueName}</Text>
+        <View style={styles.venueTitleRow}><Text style={styles.venue}>{item.venueName}</Text><ReviewCityBadge city={item.venueCity} /></View>
         <View style={styles.ratingTagRow}>
           <RatingStars rating={item.rating} styles={styles} />
           {primaryTag ? (
@@ -283,6 +284,7 @@ function FeedCard({
             ) : null}
           </Pressable>
         ) : null}
+        <ReviewMetaRow cuisine={item.cuisine} mood={tags[0]} />
 
         <View style={styles.metrics}>
           <View style={styles.metricsLeft}>
@@ -858,6 +860,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   moreButton: { width: 32, height: 32, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
   moreButtonText: { marginTop: -7, color: colors.text, fontSize: 18, fontWeight: '700', letterSpacing: 1 },
   venueSection: { paddingHorizontal: 16, gap: 4 },
+  venueTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   venue: { color: colors.text, fontSize: 16, fontWeight: '600', lineHeight: 20, letterSpacing: -0.24 },
   ratingTagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   starRow: { flexDirection: 'row', gap: 2 },
