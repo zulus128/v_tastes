@@ -2,13 +2,8 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import lightPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import darkPattern from '../../../assets/onboarding/pattern-screen.png';
-import BurgerBadge from '../../../assets/profile/reward-burger.svg';
-import CityBadge from '../../../assets/profile/reward-city.svg';
 import followIcon from '../../../assets/profile/follow.png';
-import LevelBadge from '../../../assets/profile/reward-level.svg';
-import MatchaBadge from '../../../assets/profile/reward-matcha.svg';
 import messageIcon from '../../../assets/profile/message.png';
-import TiramisuBadge from '../../../assets/profile/reward-tiramisu.svg';
 import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
@@ -18,9 +13,6 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
-
-const badgeAssets = [LevelBadge, BurgerBadge, TiramisuBadge, MatchaBadge, CityBadge];
-const badgeLabels = ['Level', 'Burger Lover', 'Tiramisu Connaisseur', 'Matcha Hunter', 'City Explorer'];
 
 function Stat({ label, onPress, value }: { label: string; onPress?: () => void; value: number }) {
   const { colors } = useAppTheme();
@@ -40,7 +32,6 @@ export function ProfileHeader({
   onMessage,
   onFollowers,
   onFollowing,
-  onRewards,
   onToggleFollow,
   own,
   profile,
@@ -54,7 +45,6 @@ export function ProfileHeader({
   onMessage: () => void;
   onFollowers: () => void;
   onFollowing: () => void;
-  onRewards: () => void;
   onToggleFollow: () => void;
   own: boolean;
   profile: ProfileData;
@@ -122,14 +112,6 @@ export function ProfileHeader({
           {chips.map((chip) => <View key={chip.label} style={styles.chip}><Text style={styles.chipText}>{chip.label}</Text>{chip.flag ? <Image source={chip.flag} style={styles.cityFlag} /> : null}{chip.icon ? <Text style={styles.chipIcon}>{chip.icon}</Text> : null}</View>)}
         </ScrollView>
       ) : null}
-      <Pressable accessibilityLabel="Open rewards" onPress={onRewards} style={styles.badges}>
-        {badgeAssets.map((BadgeArt, index) => (
-          <View key={badgeLabels[index]} style={styles.badge}>
-            <BadgeArt width={responsiveSize(59)} height={responsiveSize(59)} />
-            <Text numberOfLines={2} style={styles.badgeLabel}>{badgeLabels[index]}</Text>
-          </View>
-        ))}
-      </Pressable>
     </ImageBackground>
   );
 }
@@ -205,9 +187,6 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   chipText: { color: colors.text, fontSize: 14 },
   chipIcon: { fontSize: 14, lineHeight: 18 },
   cityFlag: { width: 16, height: 16, transform: [{ translateY: -1 }] },
-  badges: { height: 82, marginTop: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  badge: { width: 68, alignItems: 'center' },
-  badgeLabel: { width: 72, marginTop: 4, color: colors.text, fontSize: 10, lineHeight: 10, fontWeight: '400', letterSpacing: -0.12, textAlign: 'center' },
 });
 
 const staticStyles = responsiveStyleSheet({

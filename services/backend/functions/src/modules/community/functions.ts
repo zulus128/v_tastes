@@ -24,7 +24,7 @@ import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
 import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
 import { notificationPreferences, sendNotification, sendNotifications } from '../../shared/notifications';
-import { computeRewards, levelForXp, storedRewardProgress } from '../../shared/rewards';
+import { levelForXp } from '../../shared/rewards';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { enforceRateLimit } from '../../shared/mutations';
@@ -413,23 +413,6 @@ export const getProfileExtras = onCall(
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError('failed-precondition', 'An active user profile is required.');
     }
-    const storedRewards = profile.get('rewardProgressDirty') === true
-      ? null
-      : storedRewardProgress(profile.get('rewardProgress'));
-    const rewards = storedRewards ?? await computeRewards(profileId);
-    if (!storedRewards) {
-      const observedVersion = Math.max(0, Number(profile.get('rewardProgressVersion') ?? 0));
-      await db.runTransaction(async (transaction) => {
-        const current = await transaction.get(userRef);
-        if (!current.exists || Number(current.get('rewardProgressVersion') ?? 0) !== observedVersion) return;
-        transaction.set(userRef, {
-          rewardProgress: rewards,
-          rewardProgressDirty: false,
-          rewardProgressUpdatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      });
-    }
-
     const followerProfiles = followers.size
       ? await db.getAll(
           ...followers.docs.map((document) => db.collection('users').doc(document.id)),
@@ -461,7 +444,6 @@ export const getProfileExtras = onCall(
       level: levelForXp(xp),
       xp,
       notificationPreferences: notificationPreferences(profile),
-      rewards,
     };
   },
 );

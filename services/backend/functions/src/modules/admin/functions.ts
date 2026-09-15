@@ -106,42 +106,6 @@ function contentReference(input: z.infer<typeof contentTargetSchema>) {
     : db.collection('reviews').doc(input.parentId).collection('comments').doc(input.targetId);
 }
 
-async function invalidateRewardProgress(userId: string): Promise<void> {
-  if (!userId) return;
-  await db.collection('users').doc(userId).set({
-    rewardProgressDirty: true,
-    rewardProgressVersion: FieldValue.increment(1),
-  }, { merge: true });
-}
-
-async function invalidateVenueRewardProgress(venueId: string): Promise<void> {
-  const authorIds = new Set<string>();
-  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
-  do {
-    let reviewsQuery = db.collection('reviews')
-      .where('venueId', '==', venueId)
-      .where('status', '==', 'published')
-      .orderBy('__name__')
-      .limit(400);
-    if (cursor) reviewsQuery = reviewsQuery.startAfter(cursor);
-    const reviews = await reviewsQuery.get();
-    reviews.docs.forEach((review) => {
-      const authorId = String(review.get('authorId') ?? '');
-      if (authorId) authorIds.add(authorId);
-    });
-    cursor = reviews.docs.at(-1);
-  } while (cursor);
-  const uniqueAuthors = [...authorIds];
-  for (let offset = 0; offset < uniqueAuthors.length; offset += 400) {
-    const batch = db.batch();
-    uniqueAuthors.slice(offset, offset + 400).forEach((authorId) => batch.set(db.collection('users').doc(authorId), {
-      rewardProgressDirty: true,
-      rewardProgressVersion: FieldValue.increment(1),
-    }, { merge: true }));
-    await batch.commit();
-  }
-}
-
 function audit(actorId: string, action: string, subjectId: string, details: Record<string, unknown> = {}) {
   return db.collection('_adminAudit').add({
     actorId,
@@ -366,7 +330,6 @@ export const deleteContent = onCall(callableOptions, async (request) => {
     }),
     notifyReportResolved(report),
   ]);
-  if (input.targetType === 'review') await invalidateRewardProgress(String(content.get('authorId') ?? ''));
   return { id: input.targetId };
 });
 
@@ -381,10 +344,6 @@ export const editContent = onCall(callableOptions, async (request) => {
   });
   await audit(actorId, 'edit-content', input.targetId, { targetType: input.targetType });
   await notifyReportResolved(await db.collection('reports').doc(input.reportId).get());
-  if (input.targetType === 'review') {
-    const content = await reference.get();
-    await invalidateRewardProgress(String(content.get('authorId') ?? ''));
-  }
   return { id: input.targetId };
 });
 
@@ -625,7 +584,6 @@ export const upsertVenue = onCall(callableOptions, async (request) => {
     }),
   }, { merge: true });
   await audit(actorId, existing.exists ? 'update-venue' : 'create-venue', reference.id);
-  if (existing.exists) await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
@@ -659,7 +617,6 @@ export const updateVenue = onCall(callableOptions, async (request) => {
     updatedBy: actorId,
   });
   await audit(actorId, 'update-venue', reference.id);
-  await invalidateVenueRewardProgress(reference.id);
   return { id: reference.id };
 });
 
@@ -720,9 +677,6 @@ export const mergeVenues = onCall(callableOptions, async (request) => {
     source.update({ status: 'merged', mergedInto: target.id, reviewCount: 0, updatedAt: FieldValue.serverTimestamp(), updatedBy: actorId }),
     movedReviews > 0 ? target.update({ reviewCount: FieldValue.increment(movedReviews), updatedAt: FieldValue.serverTimestamp() }) : Promise.resolve(),
   ]);
-  // Authors of the moved reviews now contribute to the target venue's reward
-  // progress. Mark their materialized reward state stale before returning.
-  if (movedReviews > 0) await invalidateVenueRewardProgress(target.id);
   await audit(actorId, 'merge-venues', source.id, { targetVenueId: target.id, movedReviews });
   return { id: source.id, targetVenueId: target.id, movedReviews };
 });

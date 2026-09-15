@@ -491,7 +491,6 @@ export function ProfileScreen({
       onMessage={() => onMessage(targetUserId)}
       onFollowers={() => setExtra('followers')}
       onFollowing={() => setExtra('following')}
-      onRewards={() => setExtra('rewards')}
       onToggleFollow={() => void toggleFollow()}
       own={own}
       profile={profile}

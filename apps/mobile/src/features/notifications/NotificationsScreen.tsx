@@ -21,7 +21,6 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { unreadNotificationCountQueryKey } from './api';
 
-type NotificationTab = 'activity' | 'badges';
 type FeedEntry =
   | { id: string; createdAt: string; type: 'notification'; item: AppNotification }
   | { id: string; createdAt: string; type: 'request'; item: AppRequest };
@@ -40,7 +39,6 @@ const groupGlyphs: Partial<Record<NonNullable<AppNotification['group']>, string>
   likesComments: '♥',
   friendsActivity: '○',
   messages: '✉',
-  rewards: '★',
   recap: '☾',
   savedPlaces: '◎',
   reminders: '↻',
@@ -87,7 +85,6 @@ export function NotificationsScreen({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [requests, setRequests] = useState<AppRequest[]>([]);
-  const [tab, setTab] = useState<NotificationTab>('activity');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -95,14 +92,10 @@ export function NotificationsScreen({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const feed = useMemo<FeedEntry[]>(() => {
-    const notifications = items
-      .filter((item) => tab === 'badges' ? item.kind === 'reward' : item.kind !== 'reward')
-      .map((item): FeedEntry => ({ id: `notification-${item.id}`, createdAt: item.createdAt, type: 'notification', item }));
-    const pending = tab === 'activity'
-      ? requests.map((item): FeedEntry => ({ id: `request-${item.id}`, createdAt: item.createdAt, type: 'request', item }))
-      : [];
+    const notifications = items.map((item): FeedEntry => ({ id: `notification-${item.id}`, createdAt: item.createdAt, type: 'notification', item }));
+    const pending = requests.map((item): FeedEntry => ({ id: `request-${item.id}`, createdAt: item.createdAt, type: 'request', item }));
     return [...pending, ...notifications].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
-  }, [items, requests, tab]);
+  }, [items, requests]);
 
   useEffect(() => {
     let active = true;
@@ -123,7 +116,7 @@ export function NotificationsScreen({
   }, [api]);
 
   async function loadMore() {
-    if (!nextCursor || loadingMore || tab === 'badges') return;
+    if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
       const response = await api.listNotifications({ cursor: nextCursor, limit: 20 });
@@ -255,19 +248,6 @@ export function NotificationsScreen({
             <Text style={[styles.clear, !hasClearableItems && styles.disabled]}>{clearing ? 'Clearing…' : '✓ Clear all'}</Text>
           </Pressable>
         </View>
-        <View accessibilityRole="tablist" style={styles.tabs}>
-          {(['activity', 'badges'] as const).map((value) => (
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === value }}
-              key={value}
-              onPress={() => setTab(value)}
-              style={[styles.tab, tab === value && styles.activeTab]}
-            >
-              <Text style={[styles.tabText, tab === value && styles.activeTabText]}>{value === 'activity' ? 'Activity' : 'Badges'}</Text>
-            </Pressable>
-          ))}
-        </View>
       </View>
 
       {loading ? (
@@ -318,11 +298,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     clearButton: { position: 'absolute', right: -8, minWidth: 84, height: 44, alignItems: 'flex-end', justifyContent: 'center', paddingHorizontal: 8 },
     clear: { color: colors.textSecondary, fontSize: 14, letterSpacing: -0.24 },
     disabled: { opacity: 0.42 },
-    tabs: { height: 40, padding: 4, borderRadius: 100, flexDirection: 'row', backgroundColor: isDark ? 'rgba(223,223,233,0.12)' : colors.surfaceRaised },
-    tab: { flex: 1, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
-    activeTab: { backgroundColor: isDark ? '#D9DDE5' : colors.text },
-    tabText: { color: isDark ? '#C4CAD7' : colors.textMuted, opacity: 0.5, fontSize: 13, lineHeight: 18 },
-    activeTabText: { color: isDark ? '#000000' : colors.background, opacity: 1, fontWeight: '700' },
     loading: { marginTop: 60 },
     content: { paddingBottom: 30 },
     row: {

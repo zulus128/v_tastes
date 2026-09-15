@@ -965,8 +965,6 @@ async function main() {
     { id: 'group-invite', type: 'group-added', actorId: 'discover-kristin', actorName: 'Kristin Watson', params: { group: 'Weekend Foodies' }, targetId: 'weekend-foodies', unread: false, minutesAgo: 180 },
     { id: 'saved-place-trending', type: 'saved-place-trending', actorId: null, actorName: null, params: { place: 'Coffee Bar 940', city: 'Monaco' }, targetId: 'coffee-bar-940', unread: true, minutesAgo: 600 },
     { id: 'monthly-recap', type: 'recap-ready', actorId: null, actorName: null, params: { month: 'August' }, targetId: 'monthly', unread: false, minutesAgo: 1_440 },
-    { id: 'badge-city-explorer', type: 'badge-unlocked', actorId: null, actorName: null, params: { badge: 'City Explorer' }, targetId: 'city', unread: true, minutesAgo: 2_880 },
-    { id: 'badge-tiramisu', type: 'badge-unlocked', actorId: null, actorName: null, params: { badge: 'Tiramisu Connaisseur' }, targetId: 'tiramisu', unread: false, minutesAgo: 4_320 },
     { id: 'level-up', type: 'level-up', actorId: null, actorName: null, params: { level: 6 }, targetId: '6', unread: false, minutesAgo: 5_000 },
     { id: 'partner-offer', type: 'partner-offer', actorId: null, actorName: null, params: { offer: '20% off', place: 'Coffee Bar 940', text: 'This week only.' }, targetId: 'coffee-bar-940', unread: false, minutesAgo: 5_760 },
   ] as const).map((notification) => {

@@ -583,9 +583,8 @@ export interface MonthlyRecapResult {
 }
 export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
 export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; pendingMembers: GroupMember[]; createdAt: string; }
-export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
 export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
-export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
+export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; notificationPreferences: NotificationPreferences; }
 
 export interface Page<T> {
   items: T[];

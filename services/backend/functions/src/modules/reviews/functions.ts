@@ -36,7 +36,7 @@ import {
   type NotificationRequest,
 } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
-import { levelForXp, notifyLevelChange, syncRewardNotifications } from '../../shared/rewards';
+import { levelForXp, notifyLevelChange } from '../../shared/rewards';
 import { isFirebaseEmulator } from '../../shared/runtime-environment';
 import {
   compareDocumentIdsDesc,
@@ -545,7 +545,6 @@ export const processReviewEffects = onDocumentCreated({
       reviewCount: activeReview.get('wasFirstVenueReview') === true ? 0 : 1,
     })],
     ['levelNotification', () => notifyLevelChange(authorId, previousXp, nextXp)],
-    ['rewardNotifications', () => syncRewardNotifications(authorId)],
   ];
   for (const [name, run] of effects) {
     if (completedEffects[name] === true) continue;
@@ -626,11 +625,7 @@ export const createReview = onCall(callableOptions, async (request) => {
       xp: xpBefore,
       monthlyXp: Number(user.get('monthlyXp') ?? 0),
     });
-    transaction.update(userRef, {
-      reviewCount: FieldValue.increment(1),
-      rewardProgressDirty: true,
-      rewardProgressVersion: FieldValue.increment(1),
-    });
+    transaction.update(userRef, { reviewCount: FieldValue.increment(1) });
   });
 
   return { id: reviewRef.id };
@@ -680,10 +675,6 @@ export const editReview = onCall(callableOptions, async (request) => {
       rating: Math.max(0, Math.min(5, ((average * count) - oldRating + input.rating) / count)),
       updatedAt: now,
     });
-    transaction.update(db.collection('users').doc(uid), {
-      rewardProgressDirty: true,
-      rewardProgressVersion: FieldValue.increment(1),
-    });
   });
   try {
     await attachDishPhotoUrls(await reviewRef.get());
@@ -730,8 +721,6 @@ export const deleteReview = onCall(callableOptions, async (request) => {
       });
       transaction.update(userRef, {
         reviewCount: Math.max(0, Number(user.get('reviewCount') ?? 0) - 1),
-        rewardProgressDirty: true,
-        rewardProgressVersion: FieldValue.increment(1),
         updatedAt: now,
       });
     }

@@ -105,7 +105,6 @@ function visualAuditData(operation: string): unknown {
         following: [],
         level: 3,
         xp: 240,
-        rewards: [],
         notificationPreferences: defaultNotificationPreferences,
       } satisfies ProfileExtrasResult;
     case 'getGroup':

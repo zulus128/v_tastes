@@ -21,7 +21,6 @@ export const notificationCategories = [
   'likesComments',
   'friendReviews',
   'messages',
-  'badges',
   'recap',
   'savedPlaces',
   'reminders',
@@ -40,7 +39,6 @@ export const notificationCategoryLabels: Record<NotificationCategory, string> = 
   likesComments: 'Likes & comments',
   friendReviews: "Friends' new reviews",
   messages: 'Messages',
-  badges: 'Badges & levels',
   recap: 'Monthly recap',
   savedPlaces: 'Saved places',
   reminders: 'Reminders',
@@ -62,7 +60,6 @@ export const notificationTargetTypes = [
   'leaderboard',
   'requests',
   'messageRequests',
-  'rewards',
   'discover',
   'settings',
   'account',
@@ -91,9 +88,7 @@ export const notificationTypes = [
   'message-request',
   'activity-invite',
   'group-added',
-  'badge-unlocked',
   'level-up',
-  'badge-almost',
   'leaderboard-overtaken',
   'season-results',
   'recap-ready',
@@ -128,7 +123,6 @@ export interface NotificationCopyParams {
   place?: string | null;
   city?: string | null;
   text?: string | null;
-  badge?: string | null;
   group?: string | null;
   feature?: string | null;
   offer?: string | null;
@@ -341,40 +335,20 @@ export const notificationCatalog: Record<NotificationType, NotificationDefinitio
     title: '{actor} added you to “{group}”',
     body: 'Say hi to the group',
   },
-  'badge-unlocked': {
-    type: 'badge-unlocked',
-    group: 'rewards',
-    category: 'badges',
-    channels: push,
-    kind: 'reward',
-    targetType: 'rewards',
-    title: 'Badge unlocked: {badge}',
-    body: 'Tap to see your rewards',
-  },
   'level-up': {
     type: 'level-up',
     group: 'rewards',
-    category: 'badges',
+    category: 'friendReviews',
     channels: push,
     kind: 'reward',
-    targetType: 'rewards',
+    targetType: 'leaderboard',
     title: 'You reached Level {level}',
     body: 'Keep reviewing to climb further',
-  },
-  'badge-almost': {
-    type: 'badge-almost',
-    group: 'rewards',
-    category: 'badges',
-    channels: push,
-    kind: 'reward',
-    targetType: 'rewards',
-    title: 'Almost there: {badge}',
-    body: 'One more review and it’s yours',
   },
   'leaderboard-overtaken': {
     type: 'leaderboard-overtaken',
     group: 'rewards',
-    category: 'badges',
+    category: 'friendReviews',
     channels: push,
     kind: 'reward',
     targetType: 'leaderboard',
@@ -384,7 +358,7 @@ export const notificationCatalog: Record<NotificationType, NotificationDefinitio
   'season-results': {
     type: 'season-results',
     group: 'rewards',
-    category: 'badges',
+    category: 'friendReviews',
     channels: push,
     kind: 'reward',
     targetType: 'leaderboard',
