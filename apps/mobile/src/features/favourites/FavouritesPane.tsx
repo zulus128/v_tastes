@@ -48,11 +48,13 @@ export type SaveablePlace = {
 
 export function FavouritesPane({
   appliedFilters = [],
+  onBack,
   onOpenFilters,
   onOpenPlace,
   userId,
 }: {
   appliedFilters?: string[];
+  onBack?: () => void;
   onOpenFilters?: () => void;
   onOpenPlace: (venueId: string) => void;
   userId: string;
@@ -99,6 +101,15 @@ export function FavouritesPane({
 
   return (
     <View style={styles.pane}>
+      {onBack || selectedFolderId ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => selectedFolderId ? setSelectedFolderId(null) : onBack?.()}
+          style={styles.favouritesBack}
+        >
+          <Text style={styles.favouritesBackText}>‹ {selectedFolder?.name ?? 'Favourite'}</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
           <SearchIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
@@ -155,7 +166,7 @@ export function FavouritesPane({
         </View>
       ) : null}
       {favourites.isSuccess && places.length === 0 ? (
-        <EmptyState folderName={selectedFolder?.name} query={normalizedQuery} styles={styles} />
+        <EmptyState folderName={selectedFolder?.name} onBrowsePlaces={onBack} query={normalizedQuery} styles={styles} />
       ) : null}
       {favourites.isSuccess && places.length > 0 ? (
         <View style={styles.placeList}>
@@ -327,6 +338,18 @@ export function SaveToFolderSheet({
                   style={styles.createFolderInput}
                   value={folderName}
                 />
+                <Text style={styles.folderSuggestionsLabel}>Or pick one</Text>
+                <View style={styles.folderSuggestions}>
+                  {['Brunch', 'Date night', 'Coffee', 'Cheap eats', 'Want to try', 'Special occasion'].map((suggestion) => (
+                    <Pressable
+                      key={suggestion}
+                      onPress={() => setFolderName(suggestion)}
+                      style={[styles.folderSuggestion, folderName === suggestion && styles.folderSuggestionActive]}
+                    >
+                      <Text style={[styles.folderSuggestionText, folderName === suggestion && styles.folderSuggestionTextActive]}>{suggestion}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
               <Pressable disabled={!folderName.trim() || createFolder.isPending} onPress={() => void createAndSelect()} style={({ pressed }) => [styles.createFolderSubmit, (!folderName.trim() || createFolder.isPending) && styles.createFolderSubmitDisabled, pressed && styles.pressed]}>
                 {createFolder.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createFolderSubmitText}>Create Folder</Text>}
@@ -368,14 +391,16 @@ function FolderChip({
 
 function EmptyState({
   folderName,
+  onBrowsePlaces,
   query,
   styles,
 }: {
   folderName?: string;
+  onBrowsePlaces?: () => void;
   query: string;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const title = query ? 'No places found' : folderName ? `${folderName} is empty` : 'Nothing saved yet';
+  const title = query ? 'No places found' : folderName ? `Nothing in ${folderName} yet` : 'Nothing saved yet';
   const body = query
     ? 'Try a different search.'
     : folderName
@@ -386,6 +411,11 @@ function EmptyState({
       <EmptyIcon color={styles.stateTitle.color} height={responsiveSize(60)} width={responsiveSize(60)} />
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateBody}>{body}</Text>
+      {!query && onBrowsePlaces ? (
+        <Pressable accessibilityRole="button" onPress={onBrowsePlaces} style={styles.browsePlacesButton}>
+          <Text style={styles.browsePlacesText}>Browse places</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -572,6 +602,8 @@ function createStyles(colors: ThemeColors) {
     // This pane is also rendered inside ProfileScreen's outer ScrollView.
     // Let its cards participate in that scroll view's measured content height.
     pane: { backgroundColor: colors.canvas },
+    favouritesBack: { alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 16, justifyContent: 'center' },
+    favouritesBackText: { color: colors.text, fontSize: 17, fontWeight: '600' },
     searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
     searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
     searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
@@ -600,6 +632,8 @@ function createStyles(colors: ThemeColors) {
     metaPill: { height: 33, color: colors.text, fontSize: 15, lineHeight: 20, borderWidth: isDark ? 1 : 0, borderColor: colors.border, backgroundColor: isDark ? '#080808' : '#F6F6F6', borderRadius: 40, paddingHorizontal: 12, paddingVertical: 6 },
     centerState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
     emptyState: { flex: 1, minHeight: 360, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
+    browsePlacesButton: { height: 46, marginTop: 8, paddingHorizontal: 24, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    browsePlacesText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
     stateTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
     stateBody: { color: colors.textMuted, fontSize: 15, lineHeight: 20, textAlign: 'center' },
     retryButton: { marginTop: 4, paddingHorizontal: 20, height: 42, borderRadius: 21, backgroundColor: colors.primary, justifyContent: 'center' },
@@ -621,13 +655,19 @@ function createStyles(colors: ThemeColors) {
     confirmText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     createFolderRoot: { flex: 1, justifyContent: 'flex-end' },
     createFolderScrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
-    createFolderSheet: { height: 294, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
+    createFolderSheet: { minHeight: 390, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
     createFolderTitleRow: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     createFolderTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', letterSpacing: -0.45 },
     closeFolderIcon: { width: 30, height: 30 },
     createFolderField: { flex: 1, padding: 16, gap: 6 },
     createFolderLabel: { color: '#FFFFFF', opacity: 0.5, fontSize: 13, lineHeight: 16 },
     createFolderInput: { height: 50, paddingHorizontal: 12, borderRadius: 12, color: '#FFFFFF', backgroundColor: '#080808', fontSize: 16 },
+    folderSuggestionsLabel: { marginTop: 8, color: '#FFFFFF', opacity: 0.6, fontSize: 13 },
+    folderSuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    folderSuggestion: { height: 30, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, borderColor: '#45474B', alignItems: 'center', justifyContent: 'center' },
+    folderSuggestionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+    folderSuggestionText: { color: '#FFFFFF', fontSize: 13 },
+    folderSuggestionTextActive: { fontWeight: '700' },
     createFolderSubmit: { width: 330, height: 54, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#4C1816', borderRadius: 27, backgroundColor: '#B82F29' },
     createFolderSubmitDisabled: { opacity: 0.45 },
     createFolderSubmitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
