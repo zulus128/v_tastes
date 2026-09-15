@@ -600,13 +600,14 @@ export const createReview = onCall(callableOptions, async (request) => {
     const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
     const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
     const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
+    const cuisine = venue.get('category');
     transaction.create(reviewRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
       venueId: venue.id,
       venueName: venue.get('name'),
       venueCity: venue.get('city'),
-      cuisine: venue.get('category'),
+      ...(typeof cuisine === 'string' && cuisine ? { cuisine } : {}),
       rating: input.rating,
       text: input.text,
       tags: input.tags,
@@ -664,6 +665,7 @@ export const editReview = onCall(callableOptions, async (request) => {
     const count = Math.max(1, Number(venue.get('reviewCount') ?? 1));
     const average = Math.max(0, Number(venue.get('rating') ?? 0));
     const oldRating = Number(review.get('rating') ?? 0);
+    const cuisine = venue.get('category');
     const now = FieldValue.serverTimestamp();
     const previousDishes = Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') as StoredDishReview[] : [];
     const photoUrlByPath = new Map(previousDishes.flatMap((dish) =>
@@ -676,7 +678,7 @@ export const editReview = onCall(callableOptions, async (request) => {
       rating: input.rating,
       text: input.text,
       tags: input.tags,
-      cuisine: venue.get('category'),
+      ...(typeof cuisine === 'string' && cuisine ? { cuisine } : {}),
       tag: input.tags[0] ?? null,
       dishReviews,
       dishNames: dishReviews.map((dish) => dish.title),
