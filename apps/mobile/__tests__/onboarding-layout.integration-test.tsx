@@ -97,7 +97,7 @@ describe('onboarding in resizable windows', () => {
       expect(choices).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
 
       await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-      expect(await screen.findByText('Find your friends')).toBeOnTheScreen();
+      expect(await screen.findByText('Find your people')).toBeOnTheScreen();
     },
   );
 

@@ -50,6 +50,7 @@ export {
 } from './modules/discover/functions';
 export { searchVenues, submitUserVenue } from './modules/venues/functions';
 export {
+  checkUsernameAvailability,
   completeOnboarding,
   getMonthlyRecap,
   createUserProfile,
