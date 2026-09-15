@@ -56,7 +56,6 @@ import {
   concentricRatingLayout,
   ratingCurvePoint,
   ratingForCurvePoint,
-  shouldClaimRatingDrag,
   snapRating,
 } from './ratingCurveGeometry';
 
@@ -591,14 +590,11 @@ function RatingCurve({
   }, [arcGeometry, geometrySignature, value, pinPosition]);
 
   const pinPanResponder = useRef(PanResponder.create({
-    // A press alone and a predominantly vertical gesture belong to the parent
-    // ScrollView. Claim only a deliberate movement along the rating control.
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_event, gesture) => shouldClaimRatingDrag(
-      gesture.dx,
-      gesture.dy,
-      responsiveSize(4),
-    ),
+    // Claim immediately when the gesture starts on the pin. Waiting for a
+    // horizontal threshold lets the parent ScrollView win first, and movement
+    // near either end of the circular arc is naturally mostly vertical anyway.
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => {
       dragging.current = true;
       dragStartRating.current = interaction.current.value;
@@ -629,7 +625,7 @@ function RatingCurve({
       dragging.current = false;
       setPinPosition(lastSnappedRating.current);
     },
-    onPanResponderTerminationRequest: () => true,
+    onPanResponderTerminationRequest: () => false,
   })).current;
   const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (

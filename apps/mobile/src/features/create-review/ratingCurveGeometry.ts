@@ -98,10 +98,3 @@ export function snapRating(rating: number) {
     maximumRating,
   );
 }
-
-/** Keeps vertical intent available to the review form's parent ScrollView. */
-export function shouldClaimRatingDrag(dx: number, dy: number, threshold: number) {
-  const horizontalTravel = Math.abs(dx);
-  const verticalTravel = Math.abs(dy);
-  return horizontalTravel >= threshold && horizontalTravel >= verticalTravel * 0.55;
-}
