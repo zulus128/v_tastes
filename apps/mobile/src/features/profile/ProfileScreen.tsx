@@ -4,16 +4,12 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
   FlatList,
-  Image,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,22 +22,9 @@ import {
 } from 'react-native';
 import SearchIcon from '../../../assets/profile/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
-import MapFilterBarIcon from '../../../assets/profile/map-filter-bar.svg';
-import mapFilterCafeIcon from '../../../assets/profile/map-filter-cafe.png';
-import MapFilterFriendsIcon from '../../../assets/profile/map-filter-friends.svg';
-import MapFilterRestaurantIcon from '../../../assets/profile/map-filter-restaurant.svg';
-import MapFilterReviewsIcon from '../../../assets/profile/map-filter-reviews.svg';
-import MapFilterTrendingIcon from '../../../assets/profile/map-filter-trending.svg';
-import MapFilterTuningIcon from '../../../assets/profile/map-filter-tuning.svg';
-import MapSearchVoiceIcon from '../../../assets/profile/followers-voice.svg';
-import mapBarIcon from '../../../assets/profile/map-bar.png';
-import mapCafeIcon from '../../../assets/profile/map-cafe.png';
-import mapTrendingIcon from '../../../assets/profile/map-trending.png';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
 import Svg, { Path } from 'react-native-svg';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { useToggleFollow } from '../discover/api';
-import { matchesPlaceFilters } from '../discover/placeFilters';
 import { firestore, storage } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
@@ -54,23 +37,12 @@ import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileDraftCard, type ProfileReviewDraft } from './ProfileDraftCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
+import { buildTasteHighlights } from './profileHighlights';
+import { ProfileMapSheet } from './ProfileMapSheet';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
-type ProfileTab = 'reviews' | 'map' | 'wishlist';
-type MapFilter = 'trending' | 'restaurant' | 'cafe' | 'bar' | 'my-reviews' | 'friends';
-
-const MAP_FILTERS: readonly { emphasized: boolean; label: string; value: MapFilter; width: number }[] = [
-  { emphasized: true, label: 'Trending', value: 'trending', width: 87 },
-  { emphasized: false, label: 'Restaurant', value: 'restaurant', width: 100 },
-  { emphasized: true, label: 'Cafe', value: 'cafe', width: 62 },
-  { emphasized: true, label: 'Bar', value: 'bar', width: 54 },
-  { emphasized: false, label: 'My Reviews', value: 'my-reviews', width: 105 },
-  { emphasized: false, label: 'Friends', value: 'friends', width: 79 },
-];
-
-const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+type ProfileTab = 'reviews' | 'wishlist';
 const FALLBACK_MAP_REGION = { latitude: 41.02, longitude: 29, latitudeDelta: 0.14, longitudeDelta: 0.13 };
 const MAP_FOCUS_PIN_LIMIT = 5;
 const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
@@ -102,22 +74,6 @@ function mapRegionFor(venues: readonly (Venue & { latitude: number; longitude: n
   };
 }
 
-function mapVenueIcon(venue: Venue, active: boolean) {
-  const category = venue.category?.toLowerCase() ?? '';
-  if (category.includes('bar') || category.includes('pub') || category.includes('club')) return mapBarIcon;
-  if (active || venue.discoverTags?.includes('trending')) return mapTrendingIcon;
-  return mapCafeIcon;
-}
-
-function MapFilterGlyph({ value }: { value: MapFilter }) {
-  if (value === 'trending') return <MapFilterTrendingIcon height={responsiveSize(11.3438)} width={responsiveSize(9.9167)} />;
-  if (value === 'restaurant') return <MapFilterRestaurantIcon height={responsiveSize(11.053)} width={responsiveSize(11.0527)} />;
-  if (value === 'cafe') return <Image source={mapFilterCafeIcon} style={staticStyles.mapFilterCafeIcon} />;
-  if (value === 'bar') return <MapFilterBarIcon height={responsiveSize(13.2408)} width={responsiveSize(11.586)} />;
-  if (value === 'my-reviews') return <MapFilterReviewsIcon height={responsiveSize(8.3256)} width={responsiveSize(11.6603)} />;
-  return <MapFilterFriendsIcon height={responsiveSize(14)} width={responsiveSize(14)} />;
-}
-
 function PencilIcon({ color }: { color: string }) {
   return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M4 20l4.2-1 10.6-10.6a2.12 2.12 0 0 0-3-3L5.2 16 4 20Z" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /><Path d="m14.6 6.6 3 3" stroke={color} strokeLinecap="round" strokeWidth={1.7} /></Svg>;
 }
@@ -128,6 +84,10 @@ function PinIcon({ color }: { color: string }) {
 
 function TrashIcon({ color }: { color: string }) {
   return <Svg fill="none" height={responsiveSize(20)} viewBox="0 0 24 24" width={responsiveSize(20)}><Path d="M5 7h14M9 7V4h6v3m2 0-.8 13H7.8L7 7m3 3v7m4-7v7" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} /></Svg>;
+}
+
+function UserBlockedIcon({ color }: { color: string }) {
+  return <Svg fill="none" height={responsiveSize(60)} viewBox="0 0 60 60" width={responsiveSize(60)}><Path d="M26 29a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-15 20c0-8.3 6.7-15 15-15 4 0 7.7 1.6 10.4 4.2" stroke={color} strokeLinecap="round" strokeWidth={3.2} /><Path d="M40 38a10 10 0 1 0 14 14 10 10 0 0 0-14-14Zm1.3 13.3 11.4-11.4" stroke={color} strokeLinecap="round" strokeWidth={3.2} /></Svg>;
 }
 
 export function ProfileScreen({
@@ -175,7 +135,10 @@ export function ProfileScreen({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [search, setSearch] = useState('');
   const [extra, setExtra] = useState<ProfileExtra>(null);
-  const [mapFilter, setMapFilter] = useState<MapFilter>('trending');
+  const [mapOpen, setMapOpen] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [blockPending, setBlockPending] = useState(false);
   const [mapVenues, setMapVenues] = useState<Venue[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReload, setMapReload] = useState(0);
@@ -187,66 +150,6 @@ export function ProfileScreen({
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
-  const mapKeyboardInset = useRef(new Animated.Value(0)).current;
-  const mapKeyboardContentTranslate = useMemo(
-    () => Animated.multiply(mapKeyboardInset, -1),
-    [mapKeyboardInset],
-  );
-  const mapKeyboardVisibleRef = useRef(false);
-  const screenRef = useRef<View>(null);
-
-  useEffect(() => {
-    mapKeyboardVisibleRef.current = false;
-    if (activeTab !== 'map') {
-      mapKeyboardInset.stopAnimation();
-      mapKeyboardInset.setValue(0);
-      return;
-    }
-
-    const updateKeyboardInset = (screenY: number, duration?: number, animate = true) => {
-      screenRef.current?.measureInWindow((_x, y, _width, height) => {
-        const nextInset = Math.max(0, y + height - screenY);
-        mapKeyboardInset.stopAnimation();
-        if (!animate) {
-          mapKeyboardInset.setValue(nextInset);
-          return;
-        }
-        Animated.timing(mapKeyboardInset, {
-          toValue: nextInset,
-          duration: duration && duration > 0 ? duration : 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }).start();
-      });
-    };
-    const currentKeyboard = Keyboard.metrics();
-    if (currentKeyboard) {
-      mapKeyboardVisibleRef.current = true;
-      updateKeyboardInset(currentKeyboard.screenY, undefined, false);
-    }
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, (event) => {
-      if (mapKeyboardVisibleRef.current) return;
-      mapKeyboardVisibleRef.current = true;
-      updateKeyboardInset(event.endCoordinates.screenY, event.duration);
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
-      mapKeyboardVisibleRef.current = false;
-      mapKeyboardInset.stopAnimation();
-      Animated.timing(mapKeyboardInset, {
-        toValue: 0,
-        duration: event.duration && event.duration > 0 ? event.duration : 250,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: false,
-      }).start();
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [activeTab, mapKeyboardInset]);
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -258,6 +161,17 @@ export function ProfileScreen({
   }
 
   useEffect(() => setFollowing(initialFollowing), [initialFollowing, targetUserId]);
+  useEffect(() => {
+    if (own) {
+      setBlocked(false);
+      return;
+    }
+    let active = true;
+    void api.getProfileExtras({ targetUserId })
+      .then((result) => { if (active) setBlocked(result.data.blocked); })
+      .catch(() => { if (active) setBlocked(false); });
+    return () => { active = false; };
+  }, [api, own, targetUserId]);
   useEffect(() => {
     if (own) return undefined;
     return onSnapshot(
@@ -301,7 +215,6 @@ export function ProfileScreen({
     return () => { active = false; };
   }, [currentUserId, own]));
   useEffect(() => {
-    if (activeTab !== 'map') return;
     const venueIds = [...new Set(profileReviews.reviews.map((review) => review.venueId))];
     let active = true;
     setMapError(null);
@@ -309,7 +222,7 @@ export function ProfileScreen({
       .then((venues) => { if (active) setMapVenues(venues); })
       .catch((error) => { if (active) setMapError(apiErrorMessage(error)); });
     return () => { active = false; };
-  }, [activeTab, api, mapReload, profileReviews.reviews]);
+  }, [api, mapReload, profileReviews.reviews]);
   useEffect(() => {
     if (!profile?.favoriteVenueId) {
       setFavoritePlaceName(null);
@@ -354,6 +267,27 @@ export function ProfileScreen({
     } finally {
       setFollowPending(false);
     }
+  }
+
+  function confirmBlock(nextBlocked: boolean) {
+    setProfileMenuOpen(false);
+    Alert.alert(
+      nextBlocked ? `Block ${profile?.displayName ?? 'this user'}?` : `Unblock ${profile?.displayName ?? 'this user'}?`,
+      nextBlocked ? "They can't follow you, message you or see your reviews." : 'They will be able to interact with you again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: nextBlocked ? 'Block' : 'Unblock', style: nextBlocked ? 'destructive' : 'default', onPress: () => {
+          setBlockPending(true);
+          void api.setUserBlocked({ targetUserId, blocked: nextBlocked })
+            .then(() => {
+              setBlocked(nextBlocked);
+              if (nextBlocked) setFollowing(false);
+            })
+            .catch((error) => Alert.alert(`Could not ${nextBlocked ? 'block' : 'unblock'} user`, apiErrorMessage(error)))
+            .finally(() => setBlockPending(false));
+        } },
+      ],
+    );
   }
 
   async function chooseProfilePhoto() {
@@ -466,17 +400,10 @@ export function ProfileScreen({
   });
   const sortedReviews = [...visibleReviews].sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)));
   const venuesById = new Map(mapVenues.map((venue) => [venue.id, venue]));
-  const mapPlaces = visibleReviews
+  const tasteHighlights = buildTasteHighlights({ favoritePlaceName, profile, reviews: profileReviews.reviews, venues: mapVenues });
+  const mapPlaces = profileReviews.reviews
     .map((review) => ({ review, venue: venuesById.get(review.venueId) }))
     .filter((place): place is { review: FeedItem; venue: Venue } => Boolean(place.venue))
-    .filter(({ venue }) => {
-      const category = venue.category?.toLowerCase() ?? '';
-      if (mapFilter === 'restaurant') return category.includes('restaurant');
-      if (mapFilter === 'cafe') return category.includes('cafe') || category.includes('coffee');
-      if (mapFilter === 'bar') return category.includes('bar') || category.includes('pub');
-      if (mapFilter === 'trending') return venue.discoverTags?.includes('trending') ?? true;
-      return matchesPlaceFilters(venue, appliedFilters);
-    })
     .filter(({ review }, index, places) => places.findIndex((place) => place.review.venueId === review.venueId) === index);
   const mappedPlaces = mapPlaces.filter((place): place is { review: FeedItem; venue: Venue & { latitude: number; longitude: number } } => hasMapCoordinates(place.venue));
   const focusPlaces = mappedPlaces.slice(0, MAP_FOCUS_PIN_LIMIT);
@@ -484,31 +411,27 @@ export function ProfileScreen({
   const mapKey = `${isDark ? 'dark' : 'light'}:${focusPlaces.map(({ venue }) => `${venue.id}:${venue.latitude}:${venue.longitude}`).join('|')}`;
   const profileHeader = (
     <ProfileHeader
-      favoritePlaceName={favoritePlaceName}
+      blocked={blocked}
       followPending={followPending}
       following={following}
       onAvatarPress={() => void chooseProfilePhoto()}
       onMessage={() => onMessage(targetUserId)}
       onFollowers={() => setExtra('followers')}
       onFollowing={() => setExtra('following')}
-      onRewards={() => setExtra('rewards')}
       onToggleFollow={() => void toggleFollow()}
       own={own}
       profile={profile}
       reviewCount={profile.reviewCount}
+      tasteHighlights={tasteHighlights}
       uploadingPhoto={uploadingPhoto}
     />
   );
   const controls = (
-    <View style={[styles.controls, activeTab === 'map' && styles.mapControls, { backgroundColor: activeTab === 'map' ? 'transparent' : colors.canvas }]}>
+    <View style={[styles.controls, { backgroundColor: colors.canvas }]}>
       <View style={styles.switcher}>
-        {(['reviews', 'map', 'wishlist'] as const).map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.switchOption, activeTab === tab && styles.switchActive]}>
-            <Text style={[styles.switchText, activeTab === tab && styles.switchTextActive]}>
-              {tab === 'wishlist' ? 'Wishlist' : tab[0].toUpperCase() + tab.slice(1)}
-            </Text>
-          </Pressable>
-        ))}
+        <Pressable onPress={() => setActiveTab('reviews')} style={[styles.switchOption, activeTab === 'reviews' && styles.switchActive]}><Text style={[styles.switchText, activeTab === 'reviews' && styles.switchTextActive]}>Reviews</Text></Pressable>
+        <Pressable onPress={() => setMapOpen(true)} style={styles.switchOption}><Text style={styles.switchText}>Map</Text></Pressable>
+        <Pressable onPress={() => setActiveTab('wishlist')} style={[styles.switchOption, activeTab === 'wishlist' && styles.switchActive]}><Text style={[styles.switchText, activeTab === 'wishlist' && styles.switchTextActive]}>Wishlist</Text></Pressable>
       </View>
       {activeTab === 'reviews' ? (
         <View style={styles.searchBar}>
@@ -521,8 +444,20 @@ export function ProfileScreen({
   );
 
   return (
-    <View ref={screenRef} style={[styles.screen, { backgroundColor: colors.canvas }]}>
-      {activeTab === 'reviews' ? (
+    <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
+      {blocked ? (
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + responsiveSize(24) }]} showsVerticalScrollIndicator={false}>
+          {profileHeader}
+          <View style={styles.blockedState}>
+            <UserBlockedIcon color={colors.text} />
+            <Text style={styles.blockedTitle}>You blocked this account</Text>
+            <Text style={styles.blockedCopy}>They can&apos;t follow you, message you or see your reviews.</Text>
+            <Pressable disabled={blockPending} onPress={() => confirmBlock(false)} style={styles.unblockButton}>
+              {blockPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.unblockText}>Unblock</Text>}
+            </Pressable>
+          </View>
+        </ScrollView>
+      ) : activeTab === 'reviews' ? (
         <FlatList
           automaticallyAdjustKeyboardInsets
           contentContainerStyle={[styles.content, styles.reviewList, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
@@ -551,107 +486,30 @@ export function ProfileScreen({
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <Animated.ScrollView
-          automaticallyAdjustKeyboardInsets={activeTab !== 'map'}
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + responsiveSize(24) }]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          stickyHeaderIndices={activeTab === 'map' ? undefined : [1]}
-          style={activeTab === 'map' ? { transform: [{ translateY: mapKeyboardContentTranslate }] } : undefined}
+          stickyHeaderIndices={[1]}
         >
           {profileHeader}
-          {activeTab !== 'map' ? controls : null}
-          {activeTab === 'map' ? (
-          <View style={styles.mapContent}>
-            <View style={styles.mapPane}>
-              <MapView
-                initialRegion={mapRegion}
-                key={mapKey}
-                mapPadding={{
-                  top: responsiveSize(68),
-                  right: responsiveSize(12),
-                  bottom: responsiveSize(122),
-                  left: responsiveSize(12),
-                }}
-                mapType={Platform.OS === 'android' ? 'none' : 'standard'}
-                pitchEnabled={false}
-                rotateEnabled={false}
-                style={styles.map}
-                userInterfaceStyle={isDark ? 'dark' : 'light'}
-              >
-                <UrlTile
-                  maximumZ={19}
-                  shouldReplaceMapContent
-                  tileSize={256}
-                  urlTemplate={isDark ? DARK_MAP_TILES : LIGHT_MAP_TILES}
-                />
-                {mappedPlaces.map(({ review, venue }, index) => (
-                  <Marker coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} key={venue.id} onPress={() => onOpenPlace(venue.id)}>
-                    <View style={styles.mapMarkerRow}>
-                      <View style={styles.mapMarkerAnchor}>
-                        <View style={[styles.mapMarkerIcon, (review.pinned || index === 0) && styles.mapMarkerIconActive]}><Image source={mapVenueIcon(venue, Boolean(review.pinned || index === 0))} style={styles.mapMarkerGlyph} /></View>
-                        <View style={[styles.mapMarkerTip, (review.pinned || index === 0) && styles.mapMarkerTipActive]} />
-                        <View style={[styles.mapMarkerDot, (review.pinned || index === 0) && styles.mapMarkerDotActive]} />
-                      </View>
-                      <View style={styles.mapMarkerCopy}>
-                        <Text numberOfLines={1} style={styles.mapMarkerName}>{venue.name}</Text>
-                        <Text numberOfLines={1} style={styles.mapMarkerCategory}>{venue.category ?? 'Place'}</Text>
-                      </View>
-                    </View>
-                  </Marker>
-                ))}
-              </MapView>
-              {controls}
-              {mapError ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{mapError}</Text><Pressable onPress={() => setMapReload((value) => value + 1)} style={styles.retryButton}><Text style={styles.retryText}>Try again</Text></Pressable></View> : mapPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>No places found</Text><Text style={styles.emptyCopy}>Try another search or filter.</Text></View> : mappedPlaces.length === 0 ? <View style={styles.mapEmpty}><Text style={styles.emptyTitle}>Locations unavailable</Text><Text style={styles.emptyCopy}>These places do not have map coordinates yet.</Text></View> : null}
-            </View>
-            {mapPlaces.map(({ review }) => <View key={review.id} style={styles.mapReviewItem}><ProfileReviewCard
-              fallbackImageUrl={venueImages[review.venueId]}
-              item={review}
-              onComments={() => onOpenComments(review.id)}
-              onMore={() => own ? setSelectedReview(review) : void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
-              onReact={() => void reactToProfileReview(review.id, 'profile-map-reaction')}
-              reacted={profileReactions[review.id] ?? review.reacted}
-              onShare={() => void Share.share({ message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
-              profile={profile}
-            /></View>)}
-          </View>
-          ) : own ? (
+          {controls}
+          {own ? (
           <View style={styles.wishlistPane}><FavouritesPane appliedFilters={appliedFilters} onOpenFilters={onOpenFilters} onOpenPlace={onOpenPlace} userId={currentUserId} /></View>
         ) : (
           <View style={styles.empty}><Text style={styles.emptyTitle}>Wishlist is private</Text><Text style={styles.emptyCopy}>Saved places are only visible to their owner.</Text></View>
           )}
-        </Animated.ScrollView>
+        </ScrollView>
       )}
-      {activeTab === 'map' ? (
-        <Animated.View style={[styles.mapSearchPanel, { bottom: mapKeyboardInset }]}>
-          <View style={styles.mapSearchRow}>
-            <View style={[styles.searchBar, styles.mapSearchBar]}>
-              <SearchIcon color={colors.textMuted} width={responsiveSize(24)} height={responsiveSize(24)} />
-              <TextInput onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={search} />
-              <MapSearchVoiceIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
-            </View>
-            <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapTuningButton}>
-              <MapFilterTuningIcon height={responsiveSize(21.1838)} width={responsiveSize(17.1838)} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.mapFilters} horizontal showsHorizontalScrollIndicator={false}>
-            {MAP_FILTERS.map((item) => (
-              <Pressable key={item.value} onPress={() => setMapFilter(item.value)} style={[styles.mapFilterChip, { width: responsiveSize(item.width) }]}>
-                <View style={[styles.mapFilterIcon, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}><MapFilterGlyph value={item.value} /></View>
-                <Text style={[styles.mapFilterText, !(item.emphasized || mapFilter === item.value) && styles.mapFilterMuted]}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      ) : null}
       <ProfileTopBar
         onBack={onBack}
         onSettings={onSettings}
-        onShare={() => void Share.share({
+        onShare={() => own ? void Share.share({
           message: `See ${profile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
           url: `https://tastesapp.com/users/${targetUserId}`,
-        })}
+        }) : setProfileMenuOpen(true)}
         own={own}
         profile={profile}
       />
@@ -666,6 +524,30 @@ export function ProfileScreen({
         targetUserId={targetUserId}
         visible={extra !== null}
       />
+      <ProfileMapSheet
+        error={mapError}
+        keyValue={mapKey}
+        mappedPlaces={mappedPlaces}
+        onClose={() => setMapOpen(false)}
+        onOpenPlace={(venueId) => {
+          setMapOpen(false);
+          onOpenPlace(venueId);
+        }}
+        onRetry={() => setMapReload((value) => value + 1)}
+        placeCount={mapPlaces.length}
+        region={mapRegion}
+        visible={mapOpen && !blocked}
+      />
+      <Modal animationType="fade" onRequestClose={() => setProfileMenuOpen(false)} transparent visible={profileMenuOpen}>
+        <Pressable onPress={() => setProfileMenuOpen(false)} style={styles.reviewActionBackdrop}>
+          <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>
+            <Pressable onPress={() => { setProfileMenuOpen(false); void Share.share({ message: `See ${profile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}` }); }} style={styles.actionRow}><Text style={styles.actionText}>Share profile</Text></Pressable>
+            <Pressable disabled={blockPending} onPress={() => confirmBlock(!blocked)} style={[styles.actionRow, styles.deleteAction]}><Text style={styles.deleteActionText}>{blocked ? 'Unblock user' : 'Block this user'}</Text></Pressable>
+            <View style={styles.actionDivider} />
+            <Pressable onPress={() => setProfileMenuOpen(false)} style={[styles.actionRow, styles.cancelAction]}><Text style={styles.actionText}>Cancel</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal animationType="fade" onRequestClose={() => setSelectedReview(null)} transparent visible={selectedReview !== null && !editingReview}>
         <Pressable onPress={() => setSelectedReview(null)} style={styles.reviewActionBackdrop}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.actionSheet}>
@@ -698,7 +580,6 @@ const createStyles = (colors: ThemeColors) => {
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingTop: 102, paddingBottom: 24 },
   controls: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, gap: 12 },
-  mapControls: { position: 'absolute', top: 26, left: 0, right: 0, zIndex: 2, paddingBottom: 0 },
   switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 100, backgroundColor: isDark ? 'rgba(223,223,233,0.12)' : colors.surface },
   switchOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 100 },
   switchActive: { backgroundColor: isDark ? '#D9DDE5' : '#282828' },
@@ -706,15 +587,6 @@ const createStyles = (colors: ThemeColors) => {
   switchTextActive: { color: isDark ? '#161616' : '#FFFFFF', fontWeight: '700' },
   searchBar: { height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 44, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.surface },
   searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
-  mapSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapSearchBar: { flex: 1 },
-  mapTuningButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  mapFilters: { gap: 6, paddingRight: 16 },
-  mapSearchPanel: { position: 'absolute', left: 0, right: 0, zIndex: 4, elevation: 4, overflow: 'hidden', gap: 12, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8, borderTopWidth: 1, borderTopColor: isDark ? '#45474B' : '#D9DDE5', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: isDark ? '#161616' : colors.surface },
-  mapFilterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border, borderRadius: 40, backgroundColor: isDark ? '#161616' : colors.surface },
-  mapFilterIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
-  mapFilterText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 },
-  mapFilterMuted: { opacity: 0.5 },
   reviewList: { gap: 14 },
   reviewItem: { paddingHorizontal: 15 },
   draftCardWrap: { marginHorizontal: 15 },
@@ -722,23 +594,6 @@ const createStyles = (colors: ThemeColors) => {
   empty: { minHeight: 220, marginHorizontal: 16, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.surface },
   emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   emptyCopy: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  mapContent: { gap: 0 },
-  mapPane: { height: 426, marginTop: -26, zIndex: 0, overflow: 'hidden', backgroundColor: '#17191D' },
-  map: { width: '100%', height: '100%' },
-  mapMarkerRow: { width: 122, flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  mapMarkerAnchor: { width: 38, alignItems: 'center' },
-  mapMarkerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 18, backgroundColor: '#161616' },
-  mapMarkerIconActive: { borderColor: colors.primary },
-  mapMarkerGlyph: { width: 21, height: 21 },
-  mapMarkerTip: { width: 0, height: 0, marginTop: -1, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 7, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFFFFF' },
-  mapMarkerTipActive: { borderTopColor: colors.primary },
-  mapMarkerDot: { width: 5, height: 5, marginTop: 3, borderRadius: 3, backgroundColor: '#FFFFFF' },
-  mapMarkerDotActive: { backgroundColor: colors.primary },
-  mapMarkerCopy: { width: 80, paddingTop: 4 },
-  mapMarkerName: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', letterSpacing: -0.41 },
-  mapMarkerCategory: { color: '#FFFFFF', fontSize: 12, letterSpacing: -0.24 },
-  mapEmpty: { position: 'absolute', left: 24, right: 24, bottom: 122, zIndex: 3, padding: 18, borderRadius: 18, alignItems: 'center', backgroundColor: 'rgba(8,8,8,0.82)' },
-  mapReviewItem: { marginHorizontal: 16, marginTop: 12 },
   retryButton: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 18, backgroundColor: colors.primary },
   retryText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
   actionBackdrop: { flex: 1, padding: 16, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
@@ -757,9 +612,10 @@ const createStyles = (colors: ThemeColors) => {
   editSave: { height: 50, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 25, backgroundColor: colors.primary },
   editSaveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   wishlistPane: {},
+  blockedState: { minHeight: 360, paddingHorizontal: 36, alignItems: 'center', justifyContent: 'center' },
+  blockedTitle: { marginTop: 12, color: colors.text, fontSize: 22, lineHeight: 27, fontWeight: '700', textAlign: 'center' },
+  blockedCopy: { marginTop: 10, color: colors.textSecondary, fontSize: 15, lineHeight: 21, textAlign: 'center' },
+  unblockButton: { minWidth: 108, height: 44, marginTop: 14, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: colors.primary },
+  unblockText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
   });
 };
-
-const staticStyles = responsiveStyleSheet({
-  mapFilterCafeIcon: { width: 14, height: 14 },
-});

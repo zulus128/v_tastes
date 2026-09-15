@@ -645,25 +645,10 @@ describe('authenticated session and paginated reads', () => {
     expect((await db.collection('reviews').doc(firstReview.id).collection('comments').doc(newerReplies[0]).get()).get('status')).toBe('deleted');
   }, 15_000);
 
-  it('applies review rewards, XP, and reactions exactly once', async () => {
-    const { first, second, db, author, firstReview } = await createReviewFixture();
-    await db
-      .collection('reviews')
-      .doc(firstReview.id)
-      .update({ dishNames: ['Tiramisu'] });
-    const profileExtras = await callFunction<{
-      xp: number;
-      rewards: Array<{ id: string; completed: boolean; progress: number }>;
-    }>('getProfileExtras', {}, first.token);
+  it('applies review XP and reactions exactly once', async () => {
+    const { first, second, author, firstReview } = await createReviewFixture();
+    const profileExtras = await callFunction<{ xp: number }>('getProfileExtras', {}, first.token);
     expect(profileExtras.xp).toBe(50);
-    expect(profileExtras.rewards.find((reward) => reward.id === 'tiramisu')).toMatchObject({
-      completed: true,
-      progress: 1,
-    });
-    expect(profileExtras.rewards.find((reward) => reward.id === 'matcha')).toMatchObject({
-      completed: false,
-      progress: 0,
-    });
 
     const reactionCommand = {
       idempotencyKey: 'reaction-command-01',

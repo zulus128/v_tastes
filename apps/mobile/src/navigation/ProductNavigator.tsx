@@ -454,7 +454,6 @@ export function ProductNavigator({
                     navigation.navigate('Recap', { mode: 'ready' });
                     break;
                   case 'leaderboard':
-                  case 'rewards':
                     navigation.navigate('Leaderboard');
                     break;
                   case 'requests':

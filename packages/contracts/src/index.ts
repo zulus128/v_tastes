@@ -167,6 +167,11 @@ export const profileExtrasInputSchema = z.object({
   targetUserId: z.string().min(1).max(128).optional(),
 });
 
+export const setUserBlockedInputSchema = z.object({
+  targetUserId: z.string().min(1).max(128),
+  blocked: z.boolean(),
+});
+
 export const reactToReviewInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   reviewId: z.string().min(1),
@@ -526,6 +531,7 @@ export type UpdateGroupMembersInput = z.infer<typeof updateGroupMembersInputSche
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesInputSchema>;
 export type ReportCommentInput = z.infer<typeof reportCommentInputSchema>;
 export type ProfileExtrasInput = z.infer<typeof profileExtrasInputSchema>;
+export type SetUserBlockedInput = z.infer<typeof setUserBlockedInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;
 export type RequestPhoneOtpInput = z.infer<typeof requestPhoneOtpInputSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof verifyPhoneOtpInputSchema>;
@@ -596,9 +602,8 @@ export interface MonthlyRecapResult {
 }
 export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
 export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; pendingMembers: GroupMember[]; createdAt: string; }
-export interface RewardProgress { id: string; name: string; description: string; progress: number; completed: boolean; xp: number; }
 export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
-export interface ProfileExtrasResult { followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; rewards: RewardProgress[]; notificationPreferences: NotificationPreferences; }
+export interface ProfileExtrasResult { blocked: boolean; followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; notificationPreferences: NotificationPreferences; }
 
 export interface Page<T> {
   items: T[];
