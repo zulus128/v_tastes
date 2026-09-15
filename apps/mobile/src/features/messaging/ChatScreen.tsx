@@ -1,7 +1,7 @@
 import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc, onSnapshot, type DocumentData } from 'firebase/firestore';
 import {
   ActivityIndicator,
@@ -60,7 +60,7 @@ function useActivityChatDetails(activityId: string | null): ActivityChatDetails 
     setDetails(null);
     if (!activityId) return undefined;
     let active = true;
-    return onSnapshot(doc(firestore, 'activities', activityId), (snapshot) => {
+    const unsubscribe = onSnapshot(doc(firestore, 'activities', activityId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
       const participantIds = Array.isArray(data.participantIds)
@@ -85,6 +85,10 @@ function useActivityChatDetails(activityId: string | null): ActivityChatDetails 
         });
       });
     });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [activityId]);
   return details;
 }
