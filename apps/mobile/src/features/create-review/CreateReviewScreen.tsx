@@ -411,7 +411,12 @@ export function CreateReviewScreen({
           ) : null}
 
           <SectionLabel label="Tag" />
-          <ScrollView contentContainerStyle={styles.tags} horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.tags}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tagsScroll}
+          >
             {tagOptions.map((tag) => {
               const selected = tags.includes(tag.value);
               return (
@@ -1200,8 +1205,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   dishTitle: { marginTop: 12, color: colors.text, fontSize: 14, fontWeight: '600' },
   addDish: { height: 44, marginHorizontal: 16, flexDirection: 'row', gap: 8, borderRadius: 36, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(173,51,36,0.1)' },
   addDishText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
-  tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18 },
-  tag: { minHeight: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  tagsScroll: { flexGrow: 0 },
+  tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18, alignItems: 'center' },
+  tag: { height: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 999, alignItems: 'center', alignSelf: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   tagSelected: { borderColor: colors.primary, backgroundColor: '#D33B35' },
   tagText: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.23 },
   tagTextSelected: { color: '#fff' },
