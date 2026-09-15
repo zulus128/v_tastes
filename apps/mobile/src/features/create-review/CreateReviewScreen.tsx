@@ -129,6 +129,7 @@ export function CreateReviewScreen({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const feedbackRef = useRef<TextInput>(null);
   // Measured so the hero's SVG background (HeroBackground) can be shaped to the card's real
   // size — its bottom edge is drawn concentric with the rating arc (see heroCurveGeometry)
   // instead of an independently-radiused CSS corner, so the gap to the arc stays constant.
@@ -141,6 +142,7 @@ export function CreateReviewScreen({
   const feedbackMinHeight = responsiveSize(50);
   const feedbackMaxHeight = responsiveSize(140);
   const [feedbackHeight, setFeedbackHeight] = useState(() => responsiveSize(50));
+  const [feedbackFocused, setFeedbackFocused] = useState(false);
   const [tags, setTags] = useState<ReviewTag[]>([]);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
@@ -376,14 +378,29 @@ export function CreateReviewScreen({
             )}
           </View>
 
-          <SectionLabel label="Your review" />
+          <SectionLabel
+            label="Your review"
+            onDone={feedbackFocused ? () => {
+              feedbackRef.current?.blur();
+              Keyboard.dismiss();
+            } : undefined}
+          />
           <TextInput
+            blurOnSubmit
             maxLength={2_000}
             multiline
+            onBlur={() => setFeedbackFocused(false)}
             onChangeText={setText}
             onContentSizeChange={({ nativeEvent }) => setFeedbackHeight(Math.min(feedbackMaxHeight, Math.max(feedbackMinHeight, nativeEvent.contentSize.height)))}
+            onFocus={() => setFeedbackFocused(true)}
+            onSubmitEditing={() => {
+              feedbackRef.current?.blur();
+              Keyboard.dismiss();
+            }}
             placeholder="Enter text"
             placeholderTextColor={colors.placeholder}
+            ref={feedbackRef}
+            returnKeyType="done"
             scrollEnabled={feedbackHeight >= feedbackMaxHeight}
             style={[styles.feedback, { height: feedbackHeight }]}
             textAlignVertical="top"
@@ -516,9 +533,12 @@ export function CreateReviewScreen({
   );
 }
 
-function SectionLabel({ label }: { label: string }) {
+function SectionLabel({ label, onDone }: { label: string; onDone?: () => void }) {
   const { colors } = useAppTheme();
-  return <Text maxFontSizeMultiplier={1.3} style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
+  return <View style={sectionStyles.row}>
+    <Text maxFontSizeMultiplier={1.3} style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>
+    {onDone ? <Pressable accessibilityRole="button" hitSlop={8} onPress={onDone}><Text style={[sectionStyles.done, { color: colors.primary }]}>Done</Text></Pressable> : null}
+  </View>;
 }
 
 function ReviewTagPill({
@@ -655,7 +675,7 @@ function RatingCurve({
   })).current;
   const dragging = useRef(false);
   const settling = useRef(false);
-  const dragStartRating = useRef(value);
+  const dragStartPoint = useRef({ x: 0, y: 0 });
   const currentDragRating = useRef(value);
   const settleRating = useRef(new Animated.Value(value)).current;
   const interaction = useRef({ arcGeometry, onChange, value });
@@ -749,36 +769,42 @@ function RatingCurve({
     interaction.current.onChange(rating);
   };
 
-  const pinPanResponder = useRef(PanResponder.create({
-    // Claim immediately when the gesture starts on the pin. Waiting for a
-    // horizontal threshold lets the parent ScrollView win first, and movement
-    // near either end of the circular arc is naturally mostly vertical anyway.
+  const curvePanResponder = useRef(PanResponder.create({
+    // Capture the whole curved rating surface immediately. This lets a drag
+    // begin anywhere on the arc and prevents the parent ScrollView from taking
+    // vertical movement while the user is adjusting the rating.
+    onStartShouldSetPanResponderCapture: () => true,
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onMoveShouldSetPanResponderCapture: () => true,
+    onPanResponderGrant: (event) => {
       dragging.current = true;
-      dragStartRating.current = interaction.current.value;
-      currentDragRating.current = interaction.current.value;
+      dragStartPoint.current = {
+        x: event.nativeEvent.locationX,
+        y: event.nativeEvent.locationY,
+      };
       settleRating.stopAnimation();
       settling.current = false;
-      setVisualPosition(interaction.current.value);
+      setVisualPosition(snapRating(ratingForCurvePoint(
+        dragStartPoint.current.x,
+        dragStartPoint.current.y,
+        interaction.current.arcGeometry,
+      )));
     },
     onPanResponderMove: (_event, gesture) => {
       if (!dragging.current) return;
-      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
       const continuousRating = ratingForCurvePoint(
-        start.x + gesture.dx,
-        start.y + gesture.dy,
+        dragStartPoint.current.x + gesture.dx,
+        dragStartPoint.current.y + gesture.dy,
         interaction.current.arcGeometry,
       );
-      setVisualPosition(continuousRating);
+      setVisualPosition(snapRating(continuousRating));
     },
     onPanResponderRelease: (_event, gesture) => {
-      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
       const coast = responsiveSize(18);
       const projectedRating = ratingForCurvePoint(
-        start.x + gesture.dx + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vx * coast)),
-        start.y + gesture.dy + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vy * coast)),
+        dragStartPoint.current.x + gesture.dx + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vx * coast)),
+        dragStartPoint.current.y + gesture.dy + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vy * coast)),
         interaction.current.arcGeometry,
       );
       settleToRating(snapRating(projectedRating));
@@ -787,6 +813,7 @@ function RatingCurve({
       settleToRating(snapRating(currentDragRating.current));
     },
     onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
   })).current;
   const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (
@@ -896,7 +923,10 @@ function RatingCurve({
           ) : null}
         </View>
       ) : curvedLayout && arcGeometry ? (
-        <View style={[ratingStyles.curve, { height: curvedLayout.arcDepth, width: heroWidth }]}>
+        <View
+          style={[ratingStyles.curve, { height: curvedLayout.arcDepth, width: heroWidth }]}
+          {...curvePanResponder.panHandlers}
+        >
           <Svg
             height={curvedLayout.arcDepth}
             pointerEvents="none"
@@ -972,7 +1002,6 @@ function RatingCurve({
                 selectRating(snapRating(visualRating + delta));
               }}
               style={[ratingStyles.pointHit, ratingStyles.dragPin, pinPosition.getLayout()]}
-              {...pinPanResponder.panHandlers}
             >
               <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
             </Animated.View>
@@ -1313,7 +1342,11 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
   );
 }
 
-const sectionStyles = responsiveStyleSheet({ label: { marginTop: 16, marginHorizontal: 16, marginBottom: 6, fontSize: 13 } });
+const sectionStyles = responsiveStyleSheet({
+  row: { minHeight: 35, marginTop: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+  label: { flex: 1, fontSize: 13 },
+  done: { fontSize: 15, fontWeight: '600' },
+});
 const ratingStyles = responsiveStyleSheet({
   wrap: { height: 198, position: 'relative', alignItems: 'center' },
   value: { position: 'absolute', top: 18, zIndex: 3, color: '#B82F29', fontSize: 34, lineHeight: 40, fontWeight: '500' },
