@@ -119,7 +119,7 @@ export function ProfileHeader({
             <View key={highlight.id} style={styles.highlight}>
               <View style={styles.highlightIcon}><Text style={styles.highlightEmoji}>{highlight.emoji}</Text></View>
               <Text numberOfLines={1} style={styles.highlightLabel}>{highlight.label}</Text>
-              <Text numberOfLines={1} style={styles.highlightValue}>{highlight.value}</Text>
+              <Text ellipsizeMode="tail" numberOfLines={2} style={styles.highlightValue}>{highlight.value}</Text>
               <Text numberOfLines={1} style={styles.highlightMeta}>{highlight.meta}</Text>
             </View>
           ))}
@@ -206,7 +206,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   highlightIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.surfaceRaised },
   highlightEmoji: { fontSize: 18, lineHeight: 22 },
   highlightLabel: { marginTop: 6, color: colors.textSecondary, fontSize: 9, lineHeight: 12, textAlign: 'center' },
-  highlightValue: { marginTop: 2, color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
+  highlightValue: { minHeight: 28, marginTop: 2, color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
   highlightMeta: { marginTop: 2, color: colors.textMuted, fontSize: 8, lineHeight: 10, textAlign: 'center' },
 });
 
