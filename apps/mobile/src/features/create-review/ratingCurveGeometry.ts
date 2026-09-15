@@ -50,6 +50,10 @@ export function concentricRatingLayout(
   const centerY = arcDepth - outerRadius;
   const radius = outerRadius - gap;
   const halfChord = Math.sqrt(Math.max(0, (radius ** 2) - (centerY ** 2)));
+  // acos gives an unambiguous angle on the lower half of the circle. atan2
+  // flips from +PI to -PI when centerY rounds to +0/-0 at the exact
+  // semicircle breakpoint, sending intermediate markers over the upper arc.
+  const rightAngle = Math.acos(clamp(halfChord / radius, -1, 1));
 
   return {
     arcDepth,
@@ -57,9 +61,9 @@ export function concentricRatingLayout(
     ratingArc: {
       centerX: halfWidth,
       centerY,
-      leftAngle: Math.atan2(-centerY, -halfChord),
+      leftAngle: Math.PI - rightAngle,
       radius,
-      rightAngle: Math.atan2(-centerY, halfChord),
+      rightAngle,
     },
     straightBottom,
   };
@@ -93,4 +97,11 @@ export function snapRating(rating: number) {
     minimumRating,
     maximumRating,
   );
+}
+
+/** Keeps vertical intent available to the review form's parent ScrollView. */
+export function shouldClaimRatingDrag(dx: number, dy: number, threshold: number) {
+  const horizontalTravel = Math.abs(dx);
+  const verticalTravel = Math.abs(dy);
+  return horizontalTravel >= threshold && horizontalTravel >= verticalTravel * 0.55;
 }

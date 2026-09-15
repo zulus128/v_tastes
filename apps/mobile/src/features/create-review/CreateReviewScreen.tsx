@@ -56,6 +56,7 @@ import {
   concentricRatingLayout,
   ratingCurvePoint,
   ratingForCurvePoint,
+  shouldClaimRatingDrag,
   snapRating,
 } from './ratingCurveGeometry';
 
@@ -554,6 +555,13 @@ function RatingCurve({
   const lastSnappedRating = useRef(value);
   const interaction = useRef({ arcGeometry, onChange, value });
   interaction.current = { arcGeometry, onChange, value };
+  const geometrySignature = [
+    heroHeight,
+    heroWidth,
+    minimumStraightBottom,
+    arcGeometry?.radius ?? 0,
+  ].join(':');
+  const previousGeometrySignature = useRef(geometrySignature);
 
   const setPinPosition = (rating: number, geometry = interaction.current.arcGeometry) => {
     const point = ratingCurvePoint(rating, geometry);
@@ -564,12 +572,28 @@ function RatingCurve({
   };
 
   useEffect(() => {
-    if (value >= 1 && !dragging.current) setPinPosition(value, arcGeometry);
-  }, [arcGeometry, value, pinPosition]);
+    const geometryChanged = previousGeometrySignature.current !== geometrySignature;
+    previousGeometrySignature.current = geometrySignature;
+    if (geometryChanged) {
+      // A resize can interrupt delivery of the native release event. Explicitly
+      // end the gesture so the old responder cannot keep the ScrollView locked.
+      dragging.current = false;
+      lastSnappedRating.current = value;
+    }
+    if (value >= 1 && (!dragging.current || geometryChanged)) {
+      setPinPosition(value, arcGeometry);
+    }
+  }, [arcGeometry, geometrySignature, value, pinPosition]);
 
   const pinPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    // A press alone and a predominantly vertical gesture belong to the parent
+    // ScrollView. Claim only a deliberate movement along the rating control.
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_event, gesture) => shouldClaimRatingDrag(
+      gesture.dx,
+      gesture.dy,
+      responsiveSize(4),
+    ),
     onPanResponderGrant: () => {
       dragging.current = true;
       dragStartRating.current = interaction.current.value;
@@ -577,6 +601,7 @@ function RatingCurve({
       setPinPosition(interaction.current.value);
     },
     onPanResponderMove: (_event, gesture) => {
+      if (!dragging.current) return;
       const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
       const continuousRating = ratingForCurvePoint(
         start.x + gesture.dx,
@@ -599,7 +624,7 @@ function RatingCurve({
       dragging.current = false;
       setPinPosition(lastSnappedRating.current);
     },
-    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminationRequest: () => true,
   })).current;
   const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (

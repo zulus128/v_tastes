@@ -3,6 +3,7 @@ import {
   concentricRatingLayout,
   ratingCurvePoint,
   ratingForCurvePoint,
+  shouldClaimRatingDrag,
   snapRating,
 } from '../src/features/create-review/ratingCurveGeometry';
 
@@ -41,5 +42,25 @@ describe('rating curve geometry', () => {
 
     expect(layout.straightBottom).toBeGreaterThanOrEqual(480);
     expect(layout.straightBottom + layout.arcDepth).toBe(950);
+  });
+
+  it('keeps intermediate markers on the lower arc at the semicircle breakpoint', () => {
+    const width = 895;
+    const layout = concentricRatingLayout(width, 1_044, 0, 31);
+    const left = ratingCurvePoint(1, layout.ratingArc);
+    const middle = ratingCurvePoint(3, layout.ratingArc);
+    const right = ratingCurvePoint(5, layout.ratingArc);
+
+    expect(layout.arcDepth).toBe(width / 2);
+    expect(middle.y).toBeGreaterThan(left.y);
+    expect(middle.y).toBeGreaterThan(right.y);
+    expect(middle.y).toBeCloseTo(layout.ratingArc.centerY + layout.ratingArc.radius, 8);
+  });
+
+  it('leaves vertical gestures to the parent scroll view', () => {
+    expect(shouldClaimRatingDrag(2, 20, 4)).toBe(false);
+    expect(shouldClaimRatingDrag(6, 20, 4)).toBe(false);
+    expect(shouldClaimRatingDrag(20, 6, 4)).toBe(true);
+    expect(shouldClaimRatingDrag(14, 20, 4)).toBe(true);
   });
 });
