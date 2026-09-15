@@ -17,7 +17,10 @@ import NightIcon from '../../../assets/create-review/tag-night.svg';
 import PinnedIndicator from '../../../assets/profile/pinned-indicator.svg';
 
 const tagLabels: Record<string, string> = {
+  'quick-bites': '⚡ Quick bites',
   casual: 'Casual',
+  fancy: '🥂 Fancy',
+  'night-out': '🌙 Night out',
   'date-night': 'Date night',
   birthday: 'Birthday',
   children: 'With children',

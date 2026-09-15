@@ -50,7 +50,10 @@ const commentReportReasons: Array<{ label: string; value: ReportReason }> = [
 ];
 
 const tagLabels: Record<string, string> = {
+  'quick-bites': '⚡ Quick bites',
   casual: 'Casual',
+  fancy: '🥂 Fancy',
+  'night-out': '🌙 Night out',
   'date-night': 'Date night',
   birthday: 'Birthday',
   children: 'With children',

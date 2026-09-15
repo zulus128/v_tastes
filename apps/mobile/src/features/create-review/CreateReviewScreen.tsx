@@ -5,14 +5,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,9 +38,6 @@ import RatingScaleLight from '../../../assets/create-review/rating-scale-light.s
 import SaveCheck from '../../../assets/create-review/save-check.svg';
 import SelectPlaceCircle from '../../../assets/create-review/select-place-circle.svg';
 import SelectPlacePlus from '../../../assets/create-review/select-place-plus.svg';
-import TagBirthdayIcon from '../../../assets/create-review/tag-birthday.svg';
-import TagChildrenIcon from '../../../assets/create-review/tag-children.svg';
-import TagNightIcon from '../../../assets/create-review/tag-night.svg';
 import successGlow from '../../../assets/create-review/success-glow.png';
 import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
@@ -50,10 +51,13 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
+import {
+  concentricRatingLayout,
+  ratingCurvePoint,
+  ratingForCurvePoint,
+  snapRating,
+} from './ratingCurveGeometry';
 
-const ratingCircle = { centerX: 169, centerY: -36.8226, radius: 167.8226 };
-const ratingCircleY = (x: number) => ratingCircle.centerY
-  + Math.sqrt((ratingCircle.radius ** 2) - ((x - ratingCircle.centerX) ** 2));
 // Figma (node 5978:18283, "Rectangle 9946") draws the hero card's rounded bottom as a plain
 // CSS corner-radius (210) on the full-width card, independent of the rating arc's own circle
 // (node 5700:5935, centerX/centerY/radius above) — so the gap between the arc and the card's
@@ -64,38 +68,16 @@ const ratingCircleY = (x: number) => ratingCircle.centerY
 // unchanged from the original 210-radius version (it already left ~31px under the arc's
 // deepest point; this just makes that clearance uniform instead of only happening at center).
 const heroCurveGap = 31;
-// The curve's own SVG is 338pt wide, but the selected-star pin (a 38pt badge, hit target 44pt)
-// sticks out ~22pt past the curve's drawn endpoints — so the widget actually needs ~382pt of
-// clear width to show the end pins in full (matches the ~21pt margin Figma itself leaves
-// around the pin within its 402pt-wide "rating" frame). Below that, shrink the whole curve
-// uniformly instead of letting the end pins get clipped by the hero card's edge.
-const curveDesignWidth = 382;
-const curveScaleFor = (availableWidth: number) => Math.min(1, availableWidth / curveDesignWidth);
-function heroCurveGeometry(heroWidth: number) {
-  // Hero has 16pt of padding on each side; that's the width actually available to the curve,
-  // so the background arc shrinks in lockstep with it and stays concentric.
-  const innerRadius = ratingCircle.radius * curveScaleFor(heroWidth - 32);
-  const outerRadius = innerRadius + heroCurveGap;
-  const halfWidth = heroWidth / 2;
-  // A circle can't span a chord wider than its own diameter — grow the radius just enough to
-  // still reach edge to edge on an unusually wide screen (flattening the curve slightly there)
-  // instead of leaving it too small, which would silently force the SVG arc below to scale up
-  // its own radius to close the path, leaving this computed height out of sync with what
-  // actually renders.
-  const radius = Math.max(outerRadius, halfWidth + 1);
-  const centerY = -Math.sqrt(Math.max(0, radius ** 2 - halfWidth ** 2));
-  return { height: radius + centerY, radius };
-}
 const reviewRatingMarkers = [
-  { kind: 'dot', value: 1, x: 7, y: ratingCircleY(7) },
-  { kind: 'tick', rotation: -30, value: 1.5, x: 25, y: ratingCircleY(25) },
-  { kind: 'dot', value: 2, x: 58, y: ratingCircleY(58) },
-  { kind: 'tick', rotation: -70, value: 2.5, x: 111, y: ratingCircleY(111) },
-  { kind: 'dot', value: 3, x: 169, y: ratingCircleY(169) },
-  { kind: 'tick', rotation: 70, value: 3.5, x: 227, y: ratingCircleY(227) },
-  { kind: 'dot', value: 4, x: 278, y: ratingCircleY(278) },
-  { kind: 'tick', rotation: 30, value: 4.5, x: 313, y: ratingCircleY(313) },
-  { kind: 'dot', value: 5, x: 331, y: ratingCircleY(331) },
+  { kind: 'dot', value: 1 },
+  { kind: 'tick', rotation: -30, value: 1.5 },
+  { kind: 'dot', value: 2 },
+  { kind: 'tick', rotation: -70, value: 2.5 },
+  { kind: 'dot', value: 3 },
+  { kind: 'tick', rotation: 70, value: 3.5 },
+  { kind: 'dot', value: 4 },
+  { kind: 'tick', rotation: 30, value: 4.5 },
+  { kind: 'dot', value: 5 },
 ] as const;
 const dishRatingMarkers = [
   { value: 1, x: 7.59038 },
@@ -108,12 +90,13 @@ const dishRatingMarkers = [
   { value: 4.5, x: 310 },
   { value: 5, x: 352.313 },
 ] as const;
-const tagOptions: Array<{ label: string; value: ReviewTag }> = [
-  { label: 'Casual', value: 'casual' },
-  { label: 'Date night', value: 'date-night' },
-  { label: 'Birthday', value: 'birthday' },
-  { label: 'Children', value: 'children' },
+const tagOptions: Array<{ emoji: string; label: string; value: ReviewTag }> = [
+  { emoji: '⚡', label: 'Quick bites', value: 'quick-bites' },
+  { emoji: '🍽️', label: 'Casual', value: 'casual' },
+  { emoji: '🥂', label: 'Fancy', value: 'fancy' },
+  { emoji: '🌙', label: 'Night out', value: 'night-out' },
 ];
+const selectableReviewTags = new Set<ReviewTag>(tagOptions.map((tag) => tag.value));
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
 interface StoredReviewDraft {
@@ -150,6 +133,7 @@ export function CreateReviewScreen({
   // size — its bottom edge is drawn concentric with the rating arc (see heroCurveGeometry)
   // instead of an independently-radiused CSS corner, so the gap to the arc stays constant.
   const [heroSize, setHeroSize] = useState({ height: 0, width: 0 });
+  const [venueCardBottom, setVenueCardBottom] = useState(0);
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
@@ -158,6 +142,7 @@ export function CreateReviewScreen({
   const feedbackMaxHeight = responsiveSize(140);
   const [feedbackHeight, setFeedbackHeight] = useState(() => responsiveSize(50));
   const [tags, setTags] = useState<ReviewTag[]>([]);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [dishes, setDishes] = useState<DishReviewDraft[]>([]);
   const [placeSelectorOpen, setPlaceSelectorOpen] = useState(false);
   const [dishEditor, setDishEditor] = useState<DishReviewDraft | null>(null);
@@ -178,6 +163,18 @@ export function CreateReviewScreen({
   const hasDraftChanges = Boolean(
     venueId !== (initialVenueId ?? '') || rating > 0 || text.trim() || tags.length > 0 || dishes.length > 0,
   );
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -202,7 +199,9 @@ export function CreateReviewScreen({
         setSelectedVenue(draft.selectedVenue ?? null);
         setRating(draft.rating);
         setText(draft.text);
-        setTags(Array.isArray(draft.tags) ? draft.tags : []);
+        setTags(Array.isArray(draft.tags)
+          ? draft.tags.filter((tag): tag is ReviewTag => selectableReviewTags.has(tag)).slice(0, 1)
+          : []);
         setDishes(Array.isArray(draft.dishes) ? draft.dishes : []);
         if (typeof draft.idempotencyKey === 'string') setIdempotencyKey(draft.idempotencyKey);
       } catch {
@@ -327,6 +326,7 @@ export function CreateReviewScreen({
                 heroHeight={heroSize.height}
                 heroWidth={heroSize.width}
                 locations={[0, 0.65982, 1]}
+                minimumStraightBottom={venueCardBottom + responsiveSize(12)}
               />
             ) : null}
             <View style={styles.navigation}>
@@ -336,7 +336,11 @@ export function CreateReviewScreen({
             </View>
             {venue ? (
               <>
-                <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.venueCard}>
+                <Pressable
+                  onLayout={({ nativeEvent }) => setVenueCardBottom(nativeEvent.layout.y + nativeEvent.layout.height)}
+                  onPress={() => setPlaceSelectorOpen(true)}
+                  style={styles.venueCard}
+                >
                   <Image source={venueImage(venue.imageUrl)} style={styles.venueImage} />
                   <View style={styles.venueCopy}>
                     <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={styles.venueName}>{venue.name}</Text>
@@ -349,7 +353,13 @@ export function CreateReviewScreen({
                 {/* Fixed-height card above the arc — the venue name/address are capped so a
                     larger accessibility text size can't grow the hero past its designed height
                     and pull the arc out of alignment with the card's rounded bottom. */}
-                <RatingCurve heroWidth={heroSize.width} onChange={setRating} value={rating} />
+                <RatingCurve
+                  heroHeight={heroSize.height}
+                  heroWidth={heroSize.width}
+                  minimumStraightBottom={venueCardBottom + responsiveSize(12)}
+                  onChange={setRating}
+                  value={rating}
+                />
               </>
             ) : (
               <Pressable onPress={() => setPlaceSelectorOpen(true)} style={styles.selectPlace}>
@@ -366,7 +376,7 @@ export function CreateReviewScreen({
             )}
           </View>
 
-          <SectionLabel label="Your feedback" />
+          <SectionLabel label="Your review" />
           <TextInput
             maxLength={2_000}
             multiline
@@ -415,20 +425,23 @@ export function CreateReviewScreen({
           ) : null}
 
           <SectionLabel label="Tag" />
-          <ScrollView contentContainerStyle={styles.tags} horizontal showsHorizontalScrollIndicator={false}>
-            {tagOptions.map((tag) => {
-              const selected = tags.includes(tag.value);
-              return (
-                <Pressable
-                  key={tag.value}
-                  onPress={() => setTags((items) => selected ? items.filter((item) => item !== tag.value) : [...items, tag.value])}
-                  style={[styles.tag, selected && styles.tagSelected]}
-                >
-                  <TagGlyph color={selected ? colors.onPrimary : colors.text} value={tag.value} />
-                  <Text maxFontSizeMultiplier={1.3} style={[styles.tagText, selected && styles.tagTextSelected]}>{tag.label}</Text>
-                </Pressable>
-              );
-            })}
+          <ScrollView
+            contentContainerStyle={styles.tags}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tagsScroll}
+          >
+            {tagOptions.map((tag) => (
+              <ReviewTagPill
+                emoji={tag.emoji}
+                key={tag.value}
+                label={tag.label}
+                onPress={() => setTags((items) => items[0] === tag.value ? [] : [tag.value])}
+                reduceMotion={reduceMotion}
+                selected={tags[0] === tag.value}
+                styles={styles}
+              />
+            ))}
           </ScrollView>
         </ScrollView>
 
@@ -508,21 +521,109 @@ function SectionLabel({ label }: { label: string }) {
   return <Text maxFontSizeMultiplier={1.3} style={[sectionStyles.label, { color: colors.textMuted }]}>{label.toUpperCase()}</Text>;
 }
 
-function TagGlyph({ color, value }: { color: string; value: ReviewTag }) {
-  if (value === 'date-night') return <TagNightIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  if (value === 'birthday') return <TagBirthdayIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  if (value === 'children') return <TagChildrenIcon color={color} height={responsiveSize(12)} width={responsiveSize(12)} />;
-  return null;
+function ReviewTagPill({
+  emoji,
+  label,
+  onPress,
+  reduceMotion,
+  selected,
+  styles,
+}: {
+  emoji: string;
+  label: string;
+  onPress: () => void;
+  reduceMotion: boolean;
+  selected: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const selection = useRef(new Animated.Value(selected ? 1 : 0)).current;
+  const pressFlash = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(selection, {
+      duration: reduceMotion ? 0 : 180,
+      easing: Easing.inOut(Easing.cubic),
+      toValue: selected ? 1 : 0,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, selected, selection]);
+
+  useEffect(() => () => pressFlash.stopAnimation(), [pressFlash]);
+
+  const flashBorder = () => {
+    pressFlash.stopAnimation();
+    pressFlash.setValue(0);
+    if (reduceMotion || !selected) return;
+    Animated.sequence([
+      Animated.timing(pressFlash, {
+        duration: 8,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pressFlash, {
+        duration: 16,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      onPressIn={flashBorder}
+      style={styles.tagPressable}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.tag, {
+          backgroundColor: selection.interpolate({
+            inputRange: [0, 1],
+            outputRange: [styles.tag.backgroundColor as string, '#B82F29'],
+          }),
+          borderColor: selection.interpolate({
+            inputRange: [0, 1],
+            outputRange: [styles.tag.borderColor as string, '#B82F29'],
+          }),
+        }]}
+      >
+        <Text allowFontScaling={false} style={styles.tagEmoji}>{emoji}</Text>
+        <Animated.Text
+          maxFontSizeMultiplier={1.3}
+          style={[styles.tagText, {
+            color: selection.interpolate({
+              inputRange: [0, 1],
+              outputRange: [styles.tagText.color as string, '#FFFFFF'],
+            }),
+          }]}
+        >{label}</Animated.Text>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.tagPressFlash, { opacity: pressFlash }]}
+        />
+      </Animated.View>
+    </Pressable>
+  );
 }
 
 function RatingCurve({
+  heroHeight = 0,
   heroWidth = 0,
   linear = false,
+  minimumStraightBottom = 0,
   onChange,
   value,
 }: {
+  heroHeight?: number;
   heroWidth?: number;
   linear?: boolean;
+  minimumStraightBottom?: number;
   onChange: (value: number) => void;
   value: number;
 }) {
@@ -530,34 +631,193 @@ function RatingCurve({
   const accent = '#B82F29';
   const curveBase = isDark ? '#3D1A1C' : '#FFCBCE';
   const curvePoint = isDark ? '#120606' : '#FFFFFF';
-  const selectedMarker = reviewRatingMarkers.find((marker) => marker.value === value);
   // The scale asset is authored at a fixed 359.903pt canvas, which overflows
   // narrower screens (e.g. iPhone SE). Measure the space actually available
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
+  const [visualRating, setVisualRating] = useState(value);
+  const reduceMotion = useRef(false);
   const markerScale = scaleWidth / 359.903;
-  // Same idea for the curved scale: shrink the whole arc+pins as one unit (see
-  // curveDesignWidth) rather than let the end pins overflow the hero card's edge.
-  const curveScale = heroWidth > 0
-    ? Math.min(1, (heroWidth - 32) / responsiveSize(curveDesignWidth))
-    : 1;
+  const curvedLayout = !linear && heroWidth > 0 && heroHeight > 0
+    ? concentricRatingLayout(
+      heroWidth,
+      heroHeight,
+      minimumStraightBottom,
+      responsiveSize(heroCurveGap),
+    )
+    : null;
+  const arcGeometry = curvedLayout?.ratingArc;
+  const selectedPoint = visualRating >= 1 ? ratingCurvePoint(visualRating, arcGeometry) : null;
+  const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
+  const pinPosition = useRef(new Animated.ValueXY({
+    x: initialPinPoint.x - responsiveSize(22),
+    y: initialPinPoint.y - responsiveSize(22),
+  })).current;
+  const dragging = useRef(false);
+  const settling = useRef(false);
+  const dragStartRating = useRef(value);
+  const currentDragRating = useRef(value);
+  const settleRating = useRef(new Animated.Value(value)).current;
+  const interaction = useRef({ arcGeometry, onChange, value });
+  interaction.current = { arcGeometry, onChange, value };
+  const geometrySignature = [
+    heroHeight,
+    heroWidth,
+    minimumStraightBottom,
+    arcGeometry?.radius ?? 0,
+  ].join(':');
+  const previousGeometrySignature = useRef(geometrySignature);
+
+  const setPinPosition = (rating: number, geometry = interaction.current.arcGeometry) => {
+    const point = ratingCurvePoint(rating, geometry);
+    pinPosition.setValue({
+      x: point.x - responsiveSize(22),
+      y: point.y - responsiveSize(22),
+    });
+  };
+
+  const setVisualPosition = (rating: number) => {
+    currentDragRating.current = rating;
+    setPinPosition(rating);
+    setVisualRating(rating);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) reduceMotion.current = enabled;
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      reduceMotion.current = enabled;
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const listener = settleRating.addListener(({ value: nextRating }) => setVisualPosition(nextRating));
+    return () => {
+      settleRating.stopAnimation();
+      settleRating.removeListener(listener);
+    };
+  }, [settleRating]);
+
+  useEffect(() => {
+    const geometryChanged = previousGeometrySignature.current !== geometrySignature;
+    previousGeometrySignature.current = geometrySignature;
+    if (geometryChanged) {
+      // A resize can interrupt delivery of the native release event. Explicitly
+      // end the gesture so the old responder cannot keep the ScrollView locked.
+      dragging.current = false;
+      settling.current = false;
+      settleRating.stopAnimation();
+      currentDragRating.current = value;
+    }
+    if (!dragging.current && !settling.current) {
+      setVisualRating(value);
+    }
+    if (value >= 1 && (!dragging.current || geometryChanged) && !settling.current) {
+      setPinPosition(value, arcGeometry);
+    }
+  }, [arcGeometry, geometrySignature, value, pinPosition, settleRating]);
+
+  const settleToRating = (target: number) => {
+    dragging.current = false;
+    settling.current = true;
+    settleRating.stopAnimation();
+    settleRating.setValue(currentDragRating.current);
+    Animated.timing(settleRating, {
+      duration: reduceMotion.current ? 0 : 150,
+      easing: Easing.out(Easing.cubic),
+      toValue: target,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      settling.current = false;
+      if (!finished) return;
+      setVisualPosition(target);
+      interaction.current.onChange(target);
+    });
+  };
+
+  const selectRating = (rating: number) => {
+    settleRating.stopAnimation();
+    dragging.current = false;
+    settling.current = false;
+    setVisualPosition(rating);
+    interaction.current.onChange(rating);
+  };
+
+  const pinPanResponder = useRef(PanResponder.create({
+    // Claim immediately when the gesture starts on the pin. Waiting for a
+    // horizontal threshold lets the parent ScrollView win first, and movement
+    // near either end of the circular arc is naturally mostly vertical anyway.
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      dragging.current = true;
+      dragStartRating.current = interaction.current.value;
+      currentDragRating.current = interaction.current.value;
+      settleRating.stopAnimation();
+      settling.current = false;
+      setVisualPosition(interaction.current.value);
+    },
+    onPanResponderMove: (_event, gesture) => {
+      if (!dragging.current) return;
+      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
+      const continuousRating = ratingForCurvePoint(
+        start.x + gesture.dx,
+        start.y + gesture.dy,
+        interaction.current.arcGeometry,
+      );
+      setVisualPosition(continuousRating);
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      const start = ratingCurvePoint(dragStartRating.current, interaction.current.arcGeometry);
+      const coast = responsiveSize(18);
+      const projectedRating = ratingForCurvePoint(
+        start.x + gesture.dx + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vx * coast)),
+        start.y + gesture.dy + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vy * coast)),
+        interaction.current.arcGeometry,
+      );
+      settleToRating(snapRating(projectedRating));
+    },
+    onPanResponderTerminate: () => {
+      settleToRating(snapRating(currentDragRating.current));
+    },
+    onPanResponderTerminationRequest: () => false,
+  })).current;
+  const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (
-    <View style={ratingStyles.wrap}>
+    <View style={[
+      ratingStyles.wrap,
+      curvedLayout && {
+        bottom: 0,
+        height: curvedLayout.arcDepth,
+        left: 0,
+        position: 'absolute',
+        width: heroWidth,
+      },
+    ]}>
       {/* The digit and stars sit at fixed pixel offsets over the SVG arc below, so they opt
           out of font scaling entirely rather than drifting out of alignment with it. Screen
           readers still get the rating via each star's accessibilityLabel. */}
-      <Text allowFontScaling={false} style={ratingStyles.value}>{value >= 1 ? value.toFixed(value % 1 ? 1 : 0) : '–'}</Text>
-      <View style={ratingStyles.stars}>
+      <Text
+        allowFontScaling={false}
+        style={[ratingStyles.value, curvedLayout && { top: innerBottom - responsiveSize(149) }]}
+      >{visualRating >= 1 ? visualRating.toFixed(Math.abs(visualRating - Math.round(visualRating)) < 0.03 ? 0 : 1) : '–'}</Text>
+      <View style={[ratingStyles.stars, curvedLayout && { top: innerBottom - responsiveSize(106) }]}>
         {Array.from({ length: 5 }, (_, index) => {
           const star = index + 1;
-          const fill = Math.max(0, Math.min(1, value - index));
+          const fill = Math.max(0, Math.min(1, visualRating - index));
           return (
             <Pressable
               accessibilityLabel={`${star} stars`}
               accessibilityRole="button"
               hitSlop={4}
               key={star}
-              onPress={() => onChange(star)}
+              onPress={() => selectRating(star)}
               style={ratingStyles.starButton}
             >
               <View style={ratingStyles.starGlyph}>
@@ -635,41 +895,60 @@ function RatingCurve({
             </>
           ) : null}
         </View>
-      ) : (
-        <View style={[ratingStyles.curve, curveScale < 1 && { transform: [{ scale: curveScale }] }]}>
-          <Svg height={responsiveSize(139)} pointerEvents="none" viewBox="0 0 338 139" width={responsiveSize(338)} style={StyleSheet.absoluteFill}>
+      ) : curvedLayout && arcGeometry ? (
+        <View style={[ratingStyles.curve, { height: curvedLayout.arcDepth, width: heroWidth }]}>
+          <Svg
+            height={curvedLayout.arcDepth}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+            viewBox={`0 0 ${heroWidth} ${curvedLayout.arcDepth}`}
+            width={heroWidth}
+          >
             <Defs>
               <ClipPath id="review-rating-progress">
-                <Rect height={139} width={selectedMarker?.x ?? 0} x={0} y={0} />
+                <Rect height={curvedLayout.arcDepth} width={selectedPoint?.x ?? 0} x={0} y={0} />
               </ClipPath>
             </Defs>
-            <Path d="M7 7 A167.8226 167.8226 0 0 0 169 131" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
-            <Path d="M169 131 A167.8226 167.8226 0 0 0 331 7" fill="none" stroke={curveBase} strokeLinecap="round" strokeWidth={4} />
-            {selectedMarker ? (
+            <Path
+              d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
+              fill="none"
+              stroke={curveBase}
+              strokeLinecap="round"
+              strokeWidth={responsiveSize(4)}
+            />
+            <Path
+              d={`M${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
+              fill="none"
+              stroke={curveBase}
+              strokeLinecap="round"
+              strokeWidth={responsiveSize(4)}
+            />
+            {selectedPoint ? (
               <Path
                 clipPath="url(#review-rating-progress)"
-                d="M7 7 A167.8226 167.8226 0 0 0 169 131 A167.8226 167.8226 0 0 0 331 7"
+                d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
                 fill="none"
                 stroke={accent}
                 strokeLinecap="round"
-                strokeWidth={4}
+                strokeWidth={responsiveSize(4)}
               />
             ) : null}
           </Svg>
           {reviewRatingMarkers.map((marker) => {
-            const selected = marker.value === value;
-            const active = marker.value <= value;
+            const active = marker.value <= visualRating;
+            const point = ratingCurvePoint(marker.value, arcGeometry);
             return (
               <Pressable
                 accessibilityLabel={`${marker.value} stars`}
                 accessibilityRole="button"
                 key={marker.value}
-                onPress={() => onChange(marker.value)}
-                style={[ratingStyles.pointHit, { left: responsiveSize(marker.x - 22), top: responsiveSize(marker.y - 22) }]}
+                onPress={() => selectRating(marker.value)}
+                style={[ratingStyles.pointHit, {
+                  left: point.x - responsiveSize(22),
+                  top: point.y - responsiveSize(22),
+                }]}
               >
-                {selected ? (
-                  <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
-                ) : marker.kind === 'dot' ? (
+                {marker.kind === 'dot' ? (
                   <View style={[ratingStyles.point, { backgroundColor: curvePoint, borderColor: active ? accent : curveBase }]} />
                 ) : (
                   <View
@@ -683,8 +962,23 @@ function RatingCurve({
               </Pressable>
             );
           })}
+          {visualRating >= 1 ? (
+            <Animated.View
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              accessibilityLabel={`${visualRating.toFixed(1)} stars. Swipe left or right to adjust.`}
+              accessibilityRole="adjustable"
+              onAccessibilityAction={({ nativeEvent }) => {
+                const delta = nativeEvent.actionName === 'increment' ? 0.5 : -0.5;
+                selectRating(snapRating(visualRating + delta));
+              }}
+              style={[ratingStyles.pointHit, ratingStyles.dragPin, pinPosition.getLayout()]}
+              {...pinPanResponder.panHandlers}
+            >
+              <RatingPin color={accent} height={responsiveSize(38)} width={responsiveSize(38)} />
+            </Animated.View>
+          ) : null}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -695,21 +989,36 @@ function RatingCurve({
 // the card's edge reads as constant all the way across instead of widening toward the
 // center, where a plain corner-radius would otherwise leave a mismatched pocket of empty
 // space under the arc's deepest point (visible as extra dark background there).
-function HeroBackground({ borderColor, colors, heroHeight, heroWidth, locations }: {
+function HeroBackground({
+  borderColor,
+  colors,
+  heroHeight,
+  heroWidth,
+  locations,
+  minimumStraightBottom,
+}: {
   borderColor: string;
   colors: string[];
   heroHeight: number;
   heroWidth: number;
   locations: number[];
+  minimumStraightBottom: number;
 }) {
-  const { height: arcDepth, radius } = heroCurveGeometry(heroWidth);
-  const straightBottom = Math.max(0, heroHeight - arcDepth);
+  const {
+    outerRadius,
+    straightBottom,
+  } = concentricRatingLayout(
+    heroWidth,
+    heroHeight,
+    minimumStraightBottom,
+    responsiveSize(heroCurveGap),
+  );
   const centerX = heroWidth / 2;
   // Traversal order matters for the sweep-flag below: this mirrors the rating arc's own two
   // segments (left-edge → center-bottom → right-edge, both "0 0" flags) exactly. Going the
   // other way around with the same flags picks the other/complementary circle and produces a
   // self-intersecting path — a sharp V instead of a smooth dip.
-  const d = `M0,${straightBottom} A${radius},${radius} 0 0 0 ${centerX},${heroHeight} A${radius},${radius} 0 0 0 ${heroWidth},${straightBottom} L${heroWidth},0 L0,0 Z`;
+  const d = `M0,${straightBottom} A${outerRadius},${outerRadius} 0 0 0 ${centerX},${heroHeight} A${outerRadius},${outerRadius} 0 0 0 ${heroWidth},${straightBottom} L${heroWidth},0 L0,0 Z`;
   return (
     <Svg height={heroHeight} pointerEvents="none" style={StyleSheet.absoluteFill} width={heroWidth}>
       <Defs>
@@ -797,13 +1106,18 @@ function PlaceSelector({
           <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
           {search ? <Pressable onPress={() => setSearch('')}><Text style={styles.clear}>×</Text></Pressable> : null}
         </View>
-        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.filters}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filtersScroll}
+        >
           {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
             const active = categoryFilter === filter;
-            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
+            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
           })}
-          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text style={styles.filterText}>$$⌄</Text></Pressable>
-          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text style={styles.filterText}>♨ Trending</Text></Pressable>
+          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>$$⌄</Text></Pressable>
+          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>♨ Trending</Text></Pressable>
         </ScrollView>
         {query.isPending || (search.trim().length >= 2 && searchQuery.isPending) ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError || searchQuery.isError ? (
           <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
@@ -1009,10 +1323,11 @@ const ratingStyles = responsiveStyleSheet({
   starOutline: { position: 'absolute', color: '#B82F29', opacity: 0.3, fontSize: 29, lineHeight: 30 },
   starFillClip: { position: 'absolute', height: 30, overflow: 'hidden' },
   starFill: { width: 26, color: '#B82F29', fontSize: 27, lineHeight: 30 },
-  curve: { position: 'absolute', top: 36, width: 338, height: 139 },
+  curve: { position: 'absolute', left: 0, top: 0 },
   scale: { position: 'absolute', top: 116, alignSelf: 'center', width: '100%', maxWidth: 359.903, height: 44, justifyContent: 'center' },
   linearProgress: { position: 'absolute', left: 0, top: 14.4096 },
   pointHit: { position: 'absolute', zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dragPin: { zIndex: 6 },
   linearPointHit: { position: 'absolute', top: 0, zIndex: 5, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   point: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
   tick: { width: 12, height: 2, borderRadius: 1 },
@@ -1052,13 +1367,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
   dishTitle: { marginTop: 12, color: colors.text, fontSize: 14, fontWeight: '600' },
   addDish: { height: 44, marginHorizontal: 16, flexDirection: 'row', gap: 8, borderRadius: 36, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(173,51,36,0.1)' },
   addDishText: { color: colors.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
-  tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18 },
-  tag: { minHeight: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  tagSelected: { borderColor: colors.primary, backgroundColor: '#D33B35' },
+  tagsScroll: { flexGrow: 0 },
+  tags: { gap: 8, paddingHorizontal: 16, paddingBottom: 18, alignItems: 'center' },
+  tagPressable: { height: 34, borderRadius: 999, alignSelf: 'center' },
+  tag: { height: 34, paddingHorizontal: 10, flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.1)', borderRadius: 999, alignItems: 'center', alignSelf: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  tagPressFlash: { position: 'absolute', top: -1, right: -1, bottom: -1, left: -1, borderWidth: 2, borderColor: 'rgba(255,255,255,0.95)', borderRadius: 999 },
+  tagEmoji: { fontSize: 14, lineHeight: 18 },
   tagText: { color: colors.textMuted, fontSize: 14, letterSpacing: -0.23 },
-  tagTextSelected: { color: '#fff' },
   footer: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: 16, paddingHorizontal: 36 },
-  post: { height: 58, borderWidth: 5, borderColor: isDark ? '#4C1816' : '#FFFFFF', borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D33B35' },
+  post: { height: 54, borderRadius: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E63946', shadowColor: '#E53845', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 13, elevation: 10 },
   postDisabled: { opacity: 0.45 },
   postText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.4 },
 });
@@ -1074,10 +1391,11 @@ const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   search: { flex: 1, height: 42, paddingVertical: 0, color: colors.text, fontSize: 16 },
   clear: { color: colors.textSecondary, fontSize: 22 },
   placeList: { flex: 1 },
+  filtersScroll: { flexGrow: 0, flexShrink: 0, height: 54 },
   filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
   filter: { height: 34, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
-  filterText: { color: colors.text, fontSize: 12 },
+  filterText: { color: colors.text, fontSize: 12, lineHeight: 16 },
   loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' }, error: { color: colors.primary, textAlign: 'center' },
   row: { minHeight: 176, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowImage: { width: 122, height: 122, borderRadius: 14 }, rowCopy: { flex: 1, gap: 7 },

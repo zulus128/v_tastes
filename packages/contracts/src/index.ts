@@ -82,7 +82,7 @@ export const reviewSchema = z.object({
   venueName: z.string().min(1),
   rating: z.number().min(1).max(5),
   text: z.string().min(1).max(2_000),
-  tags: z.array(z.enum(['casual', 'date-night', 'birthday', 'children'])).max(4).default([]),
+  tags: z.array(z.enum(['quick-bites', 'casual', 'fancy', 'night-out', 'date-night', 'birthday', 'children'])).max(4).default([]),
   dishReviews: z.array(z.object({
     id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
     title: z.string().trim().min(1).max(120),
@@ -97,7 +97,17 @@ export const reviewSchema = z.object({
 
 export const idempotencyKeySchema = z.string().trim().min(16).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
 
-export const reviewTagSchema = z.enum(['casual', 'date-night', 'birthday', 'children']);
+// Keep the previous values readable for existing reviews while the composer exposes only
+// the four current visit-context choices.
+export const reviewTagSchema = z.enum([
+  'quick-bites',
+  'casual',
+  'fancy',
+  'night-out',
+  'date-night',
+  'birthday',
+  'children',
+]);
 
 export const dishReviewInputSchema = z.object({
   id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
