@@ -13,18 +13,8 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import DishIcon from '../../../assets/create-review/add-dish.svg';
-import NightIcon from '../../../assets/create-review/tag-night.svg';
 import PinnedIndicator from '../../../assets/profile/pinned-indicator.svg';
-
-const tagLabels: Record<string, string> = {
-  'quick-bites': '⚡ Quick bites',
-  casual: 'Casual',
-  fancy: '🥂 Fancy',
-  'night-out': '🌙 Night out',
-  'date-night': 'Date night',
-  birthday: 'Birthday',
-  children: 'With children',
-};
+import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 
 function DishPhoto({ fallbackUri, large = false, path, url }: { fallbackUri?: string; large?: boolean; path?: string; url?: string }) {
   const [state, setState] = useState<{ uri?: string; failed: boolean }>({ uri: url, failed: false });
@@ -133,12 +123,7 @@ export function ProfileReviewCard({
             <Text numberOfLines={1} style={styles.reviewVenue}>{item.venueName}</Text>
             <RatingStars rating={item.rating} styles={styles} />
           </View>
-          {tags[0] ? (
-            <View style={styles.visitTag}>
-              {tags[0] === 'date-night' ? <NightIcon color={colors.text} height={responsiveSize(12)} width={responsiveSize(12)} /> : null}
-              <Text style={styles.visitTagText}>{tagLabels[tags[0]] ?? tags[0]}</Text>
-            </View>
-          ) : null}
+          <ReviewCityBadge city={item.venueCity} />
         </View>
         {dishes.length > 0 ? (
           <ScrollView contentContainerStyle={styles.dishRow} horizontal showsHorizontalScrollIndicator={false}>
@@ -152,6 +137,7 @@ export function ProfileReviewCard({
           </ScrollView>
         ) : null}
         <Text numberOfLines={4} style={styles.reviewText}>{item.text}</Text>
+        <ReviewMetaRow cuisine={item.cuisine} mood={tags[0]} />
         <View style={styles.metrics}>
           <View style={styles.metricActions}>
             <Pressable onPress={onReact} style={styles.metricIconRow}>

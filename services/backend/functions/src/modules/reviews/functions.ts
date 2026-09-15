@@ -125,6 +125,8 @@ export const getFeed = onCall(callableOptions, async (request) => {
         authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
         venueId: String(document.get('venueId')),
         venueName: String(document.get('venueName')),
+        venueCity: document.get('venueCity') ? String(document.get('venueCity')) : undefined,
+        cuisine: document.get('cuisine') ? String(document.get('cuisine')) : undefined,
         rating: Number(document.get('rating')),
         text: String(document.get('text')),
         tags: Array.isArray(document.get('tags')) ? document.get('tags') : [],
@@ -214,6 +216,8 @@ export const getComments = onCall(callableOptions, async (request) => {
       authorPhotoUrl: author.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
       venueId: String(review.get('venueId')),
       venueName: String(review.get('venueName')),
+      venueCity: review.get('venueCity') ? String(review.get('venueCity')) : undefined,
+      cuisine: review.get('cuisine') ? String(review.get('cuisine')) : undefined,
       rating: Number(review.get('rating')),
       text: String(review.get('text')),
       tags: Array.isArray(review.get('tags')) ? review.get('tags') : [],
@@ -596,12 +600,14 @@ export const createReview = onCall(callableOptions, async (request) => {
     const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
     const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
     const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
+    const cuisine = venue.get('category');
     transaction.create(reviewRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
       venueId: venue.id,
       venueName: venue.get('name'),
       venueCity: venue.get('city'),
+      ...(typeof cuisine === 'string' && cuisine ? { cuisine } : {}),
       rating: input.rating,
       text: input.text,
       tags: input.tags,
@@ -659,6 +665,7 @@ export const editReview = onCall(callableOptions, async (request) => {
     const count = Math.max(1, Number(venue.get('reviewCount') ?? 1));
     const average = Math.max(0, Number(venue.get('rating') ?? 0));
     const oldRating = Number(review.get('rating') ?? 0);
+    const cuisine = venue.get('category');
     const now = FieldValue.serverTimestamp();
     const previousDishes = Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') as StoredDishReview[] : [];
     const photoUrlByPath = new Map(previousDishes.flatMap((dish) =>
@@ -671,6 +678,7 @@ export const editReview = onCall(callableOptions, async (request) => {
       rating: input.rating,
       text: input.text,
       tags: input.tags,
+      ...(typeof cuisine === 'string' && cuisine ? { cuisine } : {}),
       tag: input.tags[0] ?? null,
       dishReviews,
       dishNames: dishReviews.map((dish) => dish.title),

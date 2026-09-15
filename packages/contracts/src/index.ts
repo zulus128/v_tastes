@@ -69,6 +69,7 @@ export const venueSchema = z.object({
   rating: z.number().min(0).max(5).optional(),
   reviewCount: z.number().int().nonnegative().optional(),
   matchPercent: z.number().int().min(0).max(100).optional(),
+  recommendationReason: z.string().min(1).max(120).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   discoverTags: z.array(discoverTagSchema).optional(),
@@ -80,6 +81,8 @@ export const reviewSchema = z.object({
   authorDisplayName: z.string().min(1),
   venueId: z.string().min(1),
   venueName: z.string().min(1),
+  venueCity: z.string().min(1).optional(),
+  cuisine: z.string().min(1).optional(),
   rating: z.number().min(1).max(5),
   text: z.string().min(1).max(2_000),
   tags: z.array(z.enum(['quick-bites', 'casual', 'fancy', 'night-out', 'date-night', 'birthday', 'children'])).max(4).default([]),
@@ -783,12 +786,15 @@ export interface DiscoverReview {
   authorPhotoUrl: string | null;
   venueId: string;
   venueName: string;
+  venueCity: string;
   venueCategory: string;
+  cuisine: string;
   venueImageUrl: string | null;
   rating: number;
   text: string;
   reactionCount: number;
   commentCount: number;
+  tags: ReviewTag[];
   createdAt: string;
 }
 
@@ -825,6 +831,8 @@ export interface PlaceReview {
   authorDisplayName: string;
   authorUsername: string | null;
   authorPhotoUrl: string | null;
+  venueCity: string;
+  cuisine: string;
   rating: number;
   text: string;
   reactionCount: number;

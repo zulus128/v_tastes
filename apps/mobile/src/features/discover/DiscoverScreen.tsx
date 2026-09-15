@@ -49,6 +49,7 @@ import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
 import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
+import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import filterBarIcon from '../../../assets/onboarding/filter-bar.png';
 import filterCafeIcon from '../../../assets/onboarding/filter-cafe.png';
 import filterRestaurantIcon from '../../../assets/onboarding/filter-restaurant.png';
@@ -176,6 +177,7 @@ function joinedLabel(iso: string): string {
 }
 
 function forYouReason(venue: Venue, index: number): string {
+  if (venue.recommendationReason) return venue.recommendationReason;
   if (!venue.category) return 'Popular near you';
   return index % 2 === 0 ? `Because you ❤️ ${venue.category}` : `Popular ${venue.category} pick`;
 }
@@ -296,7 +298,7 @@ export function DiscoverScreen({
           />
         )
       ) : null}
-      {tab === 'places' && favouritesOpen ? <FavouritesPane appliedFilters={appliedFilters} onOpenFilters={onOpenFilters} onOpenPlace={onOpenPlace} userId={userId} /> : null}
+      {tab === 'places' && favouritesOpen ? <FavouritesPane appliedFilters={appliedFilters} onBack={() => setFavouritesOpen(false)} onOpenFilters={onOpenFilters} onOpenPlace={onOpenPlace} userId={userId} /> : null}
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
@@ -485,6 +487,28 @@ function TrendingFeed({
         </>
       ) : null}
 
+      {feed.forYou.length > 0 ? (
+        <>
+          <SectionLabel title="For you" subtitle="Picked from your tastes & saves" />
+          <ScrollView
+            contentContainerStyle={styles.horizontalContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {feed.forYou.map((venue, index) => (
+              <ForYouCard
+                image={venueImage(venue.imageUrl)}
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                place={venueToPlace(venue)}
+                reason={forYouReason(venue, index)}
+                width={forYouCardWidth}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+
       {feed.newSpots.length > 0 ? (
         <>
           <SectionLabel title="New spots" subtitle="Just opened in your area" />
@@ -520,6 +544,8 @@ function TrendingFeed({
               <ReviewCard
                 author={review.authorDisplayName}
                 avatarUrl={review.authorPhotoUrl}
+                city={review.venueCity}
+                cuisine={review.cuisine}
                 image={venueImage(review.venueImageUrl)}
                 key={review.id}
                 onComments={() => onOpenComments(review.id)}
@@ -528,8 +554,9 @@ function TrendingFeed({
                   setReactedReviews((current) => { const next = new Set(current); if (result.data.active) next.add(review.id); else next.delete(review.id); return next; });
                 }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
                 onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
-                onOpen={() => onOpenPlace(review.venueId)}
+                onOpen={() => onOpenComments(review.id)}
                 place={review.venueName}
+                mood={review.tags[0]}
                 rating={review.rating.toFixed(1)}
                 reactionCount={reactionCounts[review.id] ?? review.reactionCount}
                 reacted={reactedReviews.has(review.id)}
@@ -552,28 +579,6 @@ function TrendingFeed({
             pending={followPending || followPendingId === topReviewer.userId}
             person={topReviewer}
           />
-        </>
-      ) : null}
-
-      {feed.forYou.length > 0 ? (
-        <>
-          <SectionLabel title="For you" subtitle="Picked from your tastes & saves" />
-          <ScrollView
-            contentContainerStyle={styles.horizontalContent}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {feed.forYou.map((venue, index) => (
-              <ForYouCard
-                image={venueImage(venue.imageUrl)}
-                key={venue.id}
-                onOpen={() => onOpenPlace(venue.id)}
-                place={venueToPlace(venue)}
-                reason={forYouReason(venue, index)}
-                width={forYouCardWidth}
-              />
-            ))}
-          </ScrollView>
         </>
       ) : null}
 
@@ -631,8 +636,9 @@ function PlacesMap({
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const appStateRef = useRef(AppState.currentState);
   const mapResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
-  const sheetExpandedRef = useRef(false);
+  const [sheetDetent, setSheetDetent] = useState<'peek' | 'half' | 'full'>('half');
+  const sheetDetentRef = useRef<'peek' | 'half' | 'full'>('half');
+  const [sheetDismissed, setSheetDismissed] = useState(false);
   const [sort, setSort] = useState<PlaceSort>('best-match');
   const [sortOpen, setSortOpen] = useState(false);
   const mapRef = useRef<MapView | null>(null);
@@ -641,7 +647,7 @@ function PlacesMap({
   const sheetHeight = useRef(new Animated.Value(330)).current;
   const sheetKeyboardTranslate = useRef(new Animated.Value(0)).current;
   const currentSheetHeight = useRef(330);
-  const sheetBounds = useRef({ collapsed: 330, expanded: 650 });
+  const sheetBounds = useRef({ peek: 180, half: 330, full: 650 });
   const dragStartHeight = useRef(330);
   const sheetInitialized = useRef(false);
   const venueFilter = activeFilter
@@ -788,16 +794,28 @@ function PlacesMap({
     };
   }, [sheetKeyboardTranslate]);
 
-  function settleSheet(expanded: boolean) {
+  function settleSheet(target: 'dismissed' | 'peek' | 'half' | 'full') {
     if (keyboardVisibleRef.current) {
       Keyboard.dismiss();
       return;
     }
-    sheetExpandedRef.current = expanded;
-    setSheetExpanded(expanded);
-    if (!expanded) setSortOpen(false);
+    if (target === 'dismissed') {
+      setSortOpen(false);
+      Animated.spring(sheetHeight, {
+        toValue: 0,
+        damping: 24,
+        stiffness: 240,
+        mass: 0.9,
+        useNativeDriver: false,
+      }).start(({ finished }) => { if (finished) setSheetDismissed(true); });
+      return;
+    }
+    setSheetDismissed(false);
+    sheetDetentRef.current = target;
+    setSheetDetent(target);
+    if (target === 'peek') setSortOpen(false);
     Animated.spring(sheetHeight, {
-      toValue: expanded ? sheetBounds.current.expanded : sheetBounds.current.collapsed,
+      toValue: sheetBounds.current[target],
       damping: 24,
       stiffness: 240,
       mass: 0.9,
@@ -813,41 +831,49 @@ function PlacesMap({
     },
     onPanResponderMove: (_, gesture) => {
       const next = dragStartHeight.current - gesture.dy;
-      sheetHeight.setValue(Math.max(
-        sheetBounds.current.collapsed,
-        Math.min(sheetBounds.current.expanded, next),
-      ));
+      sheetHeight.setValue(Math.max(0, Math.min(sheetBounds.current.full, next)));
     },
     onPanResponderRelease: (_, gesture) => {
-      const midpoint = (sheetBounds.current.collapsed + sheetBounds.current.expanded) / 2;
-      const expand = gesture.vy < -0.35
-        || (gesture.vy <= 0.35 && currentSheetHeight.current >= midpoint);
-      settleSheet(expand);
+      const projected = currentSheetHeight.current - gesture.vy * responsiveSize(140);
+      if (projected < sheetBounds.current.peek * 0.55) {
+        settleSheet('dismissed');
+        return;
+      }
+      const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+        target,
+        distance: Math.abs(sheetBounds.current[target] - projected),
+      }));
+      detents.sort((left, right) => left.distance - right.distance);
+      settleSheet(detents[0].target);
     },
     onPanResponderTerminate: () => {
-      settleSheet(currentSheetHeight.current >= (
-        sheetBounds.current.collapsed + sheetBounds.current.expanded
-      ) / 2);
+      const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+        target,
+        distance: Math.abs(sheetBounds.current[target] - currentSheetHeight.current),
+      }));
+      detents.sort((left, right) => left.distance - right.distance);
+      settleSheet(detents[0].target);
     },
   })).current;
 
   useEffect(() => {
     if (mapHeight <= 0 || keyboardAvoidanceActive) return;
     const availableHeight = Math.max(0, mapHeight - responsiveSize(8));
-    const expanded = Math.max(0, availableHeight - headerHeight);
-    const collapsed = Math.min(expanded, Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)));
+    const full = Math.max(0, availableHeight - headerHeight);
+    const half = Math.min(full, Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)));
+    const peek = Math.min(half, responsiveSize(180));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
-      sheetBounds.current = { collapsed, expanded };
-      currentSheetHeight.current = collapsed;
-      sheetHeight.setValue(collapsed);
+      sheetBounds.current = { peek, half, full };
+      currentSheetHeight.current = half;
+      sheetHeight.setValue(half);
       return;
     }
-    sheetBounds.current = { collapsed, expanded };
+    sheetBounds.current = { peek, half, full };
 
     // Animate orientation and container-size changes without jumping.
     sheetHeight.stopAnimation();
-    const nextHeight = sheetExpandedRef.current ? expanded : collapsed;
+    const nextHeight = sheetDismissed ? 0 : sheetBounds.current[sheetDetentRef.current];
     currentSheetHeight.current = nextHeight;
     const animation = Animated.timing(sheetHeight, {
       toValue: nextHeight,
@@ -857,7 +883,7 @@ function PlacesMap({
     });
     animation.start();
     return () => animation.stop();
-  }, [headerHeight, keyboardAvoidanceActive, mapHeight, sheetHeight]);
+  }, [headerHeight, keyboardAvoidanceActive, mapHeight, sheetDismissed, sheetHeight]);
 
   function zoom(multiplier: number) {
     const next = {
@@ -990,6 +1016,11 @@ function PlacesMap({
           <MapLayerToggle active={mapLayers.openNow} label="Open now" onPress={() => toggleMapLayer('openNow')} styles={styles} />
         </View>
       ) : null}
+      {sheetDismissed && !sidePanelLayout ? (
+        <Pressable accessibilityLabel="Show place list" onPress={() => settleSheet('peek')} style={styles.showPlacesButton}>
+          <Text style={styles.showPlacesText}>Show places</Text>
+        </Pressable>
+      ) : null}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -1007,8 +1038,8 @@ function PlacesMap({
       >
         {sidePanelLayout ? null : (
           <Pressable
-            accessibilityLabel={sheetExpanded ? 'Collapse place list' : 'Expand place list'}
-            onPress={() => settleSheet(!sheetExpanded)}
+            accessibilityLabel={sheetDetent === 'full' ? 'Collapse place list' : 'Expand place list'}
+            onPress={() => settleSheet(sheetDetent === 'full' ? 'half' : sheetDetent === 'half' ? 'full' : 'half')}
             style={styles.sheetDragArea}
             {...sheetPanResponder.panHandlers}
           >
@@ -1058,7 +1089,7 @@ function PlacesMap({
             );
           })}
         </ScrollView>
-        {sheetExpanded || sidePanelLayout ? (
+        {sheetDetent !== 'peek' || sidePanelLayout ? (
           <View style={styles.mapResultsMeta}>
             <Text style={styles.mapResultsCount}>{filtered.length} places</Text>
             <Pressable
@@ -1533,8 +1564,11 @@ function GridPlace({ onOpen, place, width }: { onOpen: () => void; place: Place;
 function ReviewCard({
   author,
   avatarUrl,
+  city,
+  cuisine,
   image,
   place,
+  mood,
   rating,
   reactionCount,
   text,
@@ -1549,8 +1583,11 @@ function ReviewCard({
 }: {
   author: string;
   avatarUrl: string | null;
+  city: string;
+  cuisine: string;
   image: ImageSourcePropType;
   place: string;
+  mood?: string;
   rating: string;
   reactionCount: number;
   text: string;
@@ -1573,11 +1610,12 @@ function ReviewCard({
           <UserAvatar displayName={author} photoUrl={avatarUrl} style={styles.reviewAvatar} />
           <View style={styles.reviewWho}>
             <Text numberOfLines={1} style={styles.reviewAuthor}>{author}</Text>
-            <Text numberOfLines={2} style={styles.reviewPlace}>on {place}</Text>
+            <Text numberOfLines={2} style={styles.reviewPlace}>on {place}  ·  ★ {rating}</Text>
           </View>
-          <RatingPill value={rating} />
+          <ReviewCityBadge city={city} />
         </View>
         <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
+        <ReviewMetaRow cuisine={cuisine} mood={mood} />
         <View style={styles.reviewFooter}>
           <Pressable accessibilityLabel="Like review" onPress={(event) => { event.stopPropagation(); onReact(); }} style={styles.reviewActionIconRow}>
             {reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.textSecondary} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}
@@ -1945,7 +1983,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
     backgroundColor: colors.discoverSkeleton,
   },
   feedContent: { paddingBottom: 24, backgroundColor: colors.canvas },
-  hero: { height: 220, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
+  hero: { height: 150, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
   coverImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   hotChip: { position: 'absolute', top: 12, left: 12, height: 26, paddingHorizontal: 10, borderRadius: 13, backgroundColor: '#FF4757', justifyContent: 'center' },
   hotChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
@@ -1984,8 +2022,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   gridMeta: { color: colors.textSecondary, fontSize: 12 },
   reviewList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
-  reviewCard: { height: 121, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
-  reviewImage: { width: 110, height: 121, resizeMode: 'cover' },
+  reviewCard: { minHeight: 148, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
+  reviewImage: { width: 110, minHeight: 148, resizeMode: 'cover' },
   reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
   reviewHead: { height: 32, flexDirection: 'row', alignItems: 'center', gap: 7 },
   reviewAvatar: { width: 26, height: 26, borderRadius: 13 },
@@ -2058,6 +2096,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
   mapSheetSidePanel: { top: 0, bottom: 0, borderTopWidth: 0, borderRightWidth: 1, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
   mapSheetUnderlay: { position: 'absolute', zIndex: 7, elevation: 7, right: 0, bottom: 0, left: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
+  showPlacesButton: { position: 'absolute', zIndex: 9, elevation: 9, right: 16, bottom: 16, height: 42, paddingHorizontal: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  showPlacesText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   mapSearchRow: { zIndex: 2, height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },

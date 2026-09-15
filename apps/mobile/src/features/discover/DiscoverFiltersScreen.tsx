@@ -18,7 +18,6 @@ const CUISINES = [
 ] as const;
 const DIETARY_PREFERENCES = ['Vegetarian 🥦'] as const;
 const BUDGETS = ['$ 🍞', '$$ 🍝', '$$$ 🥂'] as const;
-const COFFEE = ['Matcha 🍵', 'Coffee ☕', 'Vegan coffee 🥛'] as const;
 const DISTANCES = ['1 km', '3 km', '5 km', 'Any'] as const;
 
 function encoded(prefix: string, value: string) {
@@ -57,10 +56,11 @@ export function DiscoverFiltersScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(), []);
   const [selected, setSelected] = useState(() => new Set(
-    initialValues.filter((value) => !/^(OpenNow|Distance):/.test(value)),
+    initialValues.filter((value) => !/^(OpenNow|Distance|Coffee):/.test(value)),
   ));
   const [openNow, setOpenNow] = useState(initialValue(initialValues, 'OpenNow') === 'true');
   const [maxDistance, setMaxDistance] = useState(initialValue(initialValues, 'Distance') ?? 'Any');
+  const [cuisinesExpanded, setCuisinesExpanded] = useState(() => initialValues.some((value) => CUISINES.slice(5).includes(value as typeof CUISINES[number])));
 
   function toggle(value: string) {
     setSelected((current) => {
@@ -95,10 +95,20 @@ export function DiscoverFiltersScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <ChipSection choices={CUISINES} selected={selected} styles={styles} title="Kind of food" toggle={toggle} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kind of food</Text>
+          <View style={styles.choices}>
+            {(cuisinesExpanded ? CUISINES : CUISINES.slice(0, 5)).map((value) => {
+              const active = selected.has(value);
+              return <Pressable key={value} onPress={() => toggle(value)} style={[styles.choice, active && styles.choiceActive]}><Text style={[styles.choiceText, active && styles.choiceTextActive]}>{value}</Text></Pressable>;
+            })}
+            <Pressable accessibilityState={{ expanded: cuisinesExpanded }} onPress={() => setCuisinesExpanded((value) => !value)} style={styles.moreChoice}>
+              <Text style={styles.moreChoiceText}>{cuisinesExpanded ? 'Show less' : `+ ${CUISINES.length - 5} more`}</Text>
+            </Pressable>
+          </View>
+        </View>
         <ChipSection choices={DIETARY_PREFERENCES} selected={selected} styles={styles} title="Dietary preferences" toggle={toggle} />
         <ChipSection choices={BUDGETS} selected={selected} styles={styles} title="Budget" toggle={toggle} />
-        <ChipSection choices={COFFEE} selected={selected} styles={styles} title="Coffee taste" toggle={toggle} />
 
         <View style={styles.openNowRow}>
           <Text style={styles.openNowLabel}>Open now</Text>
@@ -167,7 +177,7 @@ function ChipSection({
 }
 
 function createStyles() {
-  const accent = '#B82F29';
+  const accent = '#E63946';
   const border = '#45474B';
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: '#161616' },
@@ -183,6 +193,8 @@ function createStyles() {
     choiceActive: { backgroundColor: accent },
     choiceText: { color: '#FFFFFF', opacity: 0.5, fontSize: 14 },
     choiceTextActive: { opacity: 1 },
+    moreChoice: { paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: border, borderRadius: 39, backgroundColor: '#161616' },
+    moreChoiceText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
     openNowRow: { minHeight: 56, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     openNowLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
     switchTrack: { width: 46, height: 28, padding: 2, justifyContent: 'center', borderRadius: 14, backgroundColor: '#5A5B60' },
@@ -196,9 +208,9 @@ function createStyles() {
     distanceText: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
     distanceTextActive: { color: '#FFFFFF' },
     footer: { paddingHorizontal: 16, paddingTop: 16, flexDirection: 'row', gap: 10, backgroundColor: '#080808' },
-    clearButton: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: accent, borderRadius: 36, backgroundColor: '#161616' },
+    clearButton: { flex: 1, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: border, borderRadius: 36, backgroundColor: '#161616' },
     clearText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
-    applyButton: { flex: 1, height: 40, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 36, backgroundColor: accent },
+    applyButton: { flex: 1, height: 40, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 36, backgroundColor: accent, shadowColor: accent, shadowOpacity: 0.55, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
     applyText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
   });
 }
