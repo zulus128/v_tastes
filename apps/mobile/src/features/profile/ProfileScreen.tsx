@@ -54,6 +54,7 @@ import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileDraftCard, type ProfileReviewDraft } from './ProfileDraftCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
+import { buildTasteHighlights } from './profileHighlights';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
@@ -301,7 +302,6 @@ export function ProfileScreen({
     return () => { active = false; };
   }, [currentUserId, own]));
   useEffect(() => {
-    if (activeTab !== 'map') return;
     const venueIds = [...new Set(profileReviews.reviews.map((review) => review.venueId))];
     let active = true;
     setMapError(null);
@@ -309,7 +309,7 @@ export function ProfileScreen({
       .then((venues) => { if (active) setMapVenues(venues); })
       .catch((error) => { if (active) setMapError(apiErrorMessage(error)); });
     return () => { active = false; };
-  }, [activeTab, api, mapReload, profileReviews.reviews]);
+  }, [api, mapReload, profileReviews.reviews]);
   useEffect(() => {
     if (!profile?.favoriteVenueId) {
       setFavoritePlaceName(null);
@@ -466,6 +466,7 @@ export function ProfileScreen({
   });
   const sortedReviews = [...visibleReviews].sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)));
   const venuesById = new Map(mapVenues.map((venue) => [venue.id, venue]));
+  const tasteHighlights = buildTasteHighlights({ favoritePlaceName, profile, reviews: profileReviews.reviews, venues: mapVenues });
   const mapPlaces = visibleReviews
     .map((review) => ({ review, venue: venuesById.get(review.venueId) }))
     .filter((place): place is { review: FeedItem; venue: Venue } => Boolean(place.venue))
@@ -484,7 +485,6 @@ export function ProfileScreen({
   const mapKey = `${isDark ? 'dark' : 'light'}:${focusPlaces.map(({ venue }) => `${venue.id}:${venue.latitude}:${venue.longitude}`).join('|')}`;
   const profileHeader = (
     <ProfileHeader
-      favoritePlaceName={favoritePlaceName}
       followPending={followPending}
       following={following}
       onAvatarPress={() => void chooseProfilePhoto()}
@@ -495,6 +495,7 @@ export function ProfileScreen({
       own={own}
       profile={profile}
       reviewCount={profile.reviewCount}
+      tasteHighlights={tasteHighlights}
       uploadingPhoto={uploadingPhoto}
     />
   );

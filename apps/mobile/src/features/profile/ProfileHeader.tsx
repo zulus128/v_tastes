@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import lightPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import darkPattern from '../../../assets/onboarding/pattern-screen.png';
 import followIcon from '../../../assets/profile/follow.png';
@@ -13,6 +13,7 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { cityFlag } from '../onboarding/CityPicker';
 import type { ProfileData } from './api';
 import { ProfileAvatar } from './avatar';
+import type { TasteHighlight } from './profileHighlights';
 
 function Stat({ label, onPress, value }: { label: string; onPress?: () => void; value: number }) {
   const { colors } = useAppTheme();
@@ -25,7 +26,6 @@ function Stat({ label, onPress, value }: { label: string; onPress?: () => void; 
 }
 
 export function ProfileHeader({
-  favoritePlaceName,
   followPending,
   following,
   onAvatarPress,
@@ -36,9 +36,9 @@ export function ProfileHeader({
   own,
   profile,
   reviewCount,
+  tasteHighlights,
   uploadingPhoto,
 }: {
-  favoritePlaceName: string | null;
   followPending: boolean;
   following: boolean;
   onAvatarPress: () => void;
@@ -49,15 +49,11 @@ export function ProfileHeader({
   own: boolean;
   profile: ProfileData;
   reviewCount: number;
+  tasteHighlights: readonly TasteHighlight[];
   uploadingPhoto: boolean;
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const favoriteDishIcon = profile.favoriteDish?.toLocaleLowerCase().includes('sushi') ? '🍣' : '🍽️';
-  const chips: Array<{ flag?: ReturnType<typeof cityFlag>; icon?: string; label: string }> = [];
-  if (profile.city) chips.push({ flag: cityFlag(profile.city), label: profile.city });
-  if (favoritePlaceName) chips.push({ icon: '❤️', label: favoritePlaceName });
-  if (profile.favoriteDish) chips.push({ icon: favoriteDishIcon, label: profile.favoriteDish });
 
   return (
     <ImageBackground
@@ -74,7 +70,12 @@ export function ProfileHeader({
         ) : null}
       </Pressable>
       <Text style={styles.name}>{profile.displayName}</Text>
-      {profile.bio ? <Text numberOfLines={2} style={styles.bio}>{profile.bio}</Text> : null}
+      {profile.city ? (
+        <View style={styles.cityPill}>
+          <Text style={styles.cityText}>{profile.city}</Text>
+          <Image source={cityFlag(profile.city)} style={styles.cityFlag} />
+        </View>
+      ) : null}
       <View style={styles.stats}>
         <Stat label="Reviews" value={profile.reviewCount || reviewCount} />
         <View style={styles.statDivider} />
@@ -82,6 +83,7 @@ export function ProfileHeader({
         <View style={styles.statDivider} />
         <Stat label="Following" onPress={onFollowing} value={profile.followingCount} />
       </View>
+      {profile.bio ? <Text numberOfLines={3} style={styles.bio}>{profile.bio}</Text> : null}
       {!own ? (
         <View style={styles.publicActions}>
           <Pressable
@@ -107,11 +109,17 @@ export function ProfileHeader({
           </Pressable>
         </View>
       ) : null}
-      {chips.length > 0 ? (
-        <ScrollView contentContainerStyle={styles.chips} horizontal showsHorizontalScrollIndicator={false}>
-          {chips.map((chip) => <View key={chip.label} style={styles.chip}><Text style={styles.chipText}>{chip.label}</Text>{chip.flag ? <Image source={chip.flag} style={styles.cityFlag} /> : null}{chip.icon ? <Text style={styles.chipIcon}>{chip.icon}</Text> : null}</View>)}
-        </ScrollView>
-      ) : null}
+      <Text style={styles.highlightsTitle}>Taste highlights</Text>
+      <View style={styles.highlights}>
+        {tasteHighlights.map((highlight, index) => (
+          <View key={highlight.id} style={[styles.highlight, index < tasteHighlights.length - 1 && styles.highlightDivider]}>
+            <Text style={styles.highlightEmoji}>{highlight.emoji}</Text>
+            <Text numberOfLines={1} style={styles.highlightLabel}>{highlight.label}</Text>
+            <Text numberOfLines={1} style={styles.highlightValue}>{highlight.value}</Text>
+            <Text numberOfLines={1} style={styles.highlightMeta}>{highlight.meta}</Text>
+          </View>
+        ))}
+      </View>
     </ImageBackground>
   );
 }
@@ -170,8 +178,11 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.surfaceRaised },
   avatarBusy: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' },
   name: { marginTop: 10, color: colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.24, textAlign: 'center' },
-  bio: { marginTop: 6, marginHorizontal: 38, color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  stats: { height: 50, marginTop: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  cityPill: { minHeight: 30, marginTop: 8, paddingHorizontal: 12, flexDirection: 'row', gap: 6, alignItems: 'center', alignSelf: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
+  cityText: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  cityFlag: { width: 16, height: 16 },
+  bio: { marginTop: 8, marginHorizontal: 38, color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  stats: { height: 50, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   statDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: colors.border },
   publicActions: { marginTop: 13, paddingHorizontal: 16, flexDirection: 'row', gap: 10 },
   followAction: { flex: 1, height: 45, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#C9312B' },
@@ -182,11 +193,14 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   followActionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.7 },
   messageAction: { flex: 1, height: 45, borderWidth: 1, borderColor: '#C9312B', borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   messageActionText: { fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
-  chips: { minWidth: '100%', paddingHorizontal: 10, paddingTop: 14, gap: 6, justifyContent: 'center' },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', gap: 5, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 39, overflow: 'hidden', backgroundColor: colors.surface },
-  chipText: { color: colors.text, fontSize: 14 },
-  chipIcon: { fontSize: 14, lineHeight: 18 },
-  cityFlag: { width: 16, height: 16, transform: [{ translateY: -1 }] },
+  highlightsTitle: { marginTop: 18, marginHorizontal: 16, color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: '600' },
+  highlights: { minHeight: 118, marginTop: 10, marginHorizontal: 16, paddingVertical: 14, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
+  highlight: { flex: 1, minWidth: 0, paddingHorizontal: 7, alignItems: 'center' },
+  highlightDivider: { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
+  highlightEmoji: { fontSize: 24, lineHeight: 29 },
+  highlightLabel: { marginTop: 6, color: colors.textSecondary, fontSize: 9, lineHeight: 12, textAlign: 'center' },
+  highlightValue: { marginTop: 2, color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
+  highlightMeta: { marginTop: 2, color: colors.textMuted, fontSize: 8, lineHeight: 10, textAlign: 'center' },
 });
 
 const staticStyles = responsiveStyleSheet({
