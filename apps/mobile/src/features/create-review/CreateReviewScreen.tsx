@@ -1106,13 +1106,18 @@ function PlaceSelector({
           <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
           {search ? <Pressable onPress={() => setSearch('')}><Text style={styles.clear}>×</Text></Pressable> : null}
         </View>
-        <ScrollView contentContainerStyle={styles.filters} horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.filters}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filtersScroll}
+        >
           {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
             const active = categoryFilter === filter;
-            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
+            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
           })}
-          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text style={styles.filterText}>$$⌄</Text></Pressable>
-          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text style={styles.filterText}>♨ Trending</Text></Pressable>
+          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>$$⌄</Text></Pressable>
+          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>♨ Trending</Text></Pressable>
         </ScrollView>
         {query.isPending || (search.trim().length >= 2 && searchQuery.isPending) ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError || searchQuery.isError ? (
           <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
@@ -1386,10 +1391,11 @@ const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   search: { flex: 1, height: 42, paddingVertical: 0, color: colors.text, fontSize: 16 },
   clear: { color: colors.textSecondary, fontSize: 22 },
   placeList: { flex: 1 },
+  filtersScroll: { flexGrow: 0, flexShrink: 0, height: 54 },
   filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
   filter: { height: 34, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
-  filterText: { color: colors.text, fontSize: 12 },
+  filterText: { color: colors.text, fontSize: 12, lineHeight: 16 },
   loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' }, error: { color: colors.primary, textAlign: 'center' },
   row: { minHeight: 176, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   rowImage: { width: 122, height: 122, borderRadius: 14 }, rowCopy: { flex: 1, gap: 7 },
