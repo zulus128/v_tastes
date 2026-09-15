@@ -7,7 +7,8 @@ Status: temporary, explicitly accepted exception; review required
 Workspace overrides pin patched transitive versions of `fast-xml-parser`,
 `brace-expansion`, `js-yaml`, `nanoid`, `postcss`, and `uuid`. In particular,
 the Functions runtime now resolves `fast-xml-parser` 5.10.1, closing
-GHSA-8r6m-32jq-jx6q.
+GHSA-8r6m-32jq-jx6q. React Navigation core is pinned to 7.22.1, which removes
+the vulnerable `query-string` / `decode-uri-component` dependency path.
 
 ## Remaining upstream exception
 

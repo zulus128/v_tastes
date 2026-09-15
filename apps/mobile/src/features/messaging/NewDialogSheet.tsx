@@ -1,6 +1,6 @@
-import type { ActivityCandidate } from "@tastes/contracts";
-import { apiErrorMessage } from "@tastes/firebase-client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ActivityCandidate } from '@tastes/contracts';
+import { apiErrorMessage } from '@tastes/firebase-client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,18 +16,18 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Path } from "react-native-svg";
-import SearchIcon from "../../../assets/profile/search.svg";
-import { useTastesApi } from "../../session/SessionProvider";
-import { type ThemeColors, useAppTheme } from "../../ui/ThemeProvider";
-import { ResponsiveModal as Modal } from "../../ui/ResponsiveModal";
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
+import SearchIcon from '../../../assets/profile/search.svg';
+import { useTastesApi } from '../../session/SessionProvider';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import {
   responsiveSize,
   responsiveStyleSheet,
   useResponsiveViewport,
-} from "../../ui/responsive";
+} from '../../ui/responsive';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -72,7 +72,7 @@ export function NewDialogSheet({
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [actionsHidden, setActionsHidden] = useState(!actionsInitiallyVisible);
   const actionsVisibility = useRef(
     new Animated.Value(actionsInitiallyVisible ? 1 : 0),
@@ -126,7 +126,7 @@ export function NewDialogSheet({
       ]).start();
     };
     const willShowSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
         const frameTop = Math.max(0, (physicalWindowHeight - windowHeight) / 2);
         const nextKeyboardTop = Math.max(
@@ -138,7 +138,7 @@ export function NewDialogSheet({
       },
     );
     const hideSubscription = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       (event) =>
         animateLayout(null, actionsFit(windowHeight), event.duration || 280),
     );
@@ -196,7 +196,7 @@ export function NewDialogSheet({
       })
       .catch((error) => {
         if (active)
-          Alert.alert("Could not load friends", apiErrorMessage(error));
+          Alert.alert('Could not load friends', apiErrorMessage(error));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -220,7 +220,7 @@ export function NewDialogSheet({
         subscription.remove();
         resolve();
       };
-      const subscription = Keyboard.addListener("keyboardDidHide", finish);
+      const subscription = Keyboard.addListener('keyboardDidHide', finish);
       const timeout = setTimeout(finish, 450);
       searchInputRef.current?.blur();
       Keyboard.dismiss();
@@ -261,7 +261,7 @@ export function NewDialogSheet({
       await closeSheet();
       onOpenConversation(result.data.id);
     } catch (error) {
-      Alert.alert("Could not start dialog", apiErrorMessage(error));
+      Alert.alert('Could not start dialog', apiErrorMessage(error));
     } finally {
       setOpeningId(null);
     }
@@ -328,9 +328,9 @@ export function NewDialogSheet({
           <Animated.View
             accessibilityElementsHidden={actionsHidden}
             importantForAccessibility={
-              actionsHidden ? "no-hide-descendants" : "auto"
+              actionsHidden ? 'no-hide-descendants' : 'auto'
             }
-            pointerEvents={actionsHidden ? "none" : "auto"}
+            pointerEvents={actionsHidden ? 'none' : 'auto'}
             style={[
               styles.actions,
               {
@@ -383,8 +383,8 @@ export function NewDialogSheet({
               ListEmptyComponent={
                 <Text style={styles.empty}>
                   {query
-                    ? "No matching contacts."
-                    : "Mutual followers will appear here."}
+                    ? 'No matching contacts.'
+                    : 'Mutual followers will appear here.'}
                 </Text>
               }
               renderItem={({ item }) => (
@@ -411,7 +411,7 @@ export function NewDialogSheet({
                   <View style={styles.copy}>
                     <Text style={styles.name}>{item.displayName}</Text>
                     <Text style={styles.handle}>
-                      {item.username ? `@${item.username}` : "Mutual follower"}
+                      {item.username ? `@${item.username}` : 'Mutual follower'}
                     </Text>
                   </View>
                   {openingId === item.userId ? (
@@ -478,12 +478,12 @@ function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     backdrop: {
       flex: 1,
-      justifyContent: "flex-end",
-      backgroundColor: "rgba(0,0,0,0.72)",
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.72)',
     },
     sheet: {
       paddingHorizontal: 16,
-      overflow: "hidden",
+      overflow: 'hidden',
       borderTopWidth: 1,
       borderColor: colors.border,
       borderTopLeftRadius: 24,
@@ -492,19 +492,19 @@ function createStyles(colors: ThemeColors) {
     },
     header: {
       height: 64,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    title: { color: colors.text, fontSize: 20, fontWeight: "700" },
+    title: { color: colors.text, fontSize: 20, fontWeight: '700' },
     close: {
       width: 28,
       height: 28,
       borderWidth: 2,
       borderColor: colors.text,
       borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
     searchBox: {
@@ -512,9 +512,9 @@ function createStyles(colors: ThemeColors) {
       paddingLeft: 10,
       paddingRight: 8,
       borderRadius: 22,
-      flexDirection: "row",
+      flexDirection: 'row',
       gap: 8,
-      alignItems: "center",
+      alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
     },
     searchInput: {
@@ -523,15 +523,15 @@ function createStyles(colors: ThemeColors) {
       fontSize: 16,
       paddingVertical: 0,
     },
-    actions: { overflow: "hidden" },
+    actions: { overflow: 'hidden' },
     action: {
       height: 50,
       marginTop: 12,
       borderRadius: 25,
-      flexDirection: "row",
+      flexDirection: 'row',
       gap: 7,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     groupAction: { borderWidth: 1, borderColor: colors.primary },
     activityAction: { backgroundColor: colors.primary },
@@ -543,14 +543,14 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
     },
     loader: { marginTop: 35 },
-    empty: { color: colors.textMuted, marginTop: 35, textAlign: "center" },
+    empty: { color: colors.textMuted, marginTop: 35, textAlign: 'center' },
     results: { flex: 1 },
     person: {
       height: 76,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     personPressed: { opacity: 0.7 },
     avatar: {
@@ -563,13 +563,13 @@ function createStyles(colors: ThemeColors) {
       width: 40,
       height: 40,
       borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: colors.primary,
     },
-    avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: "700" },
+    avatarInitial: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },
     copy: { flex: 1, marginLeft: 10 },
-    name: { color: colors.text, fontSize: 15, fontWeight: "600" },
+    name: { color: colors.text, fontSize: 15, fontWeight: '600' },
     handle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
   });
 }

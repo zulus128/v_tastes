@@ -23,8 +23,8 @@ Run the hook manually with:
 
 ## Pre-push
 
-The pre-push hook runs the same main quality gate used by CI: build, lint, type-checking, tests,
-and a production dependency audit.
+The pre-push hook runs the same main quality gate used by CI: build, a Prettier check over the
+complete branch/push range, lint, type-checking, tests, and a production dependency audit.
 
 Run it manually with:
 
