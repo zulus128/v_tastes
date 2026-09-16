@@ -18,6 +18,8 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
+import BookmarkOutlineDarkIcon from '../../../assets/activities/bookmark-body.svg';
+import BookmarkOutlineLightIcon from '../../../assets/activities/bookmark-body-light.svg';
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
@@ -28,19 +30,14 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
+import { captureException } from '../../infrastructure/observability';
+import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { UserAvatar } from '../profile/avatar';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { PlacePhotoPager } from './PlacePhotoPager';
+import { openingHoursForDate, openingStatus } from './openingHours';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
-const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Opening hours arrive Monday-first (or as a single "Daily" entry), so resolve
-// today's row by weekday name rather than assuming index 0 is the current day.
-function todayHours(hours: Array<{ day: string; hours: string }>) {
-  const today = weekdays[new Date().getDay()];
-  return hours.find((entry) => entry.day === today) ?? hours[0];
-}
 
 function placeImage(url: string | null | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
@@ -176,7 +173,9 @@ function Overview({ details, openPhotos, styles }: { details: NonNullable<Return
   const iconColor = styles.detailIcon.color;
   const [hoursExpanded, setHoursExpanded] = useState(false);
   const hoursProgress = useRef(new Animated.Value(0)).current;
-  const today = todayHours(details.openingHours)?.day;
+  const todayEntry = openingHoursForDate(details.openingHours);
+  const today = todayEntry?.day;
+  const status = openingStatus(details.openingHours);
   const hoursHeight = responsiveSize(64 + details.openingHours.length * 42);
   function toggleHours() {
     const next = !hoursExpanded;
@@ -192,10 +191,13 @@ function Overview({ details, openPhotos, styles }: { details: NonNullable<Return
       <Pressable accessibilityState={{ expanded: hoursExpanded }} onPress={toggleHours} style={styles.hoursHeader}>
         <CalendarIcon color={iconColor} height={responsiveSize(20)} width={responsiveSize(20)} />
         <View style={styles.hoursHeaderCopy}>
-          <View style={styles.hoursTitleRow}><Text style={styles.hoursTitle}>Opening hours</Text><Text style={styles.openBadge}>OPEN</Text></View>
-          <Text style={styles.todayHours}>{todayHours(details.openingHours)?.hours ?? 'Hours unavailable'}</Text>
+          <View style={styles.hoursTitleRow}>
+            <Text style={styles.hoursTitle}>Opening hours</Text>
+            {status !== 'unknown' ? <Text style={[styles.openBadge, status === 'closed' && styles.closedBadge]}>{status.toUpperCase()}</Text> : null}
+          </View>
+          <Text style={styles.todayHours}>{todayEntry?.hours ?? 'Hours unavailable'}</Text>
         </View>
-        <Text style={[styles.hoursChevron, hoursExpanded && styles.hoursChevronExpanded]}>⌄</Text>
+        <Text style={[styles.hoursChevron, hoursExpanded && styles.hoursChevronExpanded]}>›</Text>
       </Pressable>
       <View style={styles.inlineHours}>
         {details.openingHours.map((item) => {
@@ -251,13 +253,57 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
   </View>;
 }
 
+function ReviewPhoto({ path, rating, single, styles, title }: { path: string; rating: number; single: boolean; styles: ReturnType<typeof createStyles>; title: string }) {
+  const normalizedPath = path.trim().replace(/^\/+|\/+$/g, '');
+  const [uri, setUri] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setFailed(false);
+    setUri(null);
+    if (!normalizedPath) {
+      setFailed(true);
+      return () => { active = false; };
+    }
+    let download: Promise<string>;
+    try {
+      download = resolveStorageImageUrl(normalizedPath);
+    } catch (error) {
+      captureException(error, { operation: 'load-place-review-photo', path: normalizedPath });
+      setFailed(true);
+      return () => { active = false; };
+    }
+    void download.then((value) => {
+      if (active) setUri(value);
+    }).catch((error) => {
+      captureException(error, { operation: 'load-place-review-photo', path: normalizedPath });
+      if (active) setFailed(true);
+    });
+    return () => { active = false; };
+  }, [normalizedPath]);
+
+  return <View style={[styles.reviewPhoto, single && styles.reviewPhotoSingle]}>
+    {uri ? <Image onError={() => setFailed(true)} source={{ uri }} style={styles.reviewPhotoImage} /> : <View style={styles.reviewPhotoPlaceholder}>{failed ? <Text style={styles.reviewPhotoError}>Photo unavailable</Text> : <ActivityIndicator color={styles.primaryBadge.backgroundColor as string} />}</View>}
+    <Text numberOfLines={1} style={styles.reviewPhotoTitle}>{title}</Text>
+    <Text style={styles.reviewPhotoRating}>★ {rating.toFixed(1)}</Text>
+  </View>;
+}
+
 function ReviewCard({ item: review, onComments, onReact, onShare, reacted, reactingId, styles }: { item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reacted: boolean; reactingId: string | null; styles: ReturnType<typeof createStyles> }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
+  const [bookmarked, setBookmarked] = useState(false);
+  const BookmarkReviewIcon = isDark ? BookmarkOutlineDarkIcon : BookmarkOutlineLightIcon;
   return <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}><UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.avatar} /><View style={styles.author}><Text style={styles.authorName}>{review.authorDisplayName}</Text><Text style={styles.authorHandle}>{review.authorUsername ? '@' + review.authorUsername : ''}</Text></View><ReviewCityBadge city={review.venueCity} /><Text style={styles.reviewDate}>{formatDisplayDate(review.createdAt)}</Text></View>
       <View style={styles.reviewBody}>
-        <RatingStars rating={review.rating} styles={styles} /><Text style={styles.reviewText}>{review.text}</Text><ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} />
-        {review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}<View style={styles.metricActions}><Pressable disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
+        <View style={styles.reviewSummary}><RatingStars rating={review.rating} styles={styles} /><ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} /></View>
+        <Text style={styles.reviewText}>{review.text}</Text>
+        {review.dishReviews.length > 0 ? <View style={styles.reviewPhotoGrid}>{review.dishReviews.map((dish) => <ReviewPhoto key={dish.id} path={dish.photoPath} rating={dish.rating} single={review.dishReviews.length === 1} styles={styles} title={dish.title} />)}</View> : review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}
+        <View style={styles.reviewFooter}>
+          <View style={styles.metricActions}><Pressable accessibilityLabel={reacted ? 'Unlike review' : 'Like review'} disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable accessibilityLabel="Open comments" onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable accessibilityLabel="Share review" onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
+          <Pressable accessibilityLabel={bookmarked ? 'Remove review bookmark' : 'Bookmark review'} accessibilityState={{ selected: bookmarked }} onPress={() => setBookmarked((value) => !value)} style={[styles.bookmarkReview, bookmarked && styles.bookmarkReviewActive]}><BookmarkReviewIcon height={responsiveSize(18)} width={responsiveSize(16)} /></Pressable>
+        </View>
       </View>
   </View>;
 }
@@ -309,8 +355,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   navButton: { position: 'absolute', zIndex: 2, elevation: 2, top: 16, left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(33,33,33,0.64)' }, save: { left: undefined, right: 16 }, back: { color: '#fff', fontSize: 40, lineHeight: 40, marginTop: -4 }, photoDots: { position: 'absolute', zIndex: 2, bottom: 28, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }, photoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' }, photoDotActive: { backgroundColor: '#fff' }, photoCount: { position: 'absolute', zIndex: 2, right: 18, bottom: 18, borderRadius: 13, backgroundColor: 'rgba(66,66,66,0.72)', paddingHorizontal: 11, paddingVertical: 6 }, photoCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   content: { paddingHorizontal: 16, paddingBottom: 95 }, reviewsContent: { paddingBottom: 0 }, badges: { marginTop: 15, flexDirection: 'row', alignItems: 'center', gap: 7 }, primaryBadge: { color: '#fff', backgroundColor: colors.primary, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 5, fontSize: 10, fontWeight: '700' }, count: { color: colors.textMuted, fontSize: 11 }, title: { marginTop: 7, color: colors.text, fontSize: 21, fontWeight: '700' }, address: { marginTop: 5, color: colors.textSecondary, fontSize: 13 }, chips: { marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, compoundChip: { height: 33, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, backgroundColor: colors.background }, chipDivider: { width: StyleSheet.hairlineWidth, height: 18, marginHorizontal: 8, backgroundColor: colors.border }, chipText: { color: colors.text, fontSize: 11, fontWeight: '600' }, chipSecondary: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' }, chip: { height: 33, color: colors.text, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, fontSize: 11, fontWeight: '600' },
   tabs: { marginTop: 15, flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border }, tab: { flex: 1, alignItems: 'center', paddingBottom: 10 }, tabActive: { borderBottomWidth: 2, borderColor: colors.primary }, tabText: { color: colors.textMuted, fontSize: 11 }, tabTextActive: { color: colors.text, fontWeight: '700' }, section: { gap: 10, paddingTop: 10 },
-  detail: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailIcon: { color: colors.text }, detailText: { flex: 1, color: colors.text, opacity: 0.72, fontSize: 14, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 }, detailArrow: { opacity: 0.5 }, hoursCard: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised }, hoursHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, hoursHeaderCopy: { flex: 1 }, hoursTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, hoursTitle: { color: colors.text, fontSize: 14, fontWeight: '600' }, openBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, overflow: 'hidden', color: '#57C785', backgroundColor: 'rgba(87,199,133,0.14)', fontSize: 9, fontWeight: '700' }, todayHours: { marginTop: 3, color: colors.textSecondary, fontSize: 12 }, hoursChevron: { color: colors.textSecondary, fontSize: 20, transform: [{ rotate: '0deg' }] }, hoursChevronExpanded: { transform: [{ rotate: '180deg' }] }, inlineHours: { paddingHorizontal: 16, paddingBottom: 8 }, inlineHoursRow: { height: 42, flexDirection: 'row', alignItems: 'center' }, inlineDay: { flex: 1, color: colors.textMuted, fontSize: 13 }, inlineHour: { color: colors.textMuted, fontSize: 13 }, inlineToday: { color: colors.text, fontWeight: '600' }, inlineHoliday: { color: '#E63946' }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitleIcon: { color: colors.text }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
-  reviewsHeader: { paddingTop: 10, paddingBottom: 10 }, reviewTools: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, scopeControl: { flex: 1, height: 34, padding: 3, flexDirection: 'row', borderRadius: 17, backgroundColor: colors.surfaceRaised }, scopeButton: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, scopeButtonActive: { backgroundColor: '#D9DDE5' }, scopeText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' }, scopeTextActive: { color: '#111' }, sortButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }, sort: { color: colors.text }, review: { overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewListCard: { marginHorizontal: 16, marginBottom: 12 }, reviewer: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted }, avatar: { width: 40, height: 40, borderRadius: 20 }, author: { flex: 1, gap: 3, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 15, fontWeight: '600' }, authorHandle: { color: colors.textSecondary, fontSize: 13 }, reviewDate: { color: colors.textMuted, fontSize: 12 }, reviewBody: { gap: 8, padding: 16 }, ratingStars: { flexDirection: 'row', gap: 1 }, ratingStarCell: { width: 16, height: 20, overflow: 'hidden' }, ratingStarFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' }, stars: { color: colors.primary, fontSize: 16 }, emptyStar: { color: colors.textMuted }, reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 }, dishes: { color: colors.text, fontSize: 12, fontWeight: '600' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 }, metrics: { color: colors.text, fontSize: 13 }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
+  detail: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, detailIcon: { color: colors.text }, detailText: { flex: 1, color: colors.text, opacity: 0.72, fontSize: 14, fontWeight: '500', letterSpacing: -0.23, lineHeight: 20 }, detailArrow: { opacity: 0.5 }, hoursCard: { overflow: 'hidden', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surfaceRaised }, hoursHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, hoursHeaderCopy: { flex: 1 }, hoursTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, hoursTitle: { color: colors.text, fontSize: 14, fontWeight: '600' }, openBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, overflow: 'hidden', color: '#57C785', backgroundColor: 'rgba(87,199,133,0.14)', fontSize: 9, fontWeight: '700' }, closedBadge: { color: '#E63946', backgroundColor: 'rgba(230,57,70,0.14)' }, todayHours: { marginTop: 3, color: colors.textSecondary, fontSize: 12 }, hoursChevron: { color: colors.textSecondary, fontSize: 25, lineHeight: 25, transform: [{ rotate: '0deg' }] }, hoursChevronExpanded: { transform: [{ rotate: '90deg' }] }, inlineHours: { paddingHorizontal: 16, paddingBottom: 8 }, inlineHoursRow: { height: 42, flexDirection: 'row', alignItems: 'center' }, inlineDay: { flex: 1, color: colors.textMuted, fontSize: 13 }, inlineHour: { color: colors.textMuted, fontSize: 13 }, inlineToday: { color: colors.text, fontWeight: '600' }, inlineHoliday: { color: '#E63946' }, strip: { height: 100, flexDirection: 'row', gap: 4, overflow: 'hidden', borderRadius: 14, marginTop: 8 }, stripImage: { width: 112, height: 100, resizeMode: 'cover' }, seePhotos: { position: 'absolute', right: 9, bottom: 8, color: '#fff', backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, fontSize: 10 }, sectionTitleRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, sectionTitleIcon: { color: colors.text }, sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' }, dish: { minHeight: 60, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, dishName: { flex: 1, color: colors.textSecondary, fontSize: 14 }, dishRating: { color: '#fff', backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 7, fontSize: 11, fontWeight: '700' },
+  reviewsHeader: { paddingTop: 10, paddingBottom: 10 }, reviewTools: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, scopeControl: { flex: 1, height: 34, padding: 3, flexDirection: 'row', borderRadius: 17, backgroundColor: colors.surfaceRaised }, scopeButton: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, scopeButtonActive: { backgroundColor: '#D9DDE5' }, scopeText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' }, scopeTextActive: { color: '#111' }, sortButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }, sort: { color: colors.text }, review: { overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, reviewListCard: { marginHorizontal: 16, marginBottom: 12 }, reviewer: { minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted }, avatar: { width: 40, height: 40, borderRadius: 20 }, author: { flex: 1, gap: 3, paddingLeft: 7 }, authorName: { color: colors.text, fontSize: 15, fontWeight: '600' }, authorHandle: { color: colors.textSecondary, fontSize: 13 }, reviewDate: { color: colors.textMuted, fontSize: 12 }, reviewBody: { gap: 12, padding: 16 }, reviewSummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, ratingStars: { flexDirection: 'row', gap: 1 }, ratingStarCell: { width: 16, height: 20, overflow: 'hidden' }, ratingStarFill: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' }, stars: { color: colors.primary, fontSize: 16 }, emptyStar: { color: colors.textMuted }, reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 }, dishes: { color: colors.text, fontSize: 12, fontWeight: '600' }, reviewPhotoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, reviewPhoto: { width: '49%', aspectRatio: 1, overflow: 'hidden', borderRadius: 14, backgroundColor: colors.surfaceRaised }, reviewPhotoSingle: { width: '100%', aspectRatio: 1.6 }, reviewPhotoImage: { width: '100%', height: '100%', resizeMode: 'cover' }, reviewPhotoPlaceholder: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }, reviewPhotoError: { color: colors.textMuted, fontSize: 10 }, reviewPhotoTitle: { position: 'absolute', top: 7, left: 8, right: 8, color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.72)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }, reviewPhotoRating: { position: 'absolute', left: 7, bottom: 7, overflow: 'hidden', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3, color: '#FFFFFF', backgroundColor: 'rgba(22,22,22,0.72)', fontSize: 11, fontWeight: '700' }, reviewFooter: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' }, metricIconRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 4 }, metrics: { color: colors.text, fontSize: 13 }, bookmarkReview: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }, bookmarkReviewActive: { backgroundColor: colors.surfaceRaised }, status: { alignItems: 'center', gap: 10, paddingVertical: 45 }, empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 32 }, retry: { color: colors.primary, fontWeight: '700' },
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, shadowColor: colors.primary, shadowOpacity: 0.58, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 10 }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
