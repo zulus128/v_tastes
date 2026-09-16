@@ -86,7 +86,7 @@ export function ProfileHeader({
         <View style={styles.statDivider} />
         <Stat label="Following" onPress={onFollowing} value={profile.followingCount} />
       </View>
-      {profile.bio ? <Text numberOfLines={3} style={styles.bio}>{profile.bio}</Text> : null}
+      {profile.bio ? <Text ellipsizeMode="tail" numberOfLines={2} style={styles.bio}>{profile.bio}</Text> : null}
       {!own ? (
         <View style={styles.publicActions}>
           <Pressable
