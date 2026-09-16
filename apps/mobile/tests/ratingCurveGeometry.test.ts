@@ -3,6 +3,7 @@ import {
   concentricRatingLayout,
   ratingCurvePoint,
   ratingForCurvePoint,
+  ratingForLinearPoint,
   snapRating,
 } from '../src/features/create-review/ratingCurveGeometry';
 
@@ -24,6 +25,13 @@ describe('rating curve geometry', () => {
     expect(snapRating(1.24)).toBe(1);
     expect(snapRating(2.26)).toBe(2.5);
     expect(snapRating(4.9)).toBe(5);
+  });
+
+  it('maps dish slider drag positions from 0.5 to 5 stars', () => {
+    expect(ratingForLinearPoint(-20, 360)).toBe(0.5);
+    expect(ratingForLinearPoint(40, 360)).toBe(1);
+    expect(ratingForLinearPoint(180, 360)).toBe(3);
+    expect(ratingForLinearPoint(380, 360)).toBe(5);
   });
 
   it('keeps a constant radial gap on wide screens', () => {

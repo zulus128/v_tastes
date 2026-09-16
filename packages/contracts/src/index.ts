@@ -86,7 +86,7 @@ export const reviewSchema = z.object({
   dishReviews: z.array(z.object({
     id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
     title: z.string().trim().min(1).max(120),
-    rating: z.number().min(1).max(5),
+    rating: z.number().min(0.5).max(5),
     photoPath: z.string().trim().min(1).max(512),
     photoUrl: z.string().url().optional(),
   })).max(5).default([]),
@@ -114,7 +114,7 @@ export const dishReviewInputSchema = z.object({
   title: z.string().trim()
     .min(1, 'Enter the dish name.')
     .max(120, 'The dish name must be at most 120 characters long.'),
-  rating: z.number().min(1).max(5),
+  rating: z.number().min(0.5).max(5),
   photoPath: z.string().trim()
     .min(1)
     .max(512)

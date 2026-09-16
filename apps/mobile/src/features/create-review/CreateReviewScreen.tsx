@@ -58,6 +58,7 @@ import {
   concentricRatingLayout,
   ratingCurvePoint,
   ratingForCurvePoint,
+  ratingForLinearPoint,
   snapRating,
 } from './ratingCurveGeometry';
 
@@ -82,22 +83,15 @@ const reviewRatingMarkers = [
   { kind: 'tick', rotation: 30, value: 4.5 },
   { kind: 'dot', value: 5 },
 ] as const;
-const dishRatingMarkers = [
-  { value: 1, x: 7.59038 },
-  { value: 1.5, x: 51 },
-  { value: 2, x: 93.771 },
-  { value: 2.5, x: 137 },
-  { value: 3, x: 179.952 },
-  { value: 3.5, x: 224 },
-  { value: 4, x: 266.132 },
-  { value: 4.5, x: 310 },
-  { value: 5, x: 352.313 },
-] as const;
+const dishRatingMarkers = Array.from({ length: 10 }, (_, index) => ({
+  value: (index + 1) / 2,
+  x: 7.59038 + ((352.313 - 7.59038) * index / 9),
+}));
 const tagOptions: Array<{ emoji: string; label: string; value: ReviewTag }> = [
-  { emoji: '⚡', label: 'Quick bites', value: 'quick-bites' },
+  { emoji: '⚡', label: 'Quick Bite', value: 'quick-bites' },
   { emoji: '🍽️', label: 'Casual', value: 'casual' },
   { emoji: '🥂', label: 'Fancy', value: 'fancy' },
-  { emoji: '🌙', label: 'Night out', value: 'night-out' },
+  { emoji: '🌙', label: 'Night Out', value: 'night-out' },
 ];
 const selectableReviewTags = new Set<ReviewTag>(tagOptions.map((tag) => tag.value));
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
@@ -164,7 +158,7 @@ export function CreateReviewScreen({
   const place = usePlace(venueId);
   const createReview = useCreateReview(userId);
   const venue = selectedVenue ?? place.data?.venue ?? null;
-  const valid = Boolean(venueId && text.trim() && rating >= 1 && dishes.every((dish) => dish.photoUri && dish.title.trim() && dish.rating >= 1));
+  const valid = Boolean(venueId && text.trim() && rating >= 1 && dishes.every((dish) => dish.photoUri && dish.title.trim() && dish.rating >= 0.5));
   const hasDraftChanges = Boolean(
     venueId !== (initialVenueId ?? '') || rating > 0 || text.trim() || tags.length > 0 || dishes.length > 0,
   );
@@ -436,7 +430,7 @@ export function CreateReviewScreen({
           ) : null}
           {dishes.length < 5 ? (
             <Pressable
-              onPress={() => setDishEditor({ id: createIdempotencyKey('dish'), photoUri: '', rating: 1, title: '' })}
+              onPress={() => setDishEditor({ id: createIdempotencyKey('dish'), photoUri: '', rating: 0.5, title: '' })}
               style={styles.addDish}
             >
               <AddDishIcon color={colors.text} height={responsiveSize(18.0654)} width={responsiveSize(20)} />
@@ -659,6 +653,7 @@ function RatingCurve({
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
   const [visualRating, setVisualRating] = useState(value);
+  const minimumRating = linear ? 0.5 : 1;
   const reduceMotion = useRef(false);
   const markerScale = scaleWidth / 359.903;
   const curvedLayout = !linear && heroWidth > 0 && heroHeight > 0
@@ -681,8 +676,8 @@ function RatingCurve({
   const dragStartPoint = useRef({ x: 0, y: 0 });
   const currentDragRating = useRef(value);
   const settleRating = useRef(new Animated.Value(value)).current;
-  const interaction = useRef({ arcGeometry, onChange, value });
-  interaction.current = { arcGeometry, onChange, value };
+  const interaction = useRef({ arcGeometry, onChange, scaleWidth, value });
+  interaction.current = { arcGeometry, onChange, scaleWidth, value };
   const geometrySignature = [
     heroHeight,
     heroWidth,
@@ -818,6 +813,29 @@ function RatingCurve({
     onPanResponderTerminationRequest: () => false,
     onShouldBlockNativeResponder: () => true,
   })).current;
+  const updateLinearRating = (locationX: number) => {
+    const width = interaction.current.scaleWidth;
+    if (width <= 0) return;
+    const nextRating = ratingForLinearPoint(locationX, width);
+    currentDragRating.current = nextRating;
+    setVisualRating(nextRating);
+    interaction.current.onChange(nextRating);
+  };
+  const linearPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponderCapture: () => true,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+    onPanResponderGrant: (event) => {
+      dragging.current = true;
+      updateLinearRating(event.nativeEvent.locationX);
+    },
+    onPanResponderMove: (event) => updateLinearRating(event.nativeEvent.locationX),
+    onPanResponderRelease: () => { dragging.current = false; },
+    onPanResponderTerminate: () => { dragging.current = false; },
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+  })).current;
   const innerBottom = arcGeometry ? arcGeometry.centerY + arcGeometry.radius : responsiveSize(167);
   return (
     <View style={[
@@ -836,7 +854,7 @@ function RatingCurve({
       <Text
         allowFontScaling={false}
         style={[ratingStyles.value, curvedLayout && { top: innerBottom - responsiveSize(149) }]}
-      >{visualRating >= 1 ? visualRating.toFixed(Math.abs(visualRating - Math.round(visualRating)) < 0.03 ? 0 : 1) : '–'}</Text>
+      >{visualRating >= minimumRating ? visualRating.toFixed(Math.abs(visualRating - Math.round(visualRating)) < 0.03 ? 0 : 1) : '–'}</Text>
       <View style={[ratingStyles.stars, curvedLayout && { top: innerBottom - responsiveSize(106) }]}>
         {Array.from({ length: 5 }, (_, index) => {
           const star = index + 1;
@@ -863,13 +881,13 @@ function RatingCurve({
         })}
       </View>
       {linear ? (
-        <View onLayout={(event) => setScaleWidth(event.nativeEvent.layout.width)} style={ratingStyles.scale}>
+        <View onLayout={(event) => setScaleWidth(event.nativeEvent.layout.width)} style={ratingStyles.scale} {...linearPanResponder.panHandlers}>
           {scaleWidth > 0 ? (
             <>
               {isDark
                 ? <RatingScale height={responsiveSize(15.1808)} width={scaleWidth} />
                 : <RatingScaleLight height={responsiveSize(15.1808)} width={scaleWidth} />}
-              {value >= 1 ? (
+              {value >= minimumRating ? (
                 <Svg
                   height={responsiveSize(15.1808)}
                   pointerEvents="none"
@@ -916,7 +934,7 @@ function RatingCurve({
                   accessibilityLabel={`${marker.value} stars`}
                   accessibilityRole="button"
                   key={marker.value}
-                  onPress={() => onChange(marker.value)}
+                  onPress={() => selectRating(marker.value)}
                   style={[ratingStyles.linearPointHit, { left: marker.x * markerScale - responsiveSize(22) }]}
                 >
                   {marker.value === value ? <RatingPin color="#B82F29" height={responsiveSize(38)} width={responsiveSize(38)} /> : null}
@@ -1352,7 +1370,7 @@ function DishEditor({
   }
 
   if (!draft) return null;
-  const valid = Boolean(draft.photoUri && draft.title.trim() && draft.rating >= 1);
+  const valid = Boolean(draft.photoUri && draft.title.trim() && draft.rating >= 0.5);
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       {/* Same double-compensation risk as the main review screen: the
