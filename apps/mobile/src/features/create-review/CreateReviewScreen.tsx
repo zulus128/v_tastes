@@ -3,7 +3,7 @@ import { apiErrorMessage } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -22,6 +22,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -49,8 +50,10 @@ import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
+import { useFavourites } from '../favourites/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
+import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
   ratingCurvePoint,
@@ -1060,7 +1063,7 @@ function HeroBackground({
   );
 }
 
-function PlaceSelector({
+export function PlaceSelector({
   onClose,
   onSelect,
   userId,
@@ -1074,36 +1077,141 @@ function PlaceSelector({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createSelectorStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const { collapsedOffset, expandedHeight } = placeSheetHeights(windowHeight, insets.top);
+  const sheetTranslateY = useRef(new Animated.Value(collapsedOffset)).current;
+  const dragStart = useRef(collapsedOffset);
+  const closing = useRef(false);
+  const reduceMotion = useRef(false);
+  const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'Cafe' | 'Club' | 'Restaurant' | null>('Restaurant');
-  const [priceFilter, setPriceFilter] = useState(false);
-  const [trendingFilter, setTrendingFilter] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'bar' | 'cafe' | 'my-list' | 'restaurant' | 'trending' | null>(null);
   const [submittingVenueId, setSubmittingVenueId] = useState<string | null>(null);
   const api = useTastesApi();
   const query = useDiscoverVenues(userId);
+  const favourites = useFavourites(userId);
   const searchQuery = useVenueSearch(search);
   const venues = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const localFiltered = venues.filter((venue) => {
+  const favouriteVenues: Venue[] = (favourites.data?.places ?? []).map((place) => ({
+    address: place.address,
+    category: place.category,
+    city: place.city,
+    distanceKm: place.distanceKm,
+    id: place.venueId,
+    imageUrl: place.imageUrl ?? undefined,
+    name: place.name,
+    priceLevel: place.priceLevel,
+    rating: place.rating,
+    reviewCount: place.reviewCount,
+    status: 'active',
+  }));
+  const localFiltered = (activeFilter === 'my-list' ? favouriteVenues : venues).filter((venue) => {
     const needle = search.trim().toLowerCase();
     return !needle || `${venue.name} ${venue.city} ${venue.category ?? ''}`.toLowerCase().includes(needle);
   });
-  const searchResults = search.trim().length >= 2
+  const searchResults = search.trim().length >= 2 && activeFilter !== 'my-list'
     ? searchQuery.data?.items ?? localFiltered
     : localFiltered;
-  const filtered = searchResults
-    .filter((venue) => {
-      if (!categoryFilter) return true;
-      const category = venue.category?.toLowerCase() ?? '';
-      if (categoryFilter === 'Restaurant') {
-        return !['cafe', 'club', 'bar'].some((nonRestaurant) => category.includes(nonRestaurant));
-      }
-      return category.includes(categoryFilter.toLowerCase());
-    })
-    .filter((venue) => !priceFilter || venue.priceLevel === 2)
-    .filter((venue) => !trendingFilter || venue.discoverTags?.includes('trending'));
+  const filtered = searchResults.filter((venue) => {
+    if (!activeFilter || activeFilter === 'my-list') return true;
+    const category = venue.category?.toLowerCase() ?? '';
+    if (activeFilter === 'restaurant') {
+      return !['cafe', 'club', 'bar'].some((nonRestaurant) => category.includes(nonRestaurant));
+    }
+    if (activeFilter === 'trending') return venue.discoverTags?.includes('trending');
+    if (activeFilter === 'bar') return category.includes('bar') || category.includes('club');
+    return category.includes(activeFilter);
+  });
+  const usingSearch = search.trim().length >= 2 && activeFilter !== 'my-list';
+  const isPending = activeFilter === 'my-list'
+    ? favourites.isPending
+    : query.isPending || (usingSearch && searchQuery.isPending);
+  const isError = activeFilter === 'my-list'
+    ? favourites.isError
+    : query.isError || (usingSearch && searchQuery.isError);
+
+  const animateTo = useCallback((toValue: number, onFinished?: () => void) => {
+    if (reduceMotion.current) {
+      sheetTranslateY.setValue(toValue);
+      onFinished?.();
+      return;
+    }
+    Animated.spring(sheetTranslateY, {
+      damping: 24,
+      mass: 0.85,
+      stiffness: 260,
+      toValue,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onFinished?.();
+    });
+  }, [sheetTranslateY]);
+
+  const dismiss = useCallback((afterClose: () => void = onClose) => {
+    if (closing.current) return;
+    closing.current = true;
+    Keyboard.dismiss();
+    if (reduceMotion.current) {
+      afterClose();
+      return;
+    }
+    Animated.timing(sheetTranslateY, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      toValue: expandedHeight + Math.max(insets.bottom, 24),
+      useNativeDriver: true,
+    }).start(() => afterClose());
+  }, [expandedHeight, insets.bottom, onClose, sheetTranslateY]);
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) reduceMotion.current = enabled;
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      reduceMotion.current = enabled;
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    closing.current = false;
+    setExpanded(false);
+    sheetTranslateY.setValue(collapsedOffset);
+  }, [collapsedOffset, sheetTranslateY, visible]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderGrant: () => {
+      sheetTranslateY.stopAnimation((value) => {
+        dragStart.current = value;
+      });
+    },
+    onPanResponderMove: (_event, gesture) => {
+      sheetTranslateY.setValue(Math.max(0, Math.min(expandedHeight, dragStart.current + gesture.dy)));
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      sheetTranslateY.stopAnimation((position) => {
+        const snap = resolvePlaceSheetSnap(position, gesture.vy, collapsedOffset, expandedHeight);
+        if (snap === 'dismissed') {
+          dismiss();
+          return;
+        }
+        const nextExpanded = snap === 'expanded';
+        setExpanded(nextExpanded);
+        animateTo(nextExpanded ? 0 : collapsedOffset);
+      });
+    },
+    onPanResponderTerminate: () => animateTo(expanded ? 0 : collapsedOffset),
+  }), [animateTo, collapsedOffset, dismiss, expanded, expandedHeight, sheetTranslateY]);
+
   const selectVenue = async (venue: Venue) => {
     if (!venue.id.startsWith('google:')) {
-      onSelect(venue);
+      dismiss(() => onSelect(venue));
       return;
     }
     setSubmittingVenueId(venue.id);
@@ -1125,11 +1233,14 @@ function PlaceSelector({
     }
   };
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+    <Modal animationType="fade" onRequestClose={() => dismiss()} transparent visible={visible}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(12, insets.bottom) }]}>
-        <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Select Place</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
+        <Pressable accessibilityLabel="Close place selector" onPress={() => dismiss()} style={styles.scrim} />
+        <Animated.View style={[styles.sheet, { height: expandedHeight, paddingBottom: Math.max(12, insets.bottom), transform: [{ translateY: sheetTranslateY }] }]}>
+        <View accessibilityLabel={expanded ? 'Collapse place selector' : 'Expand place selector'} accessibilityRole="adjustable" style={styles.dragArea} {...panResponder.panHandlers}>
+          <View style={styles.dragHandle} />
+        </View>
+        <View style={styles.sheetHeader} {...panResponder.panHandlers}><Text style={styles.sheetTitle}>Select Place</Text><Pressable accessibilityLabel="Close" hitSlop={12} onPress={() => dismiss()}><Text style={styles.close}>×</Text></Pressable></View>
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
@@ -1141,15 +1252,19 @@ function PlaceSelector({
           showsHorizontalScrollIndicator={false}
           style={styles.filtersScroll}
         >
-          {(['Restaurant', 'Cafe', 'Club'] as const).map((filter) => {
-            const active = categoryFilter === filter;
-            return <Pressable key={filter} onPress={() => setCategoryFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>{filter === 'Restaurant' ? '⚒' : filter === 'Cafe' ? '☕' : '▽'} {filter}</Text></Pressable>;
+          {([
+            ['trending', '♨ Trending'],
+            ['restaurant', '⚒ Restaurant'],
+            ['cafe', '☕ Cafe'],
+            ['bar', '▽ Bar'],
+            ['my-list', '♡ My list'],
+          ] as const).map(([filter, label]) => {
+            const active = activeFilter === filter;
+            return <Pressable key={filter} onPress={() => setActiveFilter(active ? null : filter)} style={[styles.filter, active && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>{label}</Text></Pressable>;
           })}
-          <Pressable onPress={() => setPriceFilter((active) => !active)} style={[styles.filter, priceFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>$$⌄</Text></Pressable>
-          <Pressable onPress={() => setTrendingFilter((active) => !active)} style={[styles.filter, trendingFilter && styles.filterActive]}><Text maxFontSizeMultiplier={1.3} style={styles.filterText}>♨ Trending</Text></Pressable>
         </ScrollView>
-        {query.isPending || (search.trim().length >= 2 && searchQuery.isPending) ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : query.isError || searchQuery.isError ? (
-          <Pressable onPress={() => void query.refetch()} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
+        {isPending ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : isError ? (
+          <Pressable onPress={() => void (activeFilter === 'my-list' ? favourites.refetch() : usingSearch ? searchQuery.refetch() : query.refetch())} style={styles.loading}><Text style={styles.error}>Could not load places. Tap to retry.</Text></Pressable>
         ) : (
           <FlatList
             style={styles.placeList}
@@ -1167,18 +1282,25 @@ function PlaceSelector({
             windowSize={7}
             renderItem={({ item: venue }) => (
               <Pressable disabled={submittingVenueId === venue.id} onPress={() => void selectVenue(venue)} style={styles.row}>
-                <Image source={venueImage(venue.imageUrl)} style={styles.rowImage} />
+                <View style={styles.rowImageWrap}>
+                  <Image source={venueImage(venue.imageUrl)} style={styles.rowImage} />
+                  {venue.discoverTags?.includes('trending') ? <Text style={styles.badge}>Trending</Text> : (venue.reviewCount ?? 0) >= 20 ? <Text style={styles.badge}>Popular</Text> : null}
+                </View>
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={styles.rowName}>{venue.name}</Text>
-                  <Text numberOfLines={1} style={styles.rowAddress}>{venue.address ?? venue.city}</Text>
                   <View style={styles.meta}><Text style={styles.ratingPill}>★ {(venue.rating ?? 0).toFixed(1)}</Text><Text style={styles.metaText}>{venue.reviewCount ?? 0} reviews</Text></View>
+                  <Text numberOfLines={1} style={styles.rowAddress}>{[
+                    venue.category,
+                    venue.priceLevel ? '$'.repeat(venue.priceLevel) : null,
+                    venue.distanceKm == null ? null : `${venue.distanceKm.toFixed(1)} km`,
+                  ].filter(Boolean).join(' · ') || venue.address || venue.city}</Text>
                 </View>
-                {submittingVenueId === venue.id ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.add}>{venue.id.startsWith('google:') ? 'Submit' : '⊕'}</Text>}
+                {submittingVenueId === venue.id ? <ActivityIndicator color={colors.primary} /> : null}
               </Pressable>
             )}
           />
         )}
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -1416,8 +1538,10 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSh
 const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
-  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, maxHeight: '91%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
-  sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
+  dragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
+  dragHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.45 },
+  sheetHeader: { height: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   sheetTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
   searchBox: { height: 42, marginHorizontal: 16, marginTop: 16, borderRadius: 22, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
   searchIcon: { color: colors.text, marginRight: 8, fontSize: 22 },
@@ -1430,11 +1554,14 @@ const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   filterActive: { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
   filterText: { color: colors.text, fontSize: 12, lineHeight: 16 },
   loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' }, error: { color: colors.primary, textAlign: 'center' },
-  row: { minHeight: 176, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  rowImage: { width: 122, height: 122, borderRadius: 14 }, rowCopy: { flex: 1, gap: 7 },
+  row: { minHeight: 154, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  rowImageWrap: { width: 112, height: 112 },
+  rowImage: { width: 112, height: 112, borderRadius: 14 },
+  badge: { position: 'absolute', left: 7, bottom: 7, overflow: 'hidden', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3, color: '#FFFFFF', backgroundColor: '#D33B35', fontSize: 10, fontWeight: '700' },
+  rowCopy: { flex: 1, gap: 7 },
   rowName: { color: colors.text, fontSize: 15, fontWeight: '600' }, rowAddress: { color: colors.textSecondary, fontSize: 13 },
   meta: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }, ratingPill: { color: '#fff', borderRadius: 15, paddingHorizontal: 11, paddingVertical: 6, backgroundColor: '#D33B35', fontWeight: '700' }, metaText: { flexShrink: 1, color: colors.textMuted, fontSize: 12, lineHeight: 16 },
-  add: { color: colors.text, fontSize: 21 }, empty: { color: colors.textMuted, padding: 36, textAlign: 'center' },
+  empty: { color: colors.textMuted, padding: 36, textAlign: 'center' },
   more: { height: 54, alignItems: 'center', justifyContent: 'center' }, moreText: { color: colors.primary, fontWeight: '600' },
 });
 
