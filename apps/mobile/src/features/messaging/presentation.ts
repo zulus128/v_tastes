@@ -11,6 +11,14 @@ export function compareConversations(
   right: ConversationSummary,
   now = Date.now(),
 ): number {
+  // A newly received personal message must be immediately visible even when
+  // there are upcoming activity rows pinned in the inbox. Once it is read,
+  // the normal upcoming-activity and recency ordering resumes.
+  const leftNewDirect = left.kind === 'direct' && left.unreadCount > 0;
+  const rightNewDirect = right.kind === 'direct' && right.unreadCount > 0;
+  if (leftNewDirect !== rightNewDirect) return leftNewDirect ? -1 : 1;
+  if (leftNewDirect && rightNewDirect) return right.updatedAt.localeCompare(left.updatedAt);
+
   const leftTime = activityTime(left);
   const rightTime = activityTime(right);
   const leftUpcoming = leftTime !== null && leftTime > now;
