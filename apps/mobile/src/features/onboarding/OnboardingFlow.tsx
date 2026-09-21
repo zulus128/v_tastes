@@ -460,7 +460,7 @@ function PhoneScreen(props: {
             <View onLayout={scrollLayout.onContentLayout} style={styles.authContent} testID="onboarding-phone-content">
               <Text style={styles.authTitle}>Your phone number</Text>
               <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
-              <View style={[styles.phoneRow, (focused || props.digits) ? styles.phoneRowFocused : null, props.error ? styles.phoneRowError : null]}>
+              <View style={[styles.phoneRow, (focused || props.digits) ? styles.phoneRowFocused : null, props.error ? styles.phoneRowError : null]} testID="onboarding-phone-row">
                 <Pressable onPress={props.onCountry} style={styles.countrySelector}>
                   <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
                 </Pressable>
@@ -663,7 +663,7 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   authTitle: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   authSubtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
   phoneSent: { color: colors.text },
-  phoneRow: { width: '100%', height: 60, marginTop: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: 16, backgroundColor: '#1A1A1C', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  phoneRow: { width: '100%', height: 60, marginTop: 17, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
   phoneRowFocused: { borderWidth: 2, borderColor: '#E63946' },
   phoneRowError: { borderWidth: 2, borderColor: '#E63946' },
   countrySelector: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -687,9 +687,9 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   otpContent: { width: '100%', minHeight: 190, alignItems: 'center' },
   otpRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  otpCellEmpty: { borderColor: 'rgba(255,255,255,0.18)', backgroundColor: '#141416' },
-  otpCellFilled: { borderColor: '#FFFFFF', backgroundColor: '#1A1A1C' },
-  otpCellActive: { borderWidth: 2, borderColor: '#E63946', backgroundColor: '#1A1A1C' },
+  otpCellEmpty: { borderColor: colors.border, backgroundColor: colors.surface },
+  otpCellFilled: { borderColor: colors.text, backgroundColor: colors.surface },
+  otpCellActive: { borderWidth: 2, borderColor: '#E63946', backgroundColor: colors.surface },
   otpCellError: { borderWidth: 2, borderColor: colors.danger },
   otpCaret: { width: 2, height: 20, borderRadius: 1, backgroundColor: '#E63946' },
   otpDigit: { color: colors.text, fontSize: 17, lineHeight: 18, letterSpacing: -0.41 },
