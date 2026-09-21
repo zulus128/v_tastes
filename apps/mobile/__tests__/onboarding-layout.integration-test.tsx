@@ -72,6 +72,9 @@ describe('onboarding in resizable windows', () => {
 
     await fireEvent(scroll, 'layout', measure(313));
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBe(normalTop);
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-phone-row').props.style)).toMatchObject({
+      backgroundColor: '#FFFFFF',
+    });
   });
 
   it('removes surplus space above OTP cells while retaining scrolling for the remaining content', async () => {
@@ -110,16 +113,16 @@ describe('onboarding in resizable windows', () => {
 
     await fireEvent.changeText(input, '13');
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
-      backgroundColor: '#1A1A1C',
-      borderColor: '#FFFFFF',
+      backgroundColor: '#FFFFFF',
+      borderColor: '#000000',
     });
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-2').props.style)).toMatchObject({
       borderColor: '#E63946',
       borderWidth: 2,
     });
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-3').props.style)).toMatchObject({
-      backgroundColor: '#141416',
-      borderColor: 'rgba(255,255,255,0.18)',
+      backgroundColor: '#FFFFFF',
+      borderColor: '#E4E4E4',
     });
   });
 
