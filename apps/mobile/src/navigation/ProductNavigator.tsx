@@ -23,7 +23,7 @@ import { useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
-import { CreateReviewScreen } from '../features/create-review/CreateReviewScreen';
+import { CreateReviewScreen, PlaceSelector } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { DiscoverFiltersScreen } from '../features/discover/DiscoverFiltersScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
@@ -176,6 +176,7 @@ function MainTabs({
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [placeSelectorVisible, setPlaceSelectorVisible] = useState(false);
 
   async function openConversation(targetUserId: string) {
     try {
@@ -224,7 +225,15 @@ function MainTabs({
             />
           )}
         </Tabs.Screen>
-        <Tabs.Screen name="Create">
+        <Tabs.Screen
+          listeners={{
+            tabPress: (event) => {
+              event.preventDefault();
+              setPlaceSelectorVisible(true);
+            },
+          }}
+          name="Create"
+        >
           {({ navigation, route }) => (
             <CreateReviewScreen
               initialVenueId={route.params?.venueId}
@@ -303,6 +312,18 @@ function MainTabs({
           }}
         </Tabs.Screen>
       </Tabs.Navigator>
+      <PlaceSelector
+        onClose={() => setPlaceSelectorVisible(false)}
+        onSelect={(venue) => {
+          setPlaceSelectorVisible(false);
+          rootNavigation.navigate('MainTabs', {
+            params: { venueId: venue.id },
+            screen: 'Create',
+          });
+        }}
+        userId={user.uid}
+        visible={placeSelectorVisible}
+      />
       <ProfileSettingsSheet
         fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}

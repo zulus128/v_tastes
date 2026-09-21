@@ -69,6 +69,22 @@ describe('public API contracts', () => {
     }).success).toBe(true);
   });
 
+  it('accepts half-star dish ratings', () => {
+    expect(createReviewInputSchema.safeParse({
+      idempotencyKey: 'review-command-0001',
+      venueId: 'demo-cafe',
+      rating: 5,
+      text: 'Great place',
+      tags: [],
+      dishReviews: [{
+        id: 'dish-command-0001',
+        title: 'Soup dumplings',
+        rating: 0.5,
+        photoPath: 'review-images/user-1/review-1/dish-1.jpg',
+      }],
+    }).success).toBe(true);
+  });
+
   it('rejects protected or malformed input', () => {
     expect(createReviewInputSchema.safeParse({
       authorId: 'someone-else',

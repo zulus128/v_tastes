@@ -98,3 +98,14 @@ export function snapRating(rating: number) {
     maximumRating,
   );
 }
+
+export function ratingForLinearPoint(x: number, width: number) {
+  if (width <= 0) return 0.5;
+  const minimum = 0.5;
+  const progress = clamp(x / width, 0, 1);
+  return clamp(
+    Math.round((minimum + progress * (maximumRating - minimum)) / ratingStep) * ratingStep,
+    minimum,
+    maximumRating,
+  );
+}
