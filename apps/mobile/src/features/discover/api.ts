@@ -1,4 +1,4 @@
-import type { DiscoverTag, PlaceReview } from '@tastes/contracts';
+import type { DiscoverFeed, DiscoverTag, PlaceReview } from '@tastes/contracts';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
 
@@ -21,6 +21,18 @@ export const discoverVenuesQueryKey = (userId: string, filter: DiscoverVenueFilt
   filter.tag ?? null,
 ] as const;
 
+export function normalizeDiscoverFeed(feed: DiscoverFeed): DiscoverFeed {
+  return {
+    ...feed,
+    popularReviews: feed.popularReviews.map((review) => ({
+      ...review,
+      // Older persisted reviews predate tags. Keep those records renderable
+      // instead of letting a missing optional field crash the whole feed.
+      tags: Array.isArray(review.tags) ? review.tags : [],
+    })),
+  };
+}
+
 function isPlaceReview(value: unknown): value is PlaceReview {
   return typeof value === 'object'
     && value !== null
@@ -41,6 +53,7 @@ export function useDiscoverFeed(userId: string, profileSignature?: string) {
   return useQuery({
     queryKey: discoverFeedQueryKey(userId, profileSignature),
     queryFn: async () => (await api.getDiscoverFeed()).data,
+    select: normalizeDiscoverFeed,
   });
 }
 

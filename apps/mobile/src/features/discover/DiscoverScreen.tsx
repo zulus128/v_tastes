@@ -556,7 +556,7 @@ function TrendingFeed({
                 onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
                 onOpen={() => onOpenComments(review.id)}
                 place={review.venueName}
-                mood={review.tags[0]}
+                mood={review.tags?.[0]}
                 rating={review.rating.toFixed(1)}
                 reactionCount={reactionCounts[review.id] ?? review.reactionCount}
                 reacted={reactedReviews.has(review.id)}
