@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
-import { Animated, Dimensions } from 'react-native';
+import { Animated, Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProfileSettingsSheet } from '../src/features/profile/ProfileSettingsSheet';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
@@ -48,6 +48,17 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(() => Dimensions.set({ window: originalWindow }));
   jest.restoreAllMocks();
+});
+
+it('keeps account actions inside the scroll area above the fixed footer', async () => {
+  await render(<ProfileSettingsSheet fallbackName="Test User" onClose={jest.fn()} onLogout={jest.fn()} userId="tester" visible />, { wrapper: Providers });
+
+  const scroll = screen.getByTestId('profile-settings-scroll');
+  const footerStyle = StyleSheet.flatten(screen.getByTestId('profile-settings-footer').props.style);
+
+  expect(scroll).toContainElement(screen.getByTestId('profile-settings-account-actions'));
+  expect(footerStyle.position).not.toBe('absolute');
+  expect(footerStyle.flexShrink).toBe(0);
 });
 
 it.each([

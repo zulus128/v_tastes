@@ -324,7 +324,8 @@ export function ProfileSettingsSheet({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               style={styles.contentScroll}
-              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) + responsiveSize(118) }]}
+              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}
+              testID="profile-settings-scroll"
             >
             <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
               <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
@@ -345,7 +346,7 @@ export function ProfileSettingsSheet({
                 </Pressable>
               ))}
             </View>
-            <View style={styles.accountActions}>
+            <View style={styles.accountActions} testID="profile-settings-account-actions">
               <Pressable accessibilityLabel="Log out" accessibilityRole="button" hitSlop={8} onPress={confirmLogout}>
                 <Text style={styles.logout}>Log out</Text>
               </Pressable>
@@ -355,7 +356,7 @@ export function ProfileSettingsSheet({
             </View>
             </ScrollView>
         )}
-        <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}>
+        <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]} testID="profile-settings-footer">
           <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''} OTA ${otaRevision}`} style={styles.version}>
             Version {appVersion}{buildVersion ? ` (${buildVersion}` : ''}{buildVersion ? ` · OTA ${otaRevision})` : ` (OTA ${otaRevision})`}{updateId ? ` · ${updateId}` : ''}
           </Text>
@@ -521,7 +522,7 @@ function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: numbe
     rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
     cityFlag: { width: s(18), height: s(18), marginLeft: s(5) },
     chevron: { width: s(8), marginLeft: s(8), color: colors.textMuted, fontSize: s(27), lineHeight: s(29) },
-    actions: { position: 'absolute', right: 0, bottom: 0, left: 0, paddingTop: s(16), paddingBottom: s(24), alignItems: 'center', justifyContent: 'center' },
+    actions: { width: '100%', flexShrink: 0, paddingTop: s(16), paddingBottom: s(24), alignItems: 'center', justifyContent: 'center' },
     notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.canvas },
     notificationBackground: { flex: 1, backgroundColor: colors.canvas },
     notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 30 },
