@@ -1,4 +1,4 @@
-import { createUserProfileInputSchema, type CompleteOnboardingInput } from '@tastes/contracts';
+import { checkUsernameAvailabilityInputSchema, createUserProfileInputSchema, type CompleteOnboardingInput } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -247,7 +247,7 @@ export function PostSignupOnboardingFlow({
   const [displayName, setDisplayName] = useState(() => visualAudit ? 'Alex Morgan' : auth.currentUser?.displayName?.trim() ?? '');
   const [username, setUsername] = useState(() => visualAudit ? 'alex.morgan' : '');
   const [usernameTouched, setUsernameTouched] = useState(visualAudit);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>(visualAudit ? 'available' : 'idle');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error'>(visualAudit ? 'available' : 'idle');
   const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
   const [bio, setBio] = useState('');
@@ -274,8 +274,12 @@ export function PostSignupOnboardingFlow({
 
   useEffect(() => {
     const value = username.trim();
-    if (!usernameTouched || value.length < 2) {
+    if (!usernameTouched || value.length === 0) {
       setUsernameStatus('idle');
+      return undefined;
+    }
+    if (!checkUsernameAvailabilityInputSchema.safeParse({ username: value }).success) {
+      setUsernameStatus('invalid');
       return undefined;
     }
     if (visualAudit) {
@@ -287,7 +291,7 @@ export function PostSignupOnboardingFlow({
     const timeout = setTimeout(() => {
       void api.checkUsernameAvailability({ username: value }).then((response) => {
         if (active) setUsernameStatus(response.data.available ? 'available' : 'taken');
-      }).catch(() => { if (active) setUsernameStatus('idle'); });
+      }).catch(() => { if (active) setUsernameStatus('error'); });
     }, 350);
     return () => { active = false; clearTimeout(timeout); };
   }, [api, username, usernameTouched, visualAudit]);
@@ -321,8 +325,12 @@ export function PostSignupOnboardingFlow({
   }
 
   async function saveProfile() {
-    if (displayName.trim().length < 2 || username.trim().length < 2) {
+    if (displayName.trim().length < 2) {
       Alert.alert('Complete your profile', 'Add your name and username to continue.');
+      return;
+    }
+    if (usernameStatus !== 'available') {
+      setUsernameTouched(true);
       return;
     }
     const input = {
@@ -539,6 +547,7 @@ export function PostSignupOnboardingFlow({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             style={styles.profileScroll}
+            testID="onboarding-profile-scroll"
           >
             <StepProgress step={1} />
             <Text style={[styles.title, styles.profileTitle]}>Create your profile</Text>
@@ -551,21 +560,23 @@ export function PostSignupOnboardingFlow({
             <View style={styles.profileFieldsCard}>
               <View style={styles.profileField}><Text style={styles.profileFieldLabel}>Name</Text><TextInput value={displayName} onChangeText={setDisplayName} placeholder="What your friends call you" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} /></View>
               <View style={styles.profileSeparator} />
-              <View style={styles.profileField}><Text style={styles.profileFieldLabel}>Username</Text><TextInput value={username} autoCapitalize="none" onChangeText={(value) => { setUsername(value); setUsernameTouched(true); }} placeholder="@yourname" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
+              <View style={styles.profileField}><Text style={styles.profileFieldLabel}>Username</Text><TextInput value={username} autoCapitalize="none" maxLength={40} onChangeText={(value) => { setUsername(value); setUsernameTouched(true); }} placeholder="@yourname" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
                 {usernameStatus === 'checking' ? <Text style={styles.usernameChecking}>Checking…</Text> : null}
                 {usernameStatus === 'available' ? <Text style={styles.usernameAvailable}>✓ This name is available</Text> : null}
                 {usernameStatus === 'taken' ? <Text style={styles.usernameTaken}>✗ That name is taken</Text> : null}
+                {usernameStatus === 'invalid' ? <Text style={styles.usernameTaken}>✗ Use letters, numbers, dots, or underscores only</Text> : null}
+                {usernameStatus === 'error' ? <Text style={styles.usernameTaken}>✗ Couldn’t check this name. Try again.</Text> : null}
               </View>
               <View style={styles.profileSeparator} />
               <Pressable onPress={() => navigate('city')} style={styles.profileField}><Text style={styles.profileFieldLabel}>Location</Text><View style={styles.locationSelection}><Text style={[styles.profileFieldInput, !city && styles.profilePlaceholder]}>{city || 'Select your city'}</Text>{city ? <Image source={cityFlag} style={styles.locationFlag} /> : null}<Image source={chevronRight} style={styles.locationChevron} /></View></Pressable>
               <View style={styles.profileSeparator} />
-              <View style={styles.profileField}><View style={styles.profileLabelRow}><Text style={styles.profileFieldLabel}>Bio</Text><Text style={styles.bioCounter}>{bio.length}/80</Text></View><TextInput maxLength={80} value={bio} onChangeText={setBio} placeholder="What do you always order?" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
+              <View style={[styles.profileField, styles.profileBioField]}><View style={styles.profileLabelRow}><Text style={styles.profileFieldLabel}>Bio</Text><Text style={styles.bioCounter}>{bio.length}/80</Text></View><TextInput maxLength={80} value={bio} onChangeText={setBio} placeholder="What do you always order?" placeholderTextColor={colors.placeholder} style={styles.profileFieldInput} />
                 <View style={styles.bioSuggestions}>{['Ramen obsessive', 'Natural wine person', 'Will queue for a pastry'].map((suggestion) => <Pressable key={suggestion} onPress={() => setBio(suggestion)} style={styles.bioSuggestion}><Text style={styles.bioSuggestionText}>{suggestion}</Text></Pressable>)}</View>
               </View>
             </View>
           </ScrollView>
           <View style={styles.profileButtonArea}>
-            <PrimaryButton disabled={usernameStatus === 'checking' || usernameStatus === 'taken'} label="Continue" loading={busy} onPress={saveProfile} />
+            <PrimaryButton disabled={usernameStatus !== 'available'} label="Continue" loading={busy} onPress={saveProfile} />
             <Text style={styles.changeLater}>You can change all of this later.</Text>
           </View>
         </View>
@@ -797,8 +808,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   profileScroll: { flex: 1 },
   profilePage: { flexGrow: 1, paddingHorizontal: 16, paddingTop: landscape ? 24 : 66, paddingBottom: 16, alignItems: 'center' },
   profileButtonArea: { paddingHorizontal: 36, paddingBottom: bottomGutter, gap: 7 },
-  profileSubtitle: { marginTop: 8, width: 285 },
-  profileTitle: { marginTop: 44 },
+  profileSubtitle: { marginTop: 7, width: 285, fontSize: 15, lineHeight: 18 },
+  profileTitle: { marginTop: 60, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 1, borderColor: colors.border, marginTop: 18, marginBottom: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   photoImage: { width: '100%', height: '100%', borderRadius: 59 },
   photoAddBadge: { position: 'absolute', right: 3, bottom: 3, width: 28, height: 28, borderRadius: 14, backgroundColor: '#E63946', alignItems: 'center', justifyContent: 'center' },
@@ -806,7 +817,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   addPhotoIcon: { width: 28, height: 28 },
   profileIdentity: { color: colors.textMuted, fontSize: 15, marginBottom: 18 },
   profileFieldsCard: { width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#161616' },
-  profileField: { paddingHorizontal: 16, paddingVertical: 10, gap: 4 },
+  profileField: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
+  profileBioField: { paddingBottom: 16, gap: 12 },
   profileFieldLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '500' },
   profileFieldInput: { flex: 1, minHeight: 22, padding: 0, color: colors.text, fontSize: 16 },
   profilePlaceholder: { color: colors.placeholder },

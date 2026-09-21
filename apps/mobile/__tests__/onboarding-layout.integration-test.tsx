@@ -19,7 +19,11 @@ jest.mock('../src/infrastructure/firebase', () => ({ auth: { currentUser: null }
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: (error: Error) => error.message }));
 jest.mock('firebase/storage', () => ({ ref: jest.fn(), uploadBytes: jest.fn() }));
 jest.mock('firebase/auth', () => ({}));
-jest.mock('../src/session/SessionProvider', () => ({ useTastesApi: () => ({}) }));
+const mockCheckUsernameAvailability = jest.fn();
+const mockTastesApi = { checkUsernameAvailability: mockCheckUsernameAvailability };
+jest.mock('../src/session/SessionProvider', () => ({
+  useTastesApi: () => mockTastesApi,
+}));
 jest.mock('../src/infrastructure/pushNotifications', () => ({ syncPushNotifications: jest.fn() }));
 jest.mock('expo-auth-session/providers/google', () => ({ useIdTokenAuthRequest: () => [null, null, jest.fn()] }));
 jest.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: jest.fn() }));
@@ -39,9 +43,11 @@ function resize(width: number, height: number) {
 describe('onboarding in resizable windows', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+    mockCheckUsernameAvailability.mockReset();
   });
 
   afterEach(async () => {
+    jest.useRealTimers();
     await act(async () => Dimensions.set({ window: originalWindow, screen: originalScreen }));
   });
 
@@ -80,6 +86,97 @@ describe('onboarding in resizable windows', () => {
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBeLessThan(10);
     expect(scroll).toContainElement(screen.getByText('Resend code'));
     expect(scroll).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
+  });
+
+  it('shows the Figma active and filled states while entering an OTP', async () => {
+    resize(402, 874);
+    await render(<OnboardingFlow initialScreen="otp" visualAudit />, { wrapper: Providers });
+    const input = screen.getByDisplayValue('');
+    const button = screen.getByRole('button', { name: 'Continue' });
+    const glow = StyleSheet.flatten(screen.getByTestId('onboarding-primary-button-glow').props.style);
+
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ backgroundColor: '#E63946' });
+    expect(glow).toMatchObject({
+      shadowColor: '#E53845',
+      shadowOpacity: 0.55,
+      shadowRadius: 13,
+    });
+
+    await fireEvent(input, 'focus');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+
+    await fireEvent.changeText(input, '13');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      backgroundColor: '#1A1A1C',
+      borderColor: '#FFFFFF',
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-2').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-3').props.style)).toMatchObject({
+      backgroundColor: '#141416',
+      borderColor: 'rgba(255,255,255,0.18)',
+    });
+  });
+
+  it('validates usernames inline before checking availability', async () => {
+    resize(402, 874);
+    jest.useFakeTimers();
+    mockCheckUsernameAvailability
+      .mockResolvedValueOnce({ data: { available: true } })
+      .mockResolvedValueOnce({ data: { available: false } });
+    await render(<PostSignupOnboardingFlow initialScreen="profile" onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} />, { wrapper: Providers });
+
+    const username = screen.getByPlaceholderText('@yourname');
+    const button = screen.getByRole('button', { name: 'Continue' });
+    expect(button).toBeDisabled();
+
+    await fireEvent.changeText(username, 'bad name');
+    expect(screen.getByText('✗ Use letters, numbers, dots, or underscores only')).toBeOnTheScreen();
+    expect(mockCheckUsernameAvailability).not.toHaveBeenCalled();
+    expect(button).toBeDisabled();
+
+    await fireEvent.changeText(username, 'alex.morgan');
+    expect(screen.getByText('Checking…')).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(350);
+      await Promise.resolve();
+    });
+    expect(mockCheckUsernameAvailability).toHaveBeenCalledWith({ username: 'alex.morgan' });
+    expect(screen.getByText('✓ This name is available')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+
+    await fireEvent.changeText(username, 'already.taken');
+    await act(async () => {
+      jest.advanceTimersByTime(350);
+      await Promise.resolve();
+    });
+    expect(screen.getByText('✗ That name is taken')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  });
+
+  it('renders the profile typography and bio controls from the client note', async () => {
+    resize(402, 874);
+    await render(<PostSignupOnboardingFlow initialScreen="profile" onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} visualAudit />, { wrapper: Providers });
+
+    expect(StyleSheet.flatten(screen.getByText('Create your profile').props.style)).toMatchObject({
+      fontSize: 24,
+      lineHeight: 29,
+      marginTop: 60,
+    });
+    expect(StyleSheet.flatten(screen.getByText('This is how friends find you.').props.style)).toMatchObject({
+      fontSize: 15,
+      lineHeight: 18,
+      marginTop: 7,
+    });
+    expect(screen.getByPlaceholderText('What do you always order?').props.maxLength).toBe(80);
+    await fireEvent.press(screen.getByText('Natural wine person'));
+    expect(screen.getByDisplayValue('Natural wine person')).toBeOnTheScreen();
+    expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
   it.each([[393, 852], [667, 375], [800, 500], [600, 600], [1024, 600]])(
