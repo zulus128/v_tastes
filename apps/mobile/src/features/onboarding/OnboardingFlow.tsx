@@ -466,7 +466,6 @@ function PhoneScreen(props: {
                 </Pressable>
                 <View style={styles.phoneDivider} />
                 <TextInput
-                  autoFocus
                   keyboardType="phone-pad"
                   onChangeText={props.onChange}
                   onBlur={() => setFocused(false)}
