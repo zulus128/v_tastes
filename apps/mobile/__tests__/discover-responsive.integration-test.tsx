@@ -5,6 +5,7 @@ import { responsiveSize } from '../src/ui/responsive';
 
 const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
 let mockCarouselCount = 0;
+let mockPopularReviews: Array<Record<string, unknown>> = [];
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
@@ -36,7 +37,7 @@ jest.mock('../src/features/discover/api', () => ({
       forYou: Array.from({ length: mockCarouselCount }, (_, index) => ({
         id: `for-you-${index}`, name: `For you place ${index}`, city: 'Istanbul',
       })),
-      newSpots: [], hiddenGems: [], popularReviews: [],
+      newSpots: [], hiddenGems: [], popularReviews: mockPopularReviews,
       mostReviewed: Array.from({ length: 5 }, (_, index) => ({
         id: `venue-${index}`, name: `Place ${index}`, city: 'Istanbul',
       })),
@@ -61,6 +62,7 @@ describe('Discover responsive content', () => {
     await act(() => Dimensions.set({ window: initialWindow, screen: initialScreen }));
     mockInsets.top = 0;
     mockCarouselCount = 0;
+    mockPopularReviews = [];
     jest.restoreAllMocks();
   });
 
@@ -125,6 +127,28 @@ describe('Discover responsive content', () => {
 
     expect(StyleSheet.flatten(screen.getByText('Trending place 0').parent!.parent!.props.style).width).toBe(responsiveSize(200));
     expect(StyleSheet.flatten(screen.getByText('For you place 0').parent!.parent!.props.style).width).toBe(responsiveSize(240));
+  });
+
+  it('renders legacy reviews that do not have tags', async () => {
+    mockPopularReviews = [{
+      id: 'legacy-review',
+      authorDisplayName: 'Legacy reviewer',
+      authorPhotoUrl: null,
+      venueCity: 'Istanbul',
+      cuisine: 'Turkish',
+      venueImageUrl: null,
+      venueName: 'Legacy Place',
+      rating: 4.5,
+      reactionCount: 0,
+      commentCount: 0,
+      text: 'Still a valid review',
+      createdAt: new Date().toISOString(),
+    }];
+
+    await render(<DiscoverScreen {...props} />);
+
+    expect(screen.getByText('Legacy reviewer')).toBeOnTheScreen();
+    expect(screen.getByText('Still a valid review')).toBeOnTheScreen();
   });
 
   it.each([[667, 375], [1024, 600]])('keeps the map beside its list at %ix%i', async (width, height) => {
