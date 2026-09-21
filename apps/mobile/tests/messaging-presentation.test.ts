@@ -25,6 +25,14 @@ function conversation(id: string, overrides: Partial<ConversationSummary> = {}):
 }
 
 describe('messaging presentation', () => {
+  it('puts newly received personal chats above pinned upcoming activities', () => {
+    const now = new Date('2026-09-15T10:00:00.000Z').getTime();
+    const activity = conversation('activity', { kind: 'activity', activityStartsAt: '2026-09-15T11:00:00.000Z' });
+    const unreadDirect = conversation('direct', { unreadCount: 2, updatedAt: '2026-09-15T09:30:00.000Z' });
+    expect([activity, unreadDirect].sort((a, b) => compareConversations(a, b, now)).map((item) => item.id))
+      .toEqual(['direct', 'activity']);
+  });
+
   it('floats upcoming activities by the nearest reservation first', () => {
     const now = new Date('2026-09-15T10:00:00.000Z').getTime();
     const direct = conversation('direct', { updatedAt: '2026-09-15T12:00:00.000Z' });
