@@ -373,7 +373,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   const slides = [
     { image: hero, title: 'Discover the best places!', subtitle: 'Rate dishes and restaurants to get personalized\nrecommendations' },
     { image: heroRate, title: 'Rate what you eat', subtitle: 'Score dishes and places in seconds — your taste profile builds itself.' },
-    { image: heroFollow, title: 'Follow people you trust', subtitle: 'Build a feed from people whose taste you know you can trust.' },
+    { image: heroFollow, title: 'Follow people you trust', subtitle: 'See where your friends actually go, and skip the tourist traps.' },
   ];
   return <ScrollView horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} style={styles.consentCarousel}>
     {slides.map((slide, index) => <View key={slide.title} style={[styles.fullScreen, { width }]}>
