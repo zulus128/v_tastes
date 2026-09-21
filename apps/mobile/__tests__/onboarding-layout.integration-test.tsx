@@ -74,6 +74,14 @@ describe('onboarding in resizable windows', () => {
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBe(normalTop);
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-phone-row').props.style)).toMatchObject({
       backgroundColor: '#FFFFFF',
+      borderColor: '#E4E4E4',
+      borderWidth: 1,
+    });
+
+    await fireEvent(screen.getByPlaceholderText('Phone number'), 'focus');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-phone-row').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
     });
   });
 
