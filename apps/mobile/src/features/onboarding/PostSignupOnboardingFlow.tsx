@@ -191,19 +191,24 @@ function PermissionScreen({ button, children, footnote, icon, onBack, onPress, o
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
       {children}
     </ScrollView>
-    <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
+    <PrimaryButton label={button} onPress={onPress} style={[styles.bottomButton, step === 6 && styles.contactsPermissionButton]} />
     {footnote ? <Text style={styles.permissionFootnote}>{footnote}</Text> : null}
   </PatternScreen>;
 }
 
 function PeopleYouKnowTeaser({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  const people = [
+    { action: 'Following', detail: '4 mutual friends', name: 'Jonas Weber' },
+    { action: 'Follow', detail: '2 mutual friends', name: 'Sofia Reyes' },
+    { action: 'Follow', detail: 'In your contacts', name: 'Tom Hale' },
+  ];
   return <View style={styles.peopleTeaser}>
     <Text style={styles.peopleTeaserTitle}>People you know</Text>
     <Text style={styles.peopleTeaserCount}>3 of your contacts are on Tastes</Text>
-    {['Amara Miller', 'Sofia Reyes', 'Yas Hale'].map((name, index) => <View accessibilityElementsHidden key={name} style={styles.teaserPerson}>
+    {people.map((person, index) => <View accessibilityElementsHidden key={person.name} style={styles.teaserPerson}>
       <View style={styles.teaserAvatar} />
-      <View style={styles.teaserCopy}><Text style={styles.teaserBlurred}>{name}</Text><Text style={styles.teaserBlurredSmall}>@tastesfriend</Text></View>
-      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={styles.teaserBlurredSmall}>{index === 0 ? 'Following' : 'Follow'}</Text></View>
+      <View style={styles.teaserCopy}><Text style={styles.teaserBlurred}>{person.name}</Text><Text style={styles.teaserBlurredSmall}>{person.detail}</Text></View>
+      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={styles.teaserBlurredSmall}>{person.action}</Text></View>
     </View>)}
   </View>;
 }
@@ -786,6 +791,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   bottomButton: { position: 'absolute', left: 36, right: 36, bottom: bottomGutter },
+  contactsPermissionButton: { bottom: landscape ? bottomGutter : 24 },
   stepHeader: { position: 'absolute', top: 66, left: 16, right: 16, alignItems: 'center' },
   stepHeaderLandscape: { top: 64 },
   stepProgress: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -796,9 +802,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   stepSegmentUpcoming: { backgroundColor: 'rgba(255,255,255,0.18)' },
   stepTitle: { marginTop: 44, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
-  permissionScroll: { position: 'absolute', top: landscape ? 80 : 132, left: 26, right: 26, bottom: Math.max(94, bottomGutter + 70) },
+  permissionScroll: { position: 'absolute', top: landscape ? 80 : 130, left: 16, right: 16, bottom: Math.max(94, bottomGutter + 70) },
   permissionContent: { alignItems: 'center', paddingBottom: 16 },
-  permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
+  permissionIcon: { width: 60, height: 60, marginBottom: 24, tintColor: colors.text },
   permissionTitle: { fontSize: 24, lineHeight: 29 },
   permissionSubtitle: { width: '100%', marginTop: 7, fontSize: 15, lineHeight: 18, textAlign: 'center' },
   permissionBodyText: { color: colors.textMuted },
@@ -945,15 +951,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   automaticText: { color: colors.text, fontSize: 15 },
   automaticSubtitle: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
   livePreviewCaption: { marginTop: 34, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
-  peopleTeaser: { width: '100%', marginTop: 42, padding: 16, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
-  peopleTeaserTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  peopleTeaser: { width: '100%', height: 272, marginTop: 42, paddingTop: 15, paddingHorizontal: 15, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
+  peopleTeaserTitle: { color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: '600' },
   peopleTeaserCount: { marginTop: 5, marginBottom: 10, color: colors.textSecondary, fontSize: 13 },
-  teaserPerson: { height: 62, flexDirection: 'row', alignItems: 'center', opacity: 0.38 },
-  teaserAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#777777' },
+  teaserPerson: { height: 64, flexDirection: 'row', alignItems: 'center', opacity: 0.38 },
+  teaserAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#777777' },
   teaserCopy: { flex: 1, marginLeft: 12 },
   teaserBlurred: { color: colors.text, fontSize: 14, fontWeight: '600', textShadowColor: colors.text, textShadowRadius: 6 },
   teaserBlurredSmall: { color: colors.textSecondary, fontSize: 12, textShadowColor: colors.textSecondary, textShadowRadius: 6 },
-  teaserAction: { minWidth: 84, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  teaserAction: { width: 100, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   teaserActionMuted: { backgroundColor: colors.surfaceRaised },
   notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
   notificationCard: { minHeight: 78, padding: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1A1A1A' },
