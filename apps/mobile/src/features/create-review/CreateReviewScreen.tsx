@@ -783,11 +783,11 @@ function RatingCurve({
       };
       settleRating.stopAnimation();
       settling.current = false;
-      setVisualPosition(snapRating(ratingForCurvePoint(
+      setVisualPosition(ratingForCurvePoint(
         dragStartPoint.current.x,
         dragStartPoint.current.y,
         interaction.current.arcGeometry,
-      )));
+      ));
     },
     onPanResponderMove: (_event, gesture) => {
       if (!dragging.current) return;
@@ -796,7 +796,7 @@ function RatingCurve({
         dragStartPoint.current.y + gesture.dy,
         interaction.current.arcGeometry,
       );
-      setVisualPosition(snapRating(continuousRating));
+      setVisualPosition(continuousRating);
     },
     onPanResponderRelease: (_event, gesture) => {
       const coast = responsiveSize(18);
