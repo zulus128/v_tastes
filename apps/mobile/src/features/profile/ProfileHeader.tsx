@@ -86,7 +86,7 @@ export function ProfileHeader({
         <View style={styles.statDivider} />
         <Stat label="Following" onPress={onFollowing} value={profile.followingCount} />
       </View>
-      {profile.bio ? <Text ellipsizeMode="tail" numberOfLines={2} style={styles.bio}>{profile.bio}</Text> : null}
+      {profile.bio ? <Text ellipsizeMode="tail" numberOfLines={2} style={styles.bio}>{profile.bio.replace(/\s+/g, ' ').trim()}</Text> : null}
       {!own ? (
         <View style={styles.publicActions}>
           <Pressable
@@ -187,7 +187,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   cityPill: { minHeight: 30, marginTop: 8, paddingHorizontal: 12, flexDirection: 'row', gap: 6, alignItems: 'center', alignSelf: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.surface },
   cityText: { color: colors.text, fontSize: 13, lineHeight: 18 },
   cityFlag: { width: 16, height: 16 },
-  bio: { marginTop: 8, marginHorizontal: 38, color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  bio: { width: '100%', marginTop: 8, paddingHorizontal: 24, alignSelf: 'stretch', color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   stats: { height: 50, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   statDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: colors.border },
   publicActions: { marginTop: 13, paddingHorizontal: 16, flexDirection: 'row', gap: 10 },

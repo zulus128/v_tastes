@@ -49,11 +49,12 @@ import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
 
-type EditableField = 'displayName' | 'username' | 'favoriteDish' | 'city';
+type EditableField = 'displayName' | 'username' | 'bio' | 'favoriteDish' | 'city';
 
 const labels: Record<EditableField, string> = {
   displayName: 'Name',
   username: 'Username',
+  bio: 'Bio',
   favoriteDish: 'Favourite Dish',
   city: 'City',
 };
@@ -160,6 +161,7 @@ export function ProfileSettingsSheet({
     if (!profile) return;
     const value = field === 'displayName' ? profile.displayName
       : field === 'username' ? profile.username ?? ''
+        : field === 'bio' ? profile.bio ?? ''
         : field === 'favoriteDish' ? profile.favoriteDish ?? ''
           : profile.city ?? '';
     setDraft(value);
@@ -233,7 +235,7 @@ export function ProfileSettingsSheet({
   async function saveField() {
     if (!editing) return;
     const value = editing === 'username' ? draft.trim().replace(/^@/, '') : draft.trim();
-    if (!value) {
+    if (!value && editing !== 'bio') {
       Alert.alert(`${labels[editing]} is required`, 'Enter a value before saving.');
       return;
     }
@@ -301,6 +303,7 @@ export function ProfileSettingsSheet({
   const rows: Array<{ field?: EditableField; label: string; value?: string; valueFlag?: ReturnType<typeof cityFlag>; onPress?: () => void }> = profile ? [
     { field: 'displayName', label: 'Name', value: profile.displayName },
     { field: 'username', label: 'Username', value: profile.username ? `@${profile.username}` : 'Add username' },
+    { field: 'bio', label: 'Bio', value: profile.bio?.replace(/\s+/g, ' ').trim() || 'Add bio' },
     { field: 'favoriteDish', label: 'Favourite Dish', value: profile.favoriteDish ?? 'Select a dish' },
     { label: 'Favourite place', value: favoritePlace, onPress: () => setPlaceOpen(true) },
     { label: 'City', value: profile.city ?? 'Select a city', valueFlag: cityFlag(profile.city ?? ''), onPress: () => setCityOpen(true) },
@@ -459,7 +462,18 @@ export function ProfileSettingsSheet({
         <Pressable onPress={() => setEditing(null)} style={styles.modalBackdrop}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.editor}>
             <Text style={styles.editorTitle}>{editing ? `Edit ${labels[editing]}` : ''}</Text>
-            <TextInput autoCapitalize={editing === 'username' ? 'none' : 'sentences'} autoFocus onChangeText={setDraft} placeholderTextColor={colors.textMuted} style={styles.input} value={draft} />
+            <TextInput
+              autoCapitalize={editing === 'username' ? 'none' : 'sentences'}
+              autoFocus
+              maxLength={editing === 'bio' ? 80 : undefined}
+              multiline={editing === 'bio'}
+              onChangeText={setDraft}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.input, editing === 'bio' && styles.bioInput]}
+              textAlignVertical={editing === 'bio' ? 'top' : 'center'}
+              value={draft}
+            />
+            {editing === 'bio' ? <Text style={styles.characterCount}>{draft.length}/80</Text> : null}
             <Pressable disabled={saving} onPress={() => void saveField()} style={styles.saveButton}>
               {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Save</Text>}
             </Pressable>
@@ -550,6 +564,8 @@ function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: numbe
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
     editorTitle: { color: colors.text, fontSize: 19, fontWeight: '700' },
     input: { height: 50, marginTop: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 14, color: colors.text, backgroundColor: colors.canvas },
+    bioInput: { height: 112, paddingTop: 14, paddingBottom: 14 },
+    characterCount: { marginTop: 6, marginRight: 4, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'right' },
     saveButton: { height: 48, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: colors.primary },
     saveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
     placeContent: { flex: 1, padding: 16 },
