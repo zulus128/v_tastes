@@ -360,6 +360,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   const panelHeight = landscape ? height : Math.min(height, responsiveValue(compact ? 390 : 414, layoutScale));
   const heroHeight = landscape ? height : height - panelHeight;
   const heroOverflow = responsiveValue(48, layoutScale);
+  const panelCornerOverlap = landscape ? 0 : responsiveValue(24, layoutScale);
   const heroScale = Math.max(0, Math.min(1, heroHeight / responsiveValue(387, layoutScale)));
   const pinTop = (top: number) => responsiveValue(top, layoutScale) * heroScale
     - (1 - heroScale) * responsiveValue(34, layoutScale)
@@ -377,8 +378,8 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
   ];
   return <ScrollView horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} style={styles.consentCarousel}>
     {slides.map((slide, index) => <View key={slide.title} style={[styles.fullScreen, { width }]}>
-      <View style={[styles.heroLayer, landscape ? { bottom: 0, right: undefined, width: heroWidth } : null, { height: heroHeight }]}>
-        <Image source={slide.image} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow, top: -heroOverflow }]} />
+      <View style={[styles.heroLayer, landscape ? { bottom: 0, right: undefined, width: heroWidth } : null, { height: heroHeight + panelCornerOverlap }]}>
+        <Image source={slide.image} resizeMode="cover" style={[styles.hero, { height: heroHeight + heroOverflow + panelCornerOverlap, top: -heroOverflow }]} />
         <RatingPin label="4.5" scale={heroScale} style={pinPositions[0]} />
         <RatingPin label="5.0" scale={heroScale} style={pinPositions[1]} />
         <RatingPin label="4.2" scale={heroScale} style={pinPositions[2]} />
