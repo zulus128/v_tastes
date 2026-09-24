@@ -27,6 +27,15 @@ describe('rating curve geometry', () => {
     expect(snapRating(4.9)).toBe(5);
   });
 
+  it('keeps the visual drag rating continuous before persistence snaps it', () => {
+    const rating = 2.37;
+    const point = ratingCurvePoint(rating);
+    const visualRating = ratingForCurvePoint(point.x, point.y);
+
+    expect(visualRating).toBeCloseTo(rating, 8);
+    expect(snapRating(visualRating)).toBe(2.5);
+  });
+
   it('maps dish slider drag positions from 0.5 to 5 stars', () => {
     expect(ratingForLinearPoint(-20, 360)).toBe(0.5);
     expect(ratingForLinearPoint(40, 360)).toBe(1);
