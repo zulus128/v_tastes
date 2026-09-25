@@ -1,11 +1,12 @@
 import type { FavouriteFolder, FavouritePlace } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   PanResponder,
@@ -41,6 +42,56 @@ import {
 } from './api';
 
 type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
+
+const SHEET_DISMISS_DISTANCE = 90;
+const SHEET_DISMISS_VELOCITY = 1;
+
+function useDismissibleSheet(onClose: () => void, visible: boolean) {
+  const translateY = useMemo(() => new Animated.Value(0), []);
+
+  useEffect(() => {
+    if (visible) translateY.setValue(0);
+  }, [translateY, visible]);
+
+  const springBack = useCallback(() => {
+    Animated.spring(translateY, {
+      damping: 18,
+      stiffness: 220,
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  }, [translateY]);
+
+  const dismiss = useCallback(() => {
+    Keyboard.dismiss();
+    Animated.timing(translateY, {
+      duration: 180,
+      toValue: 600,
+      useNativeDriver: true,
+    }).start(() => {
+      translateY.setValue(0);
+      onClose();
+    });
+  }, [onClose, translateY]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+    ),
+    onPanResponderGrant: () => Keyboard.dismiss(),
+    onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy >= SHEET_DISMISS_DISTANCE || gesture.vy >= SHEET_DISMISS_VELOCITY) {
+        dismiss();
+      } else {
+        springBack();
+      }
+    },
+    onPanResponderTerminate: springBack,
+  }), [dismiss, springBack, translateY]);
+
+  return { dismiss, panHandlers: panResponder.panHandlers, translateY };
+}
 
 export type SaveablePlace = {
   venueId: string;
@@ -231,6 +282,8 @@ export function SaveToFolderSheet({
   const [creating, setCreating] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
+  const closeCreateFolder = useCallback(() => setCreating(false), []);
+  const createFolderSheet = useDismissibleSheet(closeCreateFolder, creating);
 
   useEffect(() => {
     if (visible) {
@@ -324,13 +377,16 @@ export function SaveToFolderSheet({
               : <Text style={styles.confirmText}>✓  Confirm</Text>}
           </Pressable>
         </View>
-        <Modal animationType="slide" onRequestClose={() => setCreating(false)} transparent visible={creating}>
+        <Modal animationType="fade" onRequestClose={createFolderSheet.dismiss} transparent visible={creating}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
-            <Pressable onPress={() => setCreating(false)} style={styles.createFolderScrim} />
-            <View style={styles.createFolderSheet}>
+            <Pressable onPress={createFolderSheet.dismiss} style={styles.createFolderScrim} />
+            <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
+              <View style={styles.sheetDragArea} {...createFolderSheet.panHandlers}>
+                <View style={styles.sheetHandle} />
+              </View>
               <View style={styles.createFolderTitleRow}>
                 <Text style={styles.createFolderTitle}>Create Folder</Text>
-                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={() => setCreating(false)}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
+                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={createFolderSheet.dismiss}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
               </View>
               <View style={styles.createFolderField}>
                 <Text style={styles.createFolderLabel}>TITLE</Text>
@@ -349,7 +405,7 @@ export function SaveToFolderSheet({
               <Pressable disabled={!folderName.trim() || createFolder.isPending} onPress={() => void createAndSelect()} style={({ pressed }) => [styles.createFolderSubmit, (!folderName.trim() || createFolder.isPending) && styles.createFolderSubmitDisabled, pressed && styles.pressed]}>
                 {createFolder.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createFolderSubmitText}>Create Folder</Text>}
               </Pressable>
-            </View>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
       </KeyboardAvoidingView>
@@ -501,6 +557,7 @@ function FolderNameSheet({
   const createFolder = useCreateFolder(userId);
   const renameFolder = useRenameFolder(userId);
   const [name, setName] = useState('');
+  const sheet = useDismissibleSheet(onClose, editor !== null);
 
   useEffect(() => {
     setName(editor?.mode === 'rename' ? editor.folder.name : '');
@@ -522,12 +579,19 @@ function FolderNameSheet({
   }
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={editor !== null}>
+    <Modal animationType="fade" onRequestClose={sheet.dismiss} transparent visible={editor !== null}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={styles.nameSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
+        <Pressable onPress={sheet.dismiss} style={styles.scrim} />
+        <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}>
+            <View style={styles.sheetHandle} />
+          </View>
+          <View style={styles.sheetTitleRow}>
+            <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
+            <Pressable accessibilityLabel="Cancel folder editing" hitSlop={10} onPress={sheet.dismiss}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
           <TextInput
             autoFocus
             maxLength={40}
@@ -546,7 +610,7 @@ function FolderNameSheet({
           >
             <Text style={styles.doneText}>Done</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -565,12 +629,15 @@ function FolderActionSheet({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const sheet = useDismissibleSheet(onClose, folder !== null);
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={folder !== null}>
+    <Modal animationType="fade" onRequestClose={sheet.dismiss} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={styles.actionSheet}>
-          <View style={styles.sheetHandle} />
+        <Pressable onPress={sheet.dismiss} style={styles.scrim} />
+        <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}>
+            <View style={styles.sheetHandle} />
+          </View>
           <Text style={styles.actionHeading}>{folder?.name}</Text>
           <Pressable onPress={onRename} style={styles.actionButton}>
             <Text style={styles.actionText}>Rename folder</Text>
@@ -578,7 +645,7 @@ function FolderActionSheet({
           <Pressable onPress={onDelete} style={styles.actionButton}>
             <Text style={styles.deleteText}>Delete folder</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -655,9 +722,11 @@ function createStyles(colors: ThemeColors) {
     saveSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, borderRadius: 22, backgroundColor: colors.surfaceRaised },
     nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, gap: 16, borderRadius: 22, backgroundColor: colors.surfaceRaised },
     actionSheet: { margin: 16, marginBottom: 24, padding: 16, paddingTop: 20, gap: 4, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    sheetHandle: { alignSelf: 'center', width: 36, height: 4, marginBottom: 12, borderRadius: 2, backgroundColor: colors.border },
+    sheetDragArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
+    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
     sheetTitleRow: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+    sheetCancelText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
     selectionSwipe: { height: 76, overflow: 'hidden', backgroundColor: colors.canvas },
     selectionRow: { height: 76, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.canvas },
     selectionName: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
