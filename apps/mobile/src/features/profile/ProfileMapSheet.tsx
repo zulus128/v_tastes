@@ -5,9 +5,12 @@ import MapView, { Marker, UrlTile, type Region } from 'react-native-maps';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
+import EmptyMapIcon from '../../../assets/favourites/empty.svg';
+import CloseCircleIcon from '../../../assets/recap/story/close-circle.svg';
+import CloseXIcon from '../../../assets/recap/story/close-x.svg';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
-import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { responsiveStyleSheet } from '../../ui/responsive';
 
 const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
@@ -41,9 +44,9 @@ export function ProfileMapSheet({
   visible: boolean;
 }) {
   const { colors, isDark } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { height } = useWindowDimensions();
-  const sheetHeight = Math.min(responsiveSize(610), height * 0.78);
+  const sheetHeight = Math.min(724, height * 0.86);
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
 
   const close = () => {
@@ -79,9 +82,12 @@ export function ProfileMapSheet({
             <View style={styles.header}>
               <View>
                 <Text style={styles.title}>Places you reviewed</Text>
-                <Text style={styles.count}>{placeCount} {placeCount === 1 ? 'place' : 'places'}</Text>
+                <Text style={styles.count}>{placeCount === 0 ? 'No places yet' : `${placeCount} ${placeCount === 1 ? 'place' : 'places'}`}</Text>
               </View>
-              <Pressable accessibilityLabel="Close" hitSlop={10} onPress={close} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
+              <Pressable accessibilityLabel="Close" hitSlop={10} onPress={close} style={styles.close}>
+                <CloseCircleIcon />
+                <View pointerEvents="none" style={styles.closeCross}><CloseXIcon /></View>
+              </Pressable>
             </View>
           </View>
           <View style={styles.mapWrap}>
@@ -99,7 +105,11 @@ export function ProfileMapSheet({
             ) : error ? (
               <View style={styles.empty}><Text style={styles.emptyTitle}>Could not load the map</Text><Text style={styles.emptyCopy}>{error}</Text><Pressable onPress={onRetry} style={styles.retry}><Text style={styles.retryText}>Try again</Text></Pressable></View>
             ) : (
-              <View style={styles.empty}><Text style={styles.emptyIcon}>📍</Text><Text style={styles.emptyTitle}>No reviewed places yet</Text><Text style={styles.emptyCopy}>Places appear here after the first review.</Text></View>
+              <View style={styles.empty}>
+                <View style={styles.emptyIcon}><EmptyMapIcon /></View>
+                <Text style={styles.emptyTitle}>No places on your map yet</Text>
+                <Text style={styles.emptyCopy}>Places you review or save show up here.</Text>
+              </View>
             )}
           </View>
         </Animated.View>
@@ -108,25 +118,25 @@ export function ProfileMapSheet({
   );
 }
 
-const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
+const createStyles = (colors: ThemeColors, isDark: boolean) => responsiveStyleSheet({
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.surface },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: isDark ? '#121212' : colors.surface },
   dragArea: { paddingTop: 8 },
-  grabber: { width: 42, height: 5, alignSelf: 'center', borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.55 },
-  header: { height: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600' },
+  grabber: { width: 36, height: 4, alignSelf: 'center', borderRadius: 2, backgroundColor: colors.textMuted, opacity: 0.55 },
+  header: { height: 76, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: '600' },
   count: { marginTop: 3, color: colors.textSecondary, fontSize: 13, lineHeight: 17 },
-  close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.surfaceRaised },
-  closeText: { color: colors.text, fontSize: 27, lineHeight: 30, fontWeight: '300' },
-  mapWrap: { flex: 1, overflow: 'hidden', backgroundColor: colors.canvas },
+  close: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  closeCross: { position: 'absolute' },
+  mapWrap: { flex: 1, overflow: 'hidden', backgroundColor: isDark ? '#121212' : colors.canvas },
   map: { width: '100%', height: '100%' },
   marker: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primary, borderRadius: 19, backgroundColor: '#161616' },
   markerIcon: { width: 22, height: 22 },
   empty: { flex: 1, paddingHorizontal: 36, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { fontSize: 38 },
-  emptyTitle: { marginTop: 12, color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: '600', textAlign: 'center' },
-  emptyCopy: { marginTop: 6, color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  emptyIcon: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { marginTop: 12, color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '700', textAlign: 'center' },
+  emptyCopy: { marginTop: 10, color: colors.textSecondary, fontSize: 15, lineHeight: 20, textAlign: 'center' },
   retry: { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 22, backgroundColor: colors.primary },
   retryText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
 });

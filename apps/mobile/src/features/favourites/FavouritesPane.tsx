@@ -139,6 +139,16 @@ export function FavouritesPane({
         ))}
       </ScrollView>
 
+      <Pressable
+        accessibilityLabel="Create Folder"
+        accessibilityRole="button"
+        onPress={() => setEditor({ mode: 'create' })}
+        style={({ pressed }) => [styles.createFolderButton, pressed && styles.pressed]}
+      >
+        <Image source={addFolderIcon} style={styles.addFolderIcon} />
+        <Text style={styles.createFolderButtonText}>Create Folder</Text>
+      </Pressable>
+
       {favourites.isPending ? (
         <View style={styles.centerState}>
           <ActivityIndicator color={colors.primary} />
@@ -581,6 +591,8 @@ function createStyles(colors: ThemeColors) {
     folderChipActive: { backgroundColor: colors.primary, borderColor: 'rgba(255,255,255,0.1)' },
     folderChipText: { color: isDark ? colors.textMuted : '#677083', fontSize: 12 },
     folderChipTextActive: { color: '#FFFFFF' },
+    createFolderButton: { height: 44, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 20, borderRadius: 36, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E63946', shadowColor: '#E53845', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 7, elevation: 8 },
+    createFolderButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
     placeList: { paddingBottom: 32 },
     loadMoreButton: { alignSelf: 'center', paddingVertical: 20 },
     loadMoreText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
