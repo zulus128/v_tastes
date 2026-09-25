@@ -79,11 +79,6 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
 
   const close = useCallback(() => {
     Keyboard.dismiss();
-    onClose();
-  }, [onClose]);
-
-  const dismissWithDragAnimation = useCallback(() => {
-    Keyboard.dismiss();
     Animated.timing(translateY, {
       duration: 180,
       toValue: 600,
@@ -100,7 +95,7 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
     onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
     onPanResponderRelease: (_, gesture) => {
       if (gesture.dy >= SHEET_DISMISS_DISTANCE || gesture.vy >= SHEET_DISMISS_VELOCITY) {
-        dismissWithDragAnimation();
+        close();
       } else {
         springBack();
       }
@@ -108,7 +103,7 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
     onPanResponderTerminate: springBack,
     onPanResponderTerminationRequest: () => false,
     onShouldBlockNativeResponder: () => true,
-  }), [dismissWithDragAnimation, springBack, translateY]);
+  }), [close, springBack, translateY]);
 
   return { close, panHandlers: panResponder.panHandlers, translateY };
 }
