@@ -1238,6 +1238,9 @@ export function PlaceSelector({
   }, []);
 
   const panResponder = useMemo(() => PanResponder.create({
+    // Claim the handle on pointer-down as well as touch-down. Waiting for a
+    // move event is unreliable for iOS apps running in a macOS window.
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => {
       sheetTranslateY.stopAnimation((value) => {
@@ -1260,6 +1263,7 @@ export function PlaceSelector({
       });
     },
     onPanResponderTerminate: () => animateTo(expanded ? 0 : collapsedOffset),
+    onPanResponderTerminationRequest: () => false,
   }), [animateTo, collapsedOffset, dismiss, expanded, expandedHeight, sheetTranslateY]);
 
   const selectVenue = async (venue: Venue) => {
@@ -1295,7 +1299,7 @@ export function PlaceSelector({
         <View accessibilityLabel={expanded ? 'Collapse place selector' : 'Expand place selector'} accessibilityRole="adjustable" style={styles.dragArea} {...panResponder.panHandlers}>
           <View style={styles.dragHandle} />
         </View>
-        <View style={styles.sheetHeader} {...panResponder.panHandlers}><Text style={styles.sheetTitle}>Select Place</Text><Pressable accessibilityLabel="Close" hitSlop={12} onPress={() => dismiss()}><Text style={styles.close}>×</Text></Pressable></View>
+        <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Select Place</Text><Pressable accessibilityLabel="Close" hitSlop={12} onPress={() => dismiss()}><Text style={styles.close}>×</Text></Pressable></View>
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput autoCapitalize="none" onChangeText={setSearch} placeholder="Restaurant" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
@@ -1594,7 +1598,7 @@ const createSelectorStyles = (colors: ThemeColors) => responsiveStyleSheet({
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.canvas },
-  dragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
+  dragArea: { height: 36, alignItems: 'center', justifyContent: 'center' },
   dragHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.textMuted, opacity: 0.45 },
   sheetHeader: { height: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   sheetTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' }, close: { color: colors.text, fontSize: 27 },
