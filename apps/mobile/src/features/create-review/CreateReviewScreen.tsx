@@ -1108,6 +1108,7 @@ export function PlaceSelector({
   const { collapsedOffset, expandedHeight } = placeSheetHeights(windowHeight, insets.top);
   const hiddenOffset = expandedHeight + Math.max(insets.bottom, 24);
   const sheetTranslateY = useRef(new Animated.Value(hiddenOffset)).current;
+  const scrimOpacity = useRef(new Animated.Value(0)).current;
   const dragStart = useRef(collapsedOffset);
   const closing = useRef(false);
   const openingFrame = useRef<number | null>(null);
@@ -1181,27 +1182,45 @@ export function PlaceSelector({
     closing.current = true;
     Keyboard.dismiss();
     if (reduceMotion.current) {
+      scrimOpacity.setValue(0);
       afterClose();
       return;
     }
+    Animated.timing(scrimOpacity, {
+      duration: 160,
+      easing: Easing.out(Easing.quad),
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
     Animated.timing(sheetTranslateY, {
       duration: 220,
       easing: Easing.out(Easing.cubic),
       toValue: hiddenOffset,
       useNativeDriver: true,
     }).start(() => afterClose());
-  }, [hiddenOffset, onClose, sheetTranslateY]);
+  }, [hiddenOffset, onClose, scrimOpacity, sheetTranslateY]);
 
   const handleShow = useCallback(() => {
     closing.current = false;
     setExpanded(false);
     sheetTranslateY.setValue(hiddenOffset);
+    scrimOpacity.setValue(0);
     if (openingFrame.current != null) cancelAnimationFrame(openingFrame.current);
     openingFrame.current = requestAnimationFrame(() => {
       openingFrame.current = null;
+      if (reduceMotion.current) {
+        scrimOpacity.setValue(1);
+      } else {
+        Animated.timing(scrimOpacity, {
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+      }
       animateTo(collapsedOffset);
     });
-  }, [animateTo, collapsedOffset, hiddenOffset, sheetTranslateY]);
+  }, [animateTo, collapsedOffset, hiddenOffset, scrimOpacity, sheetTranslateY]);
 
   useEffect(() => {
     let active = true;
@@ -1267,9 +1286,11 @@ export function PlaceSelector({
     }
   };
   return (
-    <Modal animationType="fade" onRequestClose={() => dismiss()} onShow={handleShow} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={() => dismiss()} onShow={handleShow} transparent visible={visible}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
-        <Pressable accessibilityLabel="Close place selector" onPress={() => dismiss()} style={styles.scrim} />
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: scrimOpacity }]}>
+          <Pressable accessibilityLabel="Close place selector" onPress={() => dismiss()} style={styles.scrim} />
+        </Animated.View>
         <Animated.View style={[styles.sheet, { height: expandedHeight, paddingBottom: Math.max(12, insets.bottom), transform: [{ translateY: sheetTranslateY }] }]}>
         <View accessibilityLabel={expanded ? 'Collapse place selector' : 'Expand place selector'} accessibilityRole="adjustable" style={styles.dragArea} {...panResponder.panHandlers}>
           <View style={styles.dragHandle} />
