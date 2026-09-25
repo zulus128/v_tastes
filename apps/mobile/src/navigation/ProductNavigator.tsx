@@ -312,7 +312,7 @@ function MainTabs({
           }}
         </Tabs.Screen>
       </Tabs.Navigator>
-      <PlaceSelector
+      {placeSelectorVisible ? <PlaceSelector
         onClose={() => setPlaceSelectorVisible(false)}
         onSelect={(venue) => {
           setPlaceSelectorVisible(false);
@@ -323,7 +323,7 @@ function MainTabs({
         }}
         userId={user.uid}
         visible={placeSelectorVisible}
-      />
+      /> : null}
       <ProfileSettingsSheet
         fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}
