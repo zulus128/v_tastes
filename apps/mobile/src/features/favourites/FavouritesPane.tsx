@@ -21,8 +21,9 @@ import FolderActiveIcon from '../../../assets/favourites/folder-active.svg';
 import FolderIcon from '../../../assets/favourites/folder.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import AddFolderCircle from '../../../assets/create-review/select-place-circle.svg';
+import AddFolderPlus from '../../../assets/create-review/select-place-plus.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -145,7 +146,10 @@ export function FavouritesPane({
         onPress={() => setEditor({ mode: 'create' })}
         style={({ pressed }) => [styles.createFolderButton, pressed && styles.pressed]}
       >
-        <Image source={addFolderIcon} style={styles.addFolderIcon} />
+        <View style={styles.addFolderIcon}>
+          <AddFolderCircle color="#FFFFFF" height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
+          <AddFolderPlus color="#FFFFFF" height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+        </View>
         <Text style={styles.createFolderButtonText}>Create Folder</Text>
       </Pressable>
 
@@ -301,7 +305,11 @@ export function SaveToFolderSheet({
             />
           ))}
           <Pressable onPress={() => setCreating(true)} style={styles.newFolderButton}>
-            <Image source={addFolderIcon} style={styles.addFolderIcon} /><Text style={styles.newFolderText}>Create Folder</Text>
+            <View style={styles.addFolderIcon}>
+              <AddFolderCircle color={colors.text} height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
+              <AddFolderPlus color={colors.text} height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+            </View>
+            <Text style={styles.newFolderText}>Create Folder</Text>
           </Pressable>
         </ScrollView>
         <View style={styles.addFooter}>
@@ -661,7 +669,8 @@ function createStyles(colors: ThemeColors) {
     checkmark: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
     radio: { color: colors.textMuted, fontSize: 22 },
     newFolderButton: { height: 46, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 23, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
-    addFolderIcon: { width: 20, height: 20 },
+    addFolderIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+    addFolderIconPart: { position: 'absolute' },
     newFolderText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     doneButton: { height: 50, marginTop: 4, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
