@@ -18,10 +18,13 @@ export function resolvePlaceSheetSnap(
   collapsedOffset: number,
   expandedHeight: number,
 ): PlaceSheetSnap {
-  const dismissDistance = Math.min(96, expandedHeight * 0.12);
+  // A bottom sheet that is already at its collapsed stop should dismiss after a
+  // deliberate, fairly short pull on the handle. The previous 96px threshold
+  // made ordinary one-handed drags feel as if the handle had snapped back.
+  const dismissDistance = Math.min(56, Math.max(32, expandedHeight * 0.07));
   if (
     position > collapsedOffset + dismissDistance ||
-    (velocityY > 1.1 && position > collapsedOffset * 0.75)
+    (velocityY > 0.65 && position > collapsedOffset + 8)
   ) {
     return 'dismissed';
   }

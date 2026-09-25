@@ -22,6 +22,11 @@ describe('place sheet motion', () => {
 
   it('dismisses after crossing the threshold or flicking down', () => {
     expect(resolvePlaceSheetSnap(340, 0.2, 236, 830)).toBe('dismissed');
-    expect(resolvePlaceSheetSnap(200, 1.2, 236, 830)).toBe('dismissed');
+    expect(resolvePlaceSheetSnap(300, 0.2, 236, 830)).toBe('dismissed');
+    expect(resolvePlaceSheetSnap(250, 0.8, 236, 830)).toBe('dismissed');
+  });
+
+  it('does not dismiss for a small accidental handle movement', () => {
+    expect(resolvePlaceSheetSnap(252, 0.2, 236, 830)).toBe('collapsed');
   });
 });
