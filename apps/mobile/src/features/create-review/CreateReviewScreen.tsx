@@ -1106,9 +1106,11 @@ export function PlaceSelector({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { collapsedOffset, expandedHeight } = placeSheetHeights(windowHeight, insets.top);
-  const sheetTranslateY = useRef(new Animated.Value(collapsedOffset)).current;
+  const hiddenOffset = expandedHeight + Math.max(insets.bottom, 24);
+  const sheetTranslateY = useRef(new Animated.Value(hiddenOffset)).current;
   const dragStart = useRef(collapsedOffset);
   const closing = useRef(false);
+  const openingFrame = useRef<number | null>(null);
   const reduceMotion = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState('');
@@ -1185,10 +1187,21 @@ export function PlaceSelector({
     Animated.timing(sheetTranslateY, {
       duration: 220,
       easing: Easing.out(Easing.cubic),
-      toValue: expandedHeight + Math.max(insets.bottom, 24),
+      toValue: hiddenOffset,
       useNativeDriver: true,
     }).start(() => afterClose());
-  }, [expandedHeight, insets.bottom, onClose, sheetTranslateY]);
+  }, [hiddenOffset, onClose, sheetTranslateY]);
+
+  const handleShow = useCallback(() => {
+    closing.current = false;
+    setExpanded(false);
+    sheetTranslateY.setValue(hiddenOffset);
+    if (openingFrame.current != null) cancelAnimationFrame(openingFrame.current);
+    openingFrame.current = requestAnimationFrame(() => {
+      openingFrame.current = null;
+      animateTo(collapsedOffset);
+    });
+  }, [animateTo, collapsedOffset, hiddenOffset, sheetTranslateY]);
 
   useEffect(() => {
     let active = true;
@@ -1201,15 +1214,9 @@ export function PlaceSelector({
     return () => {
       active = false;
       subscription.remove();
+      if (openingFrame.current != null) cancelAnimationFrame(openingFrame.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!visible) return;
-    closing.current = false;
-    setExpanded(false);
-    sheetTranslateY.setValue(collapsedOffset);
-  }, [collapsedOffset, sheetTranslateY, visible]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
@@ -1260,7 +1267,7 @@ export function PlaceSelector({
     }
   };
   return (
-    <Modal animationType="fade" onRequestClose={() => dismiss()} transparent visible={visible}>
+    <Modal animationType="fade" onRequestClose={() => dismiss()} onShow={handleShow} transparent visible={visible}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalScreen}>
         <Pressable accessibilityLabel="Close place selector" onPress={() => dismiss()} style={styles.scrim} />
         <Animated.View style={[styles.sheet, { height: expandedHeight, paddingBottom: Math.max(12, insets.bottom), transform: [{ translateY: sheetTranslateY }] }]}>
