@@ -26,10 +26,13 @@ import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { UserAvatar } from '../profile/avatar';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 import { PlacePhotoPager } from './PlacePhotoPager';
 
 const sorts: Record<PlaceReviewSort, string> = { highest: 'Highest rated', lowest: 'Lowest rated', popular: 'Popular', recent: 'Recent', oldest: 'Oldest' };
@@ -259,11 +262,13 @@ function ErrorPage({ message, onBack, retry }: { message: string; onBack: () => 
 }
 function Hours({ close, hours, styles, visible }: { close: () => void; hours: Array<{ day: string; hours: string }>; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   const today = todayHours(hours)?.day;
-  return <Modal animationType="slide" transparent visible={visible} onRequestClose={close}><Pressable onPress={close} style={styles.backdrop}><Pressable style={styles.sheet}>
+  const sheet = useBottomSheetMotion({ onClose: close, visible });
+  return <Modal animationType="none" transparent visible={visible} onRequestClose={sheet.close}><Pressable onPress={sheet.close} style={styles.backdrop}><AnimatedPressable onPress={(event) => event.stopPropagation()} style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+    <View style={styles.sheetDragArea} {...sheet.panHandlers}><View style={styles.sheetHandle} /></View>
     <View style={styles.sheetHead}>
       <CalendarIcon color={styles.sheetIcon.color} height={responsiveSize(22)} width={responsiveSize(22)} />
       <Text style={styles.sheetTitle}>Opening hours</Text>
-      <CloseButton onPress={close} styles={styles} />
+      <CloseButton onPress={sheet.close} styles={styles} />
     </View>
     <ScrollView contentContainerStyle={styles.hoursContent} showsVerticalScrollIndicator={false}>
       {hours.map((item, index) => <View key={item.day} style={[styles.hours, index > 0 && styles.hoursDivided, item.day === today && styles.hoursToday]}>
@@ -271,7 +276,7 @@ function Hours({ close, hours, styles, visible }: { close: () => void; hours: Ar
         <Text style={[styles.hour, item.day === today && styles.today]}>{item.hours}</Text>
       </View>)}
     </ScrollView>
-  </Pressable></Pressable></Modal>;
+  </AnimatedPressable></Pressable></Modal>;
 }
 function Gallery({ close, photos, styles, visible }: { close: () => void; photos: string[]; styles: ReturnType<typeof createStyles>; visible: boolean }) {
   return <Modal animationType="slide" visible={visible} onRequestClose={close}><View style={styles.gallery}><View style={styles.galleryHead}><Pressable accessibilityLabel="Close gallery" onPress={close}><Text style={styles.galleryBack}>‹</Text></Pressable><Text style={styles.galleryTitle}>Photos</Text><View style={styles.spacer} /></View><ScrollView contentContainerStyle={styles.grid}>{[...photos, ...photos, ...photos].map((key, index) => <GalleryImage key={key + String(index)} index={index} styles={styles} url={key} />)}</ScrollView></View></Modal>;
@@ -306,7 +311,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   reviewButton: { position: 'absolute', right: 16, left: 16, bottom: 18, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, reviewButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' }, toast: { position: 'absolute', alignSelf: 'center', bottom: 76, borderRadius: 18, backgroundColor: '#303030', paddingHorizontal: 16, paddingVertical: 10 }, toastText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   loadingHero: { height: 250, backgroundColor: colors.surfaceRaised }, skeleton: { height: 17, marginTop: 16, borderRadius: 8, backgroundColor: colors.surfaceRaised }, short: { width: '48%', marginTop: 9 }, skeletonTabs: { height: 35, marginTop: 20, borderRadius: 12, backgroundColor: colors.surfaceRaised }, skeletonRow: { height: 48, marginTop: 13, borderRadius: 12, backgroundColor: colors.surfaceRaised },
   errorPage: { alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }, errorTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, errorCopy: { color: colors.textMuted, textAlign: 'center' }, errorButton: { borderRadius: 18, backgroundColor: colors.primary, paddingHorizontal: 18, paddingVertical: 10 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { width: '100%', maxHeight: '82%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, hoursContent: { flexGrow: 1 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }, dialogBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }, sheet: { width: '100%', maxHeight: '82%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 35, backgroundColor: colors.surface }, sheetDragArea: { height: 24, marginTop: -12, alignItems: 'center', justifyContent: 'center' }, sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border }, sheetHead: { minHeight: 34, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, hoursContent: { flexGrow: 1 }, sheetIcon: { color: colors.text }, sheetTitle: { flex: 1, color: colors.text, fontSize: 19, fontWeight: '700' }, closeButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }, closeIcon: { color: colors.text }, closeX: { position: 'absolute' },
   hours: { minHeight: 52, marginHorizontal: -16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderColor: colors.border }, hoursDivided: { borderTopWidth: StyleSheet.hairlineWidth }, hoursToday: { borderTopWidth: 0, backgroundColor: colors.surfaceRaised }, day: { flex: 1, color: colors.textSecondary, fontSize: 15 }, hour: { color: colors.textSecondary, fontSize: 15 }, today: { color: colors.text, fontWeight: '700' },
   sortSheet: { margin: 18, borderRadius: 24, padding: 16, paddingTop: 20, backgroundColor: colors.surface }, sortTitle: { paddingBottom: 12, color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' }, sortRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, sortOption: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' }, radio: { width: 22, height: 22, borderWidth: 1.5, borderRadius: 11, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, radioSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, cancel: { height: 48, marginTop: 12, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised }, cancelText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   gallery: { flex: 1, paddingTop: 52, backgroundColor: colors.canvas }, galleryHead: { height: 42, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, galleryBack: { color: colors.text, fontSize: 34, lineHeight: 34 }, galleryTitle: { flex: 1, color: colors.text, fontWeight: '700', textAlign: 'center' }, spacer: { width: 24 }, grid: { padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }, gridImage: { width: '32.4%', aspectRatio: 1, borderRadius: 5, overflow: 'hidden', backgroundColor: colors.surfaceRaised }, galleryPhoto: { width: '100%', height: '100%', resizeMode: 'cover' }, hiddenPhoto: { opacity: 0 }, galleryLoading: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }, galleryError: { position: 'absolute', inset: 0, zIndex: 2, alignItems: 'center', justifyContent: 'center', gap: 3 }, galleryErrorIcon: { color: colors.primary, fontSize: 24, fontWeight: '700' }, galleryErrorText: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },

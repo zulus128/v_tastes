@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -32,6 +33,7 @@ import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
@@ -150,6 +152,7 @@ export function ProfileScreen({
   const [venueImages, setVenueImages] = useState<Record<string, string>>({});
   const [profileReactions, setProfileReactions] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
+  const editSheet = useBottomSheetMotion({ onClose: () => setEditingReview(false), visible: editingReview });
 
   async function reactToProfileReview(reviewId: string, idempotencyPrefix: string) {
     try {
@@ -559,14 +562,15 @@ export function ProfileScreen({
           </Pressable>
         </Pressable>
       </Modal>
-      <Modal animationType="fade" onRequestClose={() => setEditingReview(false)} transparent visible={editingReview}>
+      <Modal animationType="none" onRequestClose={editSheet.close} transparent visible={editingReview}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.actionBackdrop}>
-          <Pressable onPress={() => setEditingReview(false)} style={StyleSheet.absoluteFill} />
-          <Pressable onPress={(event) => event.stopPropagation()} style={styles.editSheet}>
+          <Pressable onPress={editSheet.close} style={StyleSheet.absoluteFill} />
+          <Animated.View style={[styles.editSheet, { transform: [{ translateY: editSheet.translateY }] }]}>
+            <View style={styles.editSheetDragArea} {...editSheet.panHandlers}><View style={styles.editSheetHandle} /></View>
             <Text style={styles.editTitle}>Edit review</Text>
             <TextInput autoFocus multiline onChangeText={setEditText} style={styles.editInput} value={editText} />
             <Pressable disabled={reviewActionPending} onPress={() => void saveReviewEdit()} style={styles.editSave}>{reviewActionPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.editSaveText}>Save</Text>}</Pressable>
-          </Pressable>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -607,6 +611,8 @@ const createStyles = (colors: ThemeColors) => {
   cancelAction: { backgroundColor: isDark ? '#242424' : 'rgba(0,0,0,0.10)' },
   actionPressed: { opacity: 0.72 },
   editSheet: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
+  editSheetDragArea: { height: 28, marginTop: -14, alignItems: 'center', justifyContent: 'center' },
+  editSheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   editTitle: { color: colors.text, fontSize: 20, fontWeight: '700' },
   editInput: { minHeight: 120, marginTop: 16, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 16, color: colors.text, backgroundColor: colors.canvas, textAlignVertical: 'top' },
   editSave: { height: 50, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 25, backgroundColor: colors.primary },

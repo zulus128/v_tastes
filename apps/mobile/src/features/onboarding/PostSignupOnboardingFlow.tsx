@@ -8,6 +8,7 @@ import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -74,6 +75,7 @@ import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import {
   DESIGN_VIEWPORT,
   responsiveStyleSheet,
@@ -250,6 +252,7 @@ export function PostSignupOnboardingFlow({
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagUk);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
+  const photoSheetMotion = useBottomSheetMotion({ onClose: () => setPhotoSheet(false), visible: photoSheet });
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState('');
@@ -540,16 +543,17 @@ export function PostSignupOnboardingFlow({
             <PrimaryButton label="Continue" loading={busy} onPress={saveProfile} />
           </View>
         </View>
-        <Modal animationType="slide" transparent visible={photoSheet} onRequestClose={() => setPhotoSheet(false)}>
-          <Pressable onPress={() => setPhotoSheet(false)} style={styles.modalBackdrop}>
-            <View style={styles.sheetWrap}>
+        <Modal animationType="none" transparent visible={photoSheet} onRequestClose={photoSheetMotion.close}>
+          <Pressable onPress={photoSheetMotion.close} style={styles.modalBackdrop}>
+            <Animated.View style={[styles.sheetWrap, { transform: [{ translateY: photoSheetMotion.translateY }] }]}>
+              <View style={styles.sheetDragArea} {...photoSheetMotion.panHandlers}><View style={styles.sheetHandle} /></View>
               <View style={styles.sheet}>
-                <Pressable onPress={() => choosePhoto(true)} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
-                <Pressable onPress={() => choosePhoto(false)} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
-                <Pressable onPress={() => { setPhotoUri(null); setPhotoSheet(false); }} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => void choosePhoto(true))} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => void choosePhoto(false))} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => setPhotoUri(null))} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
               </View>
-              <Pressable onPress={() => setPhotoSheet(false)} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
-            </View>
+                <Pressable onPress={photoSheetMotion.close} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
+            </Animated.View>
           </Pressable>
         </Modal>
       </PatternScreen>
@@ -791,6 +795,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   locationChevron: { width: 8, height: 16, marginLeft: 2 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', padding: 16, paddingBottom: Platform.OS === 'ios' ? 30 : 18 },
   sheetWrap: { gap: 9 },
+  sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheet: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   sheetAction: { height: 56, alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   sheetText: { color: colors.text, fontSize: 16 },

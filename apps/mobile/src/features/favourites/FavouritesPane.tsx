@@ -6,7 +6,6 @@ import {
   Alert,
   Animated,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   PanResponder,
@@ -30,6 +29,7 @@ import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { matchesPlaceFilters } from '../discover/placeFilters';
 import {
   useCreateFolder,
@@ -42,71 +42,6 @@ import {
 } from './api';
 
 type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
-
-const SHEET_DISMISS_DISTANCE = 90;
-const SHEET_DISMISS_VELOCITY = 1;
-
-function useDismissibleSheet(onClose: () => void, visible: boolean) {
-  const translateY = useMemo(() => new Animated.Value(600), []);
-
-  useEffect(() => {
-    translateY.stopAnimation();
-    if (!visible) {
-      translateY.setValue(600);
-      return undefined;
-    }
-
-    translateY.setValue(600);
-    const animation = Animated.spring(translateY, {
-      damping: 22,
-      mass: 0.9,
-      stiffness: 240,
-      toValue: 0,
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [translateY, visible]);
-
-  const springBack = useCallback(() => {
-    Animated.spring(translateY, {
-      damping: 18,
-      stiffness: 220,
-      toValue: 0,
-      useNativeDriver: true,
-    }).start();
-  }, [translateY]);
-
-  const close = useCallback(() => {
-    Keyboard.dismiss();
-    Animated.timing(translateY, {
-      duration: 180,
-      toValue: 600,
-      useNativeDriver: true,
-    }).start(() => {
-      onClose();
-    });
-  }, [onClose, translateY]);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => Keyboard.dismiss(),
-    onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
-    onPanResponderRelease: (_, gesture) => {
-      if (gesture.dy >= SHEET_DISMISS_DISTANCE || gesture.vy >= SHEET_DISMISS_VELOCITY) {
-        close();
-      } else {
-        springBack();
-      }
-    },
-    onPanResponderTerminate: springBack,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-  }), [close, springBack, translateY]);
-
-  return { close, panHandlers: panResponder.panHandlers, translateY };
-}
 
 export type SaveablePlace = {
   venueId: string;
@@ -298,7 +233,7 @@ export function SaveToFolderSheet({
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
   const closeCreateFolder = useCallback(() => setCreating(false), []);
-  const createFolderSheet = useDismissibleSheet(closeCreateFolder, creating);
+  const createFolderSheet = useBottomSheetMotion({ closedOffset: 600, onClose: closeCreateFolder, visible: creating });
 
   useEffect(() => {
     if (visible) {
@@ -572,7 +507,7 @@ function FolderNameSheet({
   const createFolder = useCreateFolder(userId);
   const renameFolder = useRenameFolder(userId);
   const [name, setName] = useState('');
-  const sheet = useDismissibleSheet(onClose, editor !== null);
+  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: editor !== null });
 
   useEffect(() => {
     setName(editor?.mode === 'rename' ? editor.folder.name : '');
@@ -644,7 +579,7 @@ function FolderActionSheet({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const sheet = useDismissibleSheet(onClose, folder !== null);
+  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: folder !== null });
   return (
     <Modal animationType="none" onRequestClose={sheet.close} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   Image,
   ImageBackground,
@@ -56,6 +57,7 @@ import starsBackground from '../../../assets/recap/story/stars-background.png';
 import TastesMouth from '../../../assets/recap/story/tastes-mouth.svg';
 import { TastesLogo } from '../../ui/FigmaIcons';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { DESIGN_VIEWPORT, responsiveMetrics, responsiveStyleSheet, responsiveValue } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -749,18 +751,19 @@ function CloseConfirmation({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const sheet = useBottomSheetMotion({ onClose: onKeepWatching, visible });
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onKeepWatching}>
+    <Modal animationType="none" transparent visible={visible} onRequestClose={sheet.close}>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}><View style={styles.handle} /></View>
           <Text style={styles.sheetTitle}>Leave recap?</Text>
           <Text style={styles.sheetCopy}>You can watch your {month ?? 'monthly'} recap again anytime from your profile.</Text>
-          <Pressable onPress={onKeepWatching} style={({ pressed }) => [styles.keepButton, pressed && styles.pressed]}>
+          <Pressable onPress={sheet.close} style={({ pressed }) => [styles.keepButton, pressed && styles.pressed]}>
             <Text style={styles.keepLabel}>Keep watching</Text>
           </Pressable>
-          <Pressable hitSlop={10} onPress={onLeave}><Text style={styles.leaveLabel}>Leave</Text></Pressable>
-        </View>
+          <Pressable hitSlop={10} onPress={() => sheet.closeThen(onLeave)}><Text style={styles.leaveLabel}>Leave</Text></Pressable>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -937,6 +940,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   pressed: { opacity: 0.78 },
   scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 18, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { height: 236, borderRadius: 22, backgroundColor: isDark ? '#242424' : '#FFFFFF', alignItems: 'center', paddingHorizontal: 16 },
+  sheetDragArea: { position: 'absolute', top: 0, right: 0, left: 0, height: 28, alignItems: 'center', justifyContent: 'center' },
   handle: { marginTop: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: isDark ? '#555555' : '#D6D6D6' },
   sheetTitle: { marginTop: 14, color: text, fontSize: 18, fontWeight: '600' },
   sheetCopy: { marginTop: 8, maxWidth: 310, color: secondaryText, fontSize: 14, lineHeight: 19, textAlign: 'center' },

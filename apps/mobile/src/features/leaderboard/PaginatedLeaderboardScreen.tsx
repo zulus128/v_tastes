@@ -2,6 +2,7 @@ import type { LeaderboardEntry } from '@tastes/contracts';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Image,
   ImageBackground,
@@ -27,6 +28,7 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { UserAvatar } from '../profile/avatar';
 import { useLeaderboard } from './api';
 
@@ -201,14 +203,15 @@ function HowXpSheet({
     { icon: reviewIcon, label: 'Get a like on your review', xp: '+5 XP' },
     { icon: inviteIcon, label: 'Invite a friend', xp: '+100 XP' },
   ];
+  const sheet = useBottomSheetMotion({ onClose, visible });
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+    <Modal animationType="none" transparent visible={visible} onRequestClose={sheet.close}>
       <View style={[styles.scrim, { paddingBottom: responsiveSize(16) + safeBottom }]}>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}><View style={styles.sheetHandle} /></View>
           <Text style={styles.sheetTitle}>How to earn XP</Text>
-          <Pressable accessibilityLabel="Close" onPress={onClose} style={styles.sheetClose}>
+          <Pressable accessibilityLabel="Close" onPress={sheet.close} style={styles.sheetClose}>
             <Text style={styles.sheetCloseText}>×</Text>
           </Pressable>
           <View style={styles.xpActions}>
@@ -220,10 +223,10 @@ function HowXpSheet({
               </View>
             ))}
           </View>
-          <Pressable onPress={onClose} style={({ pressed }) => [styles.gotIt, pressed && styles.pressed]}>
+          <Pressable onPress={sheet.close} style={({ pressed }) => [styles.gotIt, pressed && styles.pressed]}>
             <Text style={styles.gotItText}>Got it</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -511,6 +514,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   pageLoader: { position: 'absolute', right: 16, bottom: 92 },
   scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { height: 446, borderRadius: 22, backgroundColor: '#242426', paddingHorizontal: 24, paddingTop: 28 },
+  sheetDragArea: { position: 'absolute', top: 0, right: 0, left: 0, height: 28, alignItems: 'center', justifyContent: 'center' },
   sheetHandle: { position: 'absolute', top: 10, left: '50%', marginLeft: -17, width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   sheetTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   sheetClose: { position: 'absolute', top: 6, right: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

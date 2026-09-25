@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   Pressable,
@@ -28,6 +29,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { useDiscoverVenues } from '../discover/api';
 import { useFavourites } from '../favourites/api';
 
@@ -239,10 +241,12 @@ function PlaceSelector({ dark, onClose, onSelect, styles, userId, visible }: { d
     .filter((venue) => !priceFilter || venue.priceLevel === 2)
     .filter((venue) => !savedOnly || savedVenueIds.has(venue.id))
     .filter((venue) => !trendingFilter || venue.discoverTags?.includes('trending'));
+  const sheet = useBottomSheetMotion({ onClose, visible });
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.modalBackdrop}><View style={styles.sheet}>
-        <SheetHeader onClose={onClose} styles={styles} title="Select Place" />
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
+      <View style={styles.modalBackdrop}><Animated.View style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+        <View style={styles.sheetDragArea} {...sheet.panHandlers}><View style={styles.sheetHandle} /></View>
+        <SheetHeader onClose={sheet.close} styles={styles} title="Select Place" />
         <View style={styles.sheetSearchRow}>
           <View style={styles.sheetSearch}>
             <Text style={styles.searchGlyph}>⌕</Text>
@@ -277,9 +281,9 @@ function PlaceSelector({ dark, onClose, onSelect, styles, userId, visible }: { d
           keyExtractor={(item) => item.id}
           ListEmptyComponent={venues.isLoading ? <ActivityIndicator style={styles.loader} /> : <Text style={styles.emptyText}>No places found</Text>}
           onEndReached={() => { if (venues.hasNextPage && !venues.isFetchingNextPage) void venues.fetchNextPage(); }}
-          renderItem={({ item }) => <Pressable onPress={() => onSelect(item)} style={styles.placeRow}><Image source={venueImage(item.imageUrl)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text numberOfLines={1} style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
+          renderItem={({ item }) => <Pressable onPress={() => sheet.closeThen(() => onSelect(item))} style={styles.placeRow}><Image source={venueImage(item.imageUrl)} style={styles.placeImage} /><View style={styles.placeCopy}><Text numberOfLines={1} style={styles.placeName}>{item.name}</Text><Text numberOfLines={1} style={styles.placeAddress}>{item.address ?? item.city}</Text><View style={styles.placeMeta}><Text style={styles.rating}>★ {(item.rating ?? 0).toFixed(1)}</Text><Text numberOfLines={1} style={styles.reviews}>{item.reviewCount ?? 0} reviews</Text></View></View><Text style={styles.rowPlus}>⊕</Text></Pressable>}
         />
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }
@@ -290,14 +294,16 @@ function MemberSelector({ candidates, onClose, onConfirm, selectedIds, styles, v
   useEffect(() => { if (visible) setDraft(selectedIds); }, [selectedIds, visible]);
   const query = search.trim().toLowerCase();
   const filtered = candidates.filter((item) => !query || item.displayName.toLowerCase().includes(query) || item.username?.toLowerCase().includes(query));
+  const sheet = useBottomSheetMotion({ onClose, visible });
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <View style={styles.modalBackdrop}><View style={styles.sheet}>
-        <SheetHeader onClose={onClose} styles={styles} title="Select Members" />
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
+      <View style={styles.modalBackdrop}><Animated.View style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+        <View style={styles.sheetDragArea} {...sheet.panHandlers}><View style={styles.sheetHandle} /></View>
+        <SheetHeader onClose={sheet.close} styles={styles} title="Select Members" />
         <View style={styles.sheetSearch}><Text style={styles.searchGlyph}>⌕</Text><TextInput onChangeText={setSearch} placeholder="Search friends" placeholderTextColor={styles.searchPlaceholder.color} style={styles.sheetSearchInput} value={search} /></View>
         <FlatList data={filtered} keyExtractor={(item) => item.userId} ListEmptyComponent={<Text style={styles.emptyText}>Mutual followers will appear here.</Text>} renderItem={({ item }) => { const checked = draft.includes(item.userId); return <Pressable onPress={() => setDraft((current) => checked ? current.filter((id) => id !== item.userId) : [...current, item.userId])} style={styles.candidateRow}><Avatar member={item} styles={styles} /><View style={styles.memberCopy}><Text style={styles.memberName}>{item.displayName}</Text><Text style={styles.memberHandle}>{item.username ? `@${item.username}` : 'Mutual follower'}</Text></View><View style={[styles.radio, checked && styles.radioChecked]}><Text style={styles.check}>{checked ? '✓' : ''}</Text></View></Pressable>; }} />
-        <View style={styles.sheetFooter}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable disabled={draft.length === 0} onPress={() => onConfirm(draft)} style={[styles.confirmButton, draft.length === 0 && styles.disabled]}><Text style={styles.confirmText}>✓  Confirm</Text></Pressable></View>
-      </View></View>
+        <View style={styles.sheetFooter}><Pressable onPress={sheet.close} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable><Pressable disabled={draft.length === 0} onPress={() => sheet.closeThen(() => onConfirm(draft))} style={[styles.confirmButton, draft.length === 0 && styles.disabled]}><Text style={styles.confirmText}>✓  Confirm</Text></Pressable></View>
+      </Animated.View></View>
     </Modal>
   );
 }
@@ -333,6 +339,7 @@ function createStyles(colors: ThemeColors) {
     addMember: { width: 44, height: 44, marginLeft: 16, marginTop: 5, borderWidth: 1, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, addMemberText: { color: colors.text, fontSize: 28, fontWeight: '300' },
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 31, backgroundColor: colors.canvas }, createButton: { height: 54, borderWidth: 5, borderColor: colors.primaryBorder, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, createText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', letterSpacing: 0.3 }, disabled: { opacity: 0.45 },
     modalBackdrop: { flex: 1, paddingTop: 86, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' }, sheet: { height: '91%', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: colors.canvas }, sheetHeader: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' }, closeCircle: { width: 30, height: 30, borderWidth: 2, borderColor: colors.text, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
+    sheetDragArea: { height: 28, alignItems: 'center', justifyContent: 'center' }, sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
     placeList: { flex: 1 },
     sheetSearchRow: { marginHorizontal: 16, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 12 },
     sheetSearch: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 22, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },

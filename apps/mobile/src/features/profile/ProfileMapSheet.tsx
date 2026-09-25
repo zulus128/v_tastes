@@ -1,6 +1,6 @@
 import type { FeedItem, Venue } from '@tastes/contracts';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, PanResponder, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { useMemo } from 'react';
+import { Animated, Image, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import MapView, { Marker, UrlTile, type Region } from 'react-native-maps';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
@@ -11,6 +11,7 @@ import CloseXIcon from '../../../assets/recap/story/close-x.svg';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 
 const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
@@ -47,70 +48,21 @@ export function ProfileMapSheet({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { height } = useWindowDimensions();
   const sheetHeight = Math.min(724, height * 0.86);
-  const translateY = useRef(new Animated.Value(sheetHeight)).current;
-
-  const close = useCallback(() => {
-    translateY.stopAnimation();
-    Animated.timing(translateY, { toValue: sheetHeight, duration: 180, useNativeDriver: true }).start(onClose);
-  }, [onClose, sheetHeight, translateY]);
-
-  const springBack = useCallback(() => {
-    Animated.spring(translateY, {
-      toValue: 0,
-      damping: 18,
-      stiffness: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [translateY]);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_event, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
-    onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dy >= 90 || gesture.vy >= 1) {
-        close();
-        return;
-      }
-      springBack();
-    },
-    onPanResponderTerminate: springBack,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-  }), [close, springBack, translateY]);
-
-  useEffect(() => {
-    translateY.stopAnimation();
-    if (!visible) {
-      translateY.setValue(sheetHeight);
-      return undefined;
-    }
-
-    translateY.setValue(sheetHeight);
-    const animation = Animated.spring(translateY, {
-      toValue: 0,
-      damping: 22,
-      stiffness: 240,
-      mass: 0.9,
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [sheetHeight, translateY, visible]);
+  const sheet = useBottomSheetMotion({ closedOffset: sheetHeight, onClose, visible });
 
   return (
-    <Modal animationType="none" onRequestClose={close} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
       <View style={styles.root}>
-        <Pressable accessibilityLabel="Close reviewed places map" onPress={close} style={styles.backdrop} />
-        <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}>
-          <View accessibilityLabel="Drag map sheet" style={styles.dragArea} {...panResponder.panHandlers}>
+        <Pressable accessibilityLabel="Close reviewed places map" onPress={sheet.close} style={styles.backdrop} />
+        <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY: sheet.translateY }] }]}>
+          <View accessibilityLabel="Drag map sheet" style={styles.dragArea} {...sheet.panHandlers}>
             <View style={styles.grabber} />
             <View style={styles.header}>
               <View>
                 <Text style={styles.title}>Places you reviewed</Text>
                 <Text style={styles.count}>{placeCount === 0 ? 'No places yet' : `${placeCount} ${placeCount === 1 ? 'place' : 'places'}`}</Text>
               </View>
-              <Pressable accessibilityLabel="Close" hitSlop={10} onPress={close} style={styles.close}>
+              <Pressable accessibilityLabel="Close" hitSlop={10} onPress={sheet.close} style={styles.close}>
                 <CloseCircleIcon />
                 <View pointerEvents="none" style={styles.closeCross}><CloseXIcon /></View>
               </Pressable>
