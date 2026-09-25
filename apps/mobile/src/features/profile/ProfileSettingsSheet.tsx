@@ -43,7 +43,6 @@ import { captureException } from '../../infrastructure/observability';
 import { SideSlideScreen, type SideSlideScreenHandle, useSideSlideTransition } from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
 import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
-import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
@@ -338,14 +337,21 @@ export function ProfileSettingsSheet({
             <View style={styles.rows}>
               {rows.map((row) => (
                 <Pressable
+                  accessibilityLabel={`Edit ${row.label}`}
+                  accessibilityRole="button"
                   key={row.label}
-                  onPress={row.onPress ?? (() => row.field && beginEdit(row.field))}
+                  onPress={() => {
+                    if (row.onPress) row.onPress();
+                    else if (row.field) beginEdit(row.field);
+                  }}
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}
                 >
-                  <Text style={styles.rowLabel}>{row.label}</Text>
-                  {row.value ? <Text numberOfLines={1} style={styles.rowValue}>{row.value}</Text> : null}
-                  {row.valueFlag ? <Image source={row.valueFlag} style={styles.cityFlag} /> : null}
-                  <Text style={styles.chevron}>›</Text>
+                  <View pointerEvents="none" style={styles.rowContent}>
+                    <Text style={styles.rowLabel}>{row.label}</Text>
+                    {row.value ? <Text numberOfLines={1} style={styles.rowValue}>{row.value}</Text> : null}
+                    {row.valueFlag ? <Image source={row.valueFlag} style={styles.cityFlag} /> : null}
+                    <Text style={styles.chevron}>›</Text>
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -455,31 +461,32 @@ export function ProfileSettingsSheet({
             </View>
           </ImageBackground>
         </Animated.View>
+        {editing !== null ? (
+          <View style={styles.editorOverlay}>
+            <Pressable onPress={() => setEditing(null)} style={styles.modalBackdrop}>
+              <Pressable onPress={(event) => event.stopPropagation()} style={styles.editor}>
+                <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
+                <TextInput
+                  autoCapitalize={editing === 'username' ? 'none' : 'sentences'}
+                  autoFocus
+                  maxLength={editing === 'bio' ? 80 : undefined}
+                  multiline={editing === 'bio'}
+                  onChangeText={setDraft}
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.input, editing === 'bio' && styles.bioInput]}
+                  textAlignVertical={editing === 'bio' ? 'top' : 'center'}
+                  value={draft}
+                />
+                {editing === 'bio' ? <Text style={styles.characterCount}>{draft.length}/80</Text> : null}
+                <Pressable disabled={saving} onPress={() => void saveField()} style={styles.saveButton}>
+                  {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Save</Text>}
+                </Pressable>
+              </Pressable>
+            </Pressable>
+          </View>
+        ) : null}
       </ImageBackground>
     </SideSlideScreen>
-
-      <Modal animationType="fade" onRequestClose={() => setEditing(null)} transparent visible={editing !== null}>
-        <Pressable onPress={() => setEditing(null)} style={styles.modalBackdrop}>
-          <Pressable onPress={(event) => event.stopPropagation()} style={styles.editor}>
-            <Text style={styles.editorTitle}>{editing ? `Edit ${labels[editing]}` : ''}</Text>
-            <TextInput
-              autoCapitalize={editing === 'username' ? 'none' : 'sentences'}
-              autoFocus
-              maxLength={editing === 'bio' ? 80 : undefined}
-              multiline={editing === 'bio'}
-              onChangeText={setDraft}
-              placeholderTextColor={colors.textMuted}
-              style={[styles.input, editing === 'bio' && styles.bioInput]}
-              textAlignVertical={editing === 'bio' ? 'top' : 'center'}
-              value={draft}
-            />
-            {editing === 'bio' ? <Text style={styles.characterCount}>{draft.length}/80</Text> : null}
-            <Pressable disabled={saving} onPress={() => void saveField()} style={styles.saveButton}>
-              {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Save</Text>}
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <SideSlideScreen onRequestClose={() => setPlaceOpen(false)} ref={placeSlide} visible={placeOpen}>
         <View style={styles.screen}>
@@ -531,7 +538,8 @@ function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: numbe
     logout: { color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
     deleteAccount: { color: colors.danger, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
     version: { marginBottom: s(8), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
-    row: { width: '100%', height: s(50), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
+    row: { width: '100%', height: s(50), borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
+    rowContent: { flex: 1, paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center' },
     rowLabel: { flex: 1, color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41 },
     rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
     cityFlag: { width: s(18), height: s(18), marginLeft: s(5) },
@@ -560,6 +568,7 @@ function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: numbe
     invite: { flex: 1, paddingHorizontal: s(20), flexDirection: 'row', gap: s(8), alignItems: 'center', justifyContent: 'center', borderRadius: s(31), backgroundColor: '#B82F29' },
     inviteText: { color: '#FFFFFF', fontSize: s(14), fontWeight: '500', letterSpacing: 0.6 },
     pressed: { opacity: 0.72 },
+    editorOverlay: { position: 'absolute', zIndex: 30, inset: 0 },
     modalBackdrop: { flex: 1, padding: 16, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.76)' },
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
     editorTitle: { color: colors.text, fontSize: 19, fontWeight: '700' },
