@@ -69,7 +69,6 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
       toValue: 600,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(0);
       onClose();
     });
   }, [onClose, translateY]);
