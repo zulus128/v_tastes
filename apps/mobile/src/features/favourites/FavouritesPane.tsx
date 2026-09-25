@@ -75,9 +75,8 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
   }, [onClose, translateY]);
 
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
-    ),
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => Keyboard.dismiss(),
     onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
     onPanResponderRelease: (_, gesture) => {
@@ -88,6 +87,8 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
       }
     },
     onPanResponderTerminate: springBack,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
   }), [dismiss, springBack, translateY]);
 
   return { dismiss, panHandlers: panResponder.panHandlers, translateY };
@@ -720,11 +721,11 @@ function createStyles(colors: ThemeColors) {
     createFolderSubmitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
     scrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.56)' },
     saveSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, gap: 16, borderRadius: 22, backgroundColor: colors.surfaceRaised },
+    nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 0, borderRadius: 22, backgroundColor: colors.surfaceRaised },
     actionSheet: { margin: 16, marginBottom: 24, padding: 16, paddingTop: 20, gap: 4, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    sheetDragArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
+    sheetDragArea: { height: 32, alignItems: 'center', justifyContent: 'center' },
     sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
-    sheetTitleRow: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sheetTitleRow: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
     sheetCancelText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
     selectionSwipe: { height: 76, overflow: 'hidden', backgroundColor: colors.canvas },
@@ -743,7 +744,7 @@ function createStyles(colors: ThemeColors) {
     newFolderText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     doneButton: { height: 50, marginTop: 4, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    nameInput: { height: 50, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 16 },
+    nameInput: { height: 50, marginBottom: 16, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 16 },
     actionHeading: { color: colors.textMuted, fontSize: 13, padding: 12 },
     actionButton: { height: 52, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
     actionText: { color: colors.text, fontSize: 16, fontWeight: '600' },
