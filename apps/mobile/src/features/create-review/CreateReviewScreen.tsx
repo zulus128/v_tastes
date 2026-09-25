@@ -1109,6 +1109,7 @@ export function PlaceSelector({
   const hiddenOffset = expandedHeight + Math.max(insets.bottom, 24);
   const sheetTranslateY = useRef(new Animated.Value(hiddenOffset)).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
+  const sheetPosition = useRef(hiddenOffset);
   const dragStart = useRef(collapsedOffset);
   const closing = useRef(false);
   const openingFrame = useRef<number | null>(null);
@@ -1162,6 +1163,7 @@ export function PlaceSelector({
 
   const animateTo = useCallback((toValue: number, onFinished?: () => void) => {
     if (reduceMotion.current) {
+      sheetPosition.current = toValue;
       sheetTranslateY.setValue(toValue);
       onFinished?.();
       return;
@@ -1203,6 +1205,7 @@ export function PlaceSelector({
   const handleShow = useCallback(() => {
     closing.current = false;
     setExpanded(false);
+    sheetPosition.current = hiddenOffset;
     sheetTranslateY.setValue(hiddenOffset);
     scrimOpacity.setValue(0);
     if (openingFrame.current != null) cancelAnimationFrame(openingFrame.current);
@@ -1221,6 +1224,13 @@ export function PlaceSelector({
       animateTo(collapsedOffset);
     });
   }, [animateTo, collapsedOffset, hiddenOffset, scrimOpacity, sheetTranslateY]);
+
+  useEffect(() => {
+    const listener = sheetTranslateY.addListener(({ value }) => {
+      sheetPosition.current = value;
+    });
+    return () => sheetTranslateY.removeListener(listener);
+  }, [sheetTranslateY]);
 
   useEffect(() => {
     let active = true;
@@ -1243,24 +1253,24 @@ export function PlaceSelector({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => {
-      sheetTranslateY.stopAnimation((value) => {
-        dragStart.current = value;
-      });
+      sheetTranslateY.stopAnimation();
+      dragStart.current = sheetPosition.current;
     },
     onPanResponderMove: (_event, gesture) => {
-      sheetTranslateY.setValue(Math.max(0, Math.min(expandedHeight, dragStart.current + gesture.dy)));
+      const position = Math.max(0, Math.min(expandedHeight, dragStart.current + gesture.dy));
+      sheetPosition.current = position;
+      sheetTranslateY.setValue(position);
     },
     onPanResponderRelease: (_event, gesture) => {
-      sheetTranslateY.stopAnimation((position) => {
-        const snap = resolvePlaceSheetSnap(position, gesture.vy, collapsedOffset, expandedHeight);
-        if (snap === 'dismissed') {
-          dismiss();
-          return;
-        }
-        const nextExpanded = snap === 'expanded';
-        setExpanded(nextExpanded);
-        animateTo(nextExpanded ? 0 : collapsedOffset);
-      });
+      sheetTranslateY.stopAnimation();
+      const snap = resolvePlaceSheetSnap(sheetPosition.current, gesture.vy, collapsedOffset, expandedHeight);
+      if (snap === 'dismissed') {
+        dismiss();
+        return;
+      }
+      const nextExpanded = snap === 'expanded';
+      setExpanded(nextExpanded);
+      animateTo(nextExpanded ? 0 : collapsedOffset);
     },
     onPanResponderTerminate: () => animateTo(expanded ? 0 : collapsedOffset),
     onPanResponderTerminationRequest: () => false,
