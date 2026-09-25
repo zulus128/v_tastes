@@ -372,7 +372,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
     { left: heroWidth * 0.81, top: pinTop(319) },
   ];
   const slides = [
-    { image: hero, title: 'Discover the best places!', subtitle: 'Rate dishes and restaurants to get personalized\nrecommendations' },
+    { image: hero, title: 'Discover the best places!', subtitle: 'Rate dishes and restaurants to get personalized recommendations' },
     { image: heroRate, title: 'Rate what you eat', subtitle: 'Score dishes and places in seconds — your taste profile builds itself.' },
     { image: heroFollow, title: 'Follow people you trust', subtitle: 'See where your friends actually go, and skip the tourist traps.' },
   ];
@@ -393,7 +393,7 @@ function ConsentScreen({ busy, onApple, onGoogle, onPhone }: { busy: boolean; on
                 <TastesLogo width={responsiveValue(compact ? 80 : 98, layoutScale)} />
                 <View style={styles.consentCopy}>
                   <Text style={styles.consentTitle}>{slide.title}</Text>
-                  <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={2} style={styles.consentSubtitle}>{slide.subtitle}</Text>
+                  <Text numberOfLines={2} style={styles.consentSubtitle}>{slide.subtitle}</Text>
                   <View style={styles.pager}>{slides.map((_, dot) => <View key={dot} style={dot === index ? styles.pagerActive : styles.pagerDot} />)}</View>
                 </View>
                 <PrimaryButton label="Continue with Phone" onPress={onPhone} style={styles.fullWidth} />
