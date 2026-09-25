@@ -47,13 +47,25 @@ const SHEET_DISMISS_DISTANCE = 90;
 const SHEET_DISMISS_VELOCITY = 1;
 
 function useDismissibleSheet(onClose: () => void, visible: boolean) {
-  const translateY = useMemo(() => new Animated.Value(0), []);
+  const translateY = useMemo(() => new Animated.Value(600), []);
 
   useEffect(() => {
-    // Reset only after the modal has been removed from view. Resetting in the
-    // close animation callback causes a one-frame flash; resetting on the next
-    // open is too late for a native-driven animated value.
-    if (!visible) translateY.setValue(0);
+    translateY.stopAnimation();
+    if (!visible) {
+      translateY.setValue(600);
+      return undefined;
+    }
+
+    translateY.setValue(600);
+    const animation = Animated.spring(translateY, {
+      damping: 22,
+      mass: 0.9,
+      stiffness: 240,
+      toValue: 0,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
   }, [translateY, visible]);
 
   const springBack = useCallback(() => {
