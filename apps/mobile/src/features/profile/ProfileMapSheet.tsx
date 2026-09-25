@@ -1,5 +1,5 @@
 import type { FeedItem, Venue } from '@tastes/contracts';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, Image, PanResponder, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import MapView, { Marker, UrlTile, type Region } from 'react-native-maps';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
@@ -49,31 +49,57 @@ export function ProfileMapSheet({
   const sheetHeight = Math.min(724, height * 0.86);
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
 
-  const close = () => {
+  const close = useCallback(() => {
+    translateY.stopAnimation();
     Animated.timing(translateY, { toValue: sheetHeight, duration: 180, useNativeDriver: true }).start(onClose);
-  };
+  }, [onClose, sheetHeight, translateY]);
+
+  const springBack = useCallback(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      damping: 18,
+      stiffness: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [translateY]);
 
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 5,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (_event, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
     onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dy > sheetHeight * 0.22 || gesture.vy > 0.9) {
+      if (gesture.dy >= 90 || gesture.vy >= 1) {
         close();
         return;
       }
-      Animated.spring(translateY, { toValue: 0, damping: 22, stiffness: 220, mass: 0.8, useNativeDriver: true }).start();
+      springBack();
     },
-    onPanResponderTerminate: () => Animated.spring(translateY, { toValue: 0, damping: 22, stiffness: 220, mass: 0.8, useNativeDriver: true }).start(),
-  }), [sheetHeight, translateY]);
+    onPanResponderTerminate: springBack,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+  }), [close, springBack, translateY]);
 
   useEffect(() => {
-    if (!visible) return;
+    translateY.stopAnimation();
+    if (!visible) {
+      translateY.setValue(sheetHeight);
+      return undefined;
+    }
+
     translateY.setValue(sheetHeight);
-    Animated.spring(translateY, { toValue: 0, damping: 22, stiffness: 220, mass: 0.8, useNativeDriver: true }).start();
+    const animation = Animated.spring(translateY, {
+      toValue: 0,
+      damping: 22,
+      stiffness: 240,
+      mass: 0.9,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
   }, [sheetHeight, translateY, visible]);
 
   return (
-    <Modal animationType="fade" onRequestClose={close} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={close} transparent visible={visible}>
       <View style={styles.root}>
         <Pressable accessibilityLabel="Close reviewed places map" onPress={close} style={styles.backdrop} />
         <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}>
