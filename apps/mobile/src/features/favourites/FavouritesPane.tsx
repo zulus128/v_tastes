@@ -50,7 +50,10 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
   const translateY = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
-    if (visible) translateY.setValue(0);
+    // Reset only after the modal has been removed from view. Resetting in the
+    // close animation callback causes a one-frame flash; resetting on the next
+    // open is too late for a native-driven animated value.
+    if (!visible) translateY.setValue(0);
   }, [translateY, visible]);
 
   const springBack = useCallback(() => {
