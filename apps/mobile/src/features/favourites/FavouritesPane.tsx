@@ -65,7 +65,12 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
     }).start();
   }, [translateY]);
 
-  const dismiss = useCallback(() => {
+  const close = useCallback(() => {
+    Keyboard.dismiss();
+    onClose();
+  }, [onClose]);
+
+  const dismissWithDragAnimation = useCallback(() => {
     Keyboard.dismiss();
     Animated.timing(translateY, {
       duration: 180,
@@ -83,7 +88,7 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
     onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
     onPanResponderRelease: (_, gesture) => {
       if (gesture.dy >= SHEET_DISMISS_DISTANCE || gesture.vy >= SHEET_DISMISS_VELOCITY) {
-        dismiss();
+        dismissWithDragAnimation();
       } else {
         springBack();
       }
@@ -91,9 +96,9 @@ function useDismissibleSheet(onClose: () => void, visible: boolean) {
     onPanResponderTerminate: springBack,
     onPanResponderTerminationRequest: () => false,
     onShouldBlockNativeResponder: () => true,
-  }), [dismiss, springBack, translateY]);
+  }), [dismissWithDragAnimation, springBack, translateY]);
 
-  return { dismiss, panHandlers: panResponder.panHandlers, translateY };
+  return { close, panHandlers: panResponder.panHandlers, translateY };
 }
 
 export type SaveablePlace = {
@@ -380,16 +385,16 @@ export function SaveToFolderSheet({
               : <Text style={styles.confirmText}>✓  Confirm</Text>}
           </Pressable>
         </View>
-        <Modal animationType="fade" onRequestClose={createFolderSheet.dismiss} transparent visible={creating}>
+        <Modal animationType="fade" onRequestClose={createFolderSheet.close} transparent visible={creating}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
-            <Pressable onPress={createFolderSheet.dismiss} style={styles.createFolderScrim} />
+            <Pressable onPress={createFolderSheet.close} style={styles.createFolderScrim} />
             <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
               <View style={styles.sheetDragArea} {...createFolderSheet.panHandlers}>
                 <View style={styles.sheetHandle} />
               </View>
               <View style={styles.createFolderTitleRow}>
                 <Text style={styles.createFolderTitle}>Create Folder</Text>
-                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={createFolderSheet.dismiss}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
+                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={createFolderSheet.close}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
               </View>
               <View style={styles.createFolderField}>
                 <Text style={styles.createFolderLabel}>TITLE</Text>
@@ -582,16 +587,16 @@ function FolderNameSheet({
   }
 
   return (
-    <Modal animationType="fade" onRequestClose={sheet.dismiss} transparent visible={editor !== null}>
+    <Modal animationType="fade" onRequestClose={sheet.close} transparent visible={editor !== null}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
-        <Pressable onPress={sheet.dismiss} style={styles.scrim} />
+        <Pressable onPress={sheet.close} style={styles.scrim} />
         <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />
           </View>
           <View style={styles.sheetTitleRow}>
             <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
-            <Pressable accessibilityLabel="Cancel folder editing" hitSlop={10} onPress={sheet.dismiss}>
+            <Pressable accessibilityLabel="Cancel folder editing" hitSlop={10} onPress={sheet.close}>
               <Text style={styles.sheetCancelText}>Cancel</Text>
             </Pressable>
           </View>
@@ -634,9 +639,9 @@ function FolderActionSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const sheet = useDismissibleSheet(onClose, folder !== null);
   return (
-    <Modal animationType="fade" onRequestClose={sheet.dismiss} transparent visible={folder !== null}>
+    <Modal animationType="fade" onRequestClose={sheet.close} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>
-        <Pressable onPress={sheet.dismiss} style={styles.scrim} />
+        <Pressable onPress={sheet.close} style={styles.scrim} />
         <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />
