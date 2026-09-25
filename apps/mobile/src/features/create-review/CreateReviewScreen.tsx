@@ -135,6 +135,7 @@ export function CreateReviewScreen({
   const [venueId, setVenueId] = useState(initialVenueId ?? '');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [rating, setRating] = useState(0);
+  const [ratingGestureActive, setRatingGestureActive] = useState(false);
   const [text, setText] = useState('');
   const feedbackMinHeight = responsiveSize(50);
   const feedbackMaxHeight = responsiveSize(140);
@@ -305,6 +306,7 @@ export function CreateReviewScreen({
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           ref={scrollRef}
+          scrollEnabled={!ratingGestureActive}
           showsVerticalScrollIndicator={false}
           // A bottom padding on the content alone only helps once you've actually scrolled to
           // the end — it doesn't stop the floating "Post Review" button from sitting on top of
@@ -357,6 +359,7 @@ export function CreateReviewScreen({
                   heroWidth={heroSize.width}
                   minimumStraightBottom={venueCardBottom + responsiveSize(12)}
                   onChange={setRating}
+                  onGestureActiveChange={setRatingGestureActive}
                   value={rating}
                 />
               </>
@@ -472,7 +475,7 @@ export function CreateReviewScreen({
           </Pressable>
         </LinearGradient> : null}
 
-        <PlaceSelector
+        {placeSelectorOpen ? <PlaceSelector
           onClose={() => setPlaceSelectorOpen(false)}
           onSelect={(next) => {
             setVenueId(next.id);
@@ -481,7 +484,7 @@ export function CreateReviewScreen({
           }}
           userId={userId}
           visible={placeSelectorOpen}
-        />
+        /> : null}
         <DishEditor
           onClose={() => setDishEditor(null)}
           onSave={(dish) => {
@@ -635,6 +638,7 @@ function RatingCurve({
   linear = false,
   minimumStraightBottom = 0,
   onChange,
+  onGestureActiveChange,
   value,
 }: {
   heroHeight?: number;
@@ -642,6 +646,7 @@ function RatingCurve({
   linear?: boolean;
   minimumStraightBottom?: number;
   onChange: (value: number) => void;
+  onGestureActiveChange?: (active: boolean) => void;
   value: number;
 }) {
   const { isDark } = useAppTheme();
@@ -676,8 +681,8 @@ function RatingCurve({
   const dragStartPoint = useRef({ x: 0, y: 0 });
   const currentDragRating = useRef(value);
   const settleRating = useRef(new Animated.Value(value)).current;
-  const interaction = useRef({ arcGeometry, onChange, scaleWidth, value });
-  interaction.current = { arcGeometry, onChange, scaleWidth, value };
+  const interaction = useRef({ arcGeometry, onChange, onGestureActiveChange, scaleWidth, value });
+  interaction.current = { arcGeometry, onChange, onGestureActiveChange, scaleWidth, value };
   const geometrySignature = [
     heroHeight,
     heroWidth,
@@ -729,6 +734,7 @@ function RatingCurve({
       // A resize can interrupt delivery of the native release event. Explicitly
       // end the gesture so the old responder cannot keep the ScrollView locked.
       dragging.current = false;
+      interaction.current.onGestureActiveChange?.(false);
       settling.current = false;
       settleRating.stopAnimation();
       currentDragRating.current = value;
@@ -777,6 +783,7 @@ function RatingCurve({
     onMoveShouldSetPanResponderCapture: () => true,
     onPanResponderGrant: (event) => {
       dragging.current = true;
+      interaction.current.onGestureActiveChange?.(true);
       dragStartPoint.current = {
         x: event.nativeEvent.locationX,
         y: event.nativeEvent.locationY,
@@ -799,6 +806,7 @@ function RatingCurve({
       setVisualPosition(continuousRating);
     },
     onPanResponderRelease: (_event, gesture) => {
+      interaction.current.onGestureActiveChange?.(false);
       const coast = responsiveSize(18);
       const projectedRating = ratingForCurvePoint(
         dragStartPoint.current.x + gesture.dx + Math.max(-responsiveSize(30), Math.min(responsiveSize(30), gesture.vx * coast)),
@@ -808,6 +816,7 @@ function RatingCurve({
       settleToRating(snapRating(projectedRating));
     },
     onPanResponderTerminate: () => {
+      interaction.current.onGestureActiveChange?.(false);
       settleToRating(snapRating(currentDragRating.current));
     },
     onPanResponderTerminationRequest: () => false,
