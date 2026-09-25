@@ -385,7 +385,7 @@ export function SaveToFolderSheet({
               : <Text style={styles.confirmText}>✓  Confirm</Text>}
           </Pressable>
         </View>
-        <Modal animationType="fade" onRequestClose={createFolderSheet.close} transparent visible={creating}>
+        <Modal animationType="none" onRequestClose={createFolderSheet.close} transparent visible={creating}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
             <Pressable onPress={createFolderSheet.close} style={styles.createFolderScrim} />
             <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
@@ -587,7 +587,7 @@ function FolderNameSheet({
   }
 
   return (
-    <Modal animationType="fade" onRequestClose={sheet.close} transparent visible={editor !== null}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={editor !== null}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
         <Pressable onPress={sheet.close} style={styles.scrim} />
         <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
@@ -639,7 +639,7 @@ function FolderActionSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const sheet = useDismissibleSheet(onClose, folder !== null);
   return (
-    <Modal animationType="fade" onRequestClose={sheet.close} transparent visible={folder !== null}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>
         <Pressable onPress={sheet.close} style={styles.scrim} />
         <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
