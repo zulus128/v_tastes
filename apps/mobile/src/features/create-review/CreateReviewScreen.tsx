@@ -1111,6 +1111,8 @@ export function PlaceSelector({
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const sheetPosition = useRef(hiddenOffset);
   const dragStart = useRef(collapsedOffset);
+  const dragVelocityY = useRef(0);
+  const dragging = useRef(false);
   const closing = useRef(false);
   const openingFrame = useRef<number | null>(null);
   const reduceMotion = useRef(false);
@@ -1247,34 +1249,41 @@ export function PlaceSelector({
     };
   }, []);
 
+  const settleDrag = useCallback((velocityY = dragVelocityY.current) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    sheetTranslateY.stopAnimation();
+    const snap = resolvePlaceSheetSnap(sheetPosition.current, velocityY, collapsedOffset, expandedHeight);
+    if (snap === 'dismissed') {
+      dismiss();
+      return;
+    }
+    const nextExpanded = snap === 'expanded';
+    setExpanded(nextExpanded);
+    animateTo(nextExpanded ? 0 : collapsedOffset);
+  }, [animateTo, collapsedOffset, dismiss, expandedHeight, sheetTranslateY]);
+
   const panResponder = useMemo(() => PanResponder.create({
     // Claim the handle on pointer-down as well as touch-down. Waiting for a
     // move event is unreliable for iOS apps running in a macOS window.
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => {
+      dragging.current = true;
+      dragVelocityY.current = 0;
       sheetTranslateY.stopAnimation();
       dragStart.current = sheetPosition.current;
     },
     onPanResponderMove: (_event, gesture) => {
+      dragVelocityY.current = gesture.vy;
       const position = Math.max(0, Math.min(expandedHeight, dragStart.current + gesture.dy));
       sheetPosition.current = position;
       sheetTranslateY.setValue(position);
     },
-    onPanResponderRelease: (_event, gesture) => {
-      sheetTranslateY.stopAnimation();
-      const snap = resolvePlaceSheetSnap(sheetPosition.current, gesture.vy, collapsedOffset, expandedHeight);
-      if (snap === 'dismissed') {
-        dismiss();
-        return;
-      }
-      const nextExpanded = snap === 'expanded';
-      setExpanded(nextExpanded);
-      animateTo(nextExpanded ? 0 : collapsedOffset);
-    },
-    onPanResponderTerminate: () => animateTo(expanded ? 0 : collapsedOffset),
+    onPanResponderRelease: (_event, gesture) => settleDrag(gesture.vy),
+    onPanResponderTerminate: () => settleDrag(),
     onPanResponderTerminationRequest: () => false,
-  }), [animateTo, collapsedOffset, dismiss, expanded, expandedHeight, sheetTranslateY]);
+  }), [expandedHeight, settleDrag, sheetTranslateY]);
 
   const selectVenue = async (venue: Venue) => {
     if (!venue.id.startsWith('google:')) {
@@ -1306,7 +1315,16 @@ export function PlaceSelector({
           <Pressable accessibilityLabel="Close place selector" onPress={() => dismiss()} style={styles.scrim} />
         </Animated.View>
         <Animated.View style={[styles.sheet, { height: expandedHeight, paddingBottom: Math.max(12, insets.bottom), transform: [{ translateY: sheetTranslateY }] }]}>
-        <View accessibilityLabel={expanded ? 'Collapse place selector' : 'Expand place selector'} accessibilityRole="adjustable" style={styles.dragArea} {...panResponder.panHandlers}>
+        <View
+          accessibilityLabel={expanded ? 'Collapse place selector' : 'Expand place selector'}
+          accessibilityRole="adjustable"
+          onPointerCancel={() => settleDrag()}
+          onPointerUp={() => settleDrag()}
+          onTouchCancel={() => settleDrag()}
+          onTouchEnd={() => settleDrag()}
+          style={styles.dragArea}
+          {...panResponder.panHandlers}
+        >
           <View style={styles.dragHandle} />
         </View>
         <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Select Place</Text><Pressable accessibilityLabel="Close" hitSlop={12} onPress={() => dismiss()}><Text style={styles.close}>×</Text></Pressable></View>
