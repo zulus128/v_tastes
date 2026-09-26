@@ -756,8 +756,9 @@ export function PostSignupOnboardingFlow({
   if (screen === 'invite') {
     return <PatternScreen>
       <Header onBack={back} onSkip={() => navigate('notifications')} />
-      <ScrollView contentContainerStyle={styles.invitePage} showsVerticalScrollIndicator={false} style={styles.inviteScroll} testID="onboarding-invite-scroll"><Image source={invitePeople} style={styles.peopleIcon} /><Text style={styles.title}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
-        {invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
+      <StepProgress step={6} />
+      <ScrollView contentContainerStyle={styles.invitePage} showsVerticalScrollIndicator={false} style={styles.inviteScroll} testID="onboarding-invite-scroll"><Image source={invitePeople} style={styles.peopleIcon} /><Text style={[styles.title, styles.inviteTitle]}>Invite your friends</Text><Text style={[styles.subtitle, styles.permissionSubtitle]}>Add 3 friends and see their ratings and recommendations</Text>
+        {!visualAudit && invitedCount ? <><Text style={styles.progressText}>{Math.min(invitedCount, 3)} of 3 friends invited</Text><View style={styles.progressDots}>{[0, 1, 2].map((index) => <View key={index} style={[styles.progressDot, index < Math.min(invitedCount, 3) && styles.progressDotActive]} />)}</View></> : null}
         <View style={styles.inviteActions}><Pressable onPress={shareInvite} style={styles.actionRow}><Image source={inviteShare} style={styles.actionIcon} /><Text style={styles.actionText}>Share your invite link</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={() => textInvite()} style={styles.actionRow}><Image source={inviteMessage} style={styles.actionIcon} /><Text style={styles.actionText}>Invite friend via text</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable><Pressable onPress={requestContacts} style={styles.actionRow}><Image source={inviteContacts} style={styles.actionIcon} /><Text style={styles.actionText}>Invite from your contacts</Text><Image source={chevronRight} style={styles.actionChevron} /></Pressable></View>
       </ScrollView><PrimaryButton label="Continue" onPress={() => navigate('notifications')} style={styles.bottomButton} />
     </PatternScreen>;
@@ -948,17 +949,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   inviteButton: { borderRadius: 16, paddingVertical: 7, paddingHorizontal: 13, backgroundColor: colors.primary },
   invitedButton: { backgroundColor: colors.surfaceRaised },
   inviteText: { color: colors.onPrimary, fontSize: 11 },
-  inviteScroll: { position: 'absolute', top: landscape ? 80 : 131, left: 0, right: 0, bottom: Math.max(94, bottomGutter + 70) },
-  invitePage: { paddingHorizontal: 18, paddingBottom: 16, alignItems: 'center' },
+  inviteScroll: { position: 'absolute', top: landscape ? 80 : 130, left: 0, right: 0, bottom: Math.max(94, bottomGutter + 70) },
+  invitePage: { paddingHorizontal: 16, paddingBottom: 16, alignItems: 'center' },
   peopleIcon: { width: 118, height: 46, marginBottom: 22 },
+  inviteTitle: { fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   progressText: { color: '#e0453c', fontSize: 12, fontWeight: '600', marginTop: 12 },
   progressDots: { height: 8, flexDirection: 'row', gap: 6, marginTop: 7 },
   progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surfaceRaised },
   progressDotActive: { backgroundColor: colors.primary },
-  inviteActions: { width: '100%', gap: 9, marginTop: 30 },
-  actionRow: { height: 46, borderRadius: 23, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 17 },
+  inviteActions: { width: '100%', gap: 10, marginTop: 24 },
+  actionRow: { height: 50, borderRadius: 25, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
   actionIcon: { width: 18, height: 18, marginRight: 12, tintColor: colors.text },
-  actionText: { color: colors.text, fontSize: 13, flex: 1 },
+  actionText: { color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
   readyContent: { flexGrow: 1, paddingTop: 170, paddingBottom: 24, alignItems: 'center' },

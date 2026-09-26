@@ -116,6 +116,8 @@ describe('onboarding in resizable windows', () => {
     const invitations = screen.getByTestId('onboarding-invite-scroll');
     expect(StyleSheet.flatten(invitations.props.style).bottom).toBeGreaterThan(0);
     expect(invitations).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.queryByText('1 of 3 friends invited')).not.toBeOnTheScreen();
     expect(screen.getByText('Invite from your contacts')).toBeOnTheScreen();
   });
 
