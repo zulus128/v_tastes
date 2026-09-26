@@ -61,6 +61,7 @@ import placeWasabi from '../../../assets/onboarding/place-wasabi.png';
 import PlaceSearchIcon from '../../../assets/onboarding/place-search.svg';
 import ratingStar from '../../../assets/onboarding/rating-star.png';
 import readyCollage from '../../../assets/onboarding/ready-collage.png';
+import readyCollageLight from '../../../assets/onboarding/ready-collage-light.png';
 import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
 import { auth, storage } from '../../infrastructure/firebase';
@@ -1730,7 +1731,7 @@ export function PostSignupOnboardingFlow({
           testID="onboarding-ready-scroll"
         >
           <Image
-            source={readyCollage}
+            source={resolvedTheme === 'dark' ? readyCollage : readyCollageLight}
             resizeMode="contain"
             testID="onboarding-ready-collage"
             style={{
