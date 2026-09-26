@@ -354,6 +354,7 @@ function PeopleYouKnowTeaser({
           accessibilityElementsHidden
           key={person.name}
           style={styles.teaserPerson}
+          testID={`onboarding-people-teaser-row-${index}`}
         >
           <View style={styles.teaserAvatar} />
           <View style={styles.teaserCopy}>
@@ -366,7 +367,14 @@ function PeopleYouKnowTeaser({
               index === 0 && styles.teaserActionMuted,
             ]}
           >
-            <Text style={styles.teaserBlurredSmall}>{person.action}</Text>
+            <Text
+              style={[
+                styles.teaserActionText,
+                index === 0 && styles.teaserActionMutedText,
+              ]}
+            >
+              {person.action}
+            </Text>
           </View>
         </View>
       ))}
@@ -2485,47 +2493,73 @@ const createStyles = (
       fontWeight: '600',
     },
     peopleTeaserCount: {
-      marginTop: 5,
+      marginTop: 3,
       marginBottom: 10,
       color: colors.textSecondary,
       fontSize: 13,
+      lineHeight: 16,
     },
     teaserPerson: {
       height: 64,
       flexDirection: 'row',
       alignItems: 'center',
-      opacity: 0.38,
+      filter: [{ blur: 6 }],
     },
     teaserAvatar: {
       width: 44,
       height: 44,
       borderRadius: 22,
       backgroundColor: '#777777',
+      opacity: 0.58,
+      shadowColor: '#777777',
+      shadowRadius: 6,
+      shadowOpacity: 1,
     },
     teaserCopy: { flex: 1, marginLeft: 12 },
     teaserBlurred: {
-      color: colors.text,
-      fontSize: 14,
+      color: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)',
+      fontSize: 15,
+      lineHeight: 19,
       fontWeight: '600',
       textShadowColor: colors.text,
+      textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 6,
     },
     teaserBlurredSmall: {
-      color: colors.textSecondary,
-      fontSize: 12,
+      marginTop: 2,
+      color: isDark ? 'rgba(170,178,197,0.14)' : 'rgba(75,80,90,0.14)',
+      fontSize: 13,
+      lineHeight: 16,
       textShadowColor: colors.textSecondary,
+      textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 6,
     },
     teaserAction: {
       width: 100,
       height: 34,
-      paddingHorizontal: 14,
       borderRadius: 17,
       backgroundColor: '#FFFFFF',
+      opacity: 0.78,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: '#FFFFFF',
+      shadowRadius: 6,
+      shadowOpacity: 0.55,
     },
-    teaserActionMuted: { backgroundColor: colors.surfaceRaised },
+    teaserActionMuted: {
+      backgroundColor: '#2A2A2C',
+      shadowColor: '#2A2A2C',
+    },
+    teaserActionText: {
+      color: 'rgba(10,10,10,0.14)',
+      fontSize: 14,
+      lineHeight: 17,
+      fontWeight: '500',
+      textShadowColor: '#0A0A0A',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 6,
+    },
+    teaserActionMutedText: { textShadowColor: colors.text },
     notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
     notificationCard: {
       minHeight: 78,

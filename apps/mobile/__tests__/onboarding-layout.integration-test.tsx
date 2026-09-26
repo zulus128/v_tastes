@@ -448,6 +448,13 @@ describe('onboarding in resizable windows', () => {
     expect(
       screen.getByText('3 of your contacts are on Tastes'),
     ).toBeOnTheScreen();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-people-teaser-row-0', {
+          includeHiddenElements: true,
+        }).props.style,
+      ),
+    ).toMatchObject({ filter: [{ blur: 6 }] });
     await fireEvent.press(screen.getByText('Skip'));
 
     const invitations = screen.getByTestId('onboarding-invite-scroll');
