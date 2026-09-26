@@ -459,6 +459,7 @@ function PhoneScreen(props: {
   const { colors } = useAppTheme();
   const styles = useOnboardingStyles();
   const scrollLayout = useAuthScrollLayout(styles);
+  const [focused, setFocused] = useState(false);
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.fullScreen}>
       <PatternScreen>
@@ -476,15 +477,16 @@ function PhoneScreen(props: {
             <View onLayout={scrollLayout.onContentLayout} style={styles.authContent} testID="onboarding-phone-content">
               <Text style={styles.authTitle}>Your phone number</Text>
               <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.authSubtitle}>We use your number to personalize your experience</Text>
-              <View style={[styles.phoneRow, props.error ? styles.phoneRowError : null]}>
+              <View style={[styles.phoneRow, (focused || props.digits) ? styles.phoneRowFocused : null, props.error ? styles.phoneRowError : null]} testID="onboarding-phone-row">
                 <Pressable onPress={props.onCountry} style={styles.countrySelector}>
                   <Text style={styles.flag}>{props.country.flag}</Text><Text style={styles.callingCode}>{props.country.callingCode}</Text><Text style={styles.chevron}>⌄</Text>
                 </Pressable>
                 <View style={styles.phoneDivider} />
                 <TextInput
-                  autoFocus
                   keyboardType="phone-pad"
                   onChangeText={props.onChange}
+                  onBlur={() => setFocused(false)}
+                  onFocus={() => setFocused(true)}
                   placeholder="Phone number"
                   placeholderTextColor={colors.placeholder}
                   style={styles.phoneInput}
@@ -558,6 +560,7 @@ function OtpScreen(props: {
 }) {
   const styles = useOnboardingStyles();
   const scrollLayout = useAuthScrollLayout(styles);
+  const [focused, setFocused] = useState(false);
   const error = props.state === 'incorrect'
     ? 'Incorrect code. Try again.'
     : props.state === 'expired'
@@ -588,7 +591,24 @@ function OtpScreen(props: {
               <Text style={styles.authTitle}>Enter code</Text>
               <Text style={styles.authSubtitle}>A verification code has been sent to{`\n`}<Text style={styles.phoneSent}>{props.phone}</Text></Text>
               <View style={styles.otpRow}>
-                {[0, 1, 2, 3].map((index) => <View key={index} style={[styles.otpCell, error ? styles.otpCellError : null]}><Text style={styles.otpDigit}>{props.code[index] ?? ''}</Text></View>)}
+                {[0, 1, 2, 3].map((index) => {
+                  const digit = props.code[index] ?? '';
+                  const active = focused && !error && index === Math.min(props.code.length, 3);
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.otpCell,
+                        digit ? styles.otpCellFilled : styles.otpCellEmpty,
+                        active ? styles.otpCellActive : null,
+                        error ? styles.otpCellError : null,
+                      ]}
+                      testID={`onboarding-otp-cell-${index}`}
+                    >
+                      {active && !digit ? <View style={styles.otpCaret} /> : <Text style={styles.otpDigit}>{digit}</Text>}
+                    </View>
+                  );
+                })}
               </View>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               {props.resendSeconds > 0 && !error ? <Text style={styles.resendMuted}>Resend code in 0:{String(props.resendSeconds).padStart(2, '0')}</Text> : null}
@@ -599,7 +619,9 @@ function OtpScreen(props: {
                 caretHidden
                 keyboardType="number-pad"
                 maxLength={4}
+                onBlur={() => setFocused(false)}
                 onChangeText={props.onChange}
+                onFocus={() => setFocused(true)}
                 style={styles.hiddenOtpInput}
                 textContentType="oneTimeCode"
                 value={props.code}
@@ -656,8 +678,9 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   authTitle: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: 0.6, textAlign: 'center' },
   authSubtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, textAlign: 'center', marginTop: 7 },
   phoneSent: { color: colors.text },
-  phoneRow: { width: '100%', height: 44, marginTop: 17, borderBottomWidth: 1, borderBottomColor: colors.text, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  phoneRowError: { borderBottomColor: colors.danger },
+  phoneRow: { width: '100%', height: 60, marginTop: 17, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  phoneRowFocused: { borderWidth: 2, borderColor: '#E63946' },
+  phoneRowError: { borderWidth: 2, borderColor: '#E63946' },
   countrySelector: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flag: { color: colors.text, fontSize: 18 },
   callingCode: { color: colors.text, fontSize: 17 },
@@ -678,9 +701,13 @@ const createStyles = (colors: ThemeColors, compact: boolean, bottomGutter: numbe
   countryCode: { color: colors.textMuted, fontSize: 16 },
   otpContent: { width: '100%', minHeight: 190, alignItems: 'center' },
   otpRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  otpCellError: { borderColor: colors.danger },
-  otpDigit: { color: colors.text, fontSize: 17 },
+  otpCell: { width: 40, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  otpCellEmpty: { borderColor: colors.border, backgroundColor: colors.surface },
+  otpCellFilled: { borderColor: colors.text, backgroundColor: colors.surface },
+  otpCellActive: { borderWidth: 2, borderColor: '#E63946', backgroundColor: colors.surface },
+  otpCellError: { borderWidth: 2, borderColor: colors.danger },
+  otpCaret: { width: 2, height: 20, borderRadius: 1, backgroundColor: '#E63946' },
+  otpDigit: { color: colors.text, fontSize: 17, lineHeight: 18, letterSpacing: -0.41 },
   resendMuted: { color: colors.textMuted, fontSize: 12, marginTop: 10 },
   resendLink: { color: colors.primary, fontSize: 12, marginTop: 8 },
   localCode: { color: colors.textSecondary, fontSize: 11, marginTop: 8 },

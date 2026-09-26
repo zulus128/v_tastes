@@ -66,6 +66,15 @@ describe('onboarding in resizable windows', () => {
 
     await fireEvent(scroll, 'layout', measure(313));
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBe(normalTop);
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-phone-row').props.style)).toMatchObject({
+      borderWidth: 1,
+    });
+
+    await fireEvent(screen.getByPlaceholderText('Phone number'), 'focus');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-phone-row').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
   });
 
   it('removes surplus space above OTP cells while retaining scrolling for the remaining content', async () => {
@@ -80,6 +89,36 @@ describe('onboarding in resizable windows', () => {
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingTop).toBeLessThan(10);
     expect(scroll).toContainElement(screen.getByText('Resend code'));
     expect(scroll).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
+  });
+
+  it('shows active, filled, and error borders while entering an OTP', async () => {
+    resize(402, 874);
+    await render(<OnboardingFlow initialScreen="otp" visualAudit />, { wrapper: Providers });
+    const input = screen.getByDisplayValue('');
+
+    await fireEvent(input, 'focus');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+
+    await fireEvent.changeText(input, '13');
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
+      borderWidth: 1,
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-2').props.style)).toMatchObject({
+      borderColor: '#E63946',
+      borderWidth: 2,
+    });
+
+    await fireEvent.changeText(input, '1331');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Incorrect code. Try again.')).toBeOnTheScreen();
+    for (const index of [0, 1, 2, 3]) {
+      expect(StyleSheet.flatten(screen.getByTestId(`onboarding-otp-cell-${index}`).props.style)).toMatchObject({
+        borderWidth: 2,
+      });
+    }
   });
 
   it.each([
