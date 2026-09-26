@@ -204,10 +204,10 @@ describe('onboarding in resizable windows', () => {
     ['city', 'Create your profile'],
     ['dish', 'Create your profile'],
     ['location', 'Your favourite dish!'],
-    ['locationDenied', 'Discover places near you'],
-    ['place', 'Discover places near you'],
+    ['locationDenied', 'See what’s good near you'],
+    ['place', 'See what’s good near you'],
     ['style', 'Choose your favourite place'],
-    ['contactsPermission', 'Choose Your Style'],
+    ['contactsPermission', 'Pick your look'],
     ['contacts', 'Find your people'],
     ['invite', 'Find your people'],
     ['notifications', 'Invite your friends'],
@@ -260,6 +260,12 @@ describe('onboarding in resizable windows', () => {
     const permissionBody = screen.getByTestId('onboarding-permission-scroll');
     expect(StyleSheet.flatten(permissionBody.props.style).bottom).toBeGreaterThan(0);
     expect(permissionBody).not.toContainElement(screen.getByRole('button', { name: 'Allow Contacts' }));
+    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.getByText('People you know')).toBeOnTheScreen();
+    expect(screen.getByText('3 of your contacts are on Tastes')).toBeOnTheScreen();
+    expect(StyleSheet.flatten(screen.getByTestId('onboarding-people-teaser-row-0', { includeHiddenElements: true }).props.style)).toMatchObject({
+      filter: [{ blur: 6 }],
+    });
     await fireEvent.press(screen.getByText('Skip'));
 
     const invitations = screen.getByTestId('onboarding-invite-scroll');

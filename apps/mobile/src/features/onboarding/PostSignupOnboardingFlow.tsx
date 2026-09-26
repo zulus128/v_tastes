@@ -217,7 +217,7 @@ function PeopleYouKnowTeaser({ styles }: { styles: ReturnType<typeof createStyle
   return <View style={styles.peopleTeaser}>
     <Text style={styles.peopleTeaserTitle}>People you know</Text>
     <Text style={styles.peopleTeaserCount}>3 of your contacts are on Tastes</Text>
-    {people.map((person, index) => <View accessibilityElementsHidden key={person.name} style={styles.teaserPerson}>
+    {people.map((person, index) => <View accessibilityElementsHidden key={person.name} style={styles.teaserPerson} testID={`onboarding-people-teaser-row-${index}`}>
       <View style={styles.teaserAvatar} />
       <View style={styles.teaserCopy}><Text style={styles.teaserBlurred}>{person.name}</Text><Text style={styles.teaserBlurredSmall}>{person.detail}</Text></View>
       <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={[styles.teaserActionText, index === 0 && styles.teaserActionMutedText]}>{person.action}</Text></View>
