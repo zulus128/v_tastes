@@ -190,6 +190,33 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
+  it.each([
+    ['country', 'Your phone number'],
+    ['phone', 'Discover the best places!'],
+    ['otp', 'Your phone number'],
+  ] as const)('navigates back from the directly opened %s sign-in screen', async (initialScreen, expectedTitle) => {
+    await render(<OnboardingFlow initialScreen={initialScreen} visualAudit />, { wrapper: Providers });
+    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText(expectedTitle)).toBeOnTheScreen();
+  });
+
+  it.each([
+    ['city', 'Create your profile'],
+    ['dish', 'Create your profile'],
+    ['location', 'Your favourite dish!'],
+    ['locationDenied', 'Discover places near you'],
+    ['place', 'Discover places near you'],
+    ['style', 'Choose your favourite place'],
+    ['contactsPermission', 'Choose Your Style'],
+    ['contacts', 'Find your people'],
+    ['invite', 'Find your people'],
+    ['notifications', 'Invite your friends'],
+  ] as const)('navigates back from the directly opened %s post-signup screen', async (initialScreen, expectedTitle) => {
+    await render(<PostSignupOnboardingFlow initialScreen={initialScreen} onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} visualAudit />, { wrapper: Providers });
+    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText(expectedTitle)).toBeOnTheScreen();
+  });
+
   it.each([[393, 852], [667, 375], [800, 500], [600, 600], [1024, 600]])(
     'keeps appearance choices scrollable above Continue at %sx%s',
     async (width, height) => {

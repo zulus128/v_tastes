@@ -84,6 +84,19 @@ export type PostSignupScreen =
   | 'notifications'
   | 'ready';
 
+const previousPostSignupScreen: Partial<Record<PostSignupScreen, PostSignupScreen>> = {
+  city: 'profile',
+  dish: 'profile',
+  location: 'dish',
+  locationDenied: 'location',
+  place: 'location',
+  style: 'place',
+  contactsPermission: 'style',
+  contacts: 'contactsPermission',
+  invite: 'contactsPermission',
+  notifications: 'invite',
+};
+
 interface PostSignupOnboardingFlowProps {
   initialScreen?: PostSignupScreen;
   onAuthenticationRequired: () => Promise<void>;
@@ -207,7 +220,7 @@ function PeopleYouKnowTeaser({ styles }: { styles: ReturnType<typeof createStyle
     {people.map((person, index) => <View accessibilityElementsHidden key={person.name} style={styles.teaserPerson}>
       <View style={styles.teaserAvatar} />
       <View style={styles.teaserCopy}><Text style={styles.teaserBlurred}>{person.name}</Text><Text style={styles.teaserBlurredSmall}>{person.detail}</Text></View>
-      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={styles.teaserBlurredSmall}>{person.action}</Text></View>
+      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}><Text style={[styles.teaserActionText, index === 0 && styles.teaserActionMutedText]}>{person.action}</Text></View>
     </View>)}
   </View>;
 }
@@ -306,7 +319,7 @@ export function PostSignupOnboardingFlow({
   }
 
   function back() {
-    const previous = history.at(-1);
+    const previous = history.at(-1) ?? previousPostSignupScreen[screen];
     if (!previous) return;
     setHistory((items) => items.slice(0, -1));
     setScreen(previous);
@@ -956,14 +969,16 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   livePreviewCaption: { marginTop: 34, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
   peopleTeaser: { width: '100%', height: 272, marginTop: 42, paddingTop: 15, paddingHorizontal: 15, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
   peopleTeaserTitle: { color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: '600' },
-  peopleTeaserCount: { marginTop: 5, marginBottom: 10, color: colors.textSecondary, fontSize: 13 },
-  teaserPerson: { height: 64, flexDirection: 'row', alignItems: 'center', opacity: 0.38 },
-  teaserAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#777777' },
+  peopleTeaserCount: { marginTop: 3, marginBottom: 10, color: colors.textSecondary, fontSize: 13, lineHeight: 16 },
+  teaserPerson: { height: 64, flexDirection: 'row', alignItems: 'center', filter: [{ blur: 6 }] },
+  teaserAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#777777', opacity: 0.58, shadowColor: '#777777', shadowRadius: 6, shadowOpacity: 1 },
   teaserCopy: { flex: 1, marginLeft: 12 },
-  teaserBlurred: { color: colors.text, fontSize: 14, fontWeight: '600', textShadowColor: colors.text, textShadowRadius: 6 },
-  teaserBlurredSmall: { color: colors.textSecondary, fontSize: 12, textShadowColor: colors.textSecondary, textShadowRadius: 6 },
-  teaserAction: { width: 100, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  teaserActionMuted: { backgroundColor: colors.surfaceRaised },
+  teaserBlurred: { color: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)', fontSize: 15, lineHeight: 19, fontWeight: '600', textShadowColor: colors.text, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserBlurredSmall: { marginTop: 2, color: isDark ? 'rgba(170,178,197,0.14)' : 'rgba(75,80,90,0.14)', fontSize: 13, lineHeight: 16, textShadowColor: colors.textSecondary, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserAction: { width: 100, height: 34, borderRadius: 17, backgroundColor: '#FFFFFF', opacity: 0.78, alignItems: 'center', justifyContent: 'center', shadowColor: '#FFFFFF', shadowRadius: 6, shadowOpacity: 0.55 },
+  teaserActionMuted: { backgroundColor: '#2A2A2C', shadowColor: '#2A2A2C' },
+  teaserActionText: { color: 'rgba(10,10,10,0.14)', fontSize: 14, lineHeight: 17, fontWeight: '500', textShadowColor: '#0A0A0A', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserActionMutedText: { textShadowColor: colors.text },
   notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
   notificationCard: { minHeight: 78, padding: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1A1A1A' },
   notificationIcon: { width: 36, height: 36, overflow: 'hidden', borderRadius: 10, backgroundColor: '#D33B35', alignItems: 'center', justifyContent: 'center' },
