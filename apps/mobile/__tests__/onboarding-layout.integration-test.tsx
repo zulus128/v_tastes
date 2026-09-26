@@ -119,6 +119,13 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
     expect(screen.queryByText('1 of 3 friends invited')).not.toBeOnTheScreen();
     expect(screen.getByText('Invite from your contacts')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Stay in the loop')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
+    expect(screen.getByText('Amara rated Sabor ★ 4.9')).toBeOnTheScreen();
+    expect(screen.getByText('Marco started following you')).toBeOnTheScreen();
+    expect(screen.getByText('Change these anytime in Settings.')).toBeOnTheScreen();
   });
 
   it('resizes the ready illustration without squeezing out the completion action', async () => {

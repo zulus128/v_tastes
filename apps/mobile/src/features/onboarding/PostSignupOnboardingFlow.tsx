@@ -27,6 +27,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import addPhoto from '../../../assets/onboarding/add-photo.png';
 import chevronRight from '../../../assets/onboarding/chevron-right.png';
+import tastesAppIcon from '../../../assets/icon.png';
 import dishBurgers from '../../../assets/onboarding/dish-burgers.png';
 import dishCurry from '../../../assets/onboarding/dish-curry.png';
 import dishFish from '../../../assets/onboarding/dish-fish.png';
@@ -215,20 +216,21 @@ function StepHeader({ landscape = false, step, title, subtitle }: { landscape?: 
   </View>;
 }
 
-function PermissionScreen({ button, children, icon, onBack, onPress, onSkip, step, subtitle, title }: {
-  button: string; children?: ReactNode; icon: ImageSourcePropType; onBack: () => void; onPress: () => void; onSkip: () => void; step?: number; subtitle: string; title: string;
+function PermissionScreen({ button, children, footnote, icon, onBack, onPress, onSkip, step, subtitle, title }: {
+  button: string; children?: ReactNode; footnote?: string; icon: ImageSourcePropType; onBack: () => void; onPress: () => void; onSkip: () => void; step?: number; subtitle: string; title: string;
 }) {
   const styles = useOnboardingStyles();
   return <PatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
     {step ? <StepProgress step={step} /> : null}
-    <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={[styles.permissionScroll, step === 6 && styles.contactsPermissionScroll]} testID="onboarding-permission-scroll">
+    <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={[styles.permissionScroll, step !== undefined ? styles.steppedPermissionScroll : undefined]} testID="onboarding-permission-scroll">
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={[styles.title, styles.permissionTitle]}>{title}</Text>
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
       {children}
     </ScrollView>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
+    {footnote ? <Text style={styles.permissionFootnote}>{footnote}</Text> : null}
   </PatternScreen>;
 }
 
@@ -252,6 +254,27 @@ function PeopleYouKnowTeaser() {
         <Text style={[styles.teaserActionText, index === 0 && styles.teaserActionMutedText]}>{person.action}</Text>
       </View>
     </View>)}
+  </View>;
+}
+
+function NotificationExamples() {
+  const styles = useOnboardingStyles();
+  return <View style={styles.notificationExamples}>
+    <NotificationExample detail="“The seabass. Go.”" meta="now" title="Amara rated Sabor ★ 4.9" />
+    <NotificationExample detail="You have 2 mutual friends" meta="2m ago" title="Marco started following you" />
+  </View>;
+}
+
+function NotificationExample({ detail, meta, title }: { detail: string; meta: string; title: string }) {
+  const styles = useOnboardingStyles();
+  return <View style={styles.notificationCard}>
+    <Image source={tastesAppIcon} style={styles.notificationIcon} />
+    <View style={styles.notificationCopy}>
+      <Text style={styles.notificationApp}>TASTES</Text>
+      <Text numberOfLines={1} style={styles.notificationTitle}>{title}</Text>
+      <Text numberOfLines={1} style={styles.notificationDetail}>{detail}</Text>
+    </View>
+    <Text style={styles.notificationMeta}>{meta}</Text>
   </View>;
 }
 
@@ -764,7 +787,7 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'notifications') return <PermissionScreen icon={permissionNotifications} title="Stay in the loop" subtitle="Get notified when friends post, invite you, or react to your reviews." button="Turn on Notifications" onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications} />;
+  if (screen === 'notifications') return <PermissionScreen step={7} icon={permissionNotifications} title="Stay in the loop" subtitle="Only the good stuff — when friends rate, follow, or reply." button="Turn on Notifications" footnote="Change these anytime in Settings." onBack={back} onSkip={() => navigate('ready')} onPress={requestNotifications}><NotificationExamples /></PermissionScreen>;
 
   // Reserve at least half the row for the copy and action, including in a
   // nearly square window. The whole page can scroll if its height is limited.
@@ -809,12 +832,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   stepTitle: { marginTop: 7, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionScroll: { position: 'absolute', top: landscape ? 80 : 132, left: 26, right: 26, bottom: Math.max(94, bottomGutter + 70) },
-  contactsPermissionScroll: { top: landscape ? 80 : 130, left: 16, right: 16 },
+  steppedPermissionScroll: { top: landscape ? 80 : 130, left: 16, right: 16 },
   permissionContent: { alignItems: 'center', paddingBottom: 16 },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionTitle: { fontSize: 24, lineHeight: 29 },
   permissionSubtitle: { width: '100%', marginTop: 7, fontSize: 15, lineHeight: 18, textAlign: 'center' },
   permissionBodyText: { color: colors.textMuted },
+  permissionFootnote: { position: 'absolute', left: 16, right: 16, bottom: 4, color: colors.textMuted, fontSize: 11, lineHeight: 13, textAlign: 'center' },
   profileKeyboardAvoiding: { flex: 1 },
   profileKeyboardLayout: { flex: 1 },
   profileScroll: { flex: 1 },
@@ -940,6 +964,14 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   teaserActionMuted: { backgroundColor: '#2A2A2C', shadowColor: '#2A2A2C' },
   teaserActionText: { color: 'rgba(10,10,10,0.14)', fontSize: 14, lineHeight: 17, fontWeight: '500', textShadowColor: '#0A0A0A', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
   teaserActionMutedText: { textShadowColor: colors.text },
+  notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
+  notificationCard: { height: 78, padding: 11, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 16, backgroundColor: '#1A1A1A' },
+  notificationIcon: { width: 36, height: 36, borderRadius: 10 },
+  notificationCopy: { flex: 1, marginLeft: 12, gap: 3 },
+  notificationApp: { color: '#677083', fontSize: 10, lineHeight: 12, fontWeight: '500' },
+  notificationTitle: { color: colors.text, fontSize: 14, lineHeight: 17, fontWeight: '600' },
+  notificationDetail: { color: colors.textSecondary, fontSize: 13, lineHeight: 16 },
+  notificationMeta: { alignSelf: 'flex-start', marginTop: 1, color: '#677083', fontSize: 10, lineHeight: 12 },
   contactRow: { height: 62, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontSize: 11, fontWeight: '600' },
