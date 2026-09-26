@@ -16,7 +16,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -721,12 +720,13 @@ export function PostSignupOnboardingFlow({
               <View style={styles.previewLabelRow}><View style={[styles.radio, !automatic && darkMode === dark && styles.radioSelected]}>{!automatic && darkMode === dark ? <Text style={styles.radioCheck}>✓</Text> : null}</View><Text style={styles.previewLabel}>{dark ? 'Dark' : 'Light'}</Text></View>
             </Pressable>)}
           </View>
-          <View style={styles.automaticRow}><View><Text style={styles.automaticText}>Match my device</Text><Text style={styles.automaticSubtitle}>Follows your phone’s light/dark setting</Text></View><Switch value={automatic} onValueChange={(value) => {
+          <View style={styles.automaticRow}><View><Text style={styles.automaticText}>Match my device</Text><Text style={styles.automaticSubtitle}>Follows your phone’s light/dark setting</Text></View><Pressable accessibilityLabel="Match my device" accessibilityRole="switch" accessibilityState={{ checked: automatic }} hitSlop={8} onPress={() => {
+            const value = !automatic;
             setAutomatic(value);
             const currentIsDark = resolvedTheme === 'dark';
             setDarkMode(currentIsDark);
             void setPreference(value ? 'system' : (currentIsDark ? 'dark' : 'light'));
-          }} trackColor={{ false: colors.switchTrack, true: colors.primary }} thumbColor={colors.switchThumb} /></View>
+          }} style={[styles.appearanceSwitch, automatic && styles.appearanceSwitchOn]}><View style={styles.appearanceSwitchThumb} /></Pressable></View>
           <Text style={styles.livePreviewCaption}>Live preview — the whole app changes as you tap.</Text>
         </ScrollView>
       </View>
@@ -950,6 +950,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   automaticRow: { minHeight: 64, marginTop: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
   automaticText: { color: colors.text, fontSize: 15 },
   automaticSubtitle: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+  appearanceSwitch: { width: 51, height: 28, padding: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', borderRadius: 14, backgroundColor: colors.switchTrack },
+  appearanceSwitchOn: { justifyContent: 'flex-end', backgroundColor: colors.primary },
+  appearanceSwitchThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.switchThumb },
   livePreviewCaption: { marginTop: 34, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
   peopleTeaser: { width: '100%', height: 272, marginTop: 42, paddingTop: 15, paddingHorizontal: 15, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
   peopleTeaserTitle: { color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: '600' },

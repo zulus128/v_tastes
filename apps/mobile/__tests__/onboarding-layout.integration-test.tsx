@@ -209,6 +209,23 @@ describe('onboarding in resizable windows', () => {
     },
   );
 
+  it('keeps the match-device switch at the Figma size and toggles it', async () => {
+    resize(402, 874);
+    await render(<PostSignupOnboardingFlow initialScreen="style" onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} visualAudit />, { wrapper: Providers });
+
+    const appearanceSwitch = screen.getByRole('switch', { name: 'Match my device' });
+    expect(StyleSheet.flatten(appearanceSwitch.props.style)).toMatchObject({
+      width: 51,
+      height: 28,
+      padding: 2,
+      borderRadius: 14,
+    });
+    expect(appearanceSwitch.props.accessibilityState).toEqual({ checked: true });
+
+    await fireEvent.press(appearanceSwitch);
+    expect(screen.getByRole('switch', { name: 'Match my device' }).props.accessibilityState).toEqual({ checked: false });
+  });
+
   it('keeps permission and invitation content in a separate scroll area from the action', async () => {
     resize(667, 375);
     await render(<PostSignupOnboardingFlow initialScreen="contactsPermission" onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} visualAudit />, { wrapper: Providers });
