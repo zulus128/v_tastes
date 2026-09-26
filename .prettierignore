@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+.codebase-memory/**
+**/android/app/build/**
+**/.next/**
+**/dist/**

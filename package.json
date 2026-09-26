@@ -2,7 +2,7 @@
   "name": "tastes",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.26.0",
   "engines": {
     "node": ">=22.13.0 <25"
   },
@@ -23,15 +23,33 @@
     "seed": "pnpm --filter @tastes/functions seed",
     "smoke": "pnpm seed && node scripts/smoke-local.mjs",
     "lint": "eslint .",
+    "format:check": "node scripts/check-format.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm test:unit && pnpm test:frontend:integration && pnpm test:rules && pnpm test:auth",
     "test:unit": "vitest run --exclude 'services/backend/tests/rules/**' --exclude 'services/backend/tests/auth/**' --exclude 'apps/**/e2e/**'",
     "test:frontend:integration": "pnpm --filter @tastes/mobile test:integration && pnpm --filter @tastes/admin test:integration",
     "test:e2e": "pnpm --filter @tastes/admin test:e2e",
     "test:rules": "TEST_PROJECT_ID=demo-tastes-test node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only firestore,storage \"vitest run services/backend/tests/rules\"",
-    "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run services/backend/tests/auth\""
+    "test:auth": "pnpm build && TEST_PROJECT_ID=demo-tastes-test TEST_FUNCTIONS_HOST=127.0.0.1:5002 node scripts/run-firebase.mjs emulators:exec --config firebase.test.json --project demo-tastes-test --only auth,firestore,functions \"vitest run services/backend/tests/auth\"",
+    "check:staged-files": "node scripts/check-staged-files.mjs",
+    "check:changed-files": "node scripts/check-staged-files.mjs --changed-from",
+    "prepush": "pnpm build && pnpm format:check \"$(git merge-base HEAD origin/main)\" && pnpm lint && pnpm typecheck && pnpm test && pnpm audit --prod",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "!(*lock*).{json,jsonc,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "**/*": [
+      "node scripts/check-staged-files.mjs --secretlint"
+    ]
   },
   "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
     "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@tastes/contracts": "workspace:*",
@@ -41,6 +59,10 @@
     "firebase": "^12.16.0",
     "firebase-admin": "^13.6.0",
     "firebase-tools": "^15.28.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "prettier": "^3.6.2",
+    "secretlint": "^13.0.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.10"

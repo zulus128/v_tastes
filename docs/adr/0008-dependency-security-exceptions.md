@@ -1,13 +1,14 @@
 # ADR 0008: Temporary dependency security exception
 
-Status: temporary, release-blocking review required
+Status: temporary, explicitly accepted exception; review required
 
 ## Resolved advisories
 
 Workspace overrides pin patched transitive versions of `fast-xml-parser`,
 `brace-expansion`, `js-yaml`, `nanoid`, `postcss`, and `uuid`. In particular,
 the Functions runtime now resolves `fast-xml-parser` 5.10.1, closing
-GHSA-8r6m-32jq-jx6q.
+GHSA-8r6m-32jq-jx6q. React Navigation core is pinned to 7.22.1, which removes
+the vulnerable `query-string` / `decode-uri-component` dependency path.
 
 ## Remaining upstream exception
 
@@ -24,7 +25,7 @@ This reduces current exposure but does not make the advisory resolved.
 
 ## Exit criteria
 
-- Replace the override-free transitive dependency with `image-size` 2.0.3 or
+- Remove the two `audit.ignore` entries and replace the transitive dependency with `image-size` 2.0.3 or
   a later compatible version as soon as it is published by updating Expo /
   React Native / Metro or adding a workspace override.
 - Re-run `pnpm audit --prod`, the complete test suite, and both native builds.
