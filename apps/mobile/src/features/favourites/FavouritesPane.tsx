@@ -43,6 +43,7 @@ import {
 
 type FolderEditor =
   { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type SaveablePlace = {
   venueId: string;
@@ -463,9 +464,12 @@ export function SaveToFolderSheet({
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.createFolderRoot}
           >
-            <Pressable
+            <AnimatedPressable
               onPress={createFolderSheet.close}
-              style={styles.createFolderScrim}
+              style={[
+                styles.createFolderScrim,
+                { opacity: createFolderSheet.backdropOpacity },
+              ]}
             />
             <Animated.View
               style={[
@@ -848,7 +852,10 @@ function FolderNameSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.modalRoot}
       >
-        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <AnimatedPressable
+          onPress={sheet.close}
+          style={[styles.scrim, { opacity: sheet.backdropOpacity }]}
+        />
         <Animated.View
           style={[
             styles.nameSheet,
@@ -922,7 +929,10 @@ function FolderActionSheet({
       visible={folder !== null}
     >
       <View style={styles.modalRoot}>
-        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <AnimatedPressable
+          onPress={sheet.close}
+          style={[styles.scrim, { opacity: sheet.backdropOpacity }]}
+        />
         <Animated.View
           style={[
             styles.actionSheet,

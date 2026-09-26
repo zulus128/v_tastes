@@ -24,6 +24,7 @@ const LIGHT_MAP_TILES =
   'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 const DARK_MAP_TILES =
   'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function mapVenueIcon(venue: Venue, active: boolean) {
   const category = venue.category?.toLowerCase() ?? '';
@@ -80,10 +81,10 @@ export function ProfileMapSheet({
       visible={visible}
     >
       <View style={styles.root}>
-        <Pressable
+        <AnimatedPressable
           accessibilityLabel="Close reviewed places map"
           onPress={sheet.close}
-          style={styles.backdrop}
+          style={[styles.backdrop, { opacity: sheet.backdropOpacity }]}
         />
         <Animated.View
           style={[
