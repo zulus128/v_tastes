@@ -52,34 +52,56 @@ export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getFeedInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
-  const hiddenReviews = await db.collection('users').doc(uid).collection('hiddenReviews').get();
-  const hiddenReviewIds = new Set(hiddenReviews.docs.map((document) => document.id));
-  const applyCursor = (query: Query): Query => cursor
-    ? query.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id)
-    : query;
+  const hiddenReviews = await db
+    .collection('users')
+    .doc(uid)
+    .collection('hiddenReviews')
+    .get();
+  const hiddenReviewIds = new Set(
+    hiddenReviews.docs.map((document) => document.id),
+  );
+  const applyCursor = (query: Query): Query =>
+    cursor
+      ? query.startAfter(
+          Timestamp.fromDate(cursorDate(cursor.value)),
+          cursor.id,
+        )
+      : query;
   const fetchLimit = Math.min(100, input.limit * 2);
   let candidates: QueryDocumentSnapshot[];
 
   if (input.scope === 'friends') {
-    const following = await db.collection('users').doc(uid).collection('following').get();
+    const following = await db
+      .collection('users')
+      .doc(uid)
+      .collection('following')
+      .get();
     const authorIds = following.docs.map((document) => document.id);
     if (authorIds.length === 0) return { items: [], nextCursor: null };
     const chunks = Array.from(
       { length: Math.ceil(authorIds.length / 30) },
       (_, index) => authorIds.slice(index * 30, index * 30 + 30),
     );
-      const snapshots = await Promise.all(chunks.map((chunk) => applyCursor(
-      db.collection('reviews')
-        .where('status', '==', 'published')
-        .where('authorId', 'in', chunk)
-        .orderBy('createdAt', 'desc')
-        .orderBy(FieldPath.documentId(), 'desc'),
-    ).limit(fetchLimit + 1).get()));
+    const snapshots = await Promise.all(
+      chunks.map((chunk) =>
+        applyCursor(
+          db
+            .collection('reviews')
+            .where('status', '==', 'published')
+            .where('authorId', 'in', chunk)
+            .orderBy('createdAt', 'desc')
+            .orderBy(FieldPath.documentId(), 'desc'),
+        )
+          .limit(fetchLimit + 1)
+          .get(),
+      ),
+    );
     candidates = snapshots
       .flatMap((snapshot) => snapshot.docs)
       .sort((left, right) => {
-        const timeDifference = (right.get('createdAt') as Timestamp).toMillis()
-          - (left.get('createdAt') as Timestamp).toMillis();
+        const timeDifference =
+          (right.get('createdAt') as Timestamp).toMillis() -
+          (left.get('createdAt') as Timestamp).toMillis();
         return timeDifference || compareDocumentIdsDesc(left.id, right.id);
       });
   } else {
@@ -94,23 +116,43 @@ export const getFeed = onCall(callableOptions, async (request) => {
       .where('venueCity', '==', city)
       .orderBy('createdAt', 'desc')
       .orderBy(FieldPath.documentId(), 'desc');
-    candidates = (await applyCursor(feedQuery).limit(fetchLimit + 1).get()).docs;
+    candidates = (
+      await applyCursor(feedQuery)
+        .limit(fetchLimit + 1)
+        .get()
+    ).docs;
   }
 
-  const visibleCandidates = candidates.filter((document) => !hiddenReviewIds.has(document.id));
+  const visibleCandidates = candidates.filter(
+    (document) => !hiddenReviewIds.has(document.id),
+  );
   const pageDocs = visibleCandidates.slice(0, input.limit);
   const last = pageDocs.at(-1);
-  const authorIds = [...new Set(pageDocs.map((document) => String(document.get('authorId'))))];
+  const authorIds = [
+    ...new Set(pageDocs.map((document) => String(document.get('authorId')))),
+  ];
   const [authorDocuments, reactionDocuments] = await Promise.all([
     authorIds.length > 0
-      ? db.getAll(...authorIds.map((authorId) => db.collection('users').doc(authorId)))
+      ? db.getAll(
+          ...authorIds.map((authorId) => db.collection('users').doc(authorId)),
+        )
       : Promise.resolve([]),
     pageDocs.length > 0
-      ? db.getAll(...pageDocs.map((document) => document.ref.collection('reactions').doc(uid)))
+      ? db.getAll(
+          ...pageDocs.map((document) =>
+            document.ref.collection('reactions').doc(uid),
+          ),
+        )
       : Promise.resolve([]),
   ]);
-  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
-  const authorsById = new Map(authorDocuments.map((document) => [document.id, document]));
+  const reactedIds = new Set(
+    reactionDocuments
+      .filter((document) => document.exists)
+      .map((document) => document.ref.parent.parent?.id),
+  );
+  const authorsById = new Map(
+    authorDocuments.map((document) => [document.id, document]),
+  );
 
   return {
     items: pageDocs.map((document) => {
@@ -118,19 +160,32 @@ export const getFeed = onCall(callableOptions, async (request) => {
       return {
         id: document.id,
         authorId: String(document.get('authorId')),
-        authorDisplayName: author?.exists && author.get('displayName')
-          ? String(author.get('displayName'))
-          : String(document.get('authorDisplayName')),
-        authorUsername: author?.exists && author.get('username') ? String(author.get('username')) : null,
-        authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
+        authorDisplayName:
+          author?.exists && author.get('displayName')
+            ? String(author.get('displayName'))
+            : String(document.get('authorDisplayName')),
+        authorUsername:
+          author?.exists && author.get('username')
+            ? String(author.get('username'))
+            : null,
+        authorPhotoUrl:
+          author?.exists && author.get('photoUrl')
+            ? String(author.get('photoUrl'))
+            : null,
         venueId: String(document.get('venueId')),
         venueName: String(document.get('venueName')),
-        venueCity: document.get('venueCity') ? String(document.get('venueCity')) : undefined,
-        cuisine: document.get('cuisine') ? String(document.get('cuisine')) : undefined,
+        venueCity: document.get('venueCity')
+          ? String(document.get('venueCity'))
+          : undefined,
+        cuisine: document.get('cuisine')
+          ? String(document.get('cuisine'))
+          : undefined,
         rating: Number(document.get('rating')),
         text: String(document.get('text')),
         tags: Array.isArray(document.get('tags')) ? document.get('tags') : [],
-        dishReviews: Array.isArray(document.get('dishReviews')) ? document.get('dishReviews') : [],
+        dishReviews: Array.isArray(document.get('dishReviews'))
+          ? document.get('dishReviews')
+          : [],
         status: 'published' as const,
         commentCount: Number(document.get('commentCount') ?? 0),
         reactionCount: Number(document.get('reactionCount') ?? 0),
@@ -138,9 +193,13 @@ export const getFeed = onCall(callableOptions, async (request) => {
         createdAt: timestampToIso(document.get('createdAt')),
       };
     }),
-    nextCursor: candidates.length > input.limit && last
-      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
-      : null,
+    nextCursor:
+      candidates.length > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value: timestampToIso(last.get('createdAt')),
+          })
+        : null,
   };
 });
 
@@ -161,7 +220,10 @@ export const getComments = onCall(callableOptions, async (request) => {
     .orderBy(FieldPath.documentId(), 'desc');
 
   if (cursor) {
-    commentsQuery = commentsQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+    commentsQuery = commentsQuery.startAfter(
+      Timestamp.fromDate(cursorDate(cursor.value)),
+      cursor.id,
+    );
   }
 
   const snapshot = await commentsQuery.limit(input.limit + 1).get();
@@ -169,37 +231,69 @@ export const getComments = onCall(callableOptions, async (request) => {
   const last = rootDocuments.at(-1);
   // The UI previews only the latest replies for each root. Fetching every reply made this
   // callable unbounded (20 roots could previously return thousands of documents).
-  const replySnapshots = await Promise.all(rootDocuments.map((rootDocument) => review.ref
-    .collection('comments')
-    .where('status', '==', 'published')
-    .where('parentCommentId', '==', rootDocument.id)
-    .orderBy('createdAt', 'desc')
-    .limit(3)
-    .get()));
-  const replyDocuments = replySnapshots.flatMap((replySnapshot) => replySnapshot.docs);
+  const replySnapshots = await Promise.all(
+    rootDocuments.map((rootDocument) =>
+      review.ref
+        .collection('comments')
+        .where('status', '==', 'published')
+        .where('parentCommentId', '==', rootDocument.id)
+        .orderBy('createdAt', 'desc')
+        .limit(3)
+        .get(),
+    ),
+  );
+  const replyDocuments = replySnapshots.flatMap(
+    (replySnapshot) => replySnapshot.docs,
+  );
   const pageDocuments = [...rootDocuments, ...replyDocuments];
-  const commentAuthorIds = [...new Set(pageDocuments.map((document) => String(document.get('authorId'))))];
-  const [reactionDocuments, author, reviewReaction, commentAuthorDocs] = await Promise.all([
-    pageDocuments.length > 0
-      ? db.getAll(...pageDocuments.map((document) => document.ref.collection('reactions').doc(uid)))
-      : Promise.resolve([]),
-    db.collection('users').doc(String(review.get('authorId'))).get(),
-    review.ref.collection('reactions').doc(uid).get(),
-    commentAuthorIds.length > 0
-      ? db.getAll(...commentAuthorIds.map((id) => db.collection('users').doc(id)))
-      : Promise.resolve([]),
-  ]);
-  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+  const commentAuthorIds = [
+    ...new Set(
+      pageDocuments.map((document) => String(document.get('authorId'))),
+    ),
+  ];
+  const [reactionDocuments, author, reviewReaction, commentAuthorDocs] =
+    await Promise.all([
+      pageDocuments.length > 0
+        ? db.getAll(
+            ...pageDocuments.map((document) =>
+              document.ref.collection('reactions').doc(uid),
+            ),
+          )
+        : Promise.resolve([]),
+      db
+        .collection('users')
+        .doc(String(review.get('authorId')))
+        .get(),
+      review.ref.collection('reactions').doc(uid).get(),
+      commentAuthorIds.length > 0
+        ? db.getAll(
+            ...commentAuthorIds.map((id) => db.collection('users').doc(id)),
+          )
+        : Promise.resolve([]),
+    ]);
+  const reactedIds = new Set(
+    reactionDocuments
+      .filter((document) => document.exists)
+      .map((document) => document.ref.parent.parent?.id),
+  );
   const commentAuthorPhotoById = new Map(
-    commentAuthorDocs.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]),
+    commentAuthorDocs.map((document) => [
+      document.id,
+      document.exists && document.get('photoUrl')
+        ? String(document.get('photoUrl'))
+        : null,
+    ]),
   );
   const toComment = (document: QueryDocumentSnapshot) => ({
     id: document.id,
     reviewId: input.reviewId,
     authorId: String(document.get('authorId')),
     authorDisplayName: String(document.get('authorDisplayName')),
-    authorPhotoUrl: commentAuthorPhotoById.get(String(document.get('authorId'))) ?? null,
-    parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+    authorPhotoUrl:
+      commentAuthorPhotoById.get(String(document.get('authorId'))) ?? null,
+    parentCommentId: document.get('parentCommentId')
+      ? String(document.get('parentCommentId'))
+      : null,
     reactionCount: Number(document.get('reactionCount') ?? 0),
     replyCount: Number(document.get('replyCount') ?? 0),
     reacted: reactedIds.has(document.id),
@@ -212,16 +306,28 @@ export const getComments = onCall(callableOptions, async (request) => {
       id: review.id,
       authorId: String(review.get('authorId')),
       authorDisplayName: String(review.get('authorDisplayName')),
-      authorUsername: author.exists && author.get('username') ? String(author.get('username')) : null,
-      authorPhotoUrl: author.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
+      authorUsername:
+        author.exists && author.get('username')
+          ? String(author.get('username'))
+          : null,
+      authorPhotoUrl:
+        author.exists && author.get('photoUrl')
+          ? String(author.get('photoUrl'))
+          : null,
       venueId: String(review.get('venueId')),
       venueName: String(review.get('venueName')),
-      venueCity: review.get('venueCity') ? String(review.get('venueCity')) : undefined,
-      cuisine: review.get('cuisine') ? String(review.get('cuisine')) : undefined,
+      venueCity: review.get('venueCity')
+        ? String(review.get('venueCity'))
+        : undefined,
+      cuisine: review.get('cuisine')
+        ? String(review.get('cuisine'))
+        : undefined,
       rating: Number(review.get('rating')),
       text: String(review.get('text')),
       tags: Array.isArray(review.get('tags')) ? review.get('tags') : [],
-      dishReviews: Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') : [],
+      dishReviews: Array.isArray(review.get('dishReviews'))
+        ? review.get('dishReviews')
+        : [],
       status: 'published' as const,
       commentCount: Number(review.get('commentCount') ?? 0),
       reactionCount: Number(review.get('reactionCount') ?? 0),
@@ -230,11 +336,17 @@ export const getComments = onCall(callableOptions, async (request) => {
     },
     items: [
       ...rootDocuments.map(toComment),
-      ...replyDocuments.map(toComment).sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      ...replyDocuments
+        .map(toComment)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
     ],
-    nextCursor: snapshot.size > input.limit && last
-      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
-      : null,
+    nextCursor:
+      snapshot.size > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value: timestampToIso(last.get('createdAt')),
+          })
+        : null,
   };
 });
 
@@ -251,40 +363,64 @@ export const getCommentReplies = onCall(callableOptions, async (request) => {
   if (!review.exists || review.get('status') !== 'published') {
     throw new HttpsError('not-found', 'The review was not found.');
   }
-  if (!parent.exists || parent.get('status') !== 'published' || parent.get('parentCommentId') !== null) {
+  if (
+    !parent.exists ||
+    parent.get('status') !== 'published' ||
+    parent.get('parentCommentId') !== null
+  ) {
     throw new HttpsError('not-found', 'The parent comment was not found.');
   }
 
-  let repliesQuery = reviewRef.collection('comments')
+  let repliesQuery = reviewRef
+    .collection('comments')
     .where('status', '==', 'published')
     .where('parentCommentId', '==', input.parentCommentId)
     .orderBy('createdAt', 'desc')
     .orderBy(FieldPath.documentId(), 'desc');
-  if (cursor) repliesQuery = repliesQuery.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+  if (cursor)
+    repliesQuery = repliesQuery.startAfter(
+      Timestamp.fromDate(cursorDate(cursor.value)),
+      cursor.id,
+    );
   const snapshot = await repliesQuery.limit(input.limit + 1).get();
   const documents = snapshot.docs.slice(0, input.limit);
   const last = documents.at(-1);
-  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const authorIds = [
+    ...new Set(documents.map((document) => String(document.get('authorId')))),
+  ];
   const [reactionDocuments, authorDocuments] = await Promise.all([
     documents.length > 0
-      ? db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid)))
+      ? db.getAll(
+          ...documents.map((document) =>
+            document.ref.collection('reactions').doc(uid),
+          ),
+        )
       : Promise.resolve([]),
     authorIds.length > 0
       ? db.getAll(...authorIds.map((id) => db.collection('users').doc(id)))
       : Promise.resolve([]),
   ]);
-  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
-  const authorPhotoById = new Map(authorDocuments.map((document) => [
-    document.id,
-    document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null,
-  ]));
+  const reactedIds = new Set(
+    reactionDocuments
+      .filter((document) => document.exists)
+      .map((document) => document.ref.parent.parent?.id),
+  );
+  const authorPhotoById = new Map(
+    authorDocuments.map((document) => [
+      document.id,
+      document.exists && document.get('photoUrl')
+        ? String(document.get('photoUrl'))
+        : null,
+    ]),
+  );
   return {
     items: documents.map((document) => ({
       id: document.id,
       reviewId: input.reviewId,
       authorId: String(document.get('authorId')),
       authorDisplayName: String(document.get('authorDisplayName')),
-      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      authorPhotoUrl:
+        authorPhotoById.get(String(document.get('authorId'))) ?? null,
       parentCommentId: input.parentCommentId,
       reactionCount: Number(document.get('reactionCount') ?? 0),
       replyCount: Number(document.get('replyCount') ?? 0),
@@ -292,9 +428,13 @@ export const getCommentReplies = onCall(callableOptions, async (request) => {
       text: String(document.get('text')),
       createdAt: timestampToIso(document.get('createdAt')),
     })),
-    nextCursor: snapshot.size > input.limit && last
-      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
-      : null,
+    nextCursor:
+      snapshot.size > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value: timestampToIso(last.get('createdAt')),
+          })
+        : null,
   };
 });
 
@@ -304,31 +444,62 @@ export const getCommentContext = onCall(callableOptions, async (request) => {
   const input = parseInput(getCommentContextInputSchema, request.data);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const targetRef = reviewRef.collection('comments').doc(input.commentId);
-  const [review, target] = await Promise.all([reviewRef.get(), targetRef.get()]);
-  if (!review.exists || review.get('status') !== 'published' || !target.exists || target.get('status') !== 'published') {
+  const [review, target] = await Promise.all([
+    reviewRef.get(),
+    targetRef.get(),
+  ]);
+  if (
+    !review.exists ||
+    review.get('status') !== 'published' ||
+    !target.exists ||
+    target.get('status') !== 'published'
+  ) {
     throw new HttpsError('not-found', 'The comment was not found.');
   }
   const rootRef = target.get('parentCommentId')
-    ? reviewRef.collection('comments').doc(String(target.get('parentCommentId')))
+    ? reviewRef
+        .collection('comments')
+        .doc(String(target.get('parentCommentId')))
     : targetRef;
   const root = rootRef.path === targetRef.path ? target : await rootRef.get();
-  if (!root.exists || root.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+  if (!root.exists || root.get('status') !== 'published')
+    throw new HttpsError('not-found', 'The comment was not found.');
   const documents = root.id === target.id ? [root] : [root, target];
-  const authorIds = [...new Set(documents.map((document) => String(document.get('authorId'))))];
+  const authorIds = [
+    ...new Set(documents.map((document) => String(document.get('authorId')))),
+  ];
   const [reactionDocuments, authorDocuments] = await Promise.all([
-    db.getAll(...documents.map((document) => document.ref.collection('reactions').doc(uid))),
+    db.getAll(
+      ...documents.map((document) =>
+        document.ref.collection('reactions').doc(uid),
+      ),
+    ),
     db.getAll(...authorIds.map((id) => db.collection('users').doc(id))),
   ]);
-  const reactedIds = new Set(reactionDocuments.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
-  const authorPhotoById = new Map(authorDocuments.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]));
+  const reactedIds = new Set(
+    reactionDocuments
+      .filter((document) => document.exists)
+      .map((document) => document.ref.parent.parent?.id),
+  );
+  const authorPhotoById = new Map(
+    authorDocuments.map((document) => [
+      document.id,
+      document.exists && document.get('photoUrl')
+        ? String(document.get('photoUrl'))
+        : null,
+    ]),
+  );
   return {
     items: documents.map((document) => ({
       id: document.id,
       reviewId: input.reviewId,
       authorId: String(document.get('authorId')),
       authorDisplayName: String(document.get('authorDisplayName')),
-      authorPhotoUrl: authorPhotoById.get(String(document.get('authorId'))) ?? null,
-      parentCommentId: document.get('parentCommentId') ? String(document.get('parentCommentId')) : null,
+      authorPhotoUrl:
+        authorPhotoById.get(String(document.get('authorId'))) ?? null,
+      parentCommentId: document.get('parentCommentId')
+        ? String(document.get('parentCommentId'))
+        : null,
       reactionCount: Number(document.get('reactionCount') ?? 0),
       replyCount: Number(document.get('replyCount') ?? 0),
       reacted: reactedIds.has(document.id),
@@ -344,29 +515,47 @@ const MENTION_PATTERN = /@([a-zA-Z0-9._]{2,40})/g;
 const COMMENT_PREVIEW_LENGTH = 120;
 
 function commentPreview(text: string): string {
-  return text.length > COMMENT_PREVIEW_LENGTH ? `${text.slice(0, COMMENT_PREVIEW_LENGTH - 1)}…` : text;
+  return text.length > COMMENT_PREVIEW_LENGTH
+    ? `${text.slice(0, COMMENT_PREVIEW_LENGTH - 1)}…`
+    : text;
 }
 
 /** Resolves the `@username` handles inside a comment to the accounts they belong to. */
 async function mentionedUserIds(text: string): Promise<string[]> {
-  const usernames = [...new Set([...text.matchAll(MENTION_PATTERN)].flatMap((match) => (
-    match[1] ? [normalizeUsername(match[1])] : []
-  )))].slice(0, 10);
+  const usernames = [
+    ...new Set(
+      [...text.matchAll(MENTION_PATTERN)].flatMap((match) =>
+        match[1] ? [normalizeUsername(match[1])] : [],
+      ),
+    ),
+  ].slice(0, 10);
   if (usernames.length === 0) return [];
   const claims = await db.getAll(...usernames.map(usernameReference));
-  const claimedUserIds = claims.flatMap((claim) => claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : []);
-  const unresolvedUsernames = usernames.filter((_, index) => !claims[index]?.exists);
+  const claimedUserIds = claims.flatMap((claim) =>
+    claim.exists && claim.get('uid') ? [String(claim.get('uid'))] : [],
+  );
+  const unresolvedUsernames = usernames.filter(
+    (_, index) => !claims[index]?.exists,
+  );
   if (unresolvedUsernames.length === 0) return [...new Set(claimedUserIds)];
 
   // Username claims are populated by a rolling migration. searchTokens was
   // already normalized on old profiles, so it is a bounded, case-insensitive
   // bridge for mentions until every account has a claim document.
-  const legacyMatches = await Promise.all(unresolvedUsernames.map(async (username) => {
-    const profiles = await db.collection('users').where('searchTokens', 'array-contains', `p:${username}`).limit(2).get();
-    return profiles.docs.flatMap((profile) => (
-      normalizeUsername(String(profile.get('username') ?? '')) === username ? [profile.id] : []
-    ));
-  }));
+  const legacyMatches = await Promise.all(
+    unresolvedUsernames.map(async (username) => {
+      const profiles = await db
+        .collection('users')
+        .where('searchTokens', 'array-contains', `p:${username}`)
+        .limit(2)
+        .get();
+      return profiles.docs.flatMap((profile) =>
+        normalizeUsername(String(profile.get('username') ?? '')) === username
+          ? [profile.id]
+          : [],
+      );
+    }),
+  );
   return [...new Set([...claimedUserIds, ...legacyMatches.flat()])];
 }
 
@@ -379,12 +568,23 @@ async function announceReview(
   venue: { id: string; name: string; city: string; reviewCount: number },
 ): Promise<void> {
   const [followers, savers] = await Promise.all([
-    db.collection('users').doc(authorId).collection('followers').limit(400).get(),
-    db.collectionGroup('savedVenues').where('venueId', '==', venue.id).limit(400).get(),
+    db
+      .collection('users')
+      .doc(authorId)
+      .collection('followers')
+      .limit(400)
+      .get(),
+    db
+      .collectionGroup('savedVenues')
+      .where('venueId', '==', venue.id)
+      .limit(400)
+      .get(),
   ]);
-  const saverIds = new Set(savers.docs
-    .map((saved) => saved.ref.parent.parent?.id)
-    .filter((id): id is string => Boolean(id) && id !== authorId));
+  const saverIds = new Set(
+    savers.docs
+      .map((saved) => saved.ref.parent.parent?.id)
+      .filter((id): id is string => Boolean(id) && id !== authorId),
+  );
   const requests: NotificationRequest[] = [];
   for (const follower of followers.docs) {
     requests.push({
@@ -422,22 +622,25 @@ async function announceReview(
 
   // The very first review of a venue is news for everyone living in that city.
   if (venue.reviewCount > 0 || !venue.city) return;
-  const neighbours = await db.collection('users')
+  const neighbours = await db
+    .collection('users')
     .where('status', '==', 'active')
     .where('city', '==', venue.city)
     .limit(400)
     .get();
   if (!(await reviewIsPublished())) return;
-  await sendNotifications(neighbours.docs
-    .filter((neighbour) => neighbour.id !== authorId)
-    .map((neighbour) => ({
-      recipientId: neighbour.id,
-      type: 'city-first-review' as const,
-      eventKey: venue.id,
-      actorId: authorId,
-      params: { place: venue.name, city: venue.city },
-      targetId: venue.id,
-    })));
+  await sendNotifications(
+    neighbours.docs
+      .filter((neighbour) => neighbour.id !== authorId)
+      .map((neighbour) => ({
+        recipientId: neighbour.id,
+        type: 'city-first-review' as const,
+        eventKey: venue.id,
+        actorId: authorId,
+        params: { place: venue.name, city: venue.city },
+        targetId: venue.id,
+      })),
+  );
 }
 
 type StoredDishReview = {
@@ -453,130 +656,221 @@ async function attachDishPhotoUrls(
 ): Promise<void> {
   // The auth/function test contour deliberately does not start Storage. Never let it
   // fall through to a real bucket when Application Default Credentials are present.
-  if (isFirebaseEmulator()
-    && !process.env.FIREBASE_STORAGE_EMULATOR_HOST
-    && !process.env.STORAGE_EMULATOR_HOST) return;
+  if (
+    isFirebaseEmulator() &&
+    !process.env.FIREBASE_STORAGE_EMULATOR_HOST &&
+    !process.env.STORAGE_EMULATOR_HOST
+  )
+    return;
   const dishes = Array.isArray(review.get('dishReviews'))
-    ? review.get('dishReviews') as StoredDishReview[]
+    ? (review.get('dishReviews') as StoredDishReview[])
     : [];
-  if (dishes.length === 0 || dishes.every((dish) => typeof dish.photoUrl === 'string')) return;
+  if (
+    dishes.length === 0 ||
+    dishes.every((dish) => typeof dish.photoUrl === 'string')
+  )
+    return;
   const bucket = getStorage().bucket();
-  const enriched = await Promise.all(dishes.map(async (dish) => {
-    if (typeof dish.photoUrl === 'string' || typeof dish.photoPath !== 'string') return dish;
-    try {
-      return { ...dish, photoUrl: await getDownloadURL(bucket.file(dish.photoPath)) };
-    } catch (error) {
-      console.warn(`Unable to resolve the review photo ${dish.photoPath}.`, error);
-      return dish;
-    }
-  }));
+  const enriched = await Promise.all(
+    dishes.map(async (dish) => {
+      if (
+        typeof dish.photoUrl === 'string' ||
+        typeof dish.photoPath !== 'string'
+      )
+        return dish;
+      try {
+        return {
+          ...dish,
+          photoUrl: await getDownloadURL(bucket.file(dish.photoPath)),
+        };
+      } catch (error) {
+        console.warn(
+          `Unable to resolve the review photo ${dish.photoPath}.`,
+          error,
+        );
+        return dish;
+      }
+    }),
+  );
   if (enriched.some((dish, index) => dish !== dishes[index])) {
-    const resolvedUrlByPath = new Map(enriched.flatMap((dish) =>
-      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    const resolvedUrlByPath = new Map(
+      enriched.flatMap((dish) =>
+        typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string'
+          ? [[dish.photoPath, dish.photoUrl]]
+          : [],
+      ),
+    );
     // The trigger can run while its author edits the review. Re-read in a
     // transaction and add URLs only to matching, still-current photo paths.
     await db.runTransaction(async (transaction) => {
       const current = await transaction.get(review.ref);
       if (!current.exists) return;
       const currentDishes = Array.isArray(current.get('dishReviews'))
-        ? current.get('dishReviews') as StoredDishReview[]
+        ? (current.get('dishReviews') as StoredDishReview[])
         : [];
       const merged = currentDishes.map((dish) => {
-        const photoUrl = typeof dish.photoPath === 'string' ? resolvedUrlByPath.get(dish.photoPath) : undefined;
-        return photoUrl && typeof dish.photoUrl !== 'string' ? { ...dish, photoUrl } : dish;
+        const photoUrl =
+          typeof dish.photoPath === 'string'
+            ? resolvedUrlByPath.get(dish.photoPath)
+            : undefined;
+        return photoUrl && typeof dish.photoUrl !== 'string'
+          ? { ...dish, photoUrl }
+          : dish;
       });
       if (merged.some((dish, index) => dish !== currentDishes[index])) {
-        transaction.update(review.ref, { dishReviews: merged, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(review.ref, {
+          dishReviews: merged,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       }
     });
   }
 }
 
 /** Heavy post-publication work runs after the callable has returned to the app. */
-export const processReviewEffects = onDocumentCreated({
-  document: 'reviews/{reviewId}',
-  database: firestoreDatabaseId,
-  region: 'europe-west1',
-  retry: true,
-}, async (event) => {
-  const review = event.data;
-  if (!review?.exists || review.get('status') !== 'published') return;
-  const authorId = String(review.get('authorId') ?? '');
-  if (!authorId) return;
-  const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
-  const claim = await db.runTransaction(async (transaction) => {
-    const [effect, currentReview] = await Promise.all([
-      transaction.get(effectRef),
-      transaction.get(review.ref),
-    ]);
-    // The create-event snapshot remains published after a delete/moderation
-    // update. Check the current document in the lease transaction, so that a
-    // concurrent status change retries this transaction rather than sending
-    // notifications for content which is no longer visible.
-    if (!currentReview.exists || currentReview.get('status') !== 'published') return { claimed: false, review: null };
-    if (effect.get('status') === 'complete') return false;
-    // A duplicate delivery retries while a live worker owns the lease. If the
-    // worker died, a later delivery can reclaim it after the short lease.
-    const leaseExpiresAt = effect.get('leaseExpiresAt') as Timestamp | undefined;
-    if (effect.exists && leaseExpiresAt instanceof Timestamp && leaseExpiresAt.toMillis() > Date.now()) {
-      throw new Error(`Review effect ${event.id} is already processing.`);
+export const processReviewEffects = onDocumentCreated(
+  {
+    document: 'reviews/{reviewId}',
+    database: firestoreDatabaseId,
+    region: 'europe-west1',
+    retry: true,
+  },
+  async (event) => {
+    const review = event.data;
+    if (!review?.exists || review.get('status') !== 'published') return;
+    const authorId = String(review.get('authorId') ?? '');
+    if (!authorId) return;
+    const effectRef = db.collection('_reviewEffectEvents').doc(event.id);
+    const claim = await db.runTransaction(async (transaction) => {
+      const [effect, currentReview] = await Promise.all([
+        transaction.get(effectRef),
+        transaction.get(review.ref),
+      ]);
+      // The create-event snapshot remains published after a delete/moderation
+      // update. Check the current document in the lease transaction, so that a
+      // concurrent status change retries this transaction rather than sending
+      // notifications for content which is no longer visible.
+      if (!currentReview.exists || currentReview.get('status') !== 'published')
+        return { claimed: false, review: null };
+      if (effect.get('status') === 'complete') return false;
+      // A duplicate delivery retries while a live worker owns the lease. If the
+      // worker died, a later delivery can reclaim it after the short lease.
+      const leaseExpiresAt = effect.get('leaseExpiresAt') as
+        Timestamp | undefined;
+      if (
+        effect.exists &&
+        leaseExpiresAt instanceof Timestamp &&
+        leaseExpiresAt.toMillis() > Date.now()
+      ) {
+        throw new Error(`Review effect ${event.id} is already processing.`);
+      }
+      transaction.set(
+        effectRef,
+        {
+          reviewId: event.params.reviewId,
+          status: 'processing',
+          leaseExpiresAt: Timestamp.fromMillis(Date.now() + 5 * 60_000),
+          // TTL retains the completed marker long enough to deduplicate delayed
+          // Eventarc deliveries without growing this internal collection forever.
+          expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60_000),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      return { claimed: true, review: currentReview };
+    });
+    if (claim === false || !claim.claimed || !claim.review) return;
+    const activeReview = claim.review;
+    const xp = Math.max(
+      0,
+      Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0),
+    );
+    const storedXpBefore = Number(activeReview.get('xpBefore'));
+    const previousXp = Number.isFinite(storedXpBefore)
+      ? Math.max(0, storedXpBefore)
+      : Math.max(0, xp - 50);
+    const storedXpAfter = Number(activeReview.get('xpAfter'));
+    const nextXp = Number.isFinite(storedXpAfter)
+      ? Math.max(0, storedXpAfter)
+      : xp;
+    const completedEffects =
+      ((await effectRef.get()).get('completedEffects') as
+        Record<string, unknown> | undefined) ?? {};
+    const effects: Array<[string, () => Promise<void>]> = [
+      ['photoUrls', () => attachDishPhotoUrls(activeReview)],
+      [
+        'announcement',
+        () =>
+          announceReview(
+            review.ref,
+            event.params.reviewId,
+            authorId,
+            String(activeReview.get('authorDisplayName') ?? 'Someone'),
+            {
+              id: String(activeReview.get('venueId') ?? ''),
+              name: String(activeReview.get('venueName') ?? 'a place'),
+              city: String(activeReview.get('venueCity') ?? ''),
+              reviewCount:
+                activeReview.get('wasFirstVenueReview') === true ? 0 : 1,
+            },
+          ),
+      ],
+      [
+        'levelNotification',
+        () => notifyLevelChange(authorId, previousXp, nextXp),
+      ],
+    ];
+    for (const [name, run] of effects) {
+      if (completedEffects[name] === true) continue;
+      try {
+        await run();
+        // Store progress immediately after each completed side effect. A retry
+        // after a later failure resumes from here instead of re-delivering the
+        // earlier notification fan-out.
+        await effectRef.set(
+          {
+            [`completedEffects.${name}`]: true,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        console.warn(
+          `Review effect ${name} failed for ${event.params.reviewId}.`,
+          error,
+        );
+        throw error;
+      }
     }
-    transaction.set(effectRef, {
-      reviewId: event.params.reviewId,
-      status: 'processing',
-      leaseExpiresAt: Timestamp.fromMillis(Date.now() + 5 * 60_000),
-      // TTL retains the completed marker long enough to deduplicate delayed
-      // Eventarc deliveries without growing this internal collection forever.
-      expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60_000),
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-    return { claimed: true, review: currentReview };
-  });
-  if (claim === false || !claim.claimed || !claim.review) return;
-  const activeReview = claim.review;
-  const xp = Math.max(0, Number((await db.collection('users').doc(authorId).get()).get('xp') ?? 0));
-  const storedXpBefore = Number(activeReview.get('xpBefore'));
-  const previousXp = Number.isFinite(storedXpBefore) ? Math.max(0, storedXpBefore) : Math.max(0, xp - 50);
-  const storedXpAfter = Number(activeReview.get('xpAfter'));
-  const nextXp = Number.isFinite(storedXpAfter) ? Math.max(0, storedXpAfter) : xp;
-  const completedEffects = (await effectRef.get()).get('completedEffects') as Record<string, unknown> | undefined ?? {};
-  const effects: Array<[string, () => Promise<void>]> = [
-    ['photoUrls', () => attachDishPhotoUrls(activeReview)],
-    ['announcement', () => announceReview(review.ref, event.params.reviewId, authorId, String(activeReview.get('authorDisplayName') ?? 'Someone'), {
-      id: String(activeReview.get('venueId') ?? ''),
-      name: String(activeReview.get('venueName') ?? 'a place'),
-      city: String(activeReview.get('venueCity') ?? ''),
-      reviewCount: activeReview.get('wasFirstVenueReview') === true ? 0 : 1,
-    })],
-    ['levelNotification', () => notifyLevelChange(authorId, previousXp, nextXp)],
-  ];
-  for (const [name, run] of effects) {
-    if (completedEffects[name] === true) continue;
-    try {
-      await run();
-      // Store progress immediately after each completed side effect. A retry
-      // after a later failure resumes from here instead of re-delivering the
-      // earlier notification fan-out.
-      await effectRef.set({ [`completedEffects.${name}`]: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-    } catch (error) {
-      console.warn(`Review effect ${name} failed for ${event.params.reviewId}.`, error);
-      throw error;
-    }
-  }
-  await effectRef.set({ status: 'complete', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-});
+    await effectRef.set(
+      {
+        status: 'complete',
+        completedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  },
+);
 
 export const createReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createReviewInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
   const venueRef = db.collection('venues').doc(input.venueId);
-  const reviewRef = db.collection('reviews').doc(
-    idempotentDocumentId(uid, 'create-review', input.idempotencyKey),
-  );
+  const reviewRef = db
+    .collection('reviews')
+    .doc(idempotentDocumentId(uid, 'create-review', input.idempotencyKey));
   const expectedPhotoPrefix = `review-images/${uid}/${input.idempotencyKey}/`;
-  if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(expectedPhotoPrefix))) {
-    throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user and draft.');
+  if (
+    input.dishReviews.some(
+      (dish) => !dish.photoPath.startsWith(expectedPhotoPrefix),
+    )
+  ) {
+    throw new HttpsError(
+      'permission-denied',
+      'Review photos must belong to the authenticated user and draft.',
+    );
   }
 
   await db.runTransaction(async (transaction) => {
@@ -587,7 +881,10 @@ export const createReview = onCall(callableOptions, async (request) => {
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (existingReview.exists) return;
 
@@ -623,7 +920,7 @@ export const createReview = onCall(callableOptions, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
     transaction.update(venueRef, {
-      rating: ((averageRating * reviewCount) + input.rating) / (reviewCount + 1),
+      rating: (averageRating * reviewCount + input.rating) / (reviewCount + 1),
       reviewCount: reviewCount + 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -641,8 +938,15 @@ export const editReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(editReviewInputSchema, request.data);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
-  if (input.dishReviews.some((dish) => !dish.photoPath.startsWith(`review-images/${uid}/`))) {
-    throw new HttpsError('permission-denied', 'Review photos must belong to the authenticated user.');
+  if (
+    input.dishReviews.some(
+      (dish) => !dish.photoPath.startsWith(`review-images/${uid}/`),
+    )
+  ) {
+    throw new HttpsError(
+      'permission-denied',
+      'Review photos must belong to the authenticated user.',
+    );
   }
 
   await db.runTransaction(async (transaction) => {
@@ -651,23 +955,36 @@ export const editReview = onCall(callableOptions, async (request) => {
       throw new HttpsError('not-found', 'The review was not found.');
     }
     if (review.get('authorId') !== uid) {
-      throw new HttpsError('permission-denied', 'Only the review author can edit this review.');
+      throw new HttpsError(
+        'permission-denied',
+        'Only the review author can edit this review.',
+      );
     }
     const venueRef = db.collection('venues').doc(String(review.get('venueId')));
     const venue = await transaction.get(venueRef);
-    if (!venue.exists) throw new HttpsError('not-found', 'The venue was not found.');
+    if (!venue.exists)
+      throw new HttpsError('not-found', 'The venue was not found.');
 
     const count = Math.max(1, Number(venue.get('reviewCount') ?? 1));
     const average = Math.max(0, Number(venue.get('rating') ?? 0));
     const oldRating = Number(review.get('rating') ?? 0);
     const cuisine = venue.get('category');
     const now = FieldValue.serverTimestamp();
-    const previousDishes = Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') as StoredDishReview[] : [];
-    const photoUrlByPath = new Map(previousDishes.flatMap((dish) =>
-      typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string' ? [[dish.photoPath, dish.photoUrl]] : []));
+    const previousDishes = Array.isArray(review.get('dishReviews'))
+      ? (review.get('dishReviews') as StoredDishReview[])
+      : [];
+    const photoUrlByPath = new Map(
+      previousDishes.flatMap((dish) =>
+        typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string'
+          ? [[dish.photoPath, dish.photoUrl]]
+          : [],
+      ),
+    );
     const dishReviews = input.dishReviews.map((dish) => ({
       ...dish,
-      ...(photoUrlByPath.get(dish.photoPath) ? { photoUrl: photoUrlByPath.get(dish.photoPath) } : {}),
+      ...(photoUrlByPath.get(dish.photoPath)
+        ? { photoUrl: photoUrlByPath.get(dish.photoPath) }
+        : {}),
     }));
     transaction.update(reviewRef, {
       rating: input.rating,
@@ -680,14 +997,20 @@ export const editReview = onCall(callableOptions, async (request) => {
       updatedAt: now,
     });
     transaction.update(venueRef, {
-      rating: Math.max(0, Math.min(5, ((average * count) - oldRating + input.rating) / count)),
+      rating: Math.max(
+        0,
+        Math.min(5, (average * count - oldRating + input.rating) / count),
+      ),
       updatedAt: now,
     });
   });
   try {
     await attachDishPhotoUrls(await reviewRef.get());
   } catch (error) {
-    console.warn(`Unable to resolve review photos after editing ${input.reviewId}.`, error);
+    console.warn(
+      `Unable to resolve review photos after editing ${input.reviewId}.`,
+      error,
+    );
   }
   return { id: input.reviewId };
 });
@@ -705,12 +1028,19 @@ export const deleteReview = onCall(callableOptions, async (request) => {
     ]);
     if (!review.exists || review.get('status') === 'deleted') return;
     if (review.get('authorId') !== uid) {
-      throw new HttpsError('permission-denied', 'Only the review author can delete this review.');
+      throw new HttpsError(
+        'permission-denied',
+        'Only the review author can delete this review.',
+      );
     }
     const venueRef = db.collection('venues').doc(String(review.get('venueId')));
     const venue = await transaction.get(venueRef);
     const now = FieldValue.serverTimestamp();
-    transaction.update(reviewRef, { status: 'deleted', deletedAt: now, updatedAt: now });
+    transaction.update(reviewRef, {
+      status: 'deleted',
+      deletedAt: now,
+      updatedAt: now,
+    });
     if (venue.exists) {
       const count = Math.max(0, Number(venue.get('reviewCount') ?? 0));
       const nextCount = Math.max(0, count - 1);
@@ -718,7 +1048,10 @@ export const deleteReview = onCall(callableOptions, async (request) => {
       const rating = Number(review.get('rating') ?? 0);
       transaction.update(venueRef, {
         reviewCount: nextCount,
-        rating: nextCount === 0 ? 0 : Math.max(0, Math.min(5, ((average * count) - rating) / nextCount)),
+        rating:
+          nextCount === 0
+            ? 0
+            : Math.max(0, Math.min(5, (average * count - rating) / nextCount)),
         updatedAt: now,
       });
     }
@@ -745,7 +1078,10 @@ export const setReviewPinned = onCall(callableOptions, async (request) => {
     throw new HttpsError('not-found', 'The review was not found.');
   }
   if (review.get('authorId') !== uid) {
-    throw new HttpsError('permission-denied', 'Only the review author can change its pinned state.');
+    throw new HttpsError(
+      'permission-denied',
+      'Only the review author can change its pinned state.',
+    );
   }
   await reviewRef.update({
     pinned: input.pinned,
@@ -758,44 +1094,84 @@ export const reactToContent = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reactToContentInputSchema, request.data);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
-  const contentRef = input.targetType === 'review'
-    ? reviewRef
-    : reviewRef.collection('comments').doc(input.commentId!);
+  const contentRef =
+    input.targetType === 'review'
+      ? reviewRef
+      : reviewRef.collection('comments').doc(input.commentId!);
   const reactionRef = contentRef.collection('reactions').doc(uid);
-  const idempotencyRef = db.collection('_idempotency').doc(
-    idempotentDocumentId(uid, `${input.targetType}-reaction:${contentRef.id}`, input.idempotencyKey),
-  );
+  const idempotencyRef = db
+    .collection('_idempotency')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `${input.targetType}-reaction:${contentRef.id}`,
+        input.idempotencyKey,
+      ),
+    );
   return db.runTransaction(async (transaction) => {
-    const [profile, review, content, reaction, idempotency] = await Promise.all([
-      transaction.get(db.collection('users').doc(uid)),
-      transaction.get(reviewRef),
-      input.targetType === 'review' ? transaction.get(reviewRef) : transaction.get(contentRef),
-      transaction.get(reactionRef),
-      transaction.get(idempotencyRef),
-    ]);
+    const [profile, review, content, reaction, idempotency] = await Promise.all(
+      [
+        transaction.get(db.collection('users').doc(uid)),
+        transaction.get(reviewRef),
+        input.targetType === 'review'
+          ? transaction.get(reviewRef)
+          : transaction.get(contentRef),
+        transaction.get(reactionRef),
+        transaction.get(idempotencyRef),
+      ],
+    );
     if (!profile.exists || profile.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (idempotency.exists) {
-      return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount') ?? 0) };
+      return {
+        active: Boolean(idempotency.get('active')),
+        reactionCount: Number(idempotency.get('reactionCount') ?? 0),
+      };
     }
-    if (!review.exists || review.get('status') !== 'published' || !content.exists || content.get('status') !== 'published') {
+    if (
+      !review.exists ||
+      review.get('status') !== 'published' ||
+      !content.exists ||
+      content.get('status') !== 'published'
+    ) {
       throw new HttpsError('not-found', 'The content was not found.');
     }
     if (content.get('authorId') === uid) {
-      throw new HttpsError('failed-precondition', 'You cannot react to your own content.');
+      throw new HttpsError(
+        'failed-precondition',
+        'You cannot react to your own content.',
+      );
     }
-    const authorRef = input.targetType === 'review'
-      ? db.collection('users').doc(String(content.get('authorId')))
-      : null;
+    const authorRef =
+      input.targetType === 'review'
+        ? db.collection('users').doc(String(content.get('authorId')))
+        : null;
     const author = authorRef ? await transaction.get(authorRef) : null;
-    await enforceRateLimit(transaction, uid, input.targetType === 'review' ? 'react-review' : 'react-content', 120, 60_000);
+    await enforceRateLimit(
+      transaction,
+      uid,
+      input.targetType === 'review' ? 'react-review' : 'react-content',
+      120,
+      60_000,
+    );
     const currentCount = Math.max(0, Number(content.get('reactionCount') ?? 0));
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
-    if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
+    if (active)
+      transaction.create(reactionRef, {
+        userId: uid,
+        reaction: input.reaction,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     else transaction.delete(reactionRef);
-    transaction.update(contentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
+    transaction.update(contentRef, {
+      reactionCount,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     const authorXp = Math.max(0, Number(author?.get('xp') ?? 0));
     if (authorRef && author?.exists) {
       addXp(transaction, authorRef, active ? 5 : -5, {
@@ -848,32 +1224,54 @@ export const reportContent = onCall(callableOptions, async (request) => {
   const input = parseInput(reportContentInputSchema, request.data);
   const profileRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
-  const contentRef = input.targetType === 'review'
-    ? reviewRef
-    : reviewRef.collection('comments').doc(input.commentId!);
-  const [profile, review, content] = await Promise.all([profileRef.get(), reviewRef.get(), contentRef.get()]);
+  const contentRef =
+    input.targetType === 'review'
+      ? reviewRef
+      : reviewRef.collection('comments').doc(input.commentId!);
+  const [profile, review, content] = await Promise.all([
+    profileRef.get(),
+    reviewRef.get(),
+    contentRef.get(),
+  ]);
   if (!profile.exists || profile.get('status') !== 'active') {
-    throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    throw new HttpsError(
+      'failed-precondition',
+      'An active user profile is required.',
+    );
   }
-  if (!review.exists || review.get('status') !== 'published' || !content.exists || content.get('status') !== 'published') {
+  if (
+    !review.exists ||
+    review.get('status') !== 'published' ||
+    !content.exists ||
+    content.get('status') !== 'published'
+  ) {
     throw new HttpsError('not-found', 'The content was not found.');
   }
-  const reportRef = db.collection('reports').doc(
-    idempotentDocumentId(uid, `report-${input.targetType}:${contentRef.id}`, input.idempotencyKey),
+  const reportRef = db
+    .collection('reports')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `report-${input.targetType}:${contentRef.id}`,
+        input.idempotencyKey,
+      ),
+    );
+  await reportRef.set(
+    {
+      reporterId: uid,
+      reporterName: String(profile.get('displayName') ?? 'Tastes user'),
+      targetType: input.targetType,
+      targetId: contentRef.id,
+      ...(input.targetType === 'comment' ? { parentId: input.reviewId } : {}),
+      reason: input.reason,
+      details: input.details ?? null,
+      contentPreview: String(content.get('text') ?? '').slice(0, 280),
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: false },
   );
-  await reportRef.set({
-    reporterId: uid,
-    reporterName: String(profile.get('displayName') ?? 'Tastes user'),
-    targetType: input.targetType,
-    targetId: contentRef.id,
-    ...(input.targetType === 'comment' ? { parentId: input.reviewId } : {}),
-    reason: input.reason,
-    details: input.details ?? null,
-    contentPreview: String(content.get('text') ?? '').slice(0, 280),
-    status: 'pending',
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  }, { merge: false });
   await sendNotification({
     recipientId: uid,
     type: 'report-received',
@@ -888,13 +1286,23 @@ export const addComment = onCall(callableOptions, async (request) => {
   const input = parseInput(addCommentInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
-  const commentRef = reviewRef.collection('comments').doc(
-    idempotentDocumentId(uid, `comment:${input.reviewId}`, input.idempotencyKey),
-  );
+  const commentRef = reviewRef
+    .collection('comments')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `comment:${input.reviewId}`,
+        input.idempotencyKey,
+      ),
+    );
   const parentRef = input.parentCommentId
     ? reviewRef.collection('comments').doc(input.parentCommentId)
     : null;
-  type CommentNotice = { actorName: string; preview: string; excludedIds: string[] };
+  type CommentNotice = {
+    actorName: string;
+    preview: string;
+    excludedIds: string[];
+  };
   let notified: CommentNotice | null = null;
 
   await db.runTransaction(async (transaction) => {
@@ -906,18 +1314,27 @@ export const addComment = onCall(callableOptions, async (request) => {
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (existingComment.exists) return;
 
     if (!review.exists || review.get('status') !== 'published') {
       throw new HttpsError('not-found', 'The review was not found.');
     }
-    if (parentRef && (!parentComment?.exists || parentComment.get('status') !== 'published')) {
+    if (
+      parentRef &&
+      (!parentComment?.exists || parentComment.get('status') !== 'published')
+    ) {
       throw new HttpsError('not-found', 'The parent comment was not found.');
     }
     if (parentComment?.get('parentCommentId')) {
-      throw new HttpsError('failed-precondition', 'Replies can only be added to top-level comments.');
+      throw new HttpsError(
+        'failed-precondition',
+        'Replies can only be added to top-level comments.',
+      );
     }
 
     await enforceRateLimit(transaction, uid, 'add-comment', 30, 60_000);
@@ -936,13 +1353,21 @@ export const addComment = onCall(callableOptions, async (request) => {
       commentCount: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    if (parentRef) transaction.update(parentRef, { replyCount: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() });
+    if (parentRef)
+      transaction.update(parentRef, {
+        replyCount: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
     const actorName = String(user.get('displayName') ?? 'Someone');
     const preview = commentPreview(input.text);
-    const parentAuthorId = parentComment ? String(parentComment.get('authorId') ?? '') : '';
+    const parentAuthorId = parentComment
+      ? String(parentComment.get('authorId') ?? '')
+      : '';
     queueNotification(transaction, {
-      recipientId: parentRef ? parentAuthorId : String(review.get('authorId') ?? ''),
+      recipientId: parentRef
+        ? parentAuthorId
+        : String(review.get('authorId') ?? ''),
       type: parentRef ? 'comment-reply' : 'review-comment',
       eventKey: commentRef.id,
       actorId: uid,
@@ -967,24 +1392,32 @@ export const addComment = onCall(callableOptions, async (request) => {
     notified = {
       actorName,
       preview,
-      excludedIds: [uid, parentAuthorId, String(review.get('authorId') ?? '')].filter(Boolean),
+      excludedIds: [
+        uid,
+        parentAuthorId,
+        String(review.get('authorId') ?? ''),
+      ].filter(Boolean),
     };
   });
 
   const notice = notified as CommentNotice | null;
   if (notice) {
     const { actorName, preview, excludedIds } = notice;
-    const mentioned = (await mentionedUserIds(input.text)).filter((id) => !excludedIds.includes(id));
-    await sendNotifications(mentioned.map((recipientId) => ({
-      recipientId,
-      type: 'mention' as const,
-      eventKey: commentRef.id,
-      actorId: uid,
-      actorName,
-      params: { text: preview },
-      targetId: input.reviewId,
-      data: { commentId: commentRef.id },
-    })));
+    const mentioned = (await mentionedUserIds(input.text)).filter(
+      (id) => !excludedIds.includes(id),
+    );
+    await sendNotifications(
+      mentioned.map((recipientId) => ({
+        recipientId,
+        type: 'mention' as const,
+        eventKey: commentRef.id,
+        actorId: uid,
+        actorName,
+        params: { text: preview },
+        targetId: input.reviewId,
+        data: { commentId: commentRef.id },
+      })),
+    );
   }
 
   return { id: commentRef.id };
@@ -993,26 +1426,62 @@ export const addComment = onCall(callableOptions, async (request) => {
 export const reactToComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reactToCommentInputSchema, request.data);
-  const commentRef = db.collection('reviews').doc(input.reviewId).collection('comments').doc(input.commentId);
+  const commentRef = db
+    .collection('reviews')
+    .doc(input.reviewId)
+    .collection('comments')
+    .doc(input.commentId);
   const reactionRef = commentRef.collection('reactions').doc(uid);
-  const idempotencyRef = db.collection('_idempotency').doc(idempotentDocumentId(uid, `comment-reaction:${input.commentId}`, input.idempotencyKey));
+  const idempotencyRef = db
+    .collection('_idempotency')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `comment-reaction:${input.commentId}`,
+        input.idempotencyKey,
+      ),
+    );
   return db.runTransaction(async (transaction) => {
     const [profile, comment, reaction, idempotency] = await Promise.all([
-      transaction.get(db.collection('users').doc(uid)), transaction.get(commentRef), transaction.get(reactionRef), transaction.get(idempotencyRef),
+      transaction.get(db.collection('users').doc(uid)),
+      transaction.get(commentRef),
+      transaction.get(reactionRef),
+      transaction.get(idempotencyRef),
     ]);
     if (!profile.exists || profile.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
-    if (idempotency.exists) return { active: Boolean(idempotency.get('active')), reactionCount: Number(idempotency.get('reactionCount')) };
-    if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
+    if (idempotency.exists)
+      return {
+        active: Boolean(idempotency.get('active')),
+        reactionCount: Number(idempotency.get('reactionCount')),
+      };
+    if (!comment.exists || comment.get('status') !== 'published')
+      throw new HttpsError('not-found', 'The comment was not found.');
     await enforceRateLimit(transaction, uid, 'react-comment', 120, 60_000);
     const currentCount = Number(comment.get('reactionCount') ?? 0);
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
-    if (active) transaction.create(reactionRef, { userId: uid, reaction: input.reaction, createdAt: FieldValue.serverTimestamp() });
+    if (active)
+      transaction.create(reactionRef, {
+        userId: uid,
+        reaction: input.reaction,
+        createdAt: FieldValue.serverTimestamp(),
+      });
     else transaction.delete(reactionRef);
-    transaction.update(commentRef, { reactionCount, updatedAt: FieldValue.serverTimestamp() });
-    transaction.create(idempotencyRef, { active, reactionCount, createdAt: FieldValue.serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000) });
+    transaction.update(commentRef, {
+      reactionCount,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.create(idempotencyRef, {
+      active,
+      reactionCount,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60_000),
+    });
     return { active, reactionCount };
   });
 });
@@ -1027,34 +1496,51 @@ export const deleteComment = onCall(callableOptions, async (request) => {
       transaction.get(reviewRef),
       transaction.get(commentRef),
     ]);
-    if (!review.exists || review.get('status') !== 'published') throw new HttpsError('not-found', 'The review was not found.');
-    if (!comment.exists || comment.get('status') !== 'published') throw new HttpsError('not-found', 'The comment was not found.');
-    if (comment.get('authorId') !== uid) throw new HttpsError('permission-denied', 'You can only delete your own comments.');
+    if (!review.exists || review.get('status') !== 'published')
+      throw new HttpsError('not-found', 'The review was not found.');
+    if (!comment.exists || comment.get('status') !== 'published')
+      throw new HttpsError('not-found', 'The comment was not found.');
+    if (comment.get('authorId') !== uid)
+      throw new HttpsError(
+        'permission-denied',
+        'You can only delete your own comments.',
+      );
     const parentId = comment.get('parentCommentId');
-    const parentRef = parentId ? reviewRef.collection('comments').doc(String(parentId)) : null;
+    const parentRef = parentId
+      ? reviewRef.collection('comments').doc(String(parentId))
+      : null;
     const parent = parentRef ? await transaction.get(parentRef) : null;
     // Preserve the synchronous path for normal threads. For a larger root,
     // hide it right away and let the scheduled worker remove replies in safe
     // batches instead of exceeding Firestore's 500-write transaction limit.
     const deletingRoot = !parentRef;
     const replies = deletingRoot
-      ? await transaction.get(reviewRef.collection('comments')
-        .where('status', '==', 'published')
-        .where('parentCommentId', '==', input.commentId)
-        .limit(451))
+      ? await transaction.get(
+          reviewRef
+            .collection('comments')
+            .where('status', '==', 'published')
+            .where('parentCommentId', '==', input.commentId)
+            .limit(451),
+        )
       : null;
     const deferredReplyDeletion = (replies?.size ?? 0) > 450;
-    const repliesToDelete = deferredReplyDeletion ? [] : replies?.docs ?? [];
+    const repliesToDelete = deferredReplyDeletion ? [] : (replies?.docs ?? []);
     transaction.update(commentRef, {
       status: 'deleted',
       ...(deferredReplyDeletion ? { replyDeletionPending: true } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
     for (const reply of repliesToDelete) {
-      transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
+      transaction.update(reply.ref, {
+        status: 'deleted',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
     transaction.update(reviewRef, {
-      commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - 1 - repliesToDelete.length),
+      commentCount: Math.max(
+        0,
+        Number(review.get('commentCount') ?? 0) - 1 - repliesToDelete.length,
+      ),
       updatedAt: FieldValue.serverTimestamp(),
     });
     if (parentRef && parent?.exists && parent.get('status') === 'published') {
@@ -1074,53 +1560,72 @@ const COMMENT_REPLY_CLEANUP_BATCH_SIZE = 400;
  * depend on the size of the discussion. A root is already hidden immediately;
  * this job only reconciles its now-unreachable replies and review count.
  */
-export const cleanupDeletedCommentReplies = onSchedule({
-  schedule: 'every 5 minutes',
-  region: 'europe-west1',
-  timeZone: 'UTC',
-  maxInstances: 1,
-}, async () => {
-  const roots = await db.collectionGroup('comments')
-    .where('replyDeletionPending', '==', true)
-    .limit(10)
-    .get();
-  for (const root of roots.docs) {
-    const reviewRef = root.ref.parent.parent;
-    if (!reviewRef) continue;
-    await db.runTransaction(async (transaction) => {
-      const [currentRoot, review, replies] = await Promise.all([
-        transaction.get(root.ref),
-        transaction.get(reviewRef),
-        transaction.get(root.ref.parent
-          .where('parentCommentId', '==', root.id)
-          .where('status', '==', 'published')
-          .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE)),
-      ]);
-      if (!currentRoot.exists || currentRoot.get('replyDeletionPending') !== true) return;
-      if (replies.empty) {
+export const cleanupDeletedCommentReplies = onSchedule(
+  {
+    schedule: 'every 5 minutes',
+    region: 'europe-west1',
+    timeZone: 'UTC',
+    maxInstances: 1,
+  },
+  async () => {
+    const roots = await db
+      .collectionGroup('comments')
+      .where('replyDeletionPending', '==', true)
+      .limit(10)
+      .get();
+    for (const root of roots.docs) {
+      const reviewRef = root.ref.parent.parent;
+      if (!reviewRef) continue;
+      await db.runTransaction(async (transaction) => {
+        const [currentRoot, review, replies] = await Promise.all([
+          transaction.get(root.ref),
+          transaction.get(reviewRef),
+          transaction.get(
+            root.ref.parent
+              .where('parentCommentId', '==', root.id)
+              .where('status', '==', 'published')
+              .limit(COMMENT_REPLY_CLEANUP_BATCH_SIZE),
+          ),
+        ]);
+        if (
+          !currentRoot.exists ||
+          currentRoot.get('replyDeletionPending') !== true
+        )
+          return;
+        if (replies.empty) {
+          transaction.update(root.ref, {
+            replyDeletionPending: FieldValue.delete(),
+            replyCount: 0,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+        for (const reply of replies.docs) {
+          transaction.update(reply.ref, {
+            status: 'deleted',
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        if (review.exists) {
+          transaction.update(reviewRef, {
+            commentCount: Math.max(
+              0,
+              Number(review.get('commentCount') ?? 0) - replies.size,
+            ),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
         transaction.update(root.ref, {
-          replyDeletionPending: FieldValue.delete(),
-          replyCount: 0,
+          replyCount: Math.max(
+            0,
+            Number(currentRoot.get('replyCount') ?? 0) - replies.size,
+          ),
           updatedAt: FieldValue.serverTimestamp(),
         });
-        return;
-      }
-      for (const reply of replies.docs) {
-        transaction.update(reply.ref, { status: 'deleted', updatedAt: FieldValue.serverTimestamp() });
-      }
-      if (review.exists) {
-        transaction.update(reviewRef, {
-          commentCount: Math.max(0, Number(review.get('commentCount') ?? 0) - replies.size),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-      transaction.update(root.ref, {
-        replyCount: Math.max(0, Number(currentRoot.get('replyCount') ?? 0) - replies.size),
-        updatedAt: FieldValue.serverTimestamp(),
       });
-    });
-  }
-});
+    }
+  },
+);
 
 export const reactToReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -1128,9 +1633,15 @@ export const reactToReview = onCall(callableOptions, async (request) => {
   const userRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const reactionRef = reviewRef.collection('reactions').doc(uid);
-  const idempotencyRef = db.collection('_idempotency').doc(
-    idempotentDocumentId(uid, `reaction:${input.reviewId}`, input.idempotencyKey),
-  );
+  const idempotencyRef = db
+    .collection('_idempotency')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `reaction:${input.reviewId}`,
+        input.idempotencyKey,
+      ),
+    );
 
   return db.runTransaction(async (transaction) => {
     const [user, review, reaction, idempotency] = await Promise.all([
@@ -1141,7 +1652,10 @@ export const reactToReview = onCall(callableOptions, async (request) => {
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (idempotency.exists) {
       return {
@@ -1154,7 +1668,10 @@ export const reactToReview = onCall(callableOptions, async (request) => {
     }
     const authorId = String(review.get('authorId'));
     if (authorId === uid) {
-      throw new HttpsError('failed-precondition', 'You cannot react to your own review.');
+      throw new HttpsError(
+        'failed-precondition',
+        'You cannot react to your own review.',
+      );
     }
     const authorRef = db.collection('users').doc(authorId);
     const author = await transaction.get(authorRef);
@@ -1170,10 +1687,11 @@ export const reactToReview = onCall(callableOptions, async (request) => {
         reactionCount,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      if (author.exists) addXp(transaction, authorRef, -5, {
-        xp: Number(author.get('xp') ?? 0),
-        monthlyXp: Number(author.get('monthlyXp') ?? 0),
-      });
+      if (author.exists)
+        addXp(transaction, authorRef, -5, {
+          xp: Number(author.get('xp') ?? 0),
+          monthlyXp: Number(author.get('monthlyXp') ?? 0),
+        });
       transaction.create(idempotencyRef, {
         active: false,
         reactionCount,
@@ -1192,10 +1710,11 @@ export const reactToReview = onCall(callableOptions, async (request) => {
       reactionCount: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    if (author.exists) addXp(transaction, authorRef, 5, {
-      xp: Number(author.get('xp') ?? 0),
-      monthlyXp: Number(author.get('monthlyXp') ?? 0),
-    });
+    if (author.exists)
+      addXp(transaction, authorRef, 5, {
+        xp: Number(author.get('xp') ?? 0),
+        monthlyXp: Number(author.get('monthlyXp') ?? 0),
+      });
     const reactionCount = currentCount + 1;
     transaction.create(idempotencyRef, {
       active: true,
@@ -1240,7 +1759,11 @@ export const hideReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(hideReviewInputSchema, request.data);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
-  const hiddenReviewRef = db.collection('users').doc(uid).collection('hiddenReviews').doc(input.reviewId);
+  const hiddenReviewRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('hiddenReviews')
+    .doc(input.reviewId);
 
   await db.runTransaction(async (transaction) => {
     const [user, review] = await Promise.all([
@@ -1249,7 +1772,10 @@ export const hideReview = onCall(callableOptions, async (request) => {
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (!review.exists || review.get('status') !== 'published') {
       throw new HttpsError('not-found', 'The review was not found.');
@@ -1268,9 +1794,15 @@ export const hideReview = onCall(callableOptions, async (request) => {
 export const reportReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reportReviewInputSchema, request.data);
-  const idempotencyRef = db.collection('_idempotency').doc(
-    idempotentDocumentId(uid, `report-review:${input.reviewId}`, input.idempotencyKey),
-  );
+  const idempotencyRef = db
+    .collection('_idempotency')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `report-review:${input.reviewId}`,
+        input.idempotencyKey,
+      ),
+    );
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const userRef = db.collection('users').doc(uid);
 
@@ -1282,7 +1814,10 @@ export const reportReview = onCall(callableOptions, async (request) => {
     ]);
 
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (idempotency.exists) {
       return { id: String(idempotency.get('reportId') ?? '') };

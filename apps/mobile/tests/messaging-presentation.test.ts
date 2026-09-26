@@ -1,8 +1,15 @@
 import type { ConversationSummary } from '@tastes/contracts';
 import { describe, expect, it } from 'vitest';
-import { activitySubtitle, compareConversations, reservationCountdown } from '../src/features/messaging/presentation';
+import {
+  activitySubtitle,
+  compareConversations,
+  reservationCountdown,
+} from '../src/features/messaging/presentation';
 
-function conversation(id: string, overrides: Partial<ConversationSummary> = {}): ConversationSummary {
+function conversation(
+  id: string,
+  overrides: Partial<ConversationSummary> = {},
+): ConversationSummary {
   return {
     id,
     kind: 'direct',
@@ -27,31 +34,66 @@ function conversation(id: string, overrides: Partial<ConversationSummary> = {}):
 describe('messaging presentation', () => {
   it('puts newly received personal chats above pinned upcoming activities', () => {
     const now = new Date('2026-09-15T10:00:00.000Z').getTime();
-    const activity = conversation('activity', { kind: 'activity', activityStartsAt: '2026-09-15T11:00:00.000Z' });
-    const unreadDirect = conversation('direct', { unreadCount: 2, updatedAt: '2026-09-15T09:30:00.000Z' });
-    expect([activity, unreadDirect].sort((a, b) => compareConversations(a, b, now)).map((item) => item.id))
-      .toEqual(['direct', 'activity']);
+    const activity = conversation('activity', {
+      kind: 'activity',
+      activityStartsAt: '2026-09-15T11:00:00.000Z',
+    });
+    const unreadDirect = conversation('direct', {
+      unreadCount: 2,
+      updatedAt: '2026-09-15T09:30:00.000Z',
+    });
+    expect(
+      [activity, unreadDirect]
+        .sort((a, b) => compareConversations(a, b, now))
+        .map((item) => item.id),
+    ).toEqual(['direct', 'activity']);
   });
 
   it('floats upcoming activities by the nearest reservation first', () => {
     const now = new Date('2026-09-15T10:00:00.000Z').getTime();
-    const direct = conversation('direct', { updatedAt: '2026-09-15T12:00:00.000Z' });
-    const later = conversation('later', { kind: 'activity', activityStartsAt: '2026-09-15T14:00:00.000Z' });
-    const sooner = conversation('sooner', { kind: 'activity', activityStartsAt: '2026-09-15T11:00:00.000Z' });
-    expect([direct, later, sooner].sort((a, b) => compareConversations(a, b, now)).map((item) => item.id))
-      .toEqual(['sooner', 'later', 'direct']);
+    const direct = conversation('direct', {
+      updatedAt: '2026-09-15T12:00:00.000Z',
+    });
+    const later = conversation('later', {
+      kind: 'activity',
+      activityStartsAt: '2026-09-15T14:00:00.000Z',
+    });
+    const sooner = conversation('sooner', {
+      kind: 'activity',
+      activityStartsAt: '2026-09-15T11:00:00.000Z',
+    });
+    expect(
+      [direct, later, sooner]
+        .sort((a, b) => compareConversations(a, b, now))
+        .map((item) => item.id),
+    ).toEqual(['sooner', 'later', 'direct']);
   });
 
   it('returns passed activities to normal recency order', () => {
     const now = new Date('2026-09-15T10:00:00.000Z').getTime();
-    const passed = conversation('passed', { kind: 'activity', activityStartsAt: '2026-09-15T09:00:00.000Z' });
-    const recent = conversation('recent', { updatedAt: '2026-09-15T12:00:00.000Z' });
-    expect([passed, recent].sort((a, b) => compareConversations(a, b, now)).map((item) => item.id))
-      .toEqual(['recent', 'passed']);
+    const passed = conversation('passed', {
+      kind: 'activity',
+      activityStartsAt: '2026-09-15T09:00:00.000Z',
+    });
+    const recent = conversation('recent', {
+      updatedAt: '2026-09-15T12:00:00.000Z',
+    });
+    expect(
+      [passed, recent]
+        .sort((a, b) => compareConversations(a, b, now))
+        .map((item) => item.id),
+    ).toEqual(['recent', 'passed']);
   });
 
   it('formats activity metadata and countdowns', () => {
-    expect(activitySubtitle('2026-09-18T20:00:00.000Z', 4)).toContain('4 going');
-    expect(reservationCountdown('2026-09-15T12:00:00.000Z', new Date('2026-09-15T10:00:00.000Z').getTime())).toBe('in 2h');
+    expect(activitySubtitle('2026-09-18T20:00:00.000Z', 4)).toContain(
+      '4 going',
+    );
+    expect(
+      reservationCountdown(
+        '2026-09-15T12:00:00.000Z',
+        new Date('2026-09-15T10:00:00.000Z').getTime(),
+      ),
+    ).toBe('in 2h');
   });
 });

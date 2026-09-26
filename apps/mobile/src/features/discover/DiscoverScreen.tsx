@@ -23,7 +23,11 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
-import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
+import MapView, {
+  Marker,
+  type MapStyleElement,
+  type Region,
+} from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
@@ -108,15 +112,51 @@ const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#777777' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#141414' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#3A3A3A' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#181818' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#202020' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#242424' }] },
-  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#292929' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#121212' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#343434' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#242424' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0D0D0D' }] },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ color: '#3A3A3A' }],
+  },
+  {
+    featureType: 'landscape',
+    elementType: 'geometry',
+    stylers: [{ color: '#181818' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#202020' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#242424' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.fill',
+    stylers: [{ color: '#292929' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#121212' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#343434' }],
+  },
+  {
+    featureType: 'transit',
+    elementType: 'geometry',
+    stylers: [{ color: '#242424' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#0D0D0D' }],
+  },
 ];
 
 const LIGHT_MAP_STYLE: MapStyleElement[] = [
@@ -124,15 +164,51 @@ const LIGHT_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#6F7480' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#E8E7E5' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#C9C9C7' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#E8E7E5' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#DEDDDA' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#D5DED7' }] },
-  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#F5F4F1' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#D5D4D1' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#E1E0DD' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#D9D8D5' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C9D5DC' }] },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ color: '#C9C9C7' }],
+  },
+  {
+    featureType: 'landscape',
+    elementType: 'geometry',
+    stylers: [{ color: '#E8E7E5' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'geometry',
+    stylers: [{ color: '#DEDDDA' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#D5DED7' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.fill',
+    stylers: [{ color: '#F5F4F1' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#D5D4D1' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#E1E0DD' }],
+  },
+  {
+    featureType: 'transit',
+    elementType: 'geometry',
+    stylers: [{ color: '#D9D8D5' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#C9D5DC' }],
+  },
 ];
 
 type Place = {
@@ -156,7 +232,8 @@ function formatDistance(km?: number): string {
 }
 
 function formatCount(value: number): string {
-  if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}K`;
+  if (value >= 1_000)
+    return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 1)}K`;
   return String(value);
 }
 
@@ -171,7 +248,9 @@ function timeAgo(iso: string): string {
 }
 
 function joinedLabel(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60_000));
+  const days = Math.floor(
+    (Date.now() - new Date(iso).getTime()) / (24 * 60 * 60_000),
+  );
   if (days <= 0) return 'joined Today';
   if (days === 1) return 'joined 1d ago';
   return `joined ${days}d ago`;
@@ -180,7 +259,9 @@ function joinedLabel(iso: string): string {
 function forYouReason(venue: Venue, index: number): string {
   if (venue.recommendationReason) return venue.recommendationReason;
   if (!venue.category) return 'Popular near you';
-  return index % 2 === 0 ? `Because you ❤️ ${venue.category}` : `Popular ${venue.category} pick`;
+  return index % 2 === 0
+    ? `Because you ❤️ ${venue.category}`
+    : `Popular ${venue.category} pick`;
 }
 
 function venueToPlace(venue: Venue): Place {
@@ -218,8 +299,14 @@ export function DiscoverScreen({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { height, width } = useOrientationDimensions();
-  const safeContentStyle = { paddingLeft: insets.left, paddingRight: insets.right };
-  const headerTop = Math.max(insets.top, responsiveSize(width > height ? 12 : 54));
+  const safeContentStyle = {
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
+  const headerTop = Math.max(
+    insets.top,
+    responsiveSize(width > height ? 12 : 54),
+  );
   const headerHeight = responsiveSize(DISCOVER_HEADER_HEIGHT - 54) + headerTop;
   const headerSafeStyle = {
     height: headerHeight,
@@ -229,7 +316,9 @@ export function DiscoverScreen({
   const [favouritesOpen, setFavouritesOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
-  const savedVenueIds = new Set(favourites.data?.places.map((place) => place.venueId) ?? []);
+  const savedVenueIds = new Set(
+    favourites.data?.places.map((place) => place.venueId) ?? [],
+  );
   const feedQuery = useDiscoverFeed(userId);
   const toggleFollow = useToggleFollow(userId);
   const [followPendingId, setFollowPendingId] = useState<string | null>(null);
@@ -247,15 +336,29 @@ export function DiscoverScreen({
     toggleFollow.mutate(
       { targetUserId: person.userId, following: person.following },
       {
-        onError: (error) => Alert.alert('Could not update follow', apiErrorMessage(error)),
+        onError: (error) =>
+          Alert.alert('Could not update follow', apiErrorMessage(error)),
         onSettled: () => setFollowPendingId(null),
       },
     );
   }
 
   return (
-    <View style={[styles.screen, safeContentStyle, mapMode && styles.mapDiscoverScreen]}>
-      <View style={[styles.header, headerSafeStyle, mapMode && styles.mapHeader, mapMode && { left: insets.left, right: insets.right }]}>
+    <View
+      style={[
+        styles.screen,
+        safeContentStyle,
+        mapMode && styles.mapDiscoverScreen,
+      ]}
+    >
+      <View
+        style={[
+          styles.header,
+          headerSafeStyle,
+          mapMode && styles.mapHeader,
+          mapMode && { left: insets.left, right: insets.right },
+        ]}
+      >
         <View style={styles.switcher}>
           {(['trending', 'places', 'people'] as const).map((value) => (
             <Pressable
@@ -263,9 +366,17 @@ export function DiscoverScreen({
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === value }}
               onPress={() => selectTab(value)}
-              style={[styles.switchOption, tab === value && styles.switchOptionActive]}
+              style={[
+                styles.switchOption,
+                tab === value && styles.switchOptionActive,
+              ]}
             >
-              <Text style={[styles.switchText, tab === value && styles.switchTextActive]}>
+              <Text
+                style={[
+                  styles.switchText,
+                  tab === value && styles.switchTextActive,
+                ]}
+              >
                 {value[0].toUpperCase() + value.slice(1)}
               </Text>
             </Pressable>
@@ -278,9 +389,20 @@ export function DiscoverScreen({
           <TrendingLoading />
         ) : feedQuery.isError ? (
           <View style={styles.centerState}>
-            <Text style={styles.stateTitle}>{/network|offline|unavailable/i.test(feedQuery.error.message) ? 'You’re offline' : 'Could not load Discover'}</Text>
-            <Text style={styles.stateCopy}>{/network|offline|unavailable/i.test(feedQuery.error.message) ? 'Reconnect to refresh trending places. Your saved places are still available.' : feedQuery.error.message}</Text>
-            <Pressable onPress={() => void feedQuery.refetch()} style={styles.retry}>
+            <Text style={styles.stateTitle}>
+              {/network|offline|unavailable/i.test(feedQuery.error.message)
+                ? 'You’re offline'
+                : 'Could not load Discover'}
+            </Text>
+            <Text style={styles.stateCopy}>
+              {/network|offline|unavailable/i.test(feedQuery.error.message)
+                ? 'Reconnect to refresh trending places. Your saved places are still available.'
+                : feedQuery.error.message}
+            </Text>
+            <Pressable
+              onPress={() => void feedQuery.refetch()}
+              style={styles.retry}
+            >
               <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           </View>
@@ -299,7 +421,15 @@ export function DiscoverScreen({
           />
         )
       ) : null}
-      {tab === 'places' && favouritesOpen ? <FavouritesPane appliedFilters={appliedFilters} onBack={() => setFavouritesOpen(false)} onOpenFilters={onOpenFilters} onOpenPlace={onOpenPlace} userId={userId} /> : null}
+      {tab === 'places' && favouritesOpen ? (
+        <FavouritesPane
+          appliedFilters={appliedFilters}
+          onBack={() => setFavouritesOpen(false)}
+          onOpenFilters={onOpenFilters}
+          onOpenPlace={onOpenPlace}
+          userId={userId}
+        />
+      ) : null}
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
@@ -312,20 +442,41 @@ export function DiscoverScreen({
           userId={userId}
         />
       ) : null}
-      {tab === 'people' ? <PeopleFeed onOpenProfile={onOpenProfile} userId={userId} /> : null}
+      {tab === 'people' ? (
+        <PeopleFeed onOpenProfile={onOpenProfile} userId={userId} />
+      ) : null}
       <SaveToFolderSheet
         onClose={() => setSaveTarget(null)}
         place={saveTarget}
         userId={userId}
         visible={saveTarget !== null}
       />
-      <Pressable accessibilityLabel="Open Tastes AI" onPress={onOpenAI} style={[styles.aiFab, { right: insets.right + responsiveSize(16) }]}>
+      <Pressable
+        accessibilityLabel="Open Tastes AI"
+        onPress={onOpenAI}
+        style={[styles.aiFab, { right: insets.right + responsiveSize(16) }]}
+      >
         <View style={styles.aiFabMark}>
-          <AiMouthPink height={responsiveSize(10)} style={styles.aiFabMarkPink} width={responsiveSize(13)} />
-          <AiMouthOutline color={colors.text} height={responsiveSize(13)} style={styles.aiFabMarkOutline} width={responsiveSize(18)} />
+          <AiMouthPink
+            height={responsiveSize(10)}
+            style={styles.aiFabMarkPink}
+            width={responsiveSize(13)}
+          />
+          <AiMouthOutline
+            color={colors.text}
+            height={responsiveSize(13)}
+            style={styles.aiFabMarkOutline}
+            width={responsiveSize(18)}
+          />
         </View>
       </Pressable>
-      <SeeAllPlacesModal onClose={() => setSeeAllPlaces(null)} onOpenPlace={onOpenPlace} onSave={setSaveTarget} savedVenueIds={savedVenueIds} venues={seeAllPlaces} />
+      <SeeAllPlacesModal
+        onClose={() => setSeeAllPlaces(null)}
+        onOpenPlace={onOpenPlace}
+        onSave={setSaveTarget}
+        savedVenueIds={savedVenueIds}
+        venues={seeAllPlaces}
+      />
     </View>
   );
 }
@@ -336,10 +487,20 @@ function TrendingLoading() {
   const pulse = useRef(new Animated.Value(0.45)).current;
 
   useEffect(() => {
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.82, duration: 780, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.45, duration: 780, useNativeDriver: true }),
-    ]));
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.82,
+          duration: 780,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.45,
+          duration: 780,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     animation.start();
     return () => animation.stop();
   }, [pulse]);
@@ -359,10 +520,16 @@ function TrendingLoading() {
   );
 }
 
-function carouselCardWidth(contentWidth: number, scale: number, designWidth: number, itemCount: number) {
+function carouselCardWidth(
+  contentWidth: number,
+  scale: number,
+  designWidth: number,
+  itemCount: number,
+) {
   const minimumWidth = responsiveValue(designWidth, scale);
   if (itemCount < 2) return minimumWidth;
-  const availableWidth = contentWidth - 2 * responsiveValue(DISCOVER_GRID_PADDING, scale);
+  const availableWidth =
+    contentWidth - 2 * responsiveValue(DISCOVER_GRID_PADDING, scale);
   const gapsWidth = (itemCount - 1) * responsiveValue(DISCOVER_GRID_GAP, scale);
   // A complete short carousel fills a wide row. Longer carousels retain their
   // original card width and scroll, and a lone result never becomes a banner.
@@ -399,43 +566,65 @@ function TrendingFeed({
   const insets = useSafeAreaInsets();
   const contentWidth = Math.max(0, viewportWidth - insets.left - insets.right);
   const { scale: layoutScale } = useResponsiveMetrics();
-  const { forYouCardWidth, gemCardWidth, gridCardWidth, placeCardWidth, reviewCardWidth, trendingCardWidth } = useMemo(() => {
-    const wrapWidth = (minimumWidth: number, maximumColumns: number) => responsiveWrapMetrics(
-      contentWidth,
-      layoutScale,
-      minimumWidth,
-      maximumColumns,
-      DISCOVER_GRID_PADDING,
-      DISCOVER_GRID_GAP,
-    );
+  const {
+    forYouCardWidth,
+    gemCardWidth,
+    gridCardWidth,
+    placeCardWidth,
+    reviewCardWidth,
+    trendingCardWidth,
+  } = useMemo(() => {
+    const wrapWidth = (minimumWidth: number, maximumColumns: number) =>
+      responsiveWrapMetrics(
+        contentWidth,
+        layoutScale,
+        minimumWidth,
+        maximumColumns,
+        DISCOVER_GRID_PADDING,
+        DISCOVER_GRID_GAP,
+      );
     return {
-      forYouCardWidth: carouselCardWidth(contentWidth, layoutScale, 240, feed.forYou.length),
+      forYouCardWidth: carouselCardWidth(
+        contentWidth,
+        layoutScale,
+        240,
+        feed.forYou.length,
+      ),
       gemCardWidth: wrapWidth(280, 2),
       gridCardWidth: wrapWidth(179, 4),
       placeCardWidth: wrapWidth(280, 2),
       reviewCardWidth: wrapWidth(300, 2),
-      trendingCardWidth: carouselCardWidth(contentWidth, layoutScale, 200, feed.trending.length),
+      trendingCardWidth: carouselCardWidth(
+        contentWidth,
+        layoutScale,
+        200,
+        feed.trending.length,
+      ),
     };
   }, [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
+    {},
+  );
   const { hero, topReviewer } = feed;
   const hasContent = Boolean(
-    hero
-    || topReviewer
-    || feed.trending.length
-    || feed.newSpots.length
-    || feed.mostReviewed.length
-    || feed.forYou.length
-    || feed.hiddenGems.length
-    || feed.popularReviews.length,
+    hero ||
+    topReviewer ||
+    feed.trending.length ||
+    feed.newSpots.length ||
+    feed.mostReviewed.length ||
+    feed.forYou.length ||
+    feed.hiddenGems.length ||
+    feed.popularReviews.length,
   );
 
   if (!hasContent) {
     return (
       <View style={styles.centerState}>
         <Text style={styles.stateTitle}>Nothing to discover yet</Text>
-        <Text style={styles.stateCopy}>New places and reviews will appear here soon.</Text>
+        <Text style={styles.stateCopy}>
+          New places and reviews will appear here soon.
+        </Text>
       </View>
     );
   }
@@ -453,13 +642,19 @@ function TrendingFeed({
             locations={[0.34, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={styles.hotChip}><Text style={styles.hotChipText}>🔥 Hot in your area</Text></View>
+          <View style={styles.hotChip}>
+            <Text style={styles.hotChipText}>🔥 Hot in your area</Text>
+          </View>
           <View style={styles.heroCopy}>
             <Text style={styles.heroTitle}>{hero.name}</Text>
-            <Text style={styles.heroMeta}>{hero.category} · {formatDistance(hero.distanceKm)}</Text>
+            <Text style={styles.heroMeta}>
+              {hero.category} · {formatDistance(hero.distanceKm)}
+            </Text>
             <View style={styles.inlineMeta}>
               <RatingPill value={(hero.rating ?? 0).toFixed(1)} />
-              <Text style={styles.imageMetaText}>{hero.reviewCount ?? 0} reviews</Text>
+              <Text style={styles.imageMetaText}>
+                {hero.reviewCount ?? 0} reviews
+              </Text>
             </View>
           </View>
         </Pressable>
@@ -467,7 +662,11 @@ function TrendingFeed({
 
       {feed.trending.length > 0 ? (
         <>
-          <SectionLabel title="Trending near you" subtitle="Highly rated within 1 mi" onSeeAll={() => onSeeAll(feed.trending)} />
+          <SectionLabel
+            title="Trending near you"
+            subtitle="Highly rated within 1 mi"
+            onSeeAll={() => onSeeAll(feed.trending)}
+          />
           <ScrollView
             contentContainerStyle={styles.horizontalContent}
             horizontal
@@ -490,7 +689,10 @@ function TrendingFeed({
 
       {feed.forYou.length > 0 ? (
         <>
-          <SectionLabel title="For you" subtitle="Picked from your tastes & saves" />
+          <SectionLabel
+            title="For you"
+            subtitle="Picked from your tastes & saves"
+          />
           <ScrollView
             contentContainerStyle={styles.horizontalContent}
             horizontal
@@ -530,16 +732,29 @@ function TrendingFeed({
 
       {feed.mostReviewed.length > 0 ? (
         <>
-          <SectionLabel title="Most reviewed" subtitle="What everyone's talking about" />
+          <SectionLabel
+            title="Most reviewed"
+            subtitle="What everyone's talking about"
+          />
           <View style={styles.grid}>
-            {feed.mostReviewed.map((venue) => <GridPlace key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gridCardWidth} />)}
+            {feed.mostReviewed.map((venue) => (
+              <GridPlace
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                place={venueToPlace(venue)}
+                width={gridCardWidth}
+              />
+            ))}
           </View>
         </>
       ) : null}
 
       {feed.popularReviews.length > 0 ? (
         <>
-          <SectionLabel title="Popular reviews" subtitle="What people are saying right now" />
+          <SectionLabel
+            title="Popular reviews"
+            subtitle="What people are saying right now"
+          />
           <View style={styles.reviewList}>
             {feed.popularReviews.map((review) => (
               <ReviewCard
@@ -550,16 +765,44 @@ function TrendingFeed({
                 image={venueImage(review.venueImageUrl)}
                 key={review.id}
                 onComments={() => onOpenComments(review.id)}
-                onReact={() => void api.reactToReview({ idempotencyKey: createIdempotencyKey('discover-reaction'), reviewId: review.id, reaction: 'like' }).then((result) => {
-                  setReactionCounts((counts) => ({ ...counts, [review.id]: result.data.reactionCount }));
-                  setReactedReviews((current) => { const next = new Set(current); if (result.data.active) next.add(review.id); else next.delete(review.id); return next; });
-                }).catch((error) => Alert.alert('Could not update reaction', apiErrorMessage(error)))}
-                onShare={() => void Share.share({ message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })}
+                onReact={() =>
+                  void api
+                    .reactToReview({
+                      idempotencyKey: createIdempotencyKey('discover-reaction'),
+                      reviewId: review.id,
+                      reaction: 'like',
+                    })
+                    .then((result) => {
+                      setReactionCounts((counts) => ({
+                        ...counts,
+                        [review.id]: result.data.reactionCount,
+                      }));
+                      setReactedReviews((current) => {
+                        const next = new Set(current);
+                        if (result.data.active) next.add(review.id);
+                        else next.delete(review.id);
+                        return next;
+                      });
+                    })
+                    .catch((error) =>
+                      Alert.alert(
+                        'Could not update reaction',
+                        apiErrorMessage(error),
+                      ),
+                    )
+                }
+                onShare={() =>
+                  void Share.share({
+                    message: `${review.authorDisplayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments`,
+                  })
+                }
                 onOpen={() => onOpenComments(review.id)}
                 place={review.venueName}
                 mood={review.tags?.[0]}
                 rating={review.rating.toFixed(1)}
-                reactionCount={reactionCounts[review.id] ?? review.reactionCount}
+                reactionCount={
+                  reactionCounts[review.id] ?? review.reactionCount
+                }
                 reacted={reactedReviews.has(review.id)}
                 text={review.text}
                 time={timeAgo(review.createdAt)}
@@ -573,7 +816,10 @@ function TrendingFeed({
 
       {topReviewer ? (
         <>
-          <SectionLabel title="Popular reviewer" subtitle="Trusted voice in your neighborhood" />
+          <SectionLabel
+            title="Popular reviewer"
+            subtitle="Trusted voice in your neighborhood"
+          />
           <TopReviewer
             onFollow={() => onToggleFollow(topReviewer)}
             onOpen={() => onOpenProfile(topReviewer)}
@@ -585,9 +831,19 @@ function TrendingFeed({
 
       {feed.hiddenGems.length > 0 ? (
         <>
-          <SectionLabel title="Hidden gems" subtitle="High ratings, low review counts" />
+          <SectionLabel
+            title="Hidden gems"
+            subtitle="High ratings, low review counts"
+          />
           <View style={styles.gemList}>
-            {feed.hiddenGems.map((venue) => <HiddenGem key={venue.id} onOpen={() => onOpenPlace(venue.id)} place={venueToPlace(venue)} width={gemCardWidth} />)}
+            {feed.hiddenGems.map((venue) => (
+              <HiddenGem
+                key={venue.id}
+                onOpen={() => onOpenPlace(venue.id)}
+                place={venueToPlace(venue)}
+                width={gemCardWidth}
+              />
+            ))}
           </View>
         </>
       ) : null}
@@ -619,8 +875,13 @@ function PlacesMap({
   const windowDimensions = useWindowDimensions();
   const orientationDimensions = useOrientationDimensions();
   const insets = useSafeAreaInsets();
-  const contentWidth = Math.max(0, windowDimensions.width - insets.left - insets.right);
-  const splitLayout = orientationDimensions.width > orientationDimensions.height && windowDimensions.width >= 600;
+  const contentWidth = Math.max(
+    0,
+    windowDimensions.width - insets.left - insets.right,
+  );
+  const splitLayout =
+    orientationDimensions.width > orientationDimensions.height &&
+    windowDimensions.width >= 600;
   // Once a resizable landscape window is wide enough, a bottom sheet leaves
   // an unnecessarily large map area above a narrow list. Switch to a stable
   // side panel so the list and map use the available width together.
@@ -633,19 +894,33 @@ function PlacesMap({
   const [activeFilter, setActiveFilter] = useState<MapFilter | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
-  const [mapLayers, setMapLayers] = useState({ friends: false, saved: false, openNow: false });
+  const [mapLayers, setMapLayers] = useState({
+    friends: false,
+    saved: false,
+    openNow: false,
+  });
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const appStateRef = useRef(AppState.currentState);
   const mapResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sheetDetent, setSheetDetent] = useState<'peek' | 'half' | 'full'>('half');
+  const [sheetDetent, setSheetDetent] = useState<'peek' | 'half' | 'full'>(
+    'half',
+  );
   const sheetDetentRef = useRef<'peek' | 'half' | 'full'>('half');
   const [sheetDismissed, setSheetDismissed] = useState(false);
   const [sort, setSort] = useState<PlaceSort>('best-match');
   const [sortOpen, setSortOpen] = useState(false);
-  const sortSheet = useBottomSheetMotion({ onClose: () => setSortOpen(false), visible: sortOpen });
+  const sortSheet = useBottomSheetMotion({
+    onClose: () => setSortOpen(false),
+    visible: sortOpen,
+  });
   const mapRef = useRef<MapView | null>(null);
   const searchRowRef = useRef<View | null>(null);
-  const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
+  const [region, setRegion] = useState<Region>({
+    latitude: 41.02,
+    longitude: 29.0,
+    latitudeDelta: 0.13,
+    longitudeDelta: 0.12,
+  });
   const sheetHeight = useRef(new Animated.Value(330)).current;
   const sheetKeyboardTranslate = useRef(new Animated.Value(0)).current;
   const currentSheetHeight = useRef(330);
@@ -660,14 +935,30 @@ function PlacesMap({
   const peopleQuery = useDiscoverPeople(userId);
   const mapFeedQuery = useDiscoverFeed(userId);
   const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const searchResults = search.trim().length >= 2 ? (venueSearchQuery.data?.items ?? []) : [];
-  const searchableVenues = searchResults.length > 0
-    ? [...new Map([...venues, ...searchResults].map((venue) => [venue.id, venue])).values()]
-    : venues;
+  const searchResults =
+    search.trim().length >= 2 ? (venueSearchQuery.data?.items ?? []) : [];
+  const searchableVenues =
+    searchResults.length > 0
+      ? [
+          ...new Map(
+            [...venues, ...searchResults].map((venue) => [venue.id, venue]),
+          ).values(),
+        ]
+      : venues;
 
   const filters: Array<MapFilter & { icon: ImageSourcePropType }> = [
-    { key: 'trending', label: 'Trending', tag: 'trending', icon: filterTrendingIcon },
-    { key: 'restaurant', label: 'Restaurant', category: 'Restaurant', icon: filterRestaurantIcon },
+    {
+      key: 'trending',
+      label: 'Trending',
+      tag: 'trending',
+      icon: filterTrendingIcon,
+    },
+    {
+      key: 'restaurant',
+      label: 'Restaurant',
+      category: 'Restaurant',
+      icon: filterRestaurantIcon,
+    },
     { key: 'cafe', label: 'Cafe', category: 'Cafe', icon: filterCafeIcon },
     { key: 'bar', label: 'Bar', category: 'Bar', icon: filterBarIcon },
     { key: 'my-reviews', label: 'My Reviews', icon: filterReviewsIcon },
@@ -685,39 +976,59 @@ function PlacesMap({
 
   const orderedVenues = [...filtered].sort((left, right) => {
     if (sort === 'best-match') {
-      return (right.matchPercent ?? 0) - (left.matchPercent ?? 0)
-        || (right.rating ?? 0) - (left.rating ?? 0);
+      return (
+        (right.matchPercent ?? 0) - (left.matchPercent ?? 0) ||
+        (right.rating ?? 0) - (left.rating ?? 0)
+      );
     }
-    if (sort === 'reviews') return (right.reviewCount ?? 0) - (left.reviewCount ?? 0);
-    if (sort === 'distance') return (left.distanceKm ?? Number.POSITIVE_INFINITY) - (right.distanceKm ?? Number.POSITIVE_INFINITY);
+    if (sort === 'reviews')
+      return (right.reviewCount ?? 0) - (left.reviewCount ?? 0);
+    if (sort === 'distance')
+      return (
+        (left.distanceKm ?? Number.POSITIVE_INFINITY) -
+        (right.distanceKm ?? Number.POSITIVE_INFINITY)
+      );
     if (sort === 'newest') {
-      return Number(right.discoverTags?.includes('new')) - Number(left.discoverTags?.includes('new'));
+      return (
+        Number(right.discoverTags?.includes('new')) -
+        Number(left.discoverTags?.includes('new'))
+      );
     }
     return (right.rating ?? 0) - (left.rating ?? 0);
   });
-  const sortLabel = placeSortOptions.find((option) => option.value === sort)?.label ?? 'Best match';
-  const mappableVenues = orderedVenues.filter((venue) => (
-    venue.latitude != null
-    && venue.longitude != null
-    && (!mapLayers.openNow || matchesPlaceFilters(venue, ['OpenNow:true']))
-  ));
+  const sortLabel =
+    placeSortOptions.find((option) => option.value === sort)?.label ??
+    'Best match';
+  const mappableVenues = orderedVenues.filter(
+    (venue) =>
+      venue.latitude != null &&
+      venue.longitude != null &&
+      (!mapLayers.openNow || matchesPlaceFilters(venue, ['OpenNow:true'])),
+  );
   const layerMode = mapLayers.friends || mapLayers.saved;
-  const followedIds = new Set([
-    ...(peopleQuery.data?.trending ?? []),
-    ...(peopleQuery.data?.new ?? []),
-    ...(peopleQuery.data?.suggested ?? []),
-  ].filter((person) => person.following).map((person) => person.userId));
+  const followedIds = new Set(
+    [
+      ...(peopleQuery.data?.trending ?? []),
+      ...(peopleQuery.data?.new ?? []),
+      ...(peopleQuery.data?.suggested ?? []),
+    ]
+      .filter((person) => person.following)
+      .map((person) => person.userId),
+  );
   const venuesById = new Map(mappableVenues.map((venue) => [venue.id, venue]));
   const friendMarkers = mapLayers.friends
     ? (mapFeedQuery.data?.popularReviews ?? []).flatMap((review) => {
-      const venue = venuesById.get(review.venueId);
-      return venue && followedIds.has(review.authorId) ? [{ review, venue }] : [];
-    })
+        const venue = venuesById.get(review.venueId);
+        return venue && followedIds.has(review.authorId)
+          ? [{ review, venue }]
+          : [];
+      })
     : [];
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      const resumed = appStateRef.current !== 'active' && nextState === 'active';
+      const resumed =
+        appStateRef.current !== 'active' && nextState === 'active';
       appStateRef.current = nextState;
 
       if (mapResumeTimerRef.current) {
@@ -739,10 +1050,13 @@ function PlacesMap({
       // iOS reports `active` before the window and software keyboard have
       // finished restoring their frames. Remounting MapKit immediately can
       // permanently leave its native view at that transient height.
-      mapResumeTimerRef.current = setTimeout(() => {
-        mapResumeTimerRef.current = null;
-        setMapInstanceKey((key) => key + 1);
-      }, Platform.OS === 'ios' ? 350 : 100);
+      mapResumeTimerRef.current = setTimeout(
+        () => {
+          mapResumeTimerRef.current = null;
+          setMapInstanceKey((key) => key + 1);
+        },
+        Platform.OS === 'ios' ? 350 : 100,
+      );
     });
     return () => {
       subscription.remove();
@@ -758,9 +1072,15 @@ function PlacesMap({
   }, [sheetHeight]);
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const animateKeyboardOffset = (translateY: number, duration?: number, onFinish?: () => void) => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const animateKeyboardOffset = (
+      translateY: number,
+      duration?: number,
+      onFinish?: () => void,
+    ) => {
       sheetKeyboardTranslate.stopAnimation();
       const animationDuration = duration && duration > 0 ? duration : 250;
       Animated.timing(sheetKeyboardTranslate, {
@@ -788,7 +1108,9 @@ function PlacesMap({
     });
     const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
       keyboardVisibleRef.current = false;
-      animateKeyboardOffset(0, event.duration, () => setKeyboardAvoidanceActive(false));
+      animateKeyboardOffset(0, event.duration, () =>
+        setKeyboardAvoidanceActive(false),
+      );
     });
     return () => {
       showSubscription.remove();
@@ -809,7 +1131,9 @@ function PlacesMap({
         stiffness: 240,
         mass: 0.9,
         useNativeDriver: false,
-      }).start(({ finished }) => { if (finished) setSheetDismissed(true); });
+      }).start(({ finished }) => {
+        if (finished) setSheetDismissed(true);
+      });
       return;
     }
     setSheetDismissed(false);
@@ -825,44 +1149,54 @@ function PlacesMap({
     }).start();
   }
 
-  const sheetPanResponder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
-    onPanResponderGrant: () => {
-      sheetHeight.stopAnimation();
-      dragStartHeight.current = currentSheetHeight.current;
-    },
-    onPanResponderMove: (_, gesture) => {
-      const next = dragStartHeight.current - gesture.dy;
-      sheetHeight.setValue(Math.max(0, Math.min(sheetBounds.current.full, next)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      const projected = currentSheetHeight.current - gesture.vy * responsiveSize(140);
-      if (projected < sheetBounds.current.peek * 0.55) {
-        settleSheet('dismissed');
-        return;
-      }
-      const detents = (['peek', 'half', 'full'] as const).map((target) => ({
-        target,
-        distance: Math.abs(sheetBounds.current[target] - projected),
-      }));
-      detents.sort((left, right) => left.distance - right.distance);
-      settleSheet(detents[0].target);
-    },
-    onPanResponderTerminate: () => {
-      const detents = (['peek', 'half', 'full'] as const).map((target) => ({
-        target,
-        distance: Math.abs(sheetBounds.current[target] - currentSheetHeight.current),
-      }));
-      detents.sort((left, right) => left.distance - right.distance);
-      settleSheet(detents[0].target);
-    },
-  })).current;
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
+      onPanResponderGrant: () => {
+        sheetHeight.stopAnimation();
+        dragStartHeight.current = currentSheetHeight.current;
+      },
+      onPanResponderMove: (_, gesture) => {
+        const next = dragStartHeight.current - gesture.dy;
+        sheetHeight.setValue(
+          Math.max(0, Math.min(sheetBounds.current.full, next)),
+        );
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const projected =
+          currentSheetHeight.current - gesture.vy * responsiveSize(140);
+        if (projected < sheetBounds.current.peek * 0.55) {
+          settleSheet('dismissed');
+          return;
+        }
+        const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+          target,
+          distance: Math.abs(sheetBounds.current[target] - projected),
+        }));
+        detents.sort((left, right) => left.distance - right.distance);
+        settleSheet(detents[0].target);
+      },
+      onPanResponderTerminate: () => {
+        const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+          target,
+          distance: Math.abs(
+            sheetBounds.current[target] - currentSheetHeight.current,
+          ),
+        }));
+        detents.sort((left, right) => left.distance - right.distance);
+        settleSheet(detents[0].target);
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     if (mapHeight <= 0 || keyboardAvoidanceActive) return;
     const availableHeight = Math.max(0, mapHeight - responsiveSize(8));
     const full = Math.max(0, availableHeight - headerHeight);
-    const half = Math.min(full, Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)));
+    const half = Math.min(
+      full,
+      Math.max(responsiveSize(330), Math.round(mapHeight * 0.53)),
+    );
     const peek = Math.min(half, responsiveSize(180));
     if (!sheetInitialized.current) {
       sheetInitialized.current = true;
@@ -875,7 +1209,9 @@ function PlacesMap({
 
     // Animate orientation and container-size changes without jumping.
     sheetHeight.stopAnimation();
-    const nextHeight = sheetDismissed ? 0 : sheetBounds.current[sheetDetentRef.current];
+    const nextHeight = sheetDismissed
+      ? 0
+      : sheetBounds.current[sheetDetentRef.current];
     currentSheetHeight.current = nextHeight;
     const animation = Animated.timing(sheetHeight, {
       toValue: nextHeight,
@@ -885,13 +1221,25 @@ function PlacesMap({
     });
     animation.start();
     return () => animation.stop();
-  }, [headerHeight, keyboardAvoidanceActive, mapHeight, sheetDismissed, sheetHeight]);
+  }, [
+    headerHeight,
+    keyboardAvoidanceActive,
+    mapHeight,
+    sheetDismissed,
+    sheetHeight,
+  ]);
 
   function zoom(multiplier: number) {
     const next = {
       ...region,
-      latitudeDelta: Math.max(0.008, Math.min(0.5, region.latitudeDelta * multiplier)),
-      longitudeDelta: Math.max(0.008, Math.min(0.5, region.longitudeDelta * multiplier)),
+      latitudeDelta: Math.max(
+        0.008,
+        Math.min(0.5, region.latitudeDelta * multiplier),
+      ),
+      longitudeDelta: Math.max(
+        0.008,
+        Math.min(0.5, region.longitudeDelta * multiplier),
+      ),
     };
     setRegion(next);
     mapRef.current?.animateToRegion(next, 250);
@@ -901,7 +1249,10 @@ function PlacesMap({
     const permission = await Location.requestForegroundPermissionsAsync();
     if (permission.status !== 'granted') {
       setLocationEnabled(false);
-      Alert.alert('Location is off', 'Enable location in Settings or keep browsing the selected city.');
+      Alert.alert(
+        'Location is off',
+        'Enable location in Settings or keep browsing the selected city.',
+      );
       return;
     }
     const position = await Location.getCurrentPositionAsync();
@@ -917,14 +1268,19 @@ function PlacesMap({
   }
 
   function focusFirstSearchResult() {
-    const venue = filtered.find((item) => item.latitude != null && item.longitude != null);
+    const venue = filtered.find(
+      (item) => item.latitude != null && item.longitude != null,
+    );
     if (!venue) return;
-    mapRef.current?.animateToRegion({
-      latitude: venue.latitude!,
-      longitude: venue.longitude!,
-      latitudeDelta: 0.035,
-      longitudeDelta: 0.035,
-    }, 350);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: venue.latitude!,
+        longitude: venue.longitude!,
+        latitudeDelta: 0.035,
+        longitudeDelta: 0.035,
+      },
+      350,
+    );
   }
 
   function toggleMapLayer(key: keyof typeof mapLayers) {
@@ -932,7 +1288,10 @@ function PlacesMap({
   }
 
   return (
-    <View onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)} style={styles.mapScreen}>
+    <View
+      onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
+      style={styles.mapScreen}
+    >
       <MapView
         key={mapInstanceKey}
         customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
@@ -954,29 +1313,47 @@ function PlacesMap({
           return (
             <Marker
               anchor={{ x: 0.5, y: 1 }}
-              coordinate={{ latitude: venue.latitude!, longitude: venue.longitude! }}
+              coordinate={{
+                latitude: venue.latitude!,
+                longitude: venue.longitude!,
+              }}
               key={venue.id}
               onPress={() => onOpenPlace(venue.id)}
             >
-              <MapVenueMarker layered={layerMode} styles={styles} venue={venue} />
+              <MapVenueMarker
+                layered={layerMode}
+                styles={styles}
+                venue={venue}
+              />
             </Marker>
           );
         })}
         {friendMarkers.map(({ review, venue }) => (
           <Marker
             anchor={{ x: 0.18, y: 1 }}
-            coordinate={{ latitude: venue.latitude!, longitude: venue.longitude! }}
+            coordinate={{
+              latitude: venue.latitude!,
+              longitude: venue.longitude!,
+            }}
             key={`friend-${review.id}`}
             onPress={() => onOpenPlace(venue.id)}
           >
             <View style={styles.mapFriendMarker}>
               <View style={styles.mapFriendAvatarWrap}>
-                <UserAvatar displayName={review.authorDisplayName} photoUrl={review.authorPhotoUrl} style={styles.mapFriendAvatar} />
+                <UserAvatar
+                  displayName={review.authorDisplayName}
+                  photoUrl={review.authorPhotoUrl}
+                  style={styles.mapFriendAvatar}
+                />
               </View>
               <View style={styles.mapLayerMarkerDot} />
               <View style={styles.mapLayerMarkerCopy}>
-                <Text numberOfLines={1} style={styles.mapLayerMarkerName}>{review.authorDisplayName}</Text>
-                <Text numberOfLines={1} style={styles.mapLayerMarkerCategory}>{review.venueCategory}</Text>
+                <Text numberOfLines={1} style={styles.mapLayerMarkerName}>
+                  {review.authorDisplayName}
+                </Text>
+                <Text numberOfLines={1} style={styles.mapLayerMarkerCategory}>
+                  {review.venueCategory}
+                </Text>
               </View>
             </View>
           </Marker>
@@ -984,42 +1361,102 @@ function PlacesMap({
       </MapView>
       <View
         pointerEvents="none"
-        style={[styles.mapToneOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.19)' }]}
+        style={[
+          styles.mapToneOverlay,
+          {
+            backgroundColor: isDark
+              ? 'rgba(0,0,0,0.32)'
+              : 'rgba(255,255,255,0.19)',
+          },
+        ]}
       />
-      <View style={[styles.mapControls, { top: headerHeight + responsiveSize(18) }, splitLayout && styles.mapControlsLandscape]}>
-        <Pressable accessibilityLabel="Zoom in" onPress={() => zoom(0.55)} style={styles.mapControlButton}>
+      <View
+        style={[
+          styles.mapControls,
+          { top: headerHeight + responsiveSize(18) },
+          splitLayout && styles.mapControlsLandscape,
+        ]}
+      >
+        <Pressable
+          accessibilityLabel="Zoom in"
+          onPress={() => zoom(0.55)}
+          style={styles.mapControlButton}
+        >
           <Text style={styles.mapControlGlyph}>+</Text>
         </Pressable>
-        <Pressable accessibilityLabel="Zoom out" onPress={() => zoom(1.8)} style={styles.mapControlButton}>
+        <Pressable
+          accessibilityLabel="Zoom out"
+          onPress={() => zoom(1.8)}
+          style={styles.mapControlButton}
+        >
           <Text style={styles.mapControlGlyph}>−</Text>
         </Pressable>
         <Pressable
           accessibilityLabel="My location"
           accessibilityState={{ selected: locationEnabled }}
           onPress={() => void goToCurrentLocation()}
-          style={[styles.mapControlButton, locationEnabled && styles.mapControlButtonActive]}
+          style={[
+            styles.mapControlButton,
+            locationEnabled && styles.mapControlButtonActive,
+          ]}
         >
-          <MapLocateIcon color={locationEnabled ? '#FFFFFF' : colors.text} height={responsiveSize(18)} width={responsiveSize(18)} />
+          <MapLocateIcon
+            color={locationEnabled ? '#FFFFFF' : colors.text}
+            height={responsiveSize(18)}
+            width={responsiveSize(18)}
+          />
         </Pressable>
         <Pressable
           accessibilityLabel="Show on map"
           accessibilityState={{ expanded: layersOpen }}
           onPress={() => setLayersOpen((value) => !value)}
-          style={[styles.mapControlButton, layersOpen && styles.mapControlButtonActive]}
+          style={[
+            styles.mapControlButton,
+            layersOpen && styles.mapControlButtonActive,
+          ]}
         >
-          <MapLayersControlIcon color={layersOpen ? '#FFFFFF' : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
+          <MapLayersControlIcon
+            color={layersOpen ? '#FFFFFF' : colors.text}
+            height={responsiveSize(20)}
+            width={responsiveSize(20)}
+          />
         </Pressable>
       </View>
       {layersOpen ? (
-        <View style={[styles.layersMenu, { top: headerHeight + responsiveSize(splitLayout ? 76 : 18) }, splitLayout && { right: responsiveSize(16) }]}>
+        <View
+          style={[
+            styles.layersMenu,
+            { top: headerHeight + responsiveSize(splitLayout ? 76 : 18) },
+            splitLayout && { right: responsiveSize(16) },
+          ]}
+        >
           <Text style={styles.layersTitle}>Show on map</Text>
-          <MapLayerToggle active={mapLayers.friends} label="Friends" onPress={() => toggleMapLayer('friends')} styles={styles} />
-          <MapLayerToggle active={mapLayers.saved} label="Saved" onPress={() => toggleMapLayer('saved')} styles={styles} />
-          <MapLayerToggle active={mapLayers.openNow} label="Open now" onPress={() => toggleMapLayer('openNow')} styles={styles} />
+          <MapLayerToggle
+            active={mapLayers.friends}
+            label="Friends"
+            onPress={() => toggleMapLayer('friends')}
+            styles={styles}
+          />
+          <MapLayerToggle
+            active={mapLayers.saved}
+            label="Saved"
+            onPress={() => toggleMapLayer('saved')}
+            styles={styles}
+          />
+          <MapLayerToggle
+            active={mapLayers.openNow}
+            label="Open now"
+            onPress={() => toggleMapLayer('openNow')}
+            styles={styles}
+          />
         </View>
       ) : null}
       {sheetDismissed && !sidePanelLayout ? (
-        <Pressable accessibilityLabel="Show place list" onPress={() => settleSheet('peek')} style={styles.showPlacesButton}>
+        <Pressable
+          accessibilityLabel="Show place list"
+          onPress={() => settleSheet('peek')}
+          style={styles.showPlacesButton}
+        >
           <Text style={styles.showPlacesText}>Show places</Text>
         </Pressable>
       ) : null}
@@ -1027,21 +1464,45 @@ function PlacesMap({
         pointerEvents="none"
         style={[
           styles.mapSheetUnderlay,
-          sidePanelLayout ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }] : { height: sheetHeight, right: sheetRight },
+          sidePanelLayout
+            ? [
+                styles.mapSheetSidePanel,
+                { right: sheetRight, top: headerHeight },
+              ]
+            : { height: sheetHeight, right: sheetRight },
         ]}
       />
       <Animated.View
         style={[
           styles.mapSheet,
           sidePanelLayout
-            ? [styles.mapSheetSidePanel, { right: sheetRight, top: headerHeight }]
-            : { height: sheetHeight, right: sheetRight, transform: [{ translateY: sheetKeyboardTranslate }] },
+            ? [
+                styles.mapSheetSidePanel,
+                { right: sheetRight, top: headerHeight },
+              ]
+            : {
+                height: sheetHeight,
+                right: sheetRight,
+                transform: [{ translateY: sheetKeyboardTranslate }],
+              },
         ]}
       >
         {sidePanelLayout ? null : (
           <Pressable
-            accessibilityLabel={sheetDetent === 'full' ? 'Collapse place list' : 'Expand place list'}
-            onPress={() => settleSheet(sheetDetent === 'full' ? 'half' : sheetDetent === 'half' ? 'full' : 'half')}
+            accessibilityLabel={
+              sheetDetent === 'full'
+                ? 'Collapse place list'
+                : 'Expand place list'
+            }
+            onPress={() =>
+              settleSheet(
+                sheetDetent === 'full'
+                  ? 'half'
+                  : sheetDetent === 'half'
+                    ? 'full'
+                    : 'half',
+              )
+            }
             style={styles.sheetDragArea}
             {...sheetPanResponder.panHandlers}
           >
@@ -1050,7 +1511,11 @@ function PlacesMap({
         )}
         <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
-            <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} />
+            <SearchIcon
+              color={colors.textSecondary}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
             <TextInput
               autoCorrect={false}
               onChangeText={setSearch}
@@ -1061,13 +1526,35 @@ function PlacesMap({
               style={styles.mapSearchInput}
               value={search}
             />
-            <VoiceIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
+            <VoiceIcon
+              color={colors.text}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
           </View>
-          <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters} style={styles.mapHeaderIcon}>
-            <MapTuneIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(20)} />
+          <Pressable
+            accessibilityLabel="Open filters"
+            hitSlop={8}
+            onPress={onOpenFilters}
+            style={styles.mapHeaderIcon}
+          >
+            <MapTuneIcon
+              color={colors.text}
+              height={responsiveSize(24)}
+              width={responsiveSize(20)}
+            />
           </Pressable>
-          <Pressable accessibilityLabel="Open favourites" hitSlop={8} onPress={onOpenFavourites} style={styles.mapHeaderIcon}>
-            <MapFavouriteIcon color={colors.text} height={responsiveSize(22)} width={responsiveSize(20)} />
+          <Pressable
+            accessibilityLabel="Open favourites"
+            hitSlop={8}
+            onPress={onOpenFavourites}
+            style={styles.mapHeaderIcon}
+          >
+            <MapFavouriteIcon
+              color={colors.text}
+              height={responsiveSize(22)}
+              width={responsiveSize(20)}
+            />
           </Pressable>
         </View>
         <ScrollView
@@ -1076,7 +1563,16 @@ function PlacesMap({
           showsHorizontalScrollIndicator={false}
           style={styles.filterList}
         >
-          {appliedFilters.length > 0 ? <Pressable onPress={onOpenFilters} style={[styles.filterChip, styles.filterChipActive]}><Text style={[styles.filterText, styles.filterTextActive]}>{appliedFilters.length} filters</Text></Pressable> : null}
+          {appliedFilters.length > 0 ? (
+            <Pressable
+              onPress={onOpenFilters}
+              style={[styles.filterChip, styles.filterChipActive]}
+            >
+              <Text style={[styles.filterText, styles.filterTextActive]}>
+                {appliedFilters.length} filters
+              </Text>
+            </Pressable>
+          ) : null}
           {filters.map((filter) => {
             const active = activeFilter?.key === filter.key;
             return (
@@ -1086,7 +1582,11 @@ function PlacesMap({
                 style={[styles.filterChip, active && styles.filterChipActive]}
               >
                 <Image source={filter.icon} style={styles.filterIcon} />
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>{filter.label}</Text>
+                <Text
+                  style={[styles.filterText, active && styles.filterTextActive]}
+                >
+                  {filter.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -1100,25 +1600,41 @@ function PlacesMap({
               onPress={() => setSortOpen((value) => !value)}
               style={styles.mapSortButton}
             >
-              <SortIcon color={colors.textSecondary} height={responsiveSize(12)} width={responsiveSize(16)} />
+              <SortIcon
+                color={colors.textSecondary}
+                height={responsiveSize(12)}
+                width={responsiveSize(16)}
+              />
               <Text style={styles.mapSortText}>Sort by: {sortLabel}</Text>
               <Text style={styles.mapSortChevron}>⌄</Text>
             </Pressable>
           </View>
         ) : null}
         {venuesQuery.isPending ? (
-          <View style={styles.placesStatus}><ActivityIndicator color={colors.primary} /></View>
+          <View style={styles.placesStatus}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
         ) : venuesQuery.isError ? (
           <View style={styles.placesStatus}>
             <Text style={styles.placesStatusText}>Could not load places.</Text>
-            <Pressable onPress={() => void venuesQuery.refetch()} style={styles.inlineRetry}>
+            <Pressable
+              onPress={() => void venuesQuery.refetch()}
+              style={styles.inlineRetry}
+            >
               <Text style={styles.inlineRetryText}>Try again</Text>
             </Pressable>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={styles.placesStatus}><Text style={styles.placesStatusText}>No places match your search.</Text></View>
+          <View style={styles.placesStatus}>
+            <Text style={styles.placesStatusText}>
+              No places match your search.
+            </Text>
+          </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.placesList}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.placesList}
+          >
             <View style={styles.placesListContent}>
               {orderedVenues.map((venue) => (
                 <PlaceRow
@@ -1135,9 +1651,11 @@ function PlacesMap({
                   onPress={() => void venuesQuery.fetchNextPage()}
                   style={styles.loadMore}
                 >
-                  {venuesQuery.isFetchingNextPage
-                    ? <ActivityIndicator color={colors.primary} />
-                    : <Text style={styles.loadMoreText}>Load more places</Text>}
+                  {venuesQuery.isFetchingNextPage ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Load more places</Text>
+                  )}
                 </Pressable>
               ) : null}
             </View>
@@ -1151,12 +1669,29 @@ function PlacesMap({
         visible={sortOpen}
       >
         <View style={styles.sortModalScrim}>
-          <Pressable accessibilityLabel="Close sort options" onPress={sortSheet.close} style={StyleSheet.absoluteFill} />
-          <Animated.View accessibilityViewIsModal style={[styles.sortSheet, { transform: [{ translateY: sortSheet.translateY }] }]}>
-            <View style={styles.sortSheetDragArea} {...sortSheet.panHandlers}><View style={styles.sortSheetHandle} /></View>
+          <Pressable
+            accessibilityLabel="Close sort options"
+            onPress={sortSheet.close}
+            style={StyleSheet.absoluteFill}
+          />
+          <Animated.View
+            accessibilityViewIsModal
+            style={[
+              styles.sortSheet,
+              { transform: [{ translateY: sortSheet.translateY }] },
+            ]}
+          >
+            <View style={styles.sortSheetDragArea} {...sortSheet.panHandlers}>
+              <View style={styles.sortSheetHandle} />
+            </View>
             <View style={styles.sortSheetHeader}>
               <Text style={styles.sortSheetTitle}>Sort by</Text>
-              <Pressable accessibilityLabel="Close" hitSlop={8} onPress={sortSheet.close} style={styles.sortSheetClose}>
+              <Pressable
+                accessibilityLabel="Close"
+                hitSlop={8}
+                onPress={sortSheet.close}
+                style={styles.sortSheetClose}
+              >
                 <Text style={styles.sortSheetCloseText}>×</Text>
               </Pressable>
             </View>
@@ -1171,11 +1706,25 @@ function PlacesMap({
                     setSort(option.value);
                     sortSheet.close();
                   }}
-                  style={[styles.sortSheetRow, index === placeSortOptions.length - 1 && styles.sortSheetRowLast]}
+                  style={[
+                    styles.sortSheetRow,
+                    index === placeSortOptions.length - 1 &&
+                      styles.sortSheetRowLast,
+                  ]}
                 >
                   <Text style={styles.sortSheetLabel}>{option.label}</Text>
-                  <View style={[styles.sortSheetRadio, selected && styles.sortSheetRadioSelected]}>
-                    {selected ? <CheckIcon height={responsiveSize(8)} width={responsiveSize(11)} /> : null}
+                  <View
+                    style={[
+                      styles.sortSheetRadio,
+                      selected && styles.sortSheetRadioSelected,
+                    ]}
+                  >
+                    {selected ? (
+                      <CheckIcon
+                        height={responsiveSize(8)}
+                        width={responsiveSize(11)}
+                      />
+                    ) : null}
                   </View>
                 </Pressable>
               );
@@ -1198,11 +1747,12 @@ function MapVenueMarker({
 }) {
   if (layered) {
     const category = venue.category?.toLowerCase() ?? '';
-    const icon = category.includes('cafe') || category.includes('coffee')
-      ? mapCafeIcon
-      : category.includes('bar') || category.includes('club')
-        ? mapBarIcon
-        : mapTrendingIcon;
+    const icon =
+      category.includes('cafe') || category.includes('coffee')
+        ? mapCafeIcon
+        : category.includes('bar') || category.includes('club')
+          ? mapBarIcon
+          : mapTrendingIcon;
     return (
       <View style={styles.mapLayerMarker}>
         <View style={styles.mapLayerMarkerIcon}>
@@ -1210,8 +1760,12 @@ function MapVenueMarker({
         </View>
         <View style={styles.mapLayerMarkerDot} />
         <View style={styles.mapLayerMarkerCopy}>
-          <Text numberOfLines={1} style={styles.mapLayerMarkerName}>{venue.name}</Text>
-          <Text numberOfLines={1} style={styles.mapLayerMarkerCategory}>{venue.category ?? 'Place'}</Text>
+          <Text numberOfLines={1} style={styles.mapLayerMarkerName}>
+            {venue.name}
+          </Text>
+          <Text numberOfLines={1} style={styles.mapLayerMarkerCategory}>
+            {venue.category ?? 'Place'}
+          </Text>
         </View>
       </View>
     );
@@ -1220,7 +1774,9 @@ function MapVenueMarker({
   return (
     <View style={styles.mapRatingMarker}>
       <MapRatingPin height={responsiveSize(44)} width={responsiveSize(36)} />
-      <Text style={styles.mapRatingMarkerText}>{(venue.rating ?? 0).toFixed(1)}</Text>
+      <Text style={styles.mapRatingMarkerText}>
+        {(venue.rating ?? 0).toFixed(1)}
+      </Text>
     </View>
   );
 }
@@ -1246,13 +1802,24 @@ function MapLayerToggle({
     >
       <Text style={styles.layerOptionText}>{label}</Text>
       <View style={[styles.layerSwitch, active && styles.layerSwitchActive]}>
-        <View style={[styles.layerSwitchThumb, active && styles.layerSwitchThumbActive]} />
+        <View
+          style={[
+            styles.layerSwitchThumb,
+            active && styles.layerSwitchThumbActive,
+          ]}
+        />
       </View>
     </Pressable>
   );
 }
 
-function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: DiscoverPerson) => void; userId: string }) {
+function PeopleFeed({
+  onOpenProfile,
+  userId,
+}: {
+  onOpenProfile: (person: DiscoverPerson) => void;
+  userId: string;
+}) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState('');
@@ -1274,7 +1841,8 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
     toggleFollow.mutate(
       { targetUserId: person.userId, following: person.following },
       {
-        onError: (error) => Alert.alert('Could not update follow', apiErrorMessage(error)),
+        onError: (error) =>
+          Alert.alert('Could not update follow', apiErrorMessage(error)),
         onSettled: () => setPendingId(null),
       },
     );
@@ -1287,24 +1855,40 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
   const trending = peopleQuery.data?.trending ?? [];
   const freshPeople = peopleQuery.data?.new ?? [];
   const suggested = peopleQuery.data?.suggested ?? [];
-  const searchResults = isSearching && searchIsSettled ? peopleSearchQuery.data ?? [] : [];
+  const searchResults =
+    isSearching && searchIsSettled ? (peopleSearchQuery.data ?? []) : [];
   const resultIds = new Set(searchResults.map((person) => person.userId));
-  const peopleYouMayKnow = suggested.filter((person) => !resultIds.has(person.userId));
+  const peopleYouMayKnow = suggested.filter(
+    (person) => !resultIds.has(person.userId),
+  );
   const resultsPending = isSearching
     ? !searchIsSettled || peopleSearchQuery.isPending
     : peopleQuery.isPending;
-  const resultsError = isSearching ? peopleSearchQuery.error : peopleQuery.error;
+  const resultsError = isSearching
+    ? peopleSearchQuery.error
+    : peopleQuery.error;
   const seeMorePeople = [
     ...new Map(
-      [...trending, ...freshPeople, ...suggested].map((person) => [person.userId, person]),
+      [...trending, ...freshPeople, ...suggested].map((person) => [
+        person.userId,
+        person,
+      ]),
     ).values(),
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.peopleContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.peopleContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.peopleSearchRow}>
         <View style={styles.peopleSearch}>
-          <PeopleSearchIcon color={colors.text} height={responsiveSize(24)} width={responsiveSize(24)} />
+          <PeopleSearchIcon
+            color={colors.text}
+            height={responsiveSize(24)}
+            width={responsiveSize(24)}
+          />
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -1316,25 +1900,52 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
             value={query}
           />
           {hasQuery ? (
-            <Pressable accessibilityLabel="Clear people search" hitSlop={8} onPress={() => setQuery('')}>
-              <Image source={searchCloseIcon} style={styles.peopleSearchClear} />
+            <Pressable
+              accessibilityLabel="Clear people search"
+              hitSlop={8}
+              onPress={() => setQuery('')}
+            >
+              <Image
+                source={searchCloseIcon}
+                style={styles.peopleSearchClear}
+              />
             </Pressable>
           ) : null}
         </View>
-        <View accessibilityLabel="People you may know" style={styles.peopleSearchFriends}>
-          {isDark
-            ? <UserHeartIcon height={responsiveSize(24)} width={responsiveSize(24)} />
-            : <UserHeartLightIcon height={responsiveSize(24)} width={responsiveSize(24)} />}
+        <View
+          accessibilityLabel="People you may know"
+          style={styles.peopleSearchFriends}
+        >
+          {isDark ? (
+            <UserHeartIcon
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+          ) : (
+            <UserHeartLightIcon
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+          )}
         </View>
       </View>
 
       {resultsPending ? (
-        <View style={styles.centerState}><Text style={styles.stateCopy}>Loading people…</Text></View>
+        <View style={styles.centerState}>
+          <Text style={styles.stateCopy}>Loading people…</Text>
+        </View>
       ) : resultsError ? (
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Could not load people</Text>
           <Text style={styles.stateCopy}>{resultsError.message}</Text>
-          <Pressable onPress={() => void (isSearching ? peopleSearchQuery.refetch() : peopleQuery.refetch())} style={styles.retry}>
+          <Pressable
+            onPress={() =>
+              void (isSearching
+                ? peopleSearchQuery.refetch()
+                : peopleQuery.refetch())
+            }
+            style={styles.retry}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
@@ -1343,7 +1954,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
           {isSearching && searchResults.length > 0 ? (
             <>
               <Text style={styles.peopleResultCount}>
-                {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'} for &quot;{normalizedQuery}&quot;
+                {searchResults.length}{' '}
+                {searchResults.length === 1 ? 'result' : 'results'} for &quot;
+                {normalizedQuery}&quot;
               </Text>
               <View style={styles.peopleSearchResults}>
                 {searchResults.map((person) => (
@@ -1352,7 +1965,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
                     onOpen={() => onOpenProfile(person)}
-                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    pending={
+                      toggleFollow.isPending || pendingId === person.userId
+                    }
                     person={person}
                   />
                 ))}
@@ -1360,12 +1975,18 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
             </>
           ) : (
             <View style={styles.peopleSearchEmpty}>
-              <PeopleSearchIcon color={colors.text} height={responsiveSize(60)} width={responsiveSize(60)} />
+              <PeopleSearchIcon
+                color={colors.text}
+                height={responsiveSize(60)}
+                width={responsiveSize(60)}
+              />
               <Text style={styles.peopleSearchEmptyTitle}>
                 {isSearching ? 'No people found' : 'Search people'}
               </Text>
               <Text style={styles.peopleSearchEmptyCopy}>
-                {isSearching ? 'Try another name, or invite friends to Tastes.' : 'Type at least 2 characters.'}
+                {isSearching
+                  ? 'Try another name, or invite friends to Tastes.'
+                  : 'Type at least 2 characters.'}
               </Text>
             </View>
           )}
@@ -1381,7 +2002,11 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
         <>
           {trending.length > 0 ? (
             <>
-              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Gaining followers this week" title="🔥 Trending tastemakers" />
+              <PeopleSectionHeader
+                onSeeMore={() => setSeeMore(true)}
+                subtitle="Gaining followers this week"
+                title="🔥 Trending tastemakers"
+              />
               <ScrollView
                 contentContainerStyle={styles.peopleCarousel}
                 horizontal
@@ -1393,7 +2018,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
                     onOpen={() => onOpenProfile(person)}
-                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    pending={
+                      toggleFollow.isPending || pendingId === person.userId
+                    }
                     person={person}
                   />
                 ))}
@@ -1403,7 +2030,11 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
 
           {freshPeople.length > 0 ? (
             <>
-              <PeopleSectionHeader onSeeMore={() => setSeeMore(true)} subtitle="Just joined the community" title="New on Tastes" />
+              <PeopleSectionHeader
+                onSeeMore={() => setSeeMore(true)}
+                subtitle="Just joined the community"
+                title="New on Tastes"
+              />
               <View style={styles.compactPeople}>
                 {freshPeople.map((person) => (
                   <CompactPerson
@@ -1411,7 +2042,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
                     onOpen={() => onOpenProfile(person)}
-                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    pending={
+                      toggleFollow.isPending || pendingId === person.userId
+                    }
                     person={person}
                   />
                 ))}
@@ -1433,7 +2066,9 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
                     key={person.userId}
                     onFollow={() => handleFollow(person)}
                     onOpen={() => onOpenProfile(person)}
-                    pending={toggleFollow.isPending || pendingId === person.userId}
+                    pending={
+                      toggleFollow.isPending || pendingId === person.userId
+                    }
                     person={person}
                   />
                 ))}
@@ -1441,20 +2076,36 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
             </>
           ) : null}
 
-          {trending.length === 0 && freshPeople.length === 0 && suggested.length === 0 ? (
+          {trending.length === 0 &&
+          freshPeople.length === 0 &&
+          suggested.length === 0 ? (
             <View style={styles.centerState}>
               <Text style={styles.stateCopy}>No people to show yet.</Text>
             </View>
           ) : null}
         </>
       )}
-      <Modal animationType="slide" visible={seeMore} onRequestClose={() => setSeeMore(false)}>
+      <Modal
+        animationType="slide"
+        visible={seeMore}
+        onRequestClose={() => setSeeMore(false)}
+      >
         <View style={styles.screen}>
-          <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
-            <Pressable onPress={() => setSeeMore(false)} style={styles.headerAction}>
+          <View
+            style={[
+              styles.header,
+              { flexDirection: 'row', alignItems: 'center' },
+            ]}
+          >
+            <Pressable
+              onPress={() => setSeeMore(false)}
+              style={styles.headerAction}
+            >
               <Text style={styles.back}>‹</Text>
             </Pressable>
-            <Text style={[styles.stateTitle, { flex: 1 }]}>Trending tastemakers</Text>
+            <Text style={[styles.stateTitle, { flex: 1 }]}>
+              Trending tastemakers
+            </Text>
             <View style={styles.headerAction} />
           </View>
           <ScrollView contentContainerStyle={styles.profileList}>
@@ -1478,82 +2129,237 @@ function PeopleFeed({ onOpenProfile, userId }: { onOpenProfile: (person: Discove
   );
 }
 
-function SectionLabel({ onSeeAll, subtitle, title }: { onSeeAll?: () => void; subtitle: string; title: string }) {
+function SectionLabel({
+  onSeeAll,
+  subtitle,
+  title,
+}: {
+  onSeeAll?: () => void;
+  subtitle: string;
+  title: string;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionLabel}>
-      <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.sectionSubtitle}>{subtitle}</Text></View>
-      {onSeeAll ? <Pressable onPress={onSeeAll}><Text style={styles.seeMoreLink}>See all →</Text></Pressable> : null}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+      </View>
+      {onSeeAll ? (
+        <Pressable onPress={onSeeAll}>
+          <Text style={styles.seeMoreLink}>See all →</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
-function SeeAllPlacesModal({ onClose, onOpenPlace, onSave, savedVenueIds, venues }: { onClose: () => void; onOpenPlace: (id: string) => void; onSave: (place: SaveablePlace) => void; savedVenueIds: Set<string>; venues: Venue[] | null }) {
-  const { colors } = useAppTheme(); const styles = useMemo(() => createStyles(colors), [colors]); const [query, setQuery] = useState('');
-  const visible = (venues ?? []).filter((venue) => venue.name.toLowerCase().includes(query.toLowerCase()));
-  return <Modal animationType="slide" visible={venues !== null} onRequestClose={onClose}><View style={styles.screen}><View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}><Pressable onPress={onClose} style={styles.headerAction}><Text style={styles.back}>‹</Text></Pressable><Text style={[styles.stateTitle, { flex: 1 }]}>Trending near you</Text><View style={styles.headerAction} /></View><View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}><PeopleSearchIcon color={colors.textSecondary} height={responsiveSize(24)} width={responsiveSize(24)} /><TextInput onChangeText={setQuery} placeholder="Search in trending" placeholderTextColor={colors.placeholder} style={styles.peopleSearchInput} value={query} /></View><ScrollView contentContainerStyle={{ paddingHorizontal: responsiveSize(16), paddingBottom: responsiveSize(30), gap: responsiveSize(10) }}>{visible.map((venue) => <PlaceRow key={venue.id} onOpen={() => { onClose(); onOpenPlace(venue.id); }} onSave={() => { onClose(); onSave({ venueId: venue.id, name: venue.name }); }} place={venueToPlace(venue)} saved={savedVenueIds.has(venue.id)} />)}</ScrollView></View></Modal>;
+function SeeAllPlacesModal({
+  onClose,
+  onOpenPlace,
+  onSave,
+  savedVenueIds,
+  venues,
+}: {
+  onClose: () => void;
+  onOpenPlace: (id: string) => void;
+  onSave: (place: SaveablePlace) => void;
+  savedVenueIds: Set<string>;
+  venues: Venue[] | null;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [query, setQuery] = useState('');
+  const visible = (venues ?? []).filter((venue) =>
+    venue.name.toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <Modal
+      animationType="slide"
+      visible={venues !== null}
+      onRequestClose={onClose}
+    >
+      <View style={styles.screen}>
+        <View
+          style={[
+            styles.header,
+            { flexDirection: 'row', alignItems: 'center' },
+          ]}
+        >
+          <Pressable onPress={onClose} style={styles.headerAction}>
+            <Text style={styles.back}>‹</Text>
+          </Pressable>
+          <Text style={[styles.stateTitle, { flex: 1 }]}>
+            Trending near you
+          </Text>
+          <View style={styles.headerAction} />
+        </View>
+        <View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}>
+          <PeopleSearchIcon
+            color={colors.textSecondary}
+            height={responsiveSize(24)}
+            width={responsiveSize(24)}
+          />
+          <TextInput
+            onChangeText={setQuery}
+            placeholder="Search in trending"
+            placeholderTextColor={colors.placeholder}
+            style={styles.peopleSearchInput}
+            value={query}
+          />
+        </View>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: responsiveSize(16),
+            paddingBottom: responsiveSize(30),
+            gap: responsiveSize(10),
+          }}
+        >
+          {visible.map((venue) => (
+            <PlaceRow
+              key={venue.id}
+              onOpen={() => {
+                onClose();
+                onOpenPlace(venue.id);
+              }}
+              onSave={() => {
+                onClose();
+                onSave({ venueId: venue.id, name: venue.name });
+              }}
+              place={venueToPlace(venue)}
+              saved={savedVenueIds.has(venue.id)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
 }
 
 function RatingPill({ value }: { value: string }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return <View style={styles.ratingPill}><Text style={styles.ratingText}>★ {value}</Text></View>;
+  return (
+    <View style={styles.ratingPill}>
+      <Text style={styles.ratingText}>★ {value}</Text>
+    </View>
+  );
 }
 
-function TrendingTile({ image, meta, name, onOpen, rating, width }: { image: ImageSourcePropType; meta: string; name: string; onOpen: () => void; rating: string; width: number }) {
+function TrendingTile({
+  image,
+  meta,
+  name,
+  onOpen,
+  rating,
+  width,
+}: {
+  image: ImageSourcePropType;
+  meta: string;
+  name: string;
+  onOpen: () => void;
+  rating: string;
+  width: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onPress={onOpen} style={[styles.trendingTile, { width }]}>
       <Image source={image} style={styles.coverImage} />
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
-      <View style={styles.tileRating}><RatingPill value={rating} /></View>
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.9)']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.tileRating}>
+        <RatingPill value={rating} />
+      </View>
       <View style={styles.tileCopy}>
-        <Text numberOfLines={1} style={styles.tileTitle}>{name}</Text>
+        <Text numberOfLines={1} style={styles.tileTitle}>
+          {name}
+        </Text>
         <Text style={styles.tileMeta}>{meta}</Text>
       </View>
     </Pressable>
   );
 }
 
-function PlaceRow({ onOpen, onSave, place, saved, width }: { onOpen: () => void; onSave: () => void; place: Place; saved: boolean; width?: number }) {
+function PlaceRow({
+  onOpen,
+  onSave,
+  place,
+  saved,
+  width,
+}: {
+  onOpen: () => void;
+  onSave: () => void;
+  place: Place;
+  saved: boolean;
+  width?: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.placeRow, { width: width ?? '100%' }]}>
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
-        <View style={styles.newChip}><Text style={styles.newChipText}>Popular</Text></View>
+        <View style={styles.newChip}>
+          <Text style={styles.newChipText}>Popular</Text>
+        </View>
       </Pressable>
       <Pressable onPress={onOpen} style={styles.placeInfo}>
-        <Text numberOfLines={1} style={styles.placeName}>{place.name}</Text>
-        <Text numberOfLines={2} style={styles.placeAddress}>{place.address}</Text>
+        <Text numberOfLines={1} style={styles.placeName}>
+          {place.name}
+        </Text>
+        <Text numberOfLines={2} style={styles.placeAddress}>
+          {place.address}
+        </Text>
         <View style={styles.inlineMeta}>
           <RatingPill value={place.rating} />
           <Text style={styles.mutedMeta}>{place.reviews}</Text>
         </View>
         <View style={styles.chipRow}>
           {[place.category, place.price, place.distance].map((chip) => (
-            <View key={chip} style={styles.infoChip}><Text style={styles.infoChipText}>{chip}</Text></View>
+            <View key={chip} style={styles.infoChip}>
+              <Text style={styles.infoChipText}>{chip}</Text>
+            </View>
           ))}
         </View>
       </Pressable>
-      <Pressable accessibilityLabel={saved ? 'Remove from saved' : 'Save place'} hitSlop={8} onPress={onSave} style={styles.placeSave}>
-        <BookmarkIcon color={saved ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} />
+      <Pressable
+        accessibilityLabel={saved ? 'Remove from saved' : 'Save place'}
+        hitSlop={8}
+        onPress={onSave}
+        style={styles.placeSave}
+      >
+        <BookmarkIcon
+          color={saved ? colors.primary : colors.text}
+          height={responsiveSize(20)}
+          width={responsiveSize(20)}
+        />
       </Pressable>
     </View>
   );
 }
 
-function GridPlace({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
+function GridPlace({
+  onOpen,
+  place,
+  width,
+}: {
+  onOpen: () => void;
+  place: Place;
+  width: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onPress={onOpen} style={[styles.gridCard, { width }]}>
       <Image source={place.image} style={styles.gridImage} />
       <View style={styles.gridBody}>
-        <Text numberOfLines={1} style={styles.gridTitle}>{place.name}</Text>
+        <Text numberOfLines={1} style={styles.gridTitle}>
+          {place.name}
+        </Text>
         <View style={styles.inlineMeta}>
           <RatingPill value={place.rating} />
           <Text style={styles.gridMeta}>{place.distance}</Text>
@@ -1609,26 +2415,78 @@ function ReviewCard({
       <Image source={image} style={styles.reviewImage} />
       <View style={styles.reviewBody}>
         <View style={styles.reviewHead}>
-          <UserAvatar displayName={author} photoUrl={avatarUrl} style={styles.reviewAvatar} />
+          <UserAvatar
+            displayName={author}
+            photoUrl={avatarUrl}
+            style={styles.reviewAvatar}
+          />
           <View style={styles.reviewWho}>
-            <Text numberOfLines={1} style={styles.reviewAuthor}>{author}</Text>
-            <Text numberOfLines={2} style={styles.reviewPlace}>on {place}  ·  ★ {rating}</Text>
+            <Text numberOfLines={1} style={styles.reviewAuthor}>
+              {author}
+            </Text>
+            <Text numberOfLines={2} style={styles.reviewPlace}>
+              on {place} · ★ {rating}
+            </Text>
           </View>
           <ReviewCityBadge city={city} />
         </View>
-        <Text numberOfLines={2} style={styles.reviewText}>{text}</Text>
+        <Text numberOfLines={2} style={styles.reviewText}>
+          {text}
+        </Text>
         <ReviewMetaRow cuisine={cuisine} mood={mood} />
         <View style={styles.reviewFooter}>
-          <Pressable accessibilityLabel="Like review" onPress={(event) => { event.stopPropagation(); onReact(); }} style={styles.reviewActionIconRow}>
-            {reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.textSecondary} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}
+          <Pressable
+            accessibilityLabel="Like review"
+            onPress={(event) => {
+              event.stopPropagation();
+              onReact();
+            }}
+            style={styles.reviewActionIconRow}
+          >
+            {reacted ? (
+              <HeartBoldIcon
+                color={colors.primary}
+                fill={colors.primary}
+                height={responsiveSize(14.3462)}
+                width={responsiveSize(16.6667)}
+              />
+            ) : (
+              <HeartIcon
+                color={colors.textSecondary}
+                height={responsiveSize(15.5978)}
+                width={responsiveSize(17.9167)}
+              />
+            )}
             <Text style={styles.reviewAction}>{reactionCount}</Text>
           </Pressable>
-          <Pressable accessibilityLabel="Open comments" onPress={(event) => { event.stopPropagation(); onComments(); }} style={styles.reviewActionIconRow}>
-            <ChatIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} />
+          <Pressable
+            accessibilityLabel="Open comments"
+            onPress={(event) => {
+              event.stopPropagation();
+              onComments();
+            }}
+            style={styles.reviewActionIconRow}
+          >
+            <ChatIcon
+              color={colors.textSecondary}
+              height={responsiveSize(20)}
+              width={responsiveSize(20)}
+            />
             <Text style={styles.reviewAction}>{commentCount}</Text>
           </Pressable>
-          <Pressable accessibilityLabel="Share review" onPress={(event) => { event.stopPropagation(); onShare(); }} style={styles.reviewActionIconRow}>
-            <ShareIcon color={colors.textSecondary} height={responsiveSize(20)} width={responsiveSize(20)} />
+          <Pressable
+            accessibilityLabel="Share review"
+            onPress={(event) => {
+              event.stopPropagation();
+              onShare();
+            }}
+            style={styles.reviewActionIconRow}
+          >
+            <ShareIcon
+              color={colors.textSecondary}
+              height={responsiveSize(20)}
+              width={responsiveSize(20)}
+            />
           </Pressable>
           <Text style={styles.reviewTime}>{time}</Text>
         </View>
@@ -1637,7 +2495,17 @@ function ReviewCard({
   );
 }
 
-function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => void; onOpen: () => void; pending: boolean; person: DiscoverPerson }) {
+function TopReviewer({
+  onFollow,
+  onOpen,
+  pending,
+  person,
+}: {
+  onFollow: () => void;
+  onOpen: () => void;
+  pending: boolean;
+  person: DiscoverPerson;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -1649,61 +2517,126 @@ function TopReviewer({ onFollow, onOpen, pending, person }: { onFollow: () => vo
     >
       <View style={styles.reviewerHead}>
         <View>
-          <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.reviewerAvatar} />
-          <View style={styles.reviewerBadge}><Text style={styles.reviewerBadgeText}>★</Text></View>
+          <UserAvatar
+            displayName={person.displayName}
+            photoUrl={person.photoUrl}
+            style={styles.reviewerAvatar}
+          />
+          <View style={styles.reviewerBadge}>
+            <Text style={styles.reviewerBadgeText}>★</Text>
+          </View>
         </View>
         <View style={styles.reviewerCopy}>
           <Text style={styles.topReviewer}>★ Top reviewer</Text>
           <Text style={styles.reviewerName}>{person.displayName}</Text>
-          <Text style={styles.reviewerHandle}>{person.username ? `@${person.username}` : ''}</Text>
+          <Text style={styles.reviewerHandle}>
+            {person.username ? `@${person.username}` : ''}
+          </Text>
         </View>
       </View>
       <Text style={styles.reviewerMeta}>
-        {person.favoriteCuisines.join(' · ') || 'Local tastemaker'} · {person.reviewCount} reviews
+        {person.favoriteCuisines.join(' · ') || 'Local tastemaker'} ·{' '}
+        {person.reviewCount} reviews
       </Text>
       <View style={styles.reviewerButtons}>
-        <Pressable disabled={pending} onPress={onFollow} style={[styles.followWide, pending && styles.pressed]}>
-          <Text style={styles.followWideText}>{person.following ? 'Following' : 'Follow'}</Text>
+        <Pressable
+          disabled={pending}
+          onPress={onFollow}
+          style={[styles.followWide, pending && styles.pressed]}
+        >
+          <Text style={styles.followWideText}>
+            {person.following ? 'Following' : 'Follow'}
+          </Text>
         </Pressable>
-        <Pressable onPress={onOpen} style={styles.profileButton}><Text style={styles.profileButtonText}>View profile</Text></Pressable>
+        <Pressable onPress={onOpen} style={styles.profileButton}>
+          <Text style={styles.profileButtonText}>View profile</Text>
+        </Pressable>
       </View>
     </LinearGradient>
   );
 }
 
-function ForYouCard({ image, onOpen, place, reason, width }: { image: ImageSourcePropType; onOpen: () => void; place: Place; reason: string; width: number }) {
+function ForYouCard({
+  image,
+  onOpen,
+  place,
+  reason,
+  width,
+}: {
+  image: ImageSourcePropType;
+  onOpen: () => void;
+  place: Place;
+  reason: string;
+  width: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onPress={onOpen} style={[styles.forYouCard, { width }]}>
       <Image source={image} style={styles.coverImage} />
-      <LinearGradient colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']} style={StyleSheet.absoluteFill} />
-      <View style={styles.reasonChip}><Text style={styles.reasonText}>{reason}</Text></View>
+      <LinearGradient
+        colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.reasonChip}>
+        <Text style={styles.reasonText}>{reason}</Text>
+      </View>
       <View style={styles.forYouCopy}>
-        <Text numberOfLines={2} style={styles.forYouTitle}>{place.name}</Text>
-        <Text style={styles.forYouMeta}>{place.category} · {place.distance}</Text>
-        <View style={styles.inlineMeta}><RatingPill value={place.rating} /><Text style={styles.imageMetaText}>{place.reviews}</Text></View>
+        <Text numberOfLines={2} style={styles.forYouTitle}>
+          {place.name}
+        </Text>
+        <Text style={styles.forYouMeta}>
+          {place.category} · {place.distance}
+        </Text>
+        <View style={styles.inlineMeta}>
+          <RatingPill value={place.rating} />
+          <Text style={styles.imageMetaText}>{place.reviews}</Text>
+        </View>
       </View>
     </Pressable>
   );
 }
 
-function HiddenGem({ onOpen, place, width }: { onOpen: () => void; place: Place; width: number }) {
+function HiddenGem({
+  onOpen,
+  place,
+  width,
+}: {
+  onOpen: () => void;
+  place: Place;
+  width: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onPress={onOpen} style={[styles.gemCard, { width }]}>
       <Image source={place.image} style={styles.gemImage} />
       <View style={styles.gemCopy}>
-        <View style={styles.gemTop}><Text style={styles.gemBadge}>💎 GEM</Text><Text style={styles.gemReviews}>only {place.reviews}</Text></View>
+        <View style={styles.gemTop}>
+          <Text style={styles.gemBadge}>💎 GEM</Text>
+          <Text style={styles.gemReviews}>only {place.reviews}</Text>
+        </View>
         <Text style={styles.gemName}>{place.name}</Text>
-        <View style={styles.inlineMeta}><RatingPill value={place.rating} /><Text style={styles.gemMeta}>{place.category} · {place.price} · {place.distance}</Text></View>
+        <View style={styles.inlineMeta}>
+          <RatingPill value={place.rating} />
+          <Text style={styles.gemMeta}>
+            {place.category} · {place.price} · {place.distance}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
 }
 
-function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore?: () => void; subtitle: string; title: string }) {
+function PeopleSectionHeader({
+  onSeeMore,
+  subtitle,
+  title,
+}: {
+  onSeeMore?: () => void;
+  subtitle: string;
+  title: string;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -1712,7 +2645,11 @@ function PeopleSectionHeader({ onSeeMore, subtitle, title }: { onSeeMore?: () =>
         <Text style={styles.peopleSectionTitle}>{title}</Text>
         <Text style={styles.peopleSectionSubtitle}>{subtitle}</Text>
       </View>
-      {onSeeMore ? <Pressable onPress={onSeeMore}><Text style={styles.seeMoreLink}>See more →</Text></Pressable> : null}
+      {onSeeMore ? (
+        <Pressable onPress={onSeeMore}>
+          <Text style={styles.seeMoreLink}>See more →</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -1734,14 +2671,24 @@ function PeopleSearchResult({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable onPress={onOpen} style={styles.peopleResultCard}>
-      <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.peopleResultAvatar} />
+      <UserAvatar
+        displayName={person.displayName}
+        photoUrl={person.photoUrl}
+        style={styles.peopleResultAvatar}
+      />
       <View style={styles.peopleResultCopy}>
-        <Text numberOfLines={1} style={styles.peopleResultName}>{person.displayName}</Text>
+        <Text numberOfLines={1} style={styles.peopleResultName}>
+          {person.displayName}
+        </Text>
         <Text numberOfLines={1} style={styles.peopleResultHandle}>
           {person.username ? `@${person.username}` : 'Tastes member'}
         </Text>
       </View>
-      <SearchFollowButton following={following} onPress={onFollow} pending={pending} />
+      <SearchFollowButton
+        following={following}
+        onPress={onFollow}
+        pending={pending}
+      />
     </Pressable>
   );
 }
@@ -1773,10 +2720,19 @@ function PeopleYouMayKnow({
         {people.map((person) => (
           <View key={person.userId} style={styles.peopleMayKnowCard}>
             <Pressable onPress={() => onOpen(person)}>
-              <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.peopleMayKnowAvatar} />
+              <UserAvatar
+                displayName={person.displayName}
+                photoUrl={person.photoUrl}
+                style={styles.peopleMayKnowAvatar}
+              />
             </Pressable>
-            <Pressable onPress={() => onOpen(person)} style={styles.peopleMayKnowCopy}>
-              <Text numberOfLines={1} style={styles.peopleMayKnowName}>{person.displayName}</Text>
+            <Pressable
+              onPress={() => onOpen(person)}
+              style={styles.peopleMayKnowCopy}
+            >
+              <Text numberOfLines={1} style={styles.peopleMayKnowName}>
+                {person.displayName}
+              </Text>
               <Text numberOfLines={1} style={styles.peopleMayKnowHandle}>
                 {person.username ? `@${person.username}` : 'Tastes member'}
               </Text>
@@ -1794,7 +2750,12 @@ function PeopleYouMayKnow({
   );
 }
 
-function SearchFollowButton({ following, onPress, pending, wide = false }: {
+function SearchFollowButton({
+  following,
+  onPress,
+  pending,
+  wide = false,
+}: {
   following: boolean;
   onPress: () => void;
   pending: boolean;
@@ -1816,23 +2777,47 @@ function SearchFollowButton({ following, onPress, pending, wide = false }: {
         pending && styles.pressed,
       ]}
     >
-      <Text style={[styles.searchFollowButtonText, following && styles.searchFollowingButtonText]}>
+      <Text
+        style={[
+          styles.searchFollowButtonText,
+          following && styles.searchFollowingButtonText,
+        ]}
+      >
         {following ? 'Following' : 'Follow'}
       </Text>
     </Pressable>
   );
 }
 
-function FollowButton({ following, onPress, pending }: { following: boolean; onPress: () => void; pending: boolean }) {
+function FollowButton({
+  following,
+  onPress,
+  pending,
+}: {
+  following: boolean;
+  onPress: () => void;
+  pending: boolean;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable
       disabled={pending}
       onPress={onPress}
-      style={[styles.followButton, following && styles.followingButton, pending && styles.pressed]}
+      style={[
+        styles.followButton,
+        following && styles.followingButton,
+        pending && styles.pressed,
+      ]}
     >
-      <Text style={[styles.followButtonText, following && styles.followingButtonText]}>{following ? 'Following' : 'Follow'}</Text>
+      <Text
+        style={[
+          styles.followButtonText,
+          following && styles.followingButtonText,
+        ]}
+      >
+        {following ? 'Following' : 'Follow'}
+      </Text>
     </Pressable>
   );
 }
@@ -1853,14 +2838,32 @@ function TastemakerCard({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <LinearGradient colors={['rgba(184,47,41,0.35)', colors.surface]} style={styles.tastemakerCard}>
+    <LinearGradient
+      colors={['rgba(184,47,41,0.35)', colors.surface]}
+      style={styles.tastemakerCard}
+    >
       <Pressable onPress={onOpen}>
-        <UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.tastemakerAvatar} />
+        <UserAvatar
+          displayName={person.displayName}
+          photoUrl={person.photoUrl}
+          style={styles.tastemakerAvatar}
+        />
       </Pressable>
-      <Text numberOfLines={1} onPress={onOpen} style={styles.tastemakerName}>{person.displayName}</Text>
-      <Text style={styles.tastemakerTastes}>{person.favoriteCuisines.join(' · ') || (person.username ? `@${person.username}` : '')}</Text>
-      <Text style={styles.tastemakerGrowth}>+{person.weeklyFollowerGrowth} this week</Text>
-      <FollowButton following={following} onPress={onFollow} pending={pending} />
+      <Text numberOfLines={1} onPress={onOpen} style={styles.tastemakerName}>
+        {person.displayName}
+      </Text>
+      <Text style={styles.tastemakerTastes}>
+        {person.favoriteCuisines.join(' · ') ||
+          (person.username ? `@${person.username}` : '')}
+      </Text>
+      <Text style={styles.tastemakerGrowth}>
+        +{person.weeklyFollowerGrowth} this week
+      </Text>
+      <FollowButton
+        following={following}
+        onPress={onFollow}
+        pending={pending}
+      />
     </LinearGradient>
   );
 }
@@ -1882,14 +2885,28 @@ function CompactPerson({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.compactPerson}>
-      <Pressable onPress={onOpen}><UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.compactAvatar} /></Pressable>
+      <Pressable onPress={onOpen}>
+        <UserAvatar
+          displayName={person.displayName}
+          photoUrl={person.photoUrl}
+          style={styles.compactAvatar}
+        />
+      </Pressable>
       <Pressable onPress={onOpen} style={styles.compactCopy}>
-        <View style={styles.newPersonRow}><Text style={styles.newPersonBadge}>NEW</Text><Text style={styles.compactName}>{person.displayName}</Text></View>
+        <View style={styles.newPersonRow}>
+          <Text style={styles.newPersonBadge}>NEW</Text>
+          <Text style={styles.compactName}>{person.displayName}</Text>
+        </View>
         <Text numberOfLines={1} style={styles.compactTastes}>
-          {person.favoriteCuisines.join(' · ') || 'Tastes explorer'} · {joinedLabel(person.createdAt)}
+          {person.favoriteCuisines.join(' · ') || 'Tastes explorer'} ·{' '}
+          {joinedLabel(person.createdAt)}
         </Text>
       </Pressable>
-      <FollowButton following={following} onPress={onFollow} pending={pending} />
+      <FollowButton
+        following={following}
+        onPress={onFollow}
+        pending={pending}
+      />
     </View>
   );
 }
@@ -1917,13 +2934,27 @@ function ProfileSuggestion({
   return (
     <View style={styles.profileSuggestion}>
       <View style={styles.suggestionHead}>
-        <Pressable onPress={onOpen}><UserAvatar displayName={person.displayName} photoUrl={person.photoUrl} style={styles.suggestionAvatar} /></Pressable>
+        <Pressable onPress={onOpen}>
+          <UserAvatar
+            displayName={person.displayName}
+            photoUrl={person.photoUrl}
+            style={styles.suggestionAvatar}
+          />
+        </Pressable>
         <Pressable onPress={onOpen} style={styles.suggestionCopy}>
           <Text style={styles.suggestionName}>{person.displayName}</Text>
-          <Text style={styles.suggestionHandle}>{person.username ? `@${person.username}` : ''}</Text>
-          <Text style={styles.suggestionTastes}>{person.favoriteCuisines.join(' · ')}</Text>
+          <Text style={styles.suggestionHandle}>
+            {person.username ? `@${person.username}` : ''}
+          </Text>
+          <Text style={styles.suggestionTastes}>
+            {person.favoriteCuisines.join(' · ')}
+          </Text>
         </Pressable>
-        <FollowButton following={following} onPress={onFollow} pending={pending} />
+        <FollowButton
+          following={following}
+          onPress={onFollow}
+          pending={pending}
+        />
       </View>
       <View style={styles.statsRow}>
         {stats.map(([value, label]) => (
@@ -1938,271 +2969,1035 @@ function ProfileSuggestion({
   );
 }
 
-const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
-  screen: { flex: 1, backgroundColor: colors.canvas },
-  mapDiscoverScreen: { backgroundColor: colors.canvas },
-  aiFab: { position: 'absolute', right: 16, bottom: 18, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 24, backgroundColor: colors.surface },
-  aiFabMark: { width: 20, height: 18 },
-  aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
-  aiFabMarkOutline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
-  header: { height: DISCOVER_HEADER_HEIGHT, paddingTop: 54, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.background },
-  mapHeader: { position: 'absolute', zIndex: 10, top: 0, right: 0, left: 0, elevation: 10 },
-  headerAction: { width: 52, height: 44, alignItems: 'center', justifyContent: 'center' },
-  back: { color: colors.text, fontSize: 38, lineHeight: 40 },
-  switcher: { height: 40, padding: 4, flexDirection: 'row', borderRadius: 999, backgroundColor: colors.surfaceRaised },
-  switchOption: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
-  switchOptionActive: { backgroundColor: '#D9DDE5' },
-  switchText: { color: colors.textSecondary, opacity: 0.5, fontSize: 13 },
-  switchTextActive: { color: '#161616', opacity: 1, fontWeight: '700' },
-  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  stateCopy: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
-  retry: { marginTop: 4, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: colors.primary },
-  retryText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
-  trendingLoading: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 12,
-    backgroundColor: colors.canvas,
-    overflow: 'hidden',
-  },
-  loadingHero: {
-    height: 188,
-    marginBottom: 4,
-    borderRadius: 16,
-    backgroundColor: colors.discoverSkeleton,
-  },
-  loadingTitle: {
-    width: 140,
-    height: 20,
-    borderRadius: 6,
-    backgroundColor: colors.discoverSkeleton,
-  },
-  loadingCard: {
-    height: 156,
-    borderRadius: 16,
-    backgroundColor: colors.discoverSkeleton,
-  },
-  feedContent: { paddingBottom: 24, backgroundColor: colors.canvas },
-  hero: { height: 150, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
-  coverImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  hotChip: { position: 'absolute', top: 12, left: 12, height: 26, paddingHorizontal: 10, borderRadius: 13, backgroundColor: '#FF4757', justifyContent: 'center' },
-  hotChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  heroCopy: { position: 'absolute', left: 14, right: 14, bottom: 13, gap: 4 },
-  heroTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '700' },
-  heroMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 13 },
-  inlineMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  ratingPill: { height: 20, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center' },
-  ratingText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  imageMetaText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
-  sectionLabel: { height: 58, paddingHorizontal: 16, paddingTop: 18, flexDirection: 'row', alignItems: 'flex-start' },
-  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  sectionSubtitle: { marginTop: 2, color: colors.textSecondary, fontSize: 13 },
-  horizontalContent: { paddingHorizontal: 16, gap: 10 },
-  trendingTile: { width: 200, height: 200, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface },
-  tileRating: { position: 'absolute', top: 8, right: 8 },
-  tileCopy: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 3 },
-  tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  placeRows: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
-  placeRow: { minHeight: 125, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
-  placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
-  newChip: { position: 'absolute', top: 6, left: 6, height: 18, paddingHorizontal: 7, borderRadius: 9, backgroundColor: '#E63946', justifyContent: 'center' },
-  newChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  placeInfo: { flex: 1, minWidth: 0, gap: 3 },
-  placeName: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  placeAddress: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
-  mutedMeta: { color: colors.textSecondary, fontSize: 13 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  infoChip: { height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
-  infoChipText: { color: colors.text, fontSize: 13 },
-  grid: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
-  gridCard: { height: 151, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: 'hidden', backgroundColor: colors.surface },
-  gridImage: { width: '100%', height: 90, resizeMode: 'cover' },
-  gridBody: { height: 61, padding: 9, gap: 4 },
-  gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  gridMeta: { color: colors.textSecondary, fontSize: 12 },
-  reviewList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
-  reviewCard: { minHeight: 148, flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 15, overflow: 'hidden', backgroundColor: colors.surface },
-  reviewImage: { width: 110, minHeight: 148, resizeMode: 'cover' },
-  reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
-  reviewHead: { height: 32, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  reviewAvatar: { width: 26, height: 26, borderRadius: 13 },
-  reviewWho: { flex: 1, minWidth: 0 },
-  reviewAuthor: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  reviewPlace: { color: colors.textSecondary, fontSize: 10, lineHeight: 12 },
-  reviewText: { color: colors.text, fontSize: 12, lineHeight: 16 },
-  reviewFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  reviewActionIconRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  reviewAction: { color: colors.textSecondary, fontSize: 12 },
-  reviewTime: { marginLeft: 'auto', color: colors.textSecondary, fontSize: 11 },
-  reviewerCard: { height: 181, marginHorizontal: 16, padding: 16, borderWidth: 1, borderColor: colors.primary, borderRadius: 17 },
-  reviewerHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  reviewerAvatar: { width: 70, height: 70, borderRadius: 35, borderWidth: 2, borderColor: colors.primary },
-  reviewerBadge: { position: 'absolute', right: -4, bottom: -4, width: 26, height: 26, borderRadius: 13, backgroundColor: '#FF4757', alignItems: 'center', justifyContent: 'center' },
-  reviewerBadgeText: { color: '#FFFFFF', fontSize: 13 },
-  reviewerCopy: { flex: 1 },
-  topReviewer: { color: '#FF4757', fontSize: 12, fontWeight: '700' },
-  reviewerName: { marginTop: 2, color: colors.text, fontSize: 20, fontWeight: '700' },
-  reviewerHandle: { marginTop: 2, color: colors.textSecondary, fontSize: 12 },
-  reviewerMeta: { marginTop: 10, color: colors.textSecondary, fontSize: 12 },
-  reviewerButtons: { marginTop: 10, flexDirection: 'row', gap: 8 },
-  followWide: { flex: 1, height: 35, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  followWideText: { color: '#161616', fontSize: 14, fontWeight: '600' },
-  profileButton: { height: 35, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  profileButtonText: { color: colors.text, fontSize: 13 },
-  forYouCard: { width: 240, height: 280, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.surface },
-  reasonChip: { position: 'absolute', top: 12, left: 12, height: 27, paddingHorizontal: 10, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center' },
-  reasonText: { color: '#FFFFFF', fontSize: 12 },
-  forYouCopy: { position: 'absolute', left: 12, right: 12, bottom: 12, gap: 5 },
-  forYouTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 20, fontWeight: '700' },
-  forYouMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
-  gemList: { paddingHorizontal: DISCOVER_GRID_PADDING, flexDirection: 'row', flexWrap: 'wrap', gap: DISCOVER_GRID_GAP },
-  gemCard: { height: 94, padding: 12, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.surface },
-  gemImage: { width: 70, height: 70, borderRadius: 8, resizeMode: 'cover' },
-  gemCopy: { flex: 1, minWidth: 0, gap: 4 },
-  gemTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  gemBadge: { color: '#FFFFFF', fontSize: 10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 9, backgroundColor: '#C99E58', overflow: 'hidden' },
-  gemReviews: { color: colors.textSecondary, fontSize: 12 },
-  gemName: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  gemMeta: { color: colors.textSecondary, fontSize: 11 },
-  mapScreen: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
-  mapNative: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  mapToneOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.32)' },
-  mapRatingMarker: { width: 36, height: 44, shadowColor: '#E63946', shadowOpacity: 0.67, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
-  mapRatingMarkerText: { position: 'absolute', top: 8, left: 0, width: 36, color: '#FFFFFF', fontSize: 14, lineHeight: 18, fontWeight: '700', textAlign: 'center' },
-  mapLayerMarker: { width: 142, height: 52, flexDirection: 'row', alignItems: 'flex-start' },
-  mapLayerMarkerIcon: { width: 36, height: 36, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 18, backgroundColor: '#161616', alignItems: 'center', justifyContent: 'center' },
-  mapLayerMarkerImage: { width: 20, height: 20, resizeMode: 'contain' },
-  mapFriendMarker: { width: 142, height: 52, flexDirection: 'row', alignItems: 'flex-start' },
-  mapFriendAvatarWrap: { width: 36, height: 36, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 18, backgroundColor: '#161616', overflow: 'hidden' },
-  mapFriendAvatar: { width: 34, height: 34, resizeMode: 'cover' },
-  mapLayerMarkerDot: { position: 'absolute', left: 16, top: 43, width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
-  mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
-  mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-  mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
-  mapControlsLandscape: { flexDirection: 'row', gap: 6 },
-  mapControlButton: { width: 48, height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
-  mapControlButtonActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.9)' },
-  mapControlGlyph: { color: colors.text, fontSize: 22, lineHeight: 26, fontWeight: '700' },
-  layersMenu: { position: 'absolute', zIndex: 6, right: 72, width: 190, paddingHorizontal: 15, paddingTop: 12, paddingBottom: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
-  layersTitle: { marginBottom: 4, color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  layerRow: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  layerOptionText: { color: colors.text, fontSize: 15 },
-  layerSwitch: { width: 38, height: 22, padding: 2, justifyContent: 'center', borderRadius: 11, backgroundColor: colors.surfaceRaised },
-  layerSwitchActive: { backgroundColor: colors.primary },
-  layerSwitchThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF' },
-  layerSwitchThumbActive: { alignSelf: 'flex-end' },
-  mapSheet: { position: 'absolute', zIndex: 8, elevation: 8, right: 0, bottom: 0, left: 0, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface, overflow: 'hidden' },
-  mapSheetSidePanel: { top: 0, bottom: 0, borderTopWidth: 0, borderRightWidth: 1, borderTopLeftRadius: 0, borderTopRightRadius: 0 },
-  mapSheetUnderlay: { position: 'absolute', zIndex: 7, elevation: 7, right: 0, bottom: 0, left: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface },
-  showPlacesButton: { position: 'absolute', zIndex: 9, elevation: 9, right: 16, bottom: 16, height: 42, paddingHorizontal: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  showPlacesText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  mapSearchRow: { zIndex: 2, height: 45, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapSearch: { flex: 1, minWidth: 0, height: 39, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, backgroundColor: colors.surfaceRaised },
-  mapSearchInput: { flex: 1, minWidth: 0, color: colors.text, fontSize: 16, paddingVertical: 0 },
-  mapHeaderIcon: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center' },
-  filterList: { flexGrow: 0, height: 38 },
-  filterContent: { alignItems: 'center', gap: 6 },
-  filterChip: { height: 28, paddingHorizontal: 8, flexDirection: 'row', gap: 3, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  filterChipActive: { borderColor: colors.primary, backgroundColor: 'rgba(184,47,41,0.12)' },
-  filterIcon: { width: 14, height: 14, resizeMode: 'contain' },
-  filterText: { color: colors.textSecondary, fontSize: 12 },
-  filterTextActive: { color: colors.primary, fontWeight: '700' },
-  mapResultsMeta: { zIndex: 3, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  mapResultsCount: { color: colors.textSecondary, fontSize: 12 },
-  mapSortButton: { minHeight: 28, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surfaceRaised },
-  mapSortText: { color: colors.textSecondary, fontSize: 11 },
-  mapSortChevron: { marginTop: -3, color: colors.textSecondary, fontSize: 13 },
-  sortModalScrim: { flex: 1, paddingHorizontal: 16, paddingBottom: 24, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sortSheet: { height: 340, paddingHorizontal: 24, borderRadius: 22, backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
-  sortSheetDragArea: { position: 'absolute', top: 0, right: 0, left: 0, height: 28, alignItems: 'center', justifyContent: 'center' },
-  sortSheetHandle: { position: 'absolute', top: 10, left: '50%', width: 36, height: 4, marginLeft: -18, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
-  sortSheetHeader: { height: 65, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sortSheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  sortSheetClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  sortSheetCloseText: { color: colors.text, fontSize: 26, lineHeight: 28 },
-  sortSheetRow: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
-  sortSheetRowLast: { borderBottomWidth: 0 },
-  sortSheetLabel: { color: colors.text, fontSize: 16 },
-  sortSheetRadio: { width: 20, height: 20, borderWidth: 1.5, borderColor: colors.textMuted, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sortSheetRadioSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
-  placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
-  placesStatusText: { color: colors.textSecondary, fontSize: 13 },
-  inlineRetry: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceRaised },
-  inlineRetryText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  placesList: { flex: 1, marginTop: 8 },
-  placesListContent: { gap: 10, paddingBottom: 16 },
-  loadMore: { height: 38, marginTop: 2, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
-  loadMoreText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  placeSave: { alignSelf: 'flex-start', paddingTop: 2 },
-  peopleContent: { padding: 16, paddingBottom: 24, gap: 16 },
-  peopleSearchRow: { height: 39, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  peopleSearch: { flex: 1, minWidth: 0, height: 39, paddingLeft: 10, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-  peopleSearchInput: { flex: 1, color: colors.text, fontSize: 16, letterSpacing: -0.41, paddingVertical: 0 },
-  peopleSearchClear: { width: 24, height: 24 },
-  peopleSearchFriends: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  peopleResultCount: { marginTop: -2, color: colors.textSecondary, fontSize: 13, letterSpacing: -0.24 },
-  peopleSearchResults: { gap: 8 },
-  peopleResultCard: { minHeight: 64, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.hairline, borderRadius: 14, backgroundColor: colors.surface },
-  peopleResultAvatar: { width: 44, height: 44, borderRadius: 22 },
-  peopleResultCopy: { flex: 1, minWidth: 0, gap: 4 },
-  peopleResultName: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41 },
-  peopleResultHandle: { color: colors.textMuted, fontSize: 13, letterSpacing: -0.24 },
-  peopleSearchEmpty: { minHeight: 380, paddingTop: 42, alignItems: 'center', gap: 10 },
-  peopleSearchEmptyTitle: { color: colors.text, fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  peopleSearchEmptyCopy: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
-  peopleMayKnowSection: { marginTop: 14, gap: 8 },
-  peopleMayKnowTitle: { color: colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.24 },
-  peopleMayKnowList: { gap: 10 },
-  peopleMayKnowCard: { width: 165, minHeight: 174, padding: 16, alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1, borderColor: colors.hairline, borderRadius: 16, backgroundColor: colors.surface },
-  peopleMayKnowAvatar: { width: 40, height: 40, borderRadius: 20 },
-  peopleMayKnowCopy: { width: '100%', alignItems: 'center', gap: 4 },
-  peopleMayKnowName: { width: '100%', color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41, textAlign: 'center' },
-  peopleMayKnowHandle: { width: '100%', color: colors.textMuted, fontSize: 13, letterSpacing: -0.24, textAlign: 'center' },
-  searchFollowButton: { minWidth: 74, height: 31, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  searchFollowButtonWide: { width: '100%', height: 40 },
-  searchFollowButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
-  searchFollowingButton: { borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  searchFollowingButtonText: { color: colors.primary },
-  peopleSectionHead: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 4 },
-  peopleSectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  peopleSectionSubtitle: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
-  seeMoreLink: { color: colors.primary, fontSize: 12 },
-  peopleCarousel: { gap: 10 },
-  tastemakerCard: { width: 156, height: 186, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 17, alignItems: 'center' },
-  tastemakerAvatar: { width: 58, height: 58, borderRadius: 29, borderWidth: 1, borderColor: '#FFFFFF' },
-  tastemakerName: { marginTop: 10, color: colors.text, fontSize: 14, fontWeight: '700' },
-  tastemakerTastes: { marginTop: 7, color: colors.textSecondary, fontSize: 12 },
-  tastemakerGrowth: { marginTop: 7, color: '#7AD49A', fontSize: 12 },
-  compactPeople: { gap: 9 },
-  compactPerson: { height: 68, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface },
-  compactAvatar: { width: 44, height: 44, borderRadius: 22 },
-  compactCopy: { flex: 1, minWidth: 0 },
-  newPersonRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  newPersonBadge: { color: '#161616', backgroundColor: '#7AD49A', fontSize: 10, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 7, overflow: 'hidden' },
-  compactName: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '700' },
-  compactTastes: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
-  followButton: { minWidth: 74, height: 30, paddingHorizontal: 14, borderRadius: 15, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  followButtonText: { color: '#161616', fontSize: 13, fontWeight: '600' },
-  followingButton: { borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' },
-  followingButtonText: { color: colors.primary },
-  profileList: { gap: 10 },
-  profileSuggestion: { minHeight: 172, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.surface },
-  suggestionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
-  suggestionAvatar: { width: 54, height: 54, borderRadius: 27 },
-  suggestionCopy: { flex: 1, minWidth: 0 },
-  suggestionName: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  suggestionHandle: { color: colors.textSecondary, fontSize: 11 },
-  suggestionTastes: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
-  statsRow: { height: 55, marginTop: 10, flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  stat: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border },
-  statValue: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  statLabel: { marginTop: 4, color: colors.textSecondary, fontSize: 11 },
-  mutualText: { color: colors.textSecondary, fontSize: 12 },
-  pressed: { opacity: 0.78 },
-});
+const createStyles = (colors: ThemeColors) =>
+  responsiveStyleSheet({
+    screen: { flex: 1, backgroundColor: colors.canvas },
+    mapDiscoverScreen: { backgroundColor: colors.canvas },
+    aiFab: {
+      position: 'absolute',
+      right: 16,
+      bottom: 18,
+      width: 48,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+    },
+    aiFabMark: { width: 20, height: 18 },
+    aiFabMarkPink: { position: 'absolute', top: 6, left: 4 },
+    aiFabMarkOutline: {
+      position: 'absolute',
+      top: 2,
+      left: 1,
+      transform: [{ scaleY: -1 }],
+    },
+    header: {
+      height: DISCOVER_HEADER_HEIGHT,
+      paddingTop: 54,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      backgroundColor: colors.background,
+    },
+    mapHeader: {
+      position: 'absolute',
+      zIndex: 10,
+      top: 0,
+      right: 0,
+      left: 0,
+      elevation: 10,
+    },
+    headerAction: {
+      width: 52,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    back: { color: colors.text, fontSize: 38, lineHeight: 40 },
+    switcher: {
+      height: 40,
+      padding: 4,
+      flexDirection: 'row',
+      borderRadius: 999,
+      backgroundColor: colors.surfaceRaised,
+    },
+    switchOption: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 999,
+    },
+    switchOptionActive: { backgroundColor: '#D9DDE5' },
+    switchText: { color: colors.textSecondary, opacity: 0.5, fontSize: 13 },
+    switchTextActive: { color: '#161616', opacity: 1, fontWeight: '700' },
+    centerState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      gap: 10,
+    },
+    stateTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    stateCopy: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    retry: {
+      marginTop: 4,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 24,
+      backgroundColor: colors.primary,
+    },
+    retryText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
+    trendingLoading: {
+      flex: 1,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      gap: 12,
+      backgroundColor: colors.canvas,
+      overflow: 'hidden',
+    },
+    loadingHero: {
+      height: 188,
+      marginBottom: 4,
+      borderRadius: 16,
+      backgroundColor: colors.discoverSkeleton,
+    },
+    loadingTitle: {
+      width: 140,
+      height: 20,
+      borderRadius: 6,
+      backgroundColor: colors.discoverSkeleton,
+    },
+    loadingCard: {
+      height: 156,
+      borderRadius: 16,
+      backgroundColor: colors.discoverSkeleton,
+    },
+    feedContent: { paddingBottom: 24, backgroundColor: colors.canvas },
+    hero: {
+      height: 150,
+      marginHorizontal: 16,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    coverImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    hotChip: {
+      position: 'absolute',
+      top: 12,
+      left: 12,
+      height: 26,
+      paddingHorizontal: 10,
+      borderRadius: 13,
+      backgroundColor: '#FF4757',
+      justifyContent: 'center',
+    },
+    hotChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+    heroCopy: { position: 'absolute', left: 14, right: 14, bottom: 13, gap: 4 },
+    heroTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '700' },
+    heroMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 13 },
+    inlineMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    ratingPill: {
+      height: 20,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      backgroundColor: '#FF4757',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ratingText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+    imageMetaText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
+    sectionLabel: {
+      height: 58,
+      paddingHorizontal: 16,
+      paddingTop: 18,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+    sectionSubtitle: {
+      marginTop: 2,
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    horizontalContent: { paddingHorizontal: 16, gap: 10 },
+    trendingTile: {
+      width: 200,
+      height: 200,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    tileRating: { position: 'absolute', top: 8, right: 8 },
+    tileCopy: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 3 },
+    tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+    tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
+    placeRows: {
+      paddingHorizontal: DISCOVER_GRID_PADDING,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: DISCOVER_GRID_GAP,
+    },
+    placeRow: {
+      minHeight: 125,
+      padding: 12,
+      flexDirection: 'row',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+    },
+    placeImage: { width: 86, height: 86, borderRadius: 9, resizeMode: 'cover' },
+    newChip: {
+      position: 'absolute',
+      top: 6,
+      left: 6,
+      height: 18,
+      paddingHorizontal: 7,
+      borderRadius: 9,
+      backgroundColor: '#E63946',
+      justifyContent: 'center',
+    },
+    newChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+    placeInfo: { flex: 1, minWidth: 0, gap: 3 },
+    placeName: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    placeAddress: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+    mutedMeta: { color: colors.textSecondary, fontSize: 13 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    infoChip: {
+      height: 32,
+      paddingHorizontal: 10,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceRaised,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    infoChipText: { color: colors.text, fontSize: 13 },
+    grid: {
+      paddingHorizontal: DISCOVER_GRID_PADDING,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: DISCOVER_GRID_GAP,
+    },
+    gridCard: {
+      height: 151,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 13,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    gridImage: { width: '100%', height: 90, resizeMode: 'cover' },
+    gridBody: { height: 61, padding: 9, gap: 4 },
+    gridTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
+    gridMeta: { color: colors.textSecondary, fontSize: 12 },
+    reviewList: {
+      paddingHorizontal: DISCOVER_GRID_PADDING,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: DISCOVER_GRID_GAP,
+    },
+    reviewCard: {
+      minHeight: 148,
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 15,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    reviewImage: { width: 110, minHeight: 148, resizeMode: 'cover' },
+    reviewBody: { flex: 1, minWidth: 0, padding: 10, gap: 7 },
+    reviewHead: {
+      height: 32,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+    },
+    reviewAvatar: { width: 26, height: 26, borderRadius: 13 },
+    reviewWho: { flex: 1, minWidth: 0 },
+    reviewAuthor: { color: colors.text, fontSize: 13, fontWeight: '700' },
+    reviewPlace: { color: colors.textSecondary, fontSize: 10, lineHeight: 12 },
+    reviewText: { color: colors.text, fontSize: 12, lineHeight: 16 },
+    reviewFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    reviewActionIconRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    reviewAction: { color: colors.textSecondary, fontSize: 12 },
+    reviewTime: {
+      marginLeft: 'auto',
+      color: colors.textSecondary,
+      fontSize: 11,
+    },
+    reviewerCard: {
+      height: 181,
+      marginHorizontal: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 17,
+    },
+    reviewerHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    reviewerAvatar: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    reviewerBadge: {
+      position: 'absolute',
+      right: -4,
+      bottom: -4,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: '#FF4757',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    reviewerBadgeText: { color: '#FFFFFF', fontSize: 13 },
+    reviewerCopy: { flex: 1 },
+    topReviewer: { color: '#FF4757', fontSize: 12, fontWeight: '700' },
+    reviewerName: {
+      marginTop: 2,
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    reviewerHandle: { marginTop: 2, color: colors.textSecondary, fontSize: 12 },
+    reviewerMeta: { marginTop: 10, color: colors.textSecondary, fontSize: 12 },
+    reviewerButtons: { marginTop: 10, flexDirection: 'row', gap: 8 },
+    followWide: {
+      flex: 1,
+      height: 35,
+      borderRadius: 18,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    followWideText: { color: '#161616', fontSize: 14, fontWeight: '600' },
+    profileButton: {
+      height: 35,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    profileButtonText: { color: colors.text, fontSize: 13 },
+    forYouCard: {
+      width: 240,
+      height: 280,
+      borderRadius: 16,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    reasonChip: {
+      position: 'absolute',
+      top: 12,
+      left: 12,
+      height: 27,
+      paddingHorizontal: 10,
+      borderRadius: 14,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+    },
+    reasonText: { color: '#FFFFFF', fontSize: 12 },
+    forYouCopy: {
+      position: 'absolute',
+      left: 12,
+      right: 12,
+      bottom: 12,
+      gap: 5,
+    },
+    forYouTitle: {
+      color: '#FFFFFF',
+      fontSize: 17,
+      lineHeight: 20,
+      fontWeight: '700',
+    },
+    forYouMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
+    gemList: {
+      paddingHorizontal: DISCOVER_GRID_PADDING,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: DISCOVER_GRID_GAP,
+    },
+    gemCard: {
+      height: 94,
+      padding: 12,
+      flexDirection: 'row',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 15,
+      backgroundColor: colors.surface,
+    },
+    gemImage: { width: 70, height: 70, borderRadius: 8, resizeMode: 'cover' },
+    gemCopy: { flex: 1, minWidth: 0, gap: 4 },
+    gemTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    gemBadge: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 9,
+      backgroundColor: '#C99E58',
+      overflow: 'hidden',
+    },
+    gemReviews: { color: colors.textSecondary, fontSize: 12 },
+    gemName: { color: colors.text, fontSize: 13, fontWeight: '700' },
+    gemMeta: { color: colors.textSecondary, fontSize: 11 },
+    mapScreen: { flex: 1, backgroundColor: colors.canvas, overflow: 'hidden' },
+    mapNative: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+    mapToneOverlay: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: 'rgba(0,0,0,0.32)',
+    },
+    mapRatingMarker: {
+      width: 36,
+      height: 44,
+      shadowColor: '#E63946',
+      shadowOpacity: 0.67,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+    },
+    mapRatingMarkerText: {
+      position: 'absolute',
+      top: 8,
+      left: 0,
+      width: 36,
+      color: '#FFFFFF',
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    mapLayerMarker: {
+      width: 142,
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    mapLayerMarkerIcon: {
+      width: 36,
+      height: 36,
+      borderWidth: 1,
+      borderColor: '#FFFFFF',
+      borderRadius: 18,
+      backgroundColor: '#161616',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mapLayerMarkerImage: { width: 20, height: 20, resizeMode: 'contain' },
+    mapFriendMarker: {
+      width: 142,
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    mapFriendAvatarWrap: {
+      width: 36,
+      height: 36,
+      borderWidth: 1,
+      borderColor: '#FFFFFF',
+      borderRadius: 18,
+      backgroundColor: '#161616',
+      overflow: 'hidden',
+    },
+    mapFriendAvatar: { width: 34, height: 34, resizeMode: 'cover' },
+    mapLayerMarkerDot: {
+      position: 'absolute',
+      left: 16,
+      top: 43,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: '#FFFFFF',
+    },
+    mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
+    mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+    mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
+    mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
+    mapControlsLandscape: { flexDirection: 'row', gap: 6 },
+    mapControlButton: {
+      width: 48,
+      height: 48,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000000',
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    mapControlButtonActive: {
+      borderColor: colors.primary,
+      backgroundColor: 'rgba(184,47,41,0.9)',
+    },
+    mapControlGlyph: {
+      color: colors.text,
+      fontSize: 22,
+      lineHeight: 26,
+      fontWeight: '700',
+    },
+    layersMenu: {
+      position: 'absolute',
+      zIndex: 6,
+      right: 72,
+      width: 190,
+      paddingHorizontal: 15,
+      paddingTop: 12,
+      paddingBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      shadowColor: '#000000',
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    layersTitle: {
+      marginBottom: 4,
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    layerRow: {
+      height: 38,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    layerOptionText: { color: colors.text, fontSize: 15 },
+    layerSwitch: {
+      width: 38,
+      height: 22,
+      padding: 2,
+      justifyContent: 'center',
+      borderRadius: 11,
+      backgroundColor: colors.surfaceRaised,
+    },
+    layerSwitchActive: { backgroundColor: colors.primary },
+    layerSwitchThumb: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: '#FFFFFF',
+    },
+    layerSwitchThumbActive: { alignSelf: 'flex-end' },
+    mapSheet: {
+      position: 'absolute',
+      zIndex: 8,
+      elevation: 8,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      paddingHorizontal: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    },
+    mapSheetSidePanel: {
+      top: 0,
+      bottom: 0,
+      borderTopWidth: 0,
+      borderRightWidth: 1,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+    },
+    mapSheetUnderlay: {
+      position: 'absolute',
+      zIndex: 7,
+      elevation: 7,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      backgroundColor: colors.surface,
+    },
+    showPlacesButton: {
+      position: 'absolute',
+      zIndex: 9,
+      elevation: 9,
+      right: 16,
+      bottom: 16,
+      height: 42,
+      paddingHorizontal: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    showPlacesText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+    sheetDragArea: {
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+    },
+    mapSearchRow: {
+      zIndex: 2,
+      height: 45,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    mapSearch: {
+      flex: 1,
+      minWidth: 0,
+      height: 39,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceRaised,
+    },
+    mapSearchInput: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.text,
+      fontSize: 16,
+      paddingVertical: 0,
+    },
+    mapHeaderIcon: {
+      width: 24,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterList: { flexGrow: 0, height: 38 },
+    filterContent: { alignItems: 'center', gap: 6 },
+    filterChip: {
+      height: 28,
+      paddingHorizontal: 8,
+      flexDirection: 'row',
+      gap: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    filterChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: 'rgba(184,47,41,0.12)',
+    },
+    filterIcon: { width: 14, height: 14, resizeMode: 'contain' },
+    filterText: { color: colors.textSecondary, fontSize: 12 },
+    filterTextActive: { color: colors.primary, fontWeight: '700' },
+    mapResultsMeta: {
+      zIndex: 3,
+      minHeight: 32,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    mapResultsCount: { color: colors.textSecondary, fontSize: 12 },
+    mapSortButton: {
+      minHeight: 28,
+      paddingHorizontal: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceRaised,
+    },
+    mapSortText: { color: colors.textSecondary, fontSize: 11 },
+    mapSortChevron: {
+      marginTop: -3,
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    sortModalScrim: {
+      flex: 1,
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    sortSheet: {
+      height: 340,
+      paddingHorizontal: 24,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+      overflow: 'hidden',
+    },
+    sortSheetDragArea: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sortSheetHandle: {
+      position: 'absolute',
+      top: 10,
+      left: '50%',
+      width: 36,
+      height: 4,
+      marginLeft: -18,
+      borderRadius: 2,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+    sortSheetHeader: {
+      height: 65,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sortSheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+    sortSheetClose: {
+      width: 30,
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sortSheetCloseText: { color: colors.text, fontSize: 26, lineHeight: 28 },
+    sortSheetRow: {
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.hairline,
+    },
+    sortSheetRowLast: { borderBottomWidth: 0 },
+    sortSheetLabel: { color: colors.text, fontSize: 16 },
+    sortSheetRadio: {
+      width: 20,
+      height: 20,
+      borderWidth: 1.5,
+      borderColor: colors.textMuted,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sortSheetRadioSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
+    placesStatusText: { color: colors.textSecondary, fontSize: 13 },
+    inlineRetry: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceRaised,
+    },
+    inlineRetryText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+    placesList: { flex: 1, marginTop: 8 },
+    placesListContent: { gap: 10, paddingBottom: 16 },
+    loadMore: {
+      height: 38,
+      marginTop: 2,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    loadMoreText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+    placeSave: { alignSelf: 'flex-start', paddingTop: 2 },
+    peopleContent: { padding: 16, paddingBottom: 24, gap: 16 },
+    peopleSearchRow: {
+      height: 39,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    peopleSearch: {
+      flex: 1,
+      minWidth: 0,
+      height: 39,
+      paddingLeft: 10,
+      paddingRight: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    peopleSearchInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      letterSpacing: -0.41,
+      paddingVertical: 0,
+    },
+    peopleSearchClear: { width: 24, height: 24 },
+    peopleSearchFriends: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    peopleResultCount: {
+      marginTop: -2,
+      color: colors.textSecondary,
+      fontSize: 13,
+      letterSpacing: -0.24,
+    },
+    peopleSearchResults: { gap: 8 },
+    peopleResultCard: {
+      minHeight: 64,
+      padding: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+    },
+    peopleResultAvatar: { width: 44, height: 44, borderRadius: 22 },
+    peopleResultCopy: { flex: 1, minWidth: 0, gap: 4 },
+    peopleResultName: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+      letterSpacing: -0.41,
+    },
+    peopleResultHandle: {
+      color: colors.textMuted,
+      fontSize: 13,
+      letterSpacing: -0.24,
+    },
+    peopleSearchEmpty: {
+      minHeight: 380,
+      paddingTop: 42,
+      alignItems: 'center',
+      gap: 10,
+    },
+    peopleSearchEmptyTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    peopleSearchEmptyCopy: {
+      color: colors.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    peopleMayKnowSection: { marginTop: 14, gap: 8 },
+    peopleMayKnowTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: -0.24,
+    },
+    peopleMayKnowList: { gap: 10 },
+    peopleMayKnowCard: {
+      width: 165,
+      minHeight: 174,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+    },
+    peopleMayKnowAvatar: { width: 40, height: 40, borderRadius: 20 },
+    peopleMayKnowCopy: { width: '100%', alignItems: 'center', gap: 4 },
+    peopleMayKnowName: {
+      width: '100%',
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+      letterSpacing: -0.41,
+      textAlign: 'center',
+    },
+    peopleMayKnowHandle: {
+      width: '100%',
+      color: colors.textMuted,
+      fontSize: 13,
+      letterSpacing: -0.24,
+      textAlign: 'center',
+    },
+    searchFollowButton: {
+      minWidth: 74,
+      height: 31,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    searchFollowButtonWide: { width: '100%', height: 40 },
+    searchFollowButtonText: {
+      color: colors.onPrimary,
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+    },
+    searchFollowingButton: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: 'transparent',
+    },
+    searchFollowingButtonText: { color: colors.primary },
+    peopleSectionHead: {
+      minHeight: 44,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+      paddingHorizontal: 4,
+    },
+    peopleSectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+    peopleSectionSubtitle: {
+      marginTop: 3,
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    seeMoreLink: { color: colors.primary, fontSize: 12 },
+    peopleCarousel: { gap: 10 },
+    tastemakerCard: {
+      width: 156,
+      height: 186,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 17,
+      alignItems: 'center',
+    },
+    tastemakerAvatar: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      borderWidth: 1,
+      borderColor: '#FFFFFF',
+    },
+    tastemakerName: {
+      marginTop: 10,
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    tastemakerTastes: {
+      marginTop: 7,
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    tastemakerGrowth: { marginTop: 7, color: '#7AD49A', fontSize: 12 },
+    compactPeople: { gap: 9 },
+    compactPerson: {
+      height: 68,
+      padding: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+    },
+    compactAvatar: { width: 44, height: 44, borderRadius: 22 },
+    compactCopy: { flex: 1, minWidth: 0 },
+    newPersonRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    newPersonBadge: {
+      color: '#161616',
+      backgroundColor: '#7AD49A',
+      fontSize: 10,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 7,
+      overflow: 'hidden',
+    },
+    compactName: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    compactTastes: { marginTop: 3, color: colors.textSecondary, fontSize: 12 },
+    followButton: {
+      minWidth: 74,
+      height: 30,
+      paddingHorizontal: 14,
+      borderRadius: 15,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    followButtonText: { color: '#161616', fontSize: 13, fontWeight: '600' },
+    followingButton: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: 'transparent',
+    },
+    followingButtonText: { color: colors.primary },
+    profileList: { gap: 10 },
+    profileSuggestion: {
+      minHeight: 172,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+    },
+    suggestionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+    suggestionAvatar: { width: 54, height: 54, borderRadius: 27 },
+    suggestionCopy: { flex: 1, minWidth: 0 },
+    suggestionName: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    suggestionHandle: { color: colors.textSecondary, fontSize: 11 },
+    suggestionTastes: {
+      marginTop: 3,
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    statsRow: {
+      height: 55,
+      marginTop: 10,
+      flexDirection: 'row',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    stat: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRightColor: colors.border,
+    },
+    statValue: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    statLabel: { marginTop: 4, color: colors.textSecondary, fontSize: 11 },
+    mutualText: { color: colors.textSecondary, fontSize: 12 },
+    pressed: { opacity: 0.78 },
+  });

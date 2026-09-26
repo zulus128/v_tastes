@@ -197,7 +197,7 @@ export const callableOperationNames = [
   'mergeVenues',
 ] as const;
 
-export type CallableOperationName = typeof callableOperationNames[number];
+export type CallableOperationName = (typeof callableOperationNames)[number];
 
 export interface IdResult {
   id: string;
@@ -219,7 +219,10 @@ export class TastesApiError extends Error {
   ) {
     super(message, options);
     this.name = 'TastesApiError';
-    this.retryable = code === 'unavailable' || code === 'deadline-exceeded' || code === 'internal';
+    this.retryable =
+      code === 'unavailable' ||
+      code === 'deadline-exceeded' ||
+      code === 'internal';
   }
 }
 
@@ -236,8 +239,12 @@ interface ValidationIssue {
 export function apiErrorMessage(error: unknown): string {
   const normalized = normalizeApiError(error);
   if (normalized.code === 'invalid-argument') {
-    const issues = (normalized.details as { issues?: ValidationIssue[] } | undefined)?.issues;
-    const message = issues?.find((issue) => typeof issue.message === 'string')?.message;
+    const issues = (
+      normalized.details as { issues?: ValidationIssue[] } | undefined
+    )?.issues;
+    const message = issues?.find(
+      (issue) => typeof issue.message === 'string',
+    )?.message;
     if (typeof message === 'string' && message.length > 0) return message;
   }
   return normalized.message;
@@ -245,10 +252,15 @@ export function apiErrorMessage(error: unknown): string {
 
 export function normalizeApiError(error: unknown): TastesApiError {
   if (error instanceof TastesApiError) return error;
-  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
-  const rawCode = typeof candidate?.code === 'string'
-    ? candidate.code.replace(/^functions\//, '')
-    : 'internal';
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    details?: unknown;
+  };
+  const rawCode =
+    typeof candidate?.code === 'string'
+      ? candidate.code.replace(/^functions\//, '')
+      : 'internal';
   const supportedCodes: ApiErrorCode[] = [
     'unauthenticated',
     'permission-denied',
@@ -261,12 +273,15 @@ export function normalizeApiError(error: unknown): TastesApiError {
     'internal',
   ];
   const code = supportedCodes.includes(rawCode as ApiErrorCode)
-    ? rawCode as ApiErrorCode
+    ? (rawCode as ApiErrorCode)
     : 'internal';
-  const message = typeof candidate?.message === 'string' && candidate.message.length > 0
-    ? candidate.message
-    : 'Something went wrong. Please try again.';
-  return new TastesApiError(code, message, candidate?.details, { cause: error });
+  const message =
+    typeof candidate?.message === 'string' && candidate.message.length > 0
+      ? candidate.message
+      : 'Something went wrong. Please try again.';
+  return new TastesApiError(code, message, candidate?.details, {
+    cause: error,
+  });
 }
 
 export interface TastesApiOptions {
@@ -274,7 +289,10 @@ export interface TastesApiOptions {
   onError?: (error: TastesApiError, operation: string) => void;
 }
 
-export function createTastesApi(functions: Functions, options: TastesApiOptions = {}) {
+export function createTastesApi(
+  functions: Functions,
+  options: TastesApiOptions = {},
+) {
   async function invoke<Input, Output>(
     operation: CallableOperationName,
     input: Input,
@@ -292,23 +310,42 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
   }
 
   return {
-    healthCheck: () => invoke<Record<string, never>, HealthCheckResult>('healthCheck', {}),
+    healthCheck: () =>
+      invoke<Record<string, never>, HealthCheckResult>('healthCheck', {}),
     requestPhoneOtp: (input: RequestPhoneOtpInput) =>
-      invoke<RequestPhoneOtpInput, RequestPhoneOtpResult>('requestPhoneOtp', input),
+      invoke<RequestPhoneOtpInput, RequestPhoneOtpResult>(
+        'requestPhoneOtp',
+        input,
+      ),
     verifyPhoneOtp: (input: VerifyPhoneOtpInput) =>
-      invoke<VerifyPhoneOtpInput, VerifyPhoneOtpResult>('verifyPhoneOtp', input),
+      invoke<VerifyPhoneOtpInput, VerifyPhoneOtpResult>(
+        'verifyPhoneOtp',
+        input,
+      ),
     getSessionStatus: () =>
       invoke<Record<string, never>, SessionStatus>('getSessionStatus', {}),
     completeOnboarding: (input: CompleteOnboardingInput) =>
-      invoke<CompleteOnboardingInput, { onboardingVersion: number }>('completeOnboarding', input),
+      invoke<CompleteOnboardingInput, { onboardingVersion: number }>(
+        'completeOnboarding',
+        input,
+      ),
     createUserProfile: (input: CreateUserProfileInput) =>
       invoke<CreateUserProfileInput, IdResult>('createUserProfile', input),
     checkUsernameAvailability: (input: CheckUsernameAvailabilityInput) =>
-      invoke<CheckUsernameAvailabilityInput, UsernameAvailabilityResult>('checkUsernameAvailability', input),
+      invoke<CheckUsernameAvailabilityInput, UsernameAvailabilityResult>(
+        'checkUsernameAvailability',
+        input,
+      ),
     updateProfileSettings: (input: UpdateProfileSettingsInput) =>
-      invoke<UpdateProfileSettingsInput, IdResult>('updateProfileSettings', input),
+      invoke<UpdateProfileSettingsInput, IdResult>(
+        'updateProfileSettings',
+        input,
+      ),
     updateProfilePhoto: (input: UpdateProfilePhotoInput) =>
-      invoke<UpdateProfilePhotoInput, ProfilePhotoResult>('updateProfilePhoto', input),
+      invoke<UpdateProfilePhotoInput, ProfilePhotoResult>(
+        'updateProfilePhoto',
+        input,
+      ),
     followUser: (input: FollowUserInput) =>
       invoke<FollowUserInput, FollowResult>('followUser', input),
     unfollowUser: (input: FollowUserInput) =>
@@ -318,27 +355,48 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     createConversation: (input: CreateConversationInput) =>
       invoke<CreateConversationInput, IdResult>('createConversation', input),
     listActivityCandidates: () =>
-      invoke<Record<string, never>, ActivityCandidate[]>('listActivityCandidates', {}),
+      invoke<Record<string, never>, ActivityCandidate[]>(
+        'listActivityCandidates',
+        {},
+      ),
     createActivity: (input: CreateActivityInput) =>
       invoke<CreateActivityInput, IdResult>('createActivity', input),
     respondToActivityInvitation: (input: RespondToActivityInvitationInput) =>
-      invoke<RespondToActivityInvitationInput, IdResult>('respondToActivityInvitation', input),
+      invoke<RespondToActivityInvitationInput, IdResult>(
+        'respondToActivityInvitation',
+        input,
+      ),
     listConversations: (input: ListConversationsInput) =>
-      invoke<ListConversationsInput, Page<ConversationSummary>>('listConversations', input),
+      invoke<ListConversationsInput, Page<ConversationSummary>>(
+        'listConversations',
+        input,
+      ),
     getMessages: (input: GetMessagesInput) =>
       invoke<GetMessagesInput, Page<ChatMessage>>('getMessages', input),
     sendMessage: (input: SendMessageInput) =>
       invoke<SendMessageInput, IdResult>('sendMessage', input),
     markConversationRead: (input: MarkConversationReadInput) =>
-      invoke<MarkConversationReadInput, MarkConversationReadResult>('markConversationRead', input),
+      invoke<MarkConversationReadInput, MarkConversationReadResult>(
+        'markConversationRead',
+        input,
+      ),
     hideConversation: (input: HideConversationInput) =>
       invoke<HideConversationInput, IdResult>('hideConversation', input),
     setTypingStatus: (input: SetTypingStatusInput) =>
-      invoke<SetTypingStatusInput, { conversationId: string; typing: boolean }>('setTypingStatus', input),
+      invoke<SetTypingStatusInput, { conversationId: string; typing: boolean }>(
+        'setTypingStatus',
+        input,
+      ),
     registerPushToken: (input: RegisterPushTokenInput) =>
-      invoke<RegisterPushTokenInput, PushTokenResult>('registerPushToken', input),
+      invoke<RegisterPushTokenInput, PushTokenResult>(
+        'registerPushToken',
+        input,
+      ),
     unregisterPushToken: (input: UnregisterPushTokenInput) =>
-      invoke<UnregisterPushTokenInput, PushTokenResult>('unregisterPushToken', input),
+      invoke<UnregisterPushTokenInput, PushTokenResult>(
+        'unregisterPushToken',
+        input,
+      ),
     getFavourites: (input: GetFavouritesInput = { limit: 20 }) =>
       invoke<GetFavouritesInput, FavouritesResult>('getFavourites', input),
     createFolder: (input: CreateFolderInput) =>
@@ -366,7 +424,10 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     getCommentReplies: (input: GetCommentRepliesInput) =>
       invoke<GetCommentRepliesInput, Page<Comment>>('getCommentReplies', input),
     getCommentContext: (input: GetCommentContextInput) =>
-      invoke<GetCommentContextInput, { items: Comment[] }>('getCommentContext', input),
+      invoke<GetCommentContextInput, { items: Comment[] }>(
+        'getCommentContext',
+        input,
+      ),
     addComment: (input: AddCommentInput) =>
       invoke<AddCommentInput, IdResult>('addComment', input),
     reactToComment: (input: ReactToCommentInput) =>
@@ -384,17 +445,29 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     reportReview: (input: ReportReviewInput) =>
       invoke<ReportReviewInput, { id: string }>('reportReview', input),
     getLeaderboard: (input: GetLeaderboardInput) =>
-      invoke<GetLeaderboardInput, Page<LeaderboardEntry>>('getLeaderboard', input),
+      invoke<GetLeaderboardInput, Page<LeaderboardEntry>>(
+        'getLeaderboard',
+        input,
+      ),
     getDiscoverFeed: () =>
       invoke<Record<string, never>, DiscoverFeed>('getDiscoverFeed', {}),
     getDiscoverPeople: () =>
-      invoke<Record<string, never>, DiscoverPeopleResult>('getDiscoverPeople', {}),
+      invoke<Record<string, never>, DiscoverPeopleResult>(
+        'getDiscoverPeople',
+        {},
+      ),
     searchPeople: (input: SearchPeopleInput) =>
       invoke<SearchPeopleInput, DiscoverPerson[]>('searchPeople', input),
     getFriendFeed: (input: GetFeedInput) =>
-      invoke<GetFeedInput, Page<FeedItem>>('getFriendFeed', { ...input, scope: 'friends' }),
+      invoke<GetFeedInput, Page<FeedItem>>('getFriendFeed', {
+        ...input,
+        scope: 'friends',
+      }),
     importContacts: (input: ImportContactsInput) =>
-      invoke<ImportContactsInput, ImportContactsResult>('importContacts', input),
+      invoke<ImportContactsInput, ImportContactsResult>(
+        'importContacts',
+        input,
+      ),
     getVenues: (input: GetVenuesInput) =>
       invoke<GetVenuesInput, Page<Venue>>('getVenues', input),
     getPlace: (input: GetPlaceInput) =>
@@ -402,33 +475,79 @@ export function createTastesApi(functions: Functions, options: TastesApiOptions 
     getVenue: (input: GetPlaceInput) =>
       invoke<GetPlaceInput, PlaceDetails>('getVenue', input),
     searchVenues: (input: SearchVenuesInput) =>
-      invoke<SearchVenuesInput, { items: Venue[]; externalResultsAvailable: boolean }>('searchVenues', input),
+      invoke<
+        SearchVenuesInput,
+        { items: Venue[]; externalResultsAvailable: boolean }
+      >('searchVenues', input),
     submitUserVenue: (input: SubmitUserVenueInput) =>
-      invoke<SubmitUserVenueInput, { id: string; status: 'pending' }>('submitUserVenue', input),
+      invoke<SubmitUserVenueInput, { id: string; status: 'pending' }>(
+        'submitUserVenue',
+        input,
+      ),
     getPlaceReviews: (input: GetPlaceReviewsInput) =>
       invoke<GetPlaceReviewsInput, Page<PlaceReview>>('getPlaceReviews', input),
     askTastesAi: (input: AskTastesAiInput) =>
       invoke<AskTastesAiInput, TastesAiAnswer>('askTastesAi', input),
     reportSavedPlaceProximity: (input: SavedPlaceProximityInput) =>
-      invoke<SavedPlaceProximityInput, { notified: boolean }>('reportSavedPlaceProximity', input),
+      invoke<SavedPlaceProximityInput, { notified: boolean }>(
+        'reportSavedPlaceProximity',
+        input,
+      ),
     sendCampaignNotification: (input: SendCampaignNotificationInput) =>
-      invoke<SendCampaignNotificationInput, { type: string; recipients: number }>('sendCampaignNotification', input),
+      invoke<
+        SendCampaignNotificationInput,
+        { type: string; recipients: number }
+      >('sendCampaignNotification', input),
     getUnreadNotificationCount: () =>
-      invoke<Record<string, never>, { count: number }>('getUnreadNotificationCount', {}),
-    listNotifications: (input: ListNotificationsInput = { limit: 20 }) => invoke<ListNotificationsInput, Page<AppNotification>>('listNotifications', input),
-    markNotificationRead: (input: NotificationInput) => invoke<NotificationInput, IdResult>('markNotificationRead', input),
-    clearNotifications: () => invoke<Record<string, never>, { cleared: number }>('clearNotifications', {}),
-    listRequests: () => invoke<Record<string, never>, AppRequest[]>('listRequests', {}),
-    respondToRequest: (input: RequestInput) => invoke<RequestInput, IdResult>('respondToRequest', input),
-    createGroup: (input: CreateGroupInput) => invoke<CreateGroupInput, IdResult>('createGroup', input),
-    getGroup: (input: GroupInput) => invoke<GroupInput, TastesGroup>('getGroup', input),
-    updateGroupMembers: (input: UpdateGroupMembersInput) => invoke<UpdateGroupMembersInput, IdResult>('updateGroupMembers', input),
-    leaveGroup: (input: GroupInput) => invoke<GroupInput, IdResult>('leaveGroup', input),
-    getProfileExtras: (input: ProfileExtrasInput = {}) => invoke<ProfileExtrasInput, ProfileExtrasResult>('getProfileExtras', input),
-    setUserBlocked: (input: SetUserBlockedInput) => invoke<SetUserBlockedInput, { blocked: boolean }>('setUserBlocked', input),
-    getMonthlyRecap: () => invoke<Record<string, never>, MonthlyRecapResult>('getMonthlyRecap', {}),
-    updateNotificationPreferences: (input: UpdateNotificationPreferencesInput) => invoke<UpdateNotificationPreferencesInput, NotificationPreferences>('updateNotificationPreferences', input),
-    reportComment: (input: ReportCommentInput) => invoke<ReportCommentInput, IdResult>('reportComment', input),
+      invoke<Record<string, never>, { count: number }>(
+        'getUnreadNotificationCount',
+        {},
+      ),
+    listNotifications: (input: ListNotificationsInput = { limit: 20 }) =>
+      invoke<ListNotificationsInput, Page<AppNotification>>(
+        'listNotifications',
+        input,
+      ),
+    markNotificationRead: (input: NotificationInput) =>
+      invoke<NotificationInput, IdResult>('markNotificationRead', input),
+    clearNotifications: () =>
+      invoke<Record<string, never>, { cleared: number }>(
+        'clearNotifications',
+        {},
+      ),
+    listRequests: () =>
+      invoke<Record<string, never>, AppRequest[]>('listRequests', {}),
+    respondToRequest: (input: RequestInput) =>
+      invoke<RequestInput, IdResult>('respondToRequest', input),
+    createGroup: (input: CreateGroupInput) =>
+      invoke<CreateGroupInput, IdResult>('createGroup', input),
+    getGroup: (input: GroupInput) =>
+      invoke<GroupInput, TastesGroup>('getGroup', input),
+    updateGroupMembers: (input: UpdateGroupMembersInput) =>
+      invoke<UpdateGroupMembersInput, IdResult>('updateGroupMembers', input),
+    leaveGroup: (input: GroupInput) =>
+      invoke<GroupInput, IdResult>('leaveGroup', input),
+    getProfileExtras: (input: ProfileExtrasInput = {}) =>
+      invoke<ProfileExtrasInput, ProfileExtrasResult>(
+        'getProfileExtras',
+        input,
+      ),
+    setUserBlocked: (input: SetUserBlockedInput) =>
+      invoke<SetUserBlockedInput, { blocked: boolean }>(
+        'setUserBlocked',
+        input,
+      ),
+    getMonthlyRecap: () =>
+      invoke<Record<string, never>, MonthlyRecapResult>('getMonthlyRecap', {}),
+    updateNotificationPreferences: (
+      input: UpdateNotificationPreferencesInput,
+    ) =>
+      invoke<UpdateNotificationPreferencesInput, NotificationPreferences>(
+        'updateNotificationPreferences',
+        input,
+      ),
+    reportComment: (input: ReportCommentInput) =>
+      invoke<ReportCommentInput, IdResult>('reportComment', input),
   };
 }
 

@@ -51,42 +51,58 @@ export function useBottomSheetMotion({
     }).start();
   }, [translateY]);
 
-  const closeThen = useCallback((afterClose?: () => void) => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    Keyboard.dismiss();
-    translateY.stopAnimation();
-    Animated.timing(translateY, {
-      duration: 180,
-      toValue: closedOffset,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) {
-        onCloseRef.current();
-        afterClose?.();
-      }
-      closingRef.current = false;
-    });
-  }, [closedOffset, translateY]);
+  const closeThen = useCallback(
+    (afterClose?: () => void) => {
+      if (closingRef.current) return;
+      closingRef.current = true;
+      Keyboard.dismiss();
+      translateY.stopAnimation();
+      Animated.timing(translateY, {
+        duration: 180,
+        toValue: closedOffset,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          onCloseRef.current();
+          afterClose?.();
+        }
+        closingRef.current = false;
+      });
+    },
+    [closedOffset, translateY],
+  );
 
   const close = useCallback(() => closeThen(), [closeThen]);
 
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => Keyboard.dismiss(),
-    onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
-    onPanResponderRelease: (_, gesture) => {
-      if (gesture.dy >= DISMISS_DISTANCE || gesture.vy >= DISMISS_VELOCITY) {
-        close();
-      } else {
-        springBack();
-      }
-    },
-    onPanResponderTerminate: springBack,
-    onPanResponderTerminationRequest: () => false,
-    onShouldBlockNativeResponder: () => true,
-  }), [close, springBack, translateY]);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => Keyboard.dismiss(),
+        onPanResponderMove: (_, gesture) =>
+          translateY.setValue(Math.max(0, gesture.dy)),
+        onPanResponderRelease: (_, gesture) => {
+          if (
+            gesture.dy >= DISMISS_DISTANCE ||
+            gesture.vy >= DISMISS_VELOCITY
+          ) {
+            close();
+          } else {
+            springBack();
+          }
+        },
+        onPanResponderTerminate: springBack,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+      }),
+    [close, springBack, translateY],
+  );
 
-  return { close, closeThen, panHandlers: panResponder.panHandlers, translateY };
+  return {
+    close,
+    closeThen,
+    panHandlers: panResponder.panHandlers,
+    translateY,
+  };
 }

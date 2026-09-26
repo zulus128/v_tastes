@@ -15,68 +15,109 @@ const ACTIVITY_RATE_LIMIT = 20;
 const ACTIVITY_RATE_WINDOW_MS = 60 * 60_000;
 const MAX_CANDIDATES = 100;
 
-export const listActivityCandidates = onCall(callableOptions, async (request) => {
-  const uid = requireUserId(request);
-  const userRef = db.collection('users').doc(uid);
-  const user = await userRef.get();
-  if (!user.exists || user.get('status') !== 'active') {
-    throw new HttpsError('failed-precondition', 'An active user profile is required.');
-  }
+export const listActivityCandidates = onCall(
+  callableOptions,
+  async (request) => {
+    const uid = requireUserId(request);
+    const userRef = db.collection('users').doc(uid);
+    const user = await userRef.get();
+    if (!user.exists || user.get('status') !== 'active') {
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
+    }
 
-  const following = await userRef.collection('following').limit(MAX_CANDIDATES).get();
-  if (following.empty) return [];
-  const candidateIds = following.docs.map((document) => document.id);
-  const [reverseEdges, profiles] = await Promise.all([
-    db.getAll(...candidateIds.map((id) => db.collection('users').doc(id).collection('following').doc(uid))),
-    db.getAll(...candidateIds.map((id) => db.collection('users').doc(id))),
-  ]);
-  const mutualIds = new Set(reverseEdges.filter((document) => document.exists).map((document) => document.ref.parent.parent?.id));
+    const following = await userRef
+      .collection('following')
+      .limit(MAX_CANDIDATES)
+      .get();
+    if (following.empty) return [];
+    const candidateIds = following.docs.map((document) => document.id);
+    const [reverseEdges, profiles] = await Promise.all([
+      db.getAll(
+        ...candidateIds.map((id) =>
+          db.collection('users').doc(id).collection('following').doc(uid),
+        ),
+      ),
+      db.getAll(...candidateIds.map((id) => db.collection('users').doc(id))),
+    ]);
+    const mutualIds = new Set(
+      reverseEdges
+        .filter((document) => document.exists)
+        .map((document) => document.ref.parent.parent?.id),
+    );
 
-  return profiles.flatMap((profile) => {
-    if (!profile.exists || profile.get('status') !== 'active' || !mutualIds.has(profile.id)) return [];
-    return [{
-      userId: profile.id,
-      displayName: String(profile.get('displayName') ?? 'Tastes user'),
-      username: profile.get('username') ? String(profile.get('username')) : null,
-      photoUrl: profile.get('photoUrl') ? String(profile.get('photoUrl')) : null,
-    }];
-  }).sort((a, b) => a.displayName.localeCompare(b.displayName));
-});
+    return profiles
+      .flatMap((profile) => {
+        if (
+          !profile.exists ||
+          profile.get('status') !== 'active' ||
+          !mutualIds.has(profile.id)
+        )
+          return [];
+        return [
+          {
+            userId: profile.id,
+            displayName: String(profile.get('displayName') ?? 'Tastes user'),
+            username: profile.get('username')
+              ? String(profile.get('username'))
+              : null,
+            photoUrl: profile.get('photoUrl')
+              ? String(profile.get('photoUrl'))
+              : null,
+          },
+        ];
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  },
+);
 
 export const createActivity = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createActivityInputSchema, request.data);
   if (input.memberIds.includes(uid)) {
-    throw new HttpsError('invalid-argument', 'You are already the activity organizer.');
+    throw new HttpsError(
+      'invalid-argument',
+      'You are already the activity organizer.',
+    );
   }
   const startsAt = new Date(input.startsAt);
 
-  const activityRef = db.collection('activities').doc(
-    idempotentDocumentId(uid, 'create-activity', input.idempotencyKey),
-  );
+  const activityRef = db
+    .collection('activities')
+    .doc(idempotentDocumentId(uid, 'create-activity', input.idempotencyKey));
   const conversationRef = db.collection('conversations').doc(activityRef.id);
   const userRef = db.collection('users').doc(uid);
   const venueRef = db.collection('venues').doc(input.venueId);
 
   await db.runTransaction(async (transaction) => {
-    const [existing, existingConversation, user, venue, ...memberData] = await Promise.all([
-      transaction.get(activityRef),
-      transaction.get(conversationRef),
-      transaction.get(userRef),
-      transaction.get(venueRef),
-      ...input.memberIds.flatMap((memberId) => [
-        transaction.get(db.collection('users').doc(memberId)),
-        transaction.get(userRef.collection('following').doc(memberId)),
-        transaction.get(db.collection('users').doc(memberId).collection('following').doc(uid)),
-      ]),
-    ]);
+    const [existing, existingConversation, user, venue, ...memberData] =
+      await Promise.all([
+        transaction.get(activityRef),
+        transaction.get(conversationRef),
+        transaction.get(userRef),
+        transaction.get(venueRef),
+        ...input.memberIds.flatMap((memberId) => [
+          transaction.get(db.collection('users').doc(memberId)),
+          transaction.get(userRef.collection('following').doc(memberId)),
+          transaction.get(
+            db
+              .collection('users')
+              .doc(memberId)
+              .collection('following')
+              .doc(uid),
+          ),
+        ]),
+      ]);
     if (existing.exists) {
       if (!existingConversation.exists) {
         const rawParticipantIds: unknown = existing.get('participantIds');
         const participantIds: string[] = Array.isArray(rawParticipantIds)
-          ? rawParticipantIds.filter((participantId: unknown): participantId is string => (
-            typeof participantId === 'string' && participantId.length > 0
-          ))
+          ? rawParticipantIds.filter(
+              (participantId: unknown): participantId is string =>
+                typeof participantId === 'string' && participantId.length > 0,
+            )
           : [uid];
         const now = FieldValue.serverTimestamp();
         transaction.create(conversationRef, {
@@ -84,15 +125,23 @@ export const createActivity = onCall(callableOptions, async (request) => {
           activityId: activityRef.id,
           organizerId: String(existing.get('organizerId') ?? uid),
           title: String(existing.get('venueName') ?? 'Activity'),
-          imageUrl: existing.get('imageUrl') ? String(existing.get('imageUrl')) : null,
+          imageUrl: existing.get('imageUrl')
+            ? String(existing.get('imageUrl'))
+            : null,
           startsAt: existing.get('startsAt') ?? null,
           venueId: existing.get('venueId') ?? null,
           participantIds,
-          invitationStatuses: Object.fromEntries(participantIds.map((participantId) => [
-            participantId,
-            participantId === String(existing.get('organizerId') ?? uid) ? 'accepted' : 'pending',
-          ])),
-          unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
+          invitationStatuses: Object.fromEntries(
+            participantIds.map((participantId) => [
+              participantId,
+              participantId === String(existing.get('organizerId') ?? uid)
+                ? 'accepted'
+                : 'pending',
+            ]),
+          ),
+          unreadCounts: Object.fromEntries(
+            participantIds.map((participantId) => [participantId, 0]),
+          ),
           lastReadAt: {},
           lastReadMessageIds: {},
           typing: {},
@@ -100,7 +149,9 @@ export const createActivity = onCall(callableOptions, async (request) => {
             id: `${activityRef.id}-created`,
             senderId: String(existing.get('organizerId') ?? uid),
             senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
-            senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
+            senderPhotoUrl: user.get('photoUrl')
+              ? String(user.get('photoUrl'))
+              : null,
             text: 'Activity created',
             createdAt: now,
           },
@@ -113,10 +164,16 @@ export const createActivity = onCall(callableOptions, async (request) => {
       return;
     }
     if (startsAt.getTime() < Date.now() + 5 * 60_000) {
-      throw new HttpsError('failed-precondition', 'Choose a time at least five minutes from now.');
+      throw new HttpsError(
+        'failed-precondition',
+        'Choose a time at least five minutes from now.',
+      );
     }
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (!venue.exists || venue.get('status') !== 'active') {
       throw new HttpsError('not-found', 'The place was not found.');
@@ -126,20 +183,34 @@ export const createActivity = onCall(callableOptions, async (request) => {
       const forward = memberData[index * 3 + 1];
       const reverse = memberData[index * 3 + 2];
       if (!profile?.exists || profile.get('status') !== 'active') {
-        throw new HttpsError('not-found', 'One of the selected members was not found.');
+        throw new HttpsError(
+          'not-found',
+          'One of the selected members was not found.',
+        );
       }
       if (!forward?.exists || !reverse?.exists) {
-        throw new HttpsError('permission-denied', 'Activities can only include mutual followers.');
+        throw new HttpsError(
+          'permission-denied',
+          'Activities can only include mutual followers.',
+        );
       }
     }
 
-    await enforceRateLimit(transaction, uid, 'create-activity', ACTIVITY_RATE_LIMIT, ACTIVITY_RATE_WINDOW_MS);
+    await enforceRateLimit(
+      transaction,
+      uid,
+      'create-activity',
+      ACTIVITY_RATE_LIMIT,
+      ACTIVITY_RATE_WINDOW_MS,
+    );
     transaction.create(activityRef, {
       organizerId: uid,
       participantIds: [uid, ...input.memberIds],
       invitationStatuses: {
         [uid]: 'accepted',
-        ...Object.fromEntries(input.memberIds.map((memberId) => [memberId, 'pending'])),
+        ...Object.fromEntries(
+          input.memberIds.map((memberId) => [memberId, 'pending']),
+        ),
       },
       venueId: venue.id,
       venueName: String(venue.get('name') ?? ''),
@@ -159,13 +230,19 @@ export const createActivity = onCall(callableOptions, async (request) => {
       imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
       startsAt: Timestamp.fromDate(startsAt),
       venueId: venue.id,
-      address: venue.get('address') ? String(venue.get('address')) : String(venue.get('city') ?? ''),
+      address: venue.get('address')
+        ? String(venue.get('address'))
+        : String(venue.get('city') ?? ''),
       participantIds,
       invitationStatuses: {
         [uid]: 'accepted',
-        ...Object.fromEntries(input.memberIds.map((memberId) => [memberId, 'pending'])),
+        ...Object.fromEntries(
+          input.memberIds.map((memberId) => [memberId, 'pending']),
+        ),
       },
-      unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
+      unreadCounts: Object.fromEntries(
+        participantIds.map((participantId) => [participantId, 0]),
+      ),
       lastReadAt: {},
       lastReadMessageIds: {},
       typing: {},
@@ -173,7 +250,9 @@ export const createActivity = onCall(callableOptions, async (request) => {
         id: `${activityRef.id}-created`,
         senderId: uid,
         senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
-        senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
+        senderPhotoUrl: user.get('photoUrl')
+          ? String(user.get('photoUrl'))
+          : null,
         text: 'Activity created',
         createdAt: now,
       },
@@ -199,76 +278,118 @@ export const createActivity = onCall(callableOptions, async (request) => {
   return { id: activityRef.id };
 });
 
-export const respondToActivityInvitation = onCall(callableOptions, async (request) => {
-  const uid = requireUserId(request);
-  const input = parseInput(respondToActivityInvitationInputSchema, request.data);
-  const activityRef = db.collection('activities').doc(input.activityId);
-  const conversationRef = db.collection('conversations').doc(input.activityId);
-  const pendingRequestQuery = db.collection('users').doc(uid).collection('requests')
-    .where('targetId', '==', input.activityId);
+export const respondToActivityInvitation = onCall(
+  callableOptions,
+  async (request) => {
+    const uid = requireUserId(request);
+    const input = parseInput(
+      respondToActivityInvitationInputSchema,
+      request.data,
+    );
+    const activityRef = db.collection('activities').doc(input.activityId);
+    const conversationRef = db
+      .collection('conversations')
+      .doc(input.activityId);
+    const pendingRequestQuery = db
+      .collection('users')
+      .doc(uid)
+      .collection('requests')
+      .where('targetId', '==', input.activityId);
 
-  await db.runTransaction(async (transaction) => {
-    const [activity, conversation, requestSnapshot] = await Promise.all([
-      transaction.get(activityRef),
-      transaction.get(conversationRef),
-      transaction.get(pendingRequestQuery),
-    ]);
-    if (!activity.exists || !conversation.exists) {
-      throw new HttpsError('not-found', 'The activity invitation was not found.');
-    }
-    if (activity.get('organizerId') === uid) {
-      throw new HttpsError('failed-precondition', 'The organizer is already taking part.');
-    }
-    const statuses = activity.get('invitationStatuses');
-    const currentStatus = statuses && typeof statuses === 'object'
-      ? (statuses as Record<string, unknown>)[uid]
-      : undefined;
-    const now = FieldValue.serverTimestamp();
-    const syncRequests = () => requestSnapshot.docs
-      .filter((document) => document.get('kind') === 'activity' && document.get('status') === 'pending')
-      .forEach((document) => transaction.update(document.ref, {
-        status: input.response,
-        respondedAt: now,
-      }));
-    if (currentStatus === input.response) {
+    await db.runTransaction(async (transaction) => {
+      const [activity, conversation, requestSnapshot] = await Promise.all([
+        transaction.get(activityRef),
+        transaction.get(conversationRef),
+        transaction.get(pendingRequestQuery),
+      ]);
+      if (!activity.exists || !conversation.exists) {
+        throw new HttpsError(
+          'not-found',
+          'The activity invitation was not found.',
+        );
+      }
+      if (activity.get('organizerId') === uid) {
+        throw new HttpsError(
+          'failed-precondition',
+          'The organizer is already taking part.',
+        );
+      }
+      const statuses = activity.get('invitationStatuses');
+      const currentStatus =
+        statuses && typeof statuses === 'object'
+          ? (statuses as Record<string, unknown>)[uid]
+          : undefined;
+      const now = FieldValue.serverTimestamp();
+      const syncRequests = () =>
+        requestSnapshot.docs
+          .filter(
+            (document) =>
+              document.get('kind') === 'activity' &&
+              document.get('status') === 'pending',
+          )
+          .forEach((document) =>
+            transaction.update(document.ref, {
+              status: input.response,
+              respondedAt: now,
+            }),
+          );
+      if (currentStatus === input.response) {
+        syncRequests();
+        return;
+      }
+      if (currentStatus !== 'pending') {
+        throw new HttpsError(
+          'failed-precondition',
+          'This invitation is no longer pending.',
+        );
+      }
+
+      if (input.response === 'declined') {
+        transaction.update(
+          activityRef,
+          new FieldPath('invitationStatuses', uid),
+          input.response,
+          'participantIds',
+          FieldValue.arrayRemove(uid),
+          'updatedAt',
+          now,
+        );
+        transaction.update(
+          conversationRef,
+          new FieldPath('invitationStatuses', uid),
+          input.response,
+          'participantIds',
+          FieldValue.arrayRemove(uid),
+          new FieldPath('unreadCounts', uid),
+          FieldValue.delete(),
+          new FieldPath('lastReadAt', uid),
+          FieldValue.delete(),
+          new FieldPath('lastReadMessageIds', uid),
+          FieldValue.delete(),
+          new FieldPath('typing', uid),
+          FieldValue.delete(),
+          'updatedAt',
+          now,
+        );
+      } else {
+        transaction.update(
+          activityRef,
+          new FieldPath('invitationStatuses', uid),
+          input.response,
+          'updatedAt',
+          now,
+        );
+        transaction.update(
+          conversationRef,
+          new FieldPath('invitationStatuses', uid),
+          input.response,
+          'updatedAt',
+          now,
+        );
+      }
       syncRequests();
-      return;
-    }
-    if (currentStatus !== 'pending') {
-      throw new HttpsError('failed-precondition', 'This invitation is no longer pending.');
-    }
+    });
 
-    if (input.response === 'declined') {
-      transaction.update(
-        activityRef,
-        new FieldPath('invitationStatuses', uid), input.response,
-        'participantIds', FieldValue.arrayRemove(uid),
-        'updatedAt', now,
-      );
-      transaction.update(
-        conversationRef,
-        new FieldPath('invitationStatuses', uid), input.response,
-        'participantIds', FieldValue.arrayRemove(uid),
-        new FieldPath('unreadCounts', uid), FieldValue.delete(),
-        new FieldPath('lastReadAt', uid), FieldValue.delete(),
-        new FieldPath('lastReadMessageIds', uid), FieldValue.delete(),
-        new FieldPath('typing', uid), FieldValue.delete(),
-        'updatedAt', now,
-      );
-    } else {
-      transaction.update(
-        activityRef,
-        new FieldPath('invitationStatuses', uid), input.response,
-        'updatedAt', now,
-      );
-      transaction.update(
-        conversationRef,
-        new FieldPath('invitationStatuses', uid), input.response,
-        'updatedAt', now,
-      );
-    }
-    syncRequests();
-  });
-
-  return { id: input.activityId };
-});
+    return { id: input.activityId };
+  },
+);

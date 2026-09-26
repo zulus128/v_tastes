@@ -19,9 +19,16 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db, firestoreDatabaseId } from '../../shared/firebase';
 import { enforceRateLimit, idempotentDocumentId } from '../../shared/mutations';
-import { notificationPreferences, sendNotification } from '../../shared/notifications';
+import {
+  notificationPreferences,
+  sendNotification,
+} from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
-import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
+import {
+  cursorDate,
+  decodeCursor,
+  encodeCursor,
+} from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 
@@ -38,9 +45,14 @@ interface ExpoPushTicket {
   details?: { error?: unknown };
 }
 
-function directConversationId(firstUserId: string, secondUserId: string): string {
+function directConversationId(
+  firstUserId: string,
+  secondUserId: string,
+): string {
   const participantIds = [firstUserId, secondUserId].sort();
-  return createHash('sha256').update(`direct:${participantIds[0]}\0${participantIds[1]}`).digest('hex');
+  return createHash('sha256')
+    .update(`direct:${participantIds[0]}\0${participantIds[1]}`)
+    .digest('hex');
 }
 
 function pushTokenId(token: string): string {
@@ -60,8 +72,12 @@ function lastMessage(document: DocumentSnapshot) {
   return {
     id: String(message.id ?? ''),
     senderId: String(message.senderId ?? ''),
-    senderDisplayName: message.senderDisplayName ? String(message.senderDisplayName) : null,
-    senderPhotoUrl: message.senderPhotoUrl ? String(message.senderPhotoUrl) : null,
+    senderDisplayName: message.senderDisplayName
+      ? String(message.senderDisplayName)
+      : null,
+    senderPhotoUrl: message.senderPhotoUrl
+      ? String(message.senderPhotoUrl)
+      : null,
     text: String(message.text ?? ''),
     createdAt: timestampToIso(message.createdAt),
   };
@@ -69,69 +85,97 @@ function lastMessage(document: DocumentSnapshot) {
 
 function invitationStatus(document: DocumentSnapshot, uid: string) {
   const statuses = document.get('invitationStatuses');
-  const status = statuses && typeof statuses === 'object'
-    ? (statuses as Record<string, unknown>)[uid]
-    : undefined;
+  const status =
+    statuses && typeof statuses === 'object'
+      ? (statuses as Record<string, unknown>)[uid]
+      : undefined;
   return status === 'pending' || status === 'declined' ? status : 'accepted';
 }
 
 function hasTypingStatus(document: DocumentSnapshot, uid: string): boolean {
   const typing = document.get('typing');
   return Boolean(
-    typing
-    && typeof typing === 'object'
-    && Object.prototype.hasOwnProperty.call(typing, uid),
+    typing &&
+    typeof typing === 'object' &&
+    Object.prototype.hasOwnProperty.call(typing, uid),
   );
 }
 
 async function requireActiveProfile(uid: string) {
   const profile = await db.collection('users').doc(uid).get();
   if (!profile.exists || profile.get('status') !== 'active') {
-    throw new HttpsError('failed-precondition', 'An active user profile is required.');
+    throw new HttpsError(
+      'failed-precondition',
+      'An active user profile is required.',
+    );
   }
   return profile;
 }
 
-function requireParticipant(conversation: DocumentSnapshot, uid: string): string[] {
+function requireParticipant(
+  conversation: DocumentSnapshot,
+  uid: string,
+): string[] {
   const participantIds = conversation.get('participantIds');
-  if (!conversation.exists || !Array.isArray(participantIds) || !participantIds.includes(uid)) {
+  if (
+    !conversation.exists ||
+    !Array.isArray(participantIds) ||
+    !participantIds.includes(uid)
+  ) {
     throw new HttpsError('not-found', 'The conversation was not found.');
   }
-  return participantIds.filter((value): value is string => typeof value === 'string');
+  return participantIds.filter(
+    (value): value is string => typeof value === 'string',
+  );
 }
 
 export const createConversation = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createConversationInputSchema, request.data);
   if (uid === input.targetUserId) {
-    throw new HttpsError('failed-precondition', 'You cannot start a conversation with yourself.');
+    throw new HttpsError(
+      'failed-precondition',
+      'You cannot start a conversation with yourself.',
+    );
   }
 
   const participantIds = [uid, input.targetUserId].sort();
-  const conversationRef = db.collection('conversations').doc(directConversationId(uid, input.targetUserId));
+  const conversationRef = db
+    .collection('conversations')
+    .doc(directConversationId(uid, input.targetUserId));
   const userRef = db.collection('users').doc(uid);
   const targetRef = db.collection('users').doc(input.targetUserId);
-  const userFollowsTarget = userRef.collection('following').doc(input.targetUserId);
+  const userFollowsTarget = userRef
+    .collection('following')
+    .doc(input.targetUserId);
   const targetFollowsUser = targetRef.collection('following').doc(uid);
 
   await db.runTransaction(async (transaction) => {
-    const [user, target, forwardEdge, reverseEdge, existingConversation] = await Promise.all([
-      transaction.get(userRef),
-      transaction.get(targetRef),
-      transaction.get(userFollowsTarget),
-      transaction.get(targetFollowsUser),
-      transaction.get(conversationRef),
-    ]);
+    const [user, target, forwardEdge, reverseEdge, existingConversation] =
+      await Promise.all([
+        transaction.get(userRef),
+        transaction.get(targetRef),
+        transaction.get(userFollowsTarget),
+        transaction.get(targetFollowsUser),
+        transaction.get(conversationRef),
+      ]);
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     if (!target.exists || target.get('status') !== 'active') {
       throw new HttpsError('not-found', 'The user was not found.');
     }
     if (!forwardEdge.exists || !reverseEdge.exists) {
-      throw new HttpsError('permission-denied', 'Conversations require a mutual follow.', {
-        reason: 'mutual-follow-required',
-      });
+      throw new HttpsError(
+        'permission-denied',
+        'Conversations require a mutual follow.',
+        {
+          reason: 'mutual-follow-required',
+        },
+      );
     }
     if (existingConversation.exists) return;
 
@@ -146,7 +190,9 @@ export const createConversation = onCall(callableOptions, async (request) => {
     transaction.create(conversationRef, {
       kind: 'direct',
       participantIds,
-      unreadCounts: Object.fromEntries(participantIds.map((participantId) => [participantId, 0])),
+      unreadCounts: Object.fromEntries(
+        participantIds.map((participantId) => [participantId, 0]),
+      ),
       lastReadAt: {},
       lastReadMessageIds: {},
       typing: {},
@@ -167,45 +213,80 @@ export const listConversations = onCall(callableOptions, async (request) => {
   const cursor = decodeCursor(input.cursor);
   await requireActiveProfile(uid);
 
-  let query: Query = db.collection('conversations')
+  let query: Query = db
+    .collection('conversations')
     .where('participantIds', 'array-contains', uid)
     .where('status', '==', 'active')
     .orderBy('updatedAt', 'desc')
     .orderBy(FieldPath.documentId(), 'desc');
   if (cursor) {
-    query = query.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+    query = query.startAfter(
+      Timestamp.fromDate(cursorDate(cursor.value)),
+      cursor.id,
+    );
   }
 
   const snapshot = await query.limit(input.limit + 1).get();
   const sourceDocuments = snapshot.docs.slice(0, input.limit);
   const pageDocuments = sourceDocuments.filter(
-    (document) => !((document.get('hiddenFor') as unknown[]) ?? []).includes(uid),
+    (document) =>
+      !((document.get('hiddenFor') as unknown[]) ?? []).includes(uid),
   );
   const rows = pageDocuments.map((document) => {
     const participantIds = requireParticipant(document, uid);
     const rawKind = document.get('kind');
-    const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
-    const otherUserId = kind === 'direct' || kind === 'activity'
-      ? participantIds.find((participantId) => participantId !== uid) ?? null
-      : null;
+    const kind =
+      rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
+    const otherUserId =
+      kind === 'direct' || kind === 'activity'
+        ? (participantIds.find((participantId) => participantId !== uid) ??
+          null)
+        : null;
     return { document, participantIds, kind, otherUserId };
   });
-  const profileIds = [...new Set(rows
-    .filter((row) => row.kind !== 'group' && Boolean(row.otherUserId))
-    .map((row) => row.otherUserId as string))];
-  const profileSnapshots = profileIds.length > 0
-    ? await db.getAll(...profileIds.map((userId) => db.collection('users').doc(userId)))
-    : [];
-  const profiles = new Map(profileSnapshots.map((profile) => [profile.id, profile]));
+  const profileIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.kind !== 'group' && Boolean(row.otherUserId))
+        .map((row) => row.otherUserId as string),
+    ),
+  ];
+  const profileSnapshots =
+    profileIds.length > 0
+      ? await db.getAll(
+          ...profileIds.map((userId) => db.collection('users').doc(userId)),
+        )
+      : [];
+  const profiles = new Map(
+    profileSnapshots.map((profile) => [profile.id, profile]),
+  );
   const activityRows = rows.filter((row) => row.kind === 'activity');
-  const activitySnapshots = activityRows.length > 0
-    ? await db.getAll(...activityRows.map((row) => db.collection('activities').doc(String(row.document.get('activityId') ?? row.document.id))))
-    : [];
-  const activities = new Map(activitySnapshots.map((activity) => [activity.id, activity]));
-  const venueIds = [...new Set(activitySnapshots.map((activity) => String(activity.get('venueId') ?? '')).filter(Boolean))];
-  const venueSnapshots = venueIds.length > 0
-    ? await db.getAll(...venueIds.map((venueId) => db.collection('venues').doc(venueId)))
-    : [];
+  const activitySnapshots =
+    activityRows.length > 0
+      ? await db.getAll(
+          ...activityRows.map((row) =>
+            db
+              .collection('activities')
+              .doc(String(row.document.get('activityId') ?? row.document.id)),
+          ),
+        )
+      : [];
+  const activities = new Map(
+    activitySnapshots.map((activity) => [activity.id, activity]),
+  );
+  const venueIds = [
+    ...new Set(
+      activitySnapshots
+        .map((activity) => String(activity.get('venueId') ?? ''))
+        .filter(Boolean),
+    ),
+  ];
+  const venueSnapshots =
+    venueIds.length > 0
+      ? await db.getAll(
+          ...venueIds.map((venueId) => db.collection('venues').doc(venueId)),
+        )
+      : [];
   const venues = new Map(venueSnapshots.map((venue) => [venue.id, venue]));
   const last = sourceDocuments.at(-1);
 
@@ -213,47 +294,88 @@ export const listConversations = onCall(callableOptions, async (request) => {
     items: rows.map((row) => {
       const { document, participantIds, kind, otherUserId } = row;
       const profile = otherUserId ? profiles.get(otherUserId) : null;
-      const activityId = kind === 'activity' ? String(document.get('activityId') ?? document.id) : null;
+      const activityId =
+        kind === 'activity'
+          ? String(document.get('activityId') ?? document.id)
+          : null;
       const activity = activityId ? activities.get(activityId) : null;
-      const venueId = String(document.get('venueId') ?? activity?.get('venueId') ?? '');
+      const venueId = String(
+        document.get('venueId') ?? activity?.get('venueId') ?? '',
+      );
       const venue = venueId ? venues.get(venueId) : null;
       const statuses = document.get('invitationStatuses');
-      const acceptedCount = statuses && typeof statuses === 'object'
-        ? Object.values(statuses as Record<string, unknown>).filter((status) => status === 'accepted').length
-        : participantIds.length;
+      const acceptedCount =
+        statuses && typeof statuses === 'object'
+          ? Object.values(statuses as Record<string, unknown>).filter(
+              (status) => status === 'accepted',
+            ).length
+          : participantIds.length;
       return {
         id: document.id,
         kind,
         participantIds,
-        otherParticipant: kind !== 'group' && otherUserId ? {
-          userId: otherUserId ?? '',
-          displayName: String(profile?.get('displayName') ?? ''),
-          username: profile?.get('username') ? String(profile.get('username')) : null,
-          photoUrl: profile?.get('photoUrl') ? String(profile.get('photoUrl')) : null,
-        } : null,
+        otherParticipant:
+          kind !== 'group' && otherUserId
+            ? {
+                userId: otherUserId ?? '',
+                displayName: String(profile?.get('displayName') ?? ''),
+                username: profile?.get('username')
+                  ? String(profile.get('username'))
+                  : null,
+                photoUrl: profile?.get('photoUrl')
+                  ? String(profile.get('photoUrl'))
+                  : null,
+              }
+            : null,
         activityId,
-        title: kind === 'activity' || kind === 'group'
-          ? String(document.get('title') ?? (kind === 'activity' ? 'Activity' : 'Group'))
-          : null,
-        imageUrl: (kind === 'activity' || kind === 'group') && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
-        organizerId: kind === 'activity' ? String(document.get('organizerId') ?? '') : null,
-        invitationStatus: kind === 'activity' ? invitationStatus(document, uid) : null,
-        activityStartsAt: kind === 'activity' && (document.get('startsAt') ?? activity?.get('startsAt'))
-          ? timestampToIso(document.get('startsAt') ?? activity?.get('startsAt'))
-          : null,
-        activityAddress: kind === 'activity'
-          ? String(document.get('address') ?? venue?.get('address') ?? venue?.get('city') ?? '') || null
-          : null,
-        memberCount: kind === 'activity' ? acceptedCount : participantIds.length,
+        title:
+          kind === 'activity' || kind === 'group'
+            ? String(
+                document.get('title') ??
+                  (kind === 'activity' ? 'Activity' : 'Group'),
+              )
+            : null,
+        imageUrl:
+          (kind === 'activity' || kind === 'group') && document.get('imageUrl')
+            ? String(document.get('imageUrl'))
+            : null,
+        organizerId:
+          kind === 'activity'
+            ? String(document.get('organizerId') ?? '')
+            : null,
+        invitationStatus:
+          kind === 'activity' ? invitationStatus(document, uid) : null,
+        activityStartsAt:
+          kind === 'activity' &&
+          (document.get('startsAt') ?? activity?.get('startsAt'))
+            ? timestampToIso(
+                document.get('startsAt') ?? activity?.get('startsAt'),
+              )
+            : null,
+        activityAddress:
+          kind === 'activity'
+            ? String(
+                document.get('address') ??
+                  venue?.get('address') ??
+                  venue?.get('city') ??
+                  '',
+              ) || null
+            : null,
+        memberCount:
+          kind === 'activity' ? acceptedCount : participantIds.length,
         lastMessage: lastMessage(document),
         unreadCount: unreadCount(document, uid),
         createdAt: timestampToIso(document.get('createdAt')),
         updatedAt: timestampToIso(document.get('updatedAt')),
       };
     }),
-    nextCursor: snapshot.size > input.limit && last
-      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('updatedAt')) })
-      : null,
+    nextCursor:
+      snapshot.size > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value: timestampToIso(last.get('updatedAt')),
+          })
+        : null,
   };
 });
 
@@ -261,24 +383,43 @@ export const getMessages = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getMessagesInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
-  const conversationRef = db.collection('conversations').doc(input.conversationId);
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
   const conversation = await conversationRef.get();
   requireParticipant(conversation, uid);
 
-  let query = conversationRef.collection('messages')
+  let query = conversationRef
+    .collection('messages')
     .orderBy('createdAt', 'desc')
     .orderBy(FieldPath.documentId(), 'desc');
   if (cursor) {
-    query = query.startAfter(Timestamp.fromDate(cursorDate(cursor.value)), cursor.id);
+    query = query.startAfter(
+      Timestamp.fromDate(cursorDate(cursor.value)),
+      cursor.id,
+    );
   }
   const snapshot = await query.limit(input.limit + 1).get();
   const pageDocuments = snapshot.docs.slice(0, input.limit);
   const last = pageDocuments.at(-1);
-  const senderIds = conversation.get('kind') === 'group'
-    ? [...new Set(pageDocuments.map((document) => String(document.get('senderId') ?? '')).filter(Boolean))]
-    : [];
+  const senderIds =
+    conversation.get('kind') === 'group'
+      ? [
+          ...new Set(
+            pageDocuments
+              .map((document) => String(document.get('senderId') ?? ''))
+              .filter(Boolean),
+          ),
+        ]
+      : [];
   const senderProfiles = senderIds.length
-    ? new Map((await db.getAll(...senderIds.map((id) => db.collection('users').doc(id)))).map((profile) => [profile.id, profile]))
+    ? new Map(
+        (
+          await db.getAll(
+            ...senderIds.map((id) => db.collection('users').doc(id)),
+          )
+        ).map((profile) => [profile.id, profile]),
+      )
     : new Map();
 
   return {
@@ -291,81 +432,154 @@ export const getMessages = onCall(callableOptions, async (request) => {
         senderId,
         senderDisplayName: document.get('senderDisplayName')
           ? String(document.get('senderDisplayName'))
-          : senderProfile?.get('displayName') ? String(senderProfile.get('displayName')) : null,
+          : senderProfile?.get('displayName')
+            ? String(senderProfile.get('displayName'))
+            : null,
         senderPhotoUrl: document.get('senderPhotoUrl')
           ? String(document.get('senderPhotoUrl'))
-          : senderProfile?.get('photoUrl') ? String(senderProfile.get('photoUrl')) : null,
+          : senderProfile?.get('photoUrl')
+            ? String(senderProfile.get('photoUrl'))
+            : null,
         recipientId: String(document.get('recipientId')),
         recipientIds: Array.isArray(document.get('recipientIds'))
-          ? document.get('recipientIds').filter((value: unknown): value is string => typeof value === 'string')
+          ? document
+              .get('recipientIds')
+              .filter(
+                (value: unknown): value is string => typeof value === 'string',
+              )
           : [String(document.get('recipientId'))].filter(Boolean),
         text: String(document.get('text')),
         createdAt: timestampToIso(document.get('createdAt')),
       };
     }),
-    nextCursor: snapshot.size > input.limit && last
-      ? encodeCursor({ id: last.id, value: timestampToIso(last.get('createdAt')) })
-      : null,
+    nextCursor:
+      snapshot.size > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value: timestampToIso(last.get('createdAt')),
+          })
+        : null,
   };
 });
 
 export const sendMessage = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(sendMessageInputSchema, request.data);
-  const conversationRef = db.collection('conversations').doc(input.conversationId);
-  const messageRef = conversationRef.collection('messages').doc(
-    idempotentDocumentId(uid, `message:${input.conversationId}`, input.idempotencyKey),
-  );
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
+  const messageRef = conversationRef
+    .collection('messages')
+    .doc(
+      idempotentDocumentId(
+        uid,
+        `message:${input.conversationId}`,
+        input.idempotencyKey,
+      ),
+    );
 
   await db.runTransaction(async (transaction) => {
     const conversation = await transaction.get(conversationRef);
     const participantIds = requireParticipant(conversation, uid);
     if (conversation.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'The conversation is not active.');
+      throw new HttpsError(
+        'failed-precondition',
+        'The conversation is not active.',
+      );
     }
     const rawKind = conversation.get('kind');
-    const kind = rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
-    const recipientIds = participantIds.filter((participantId) => participantId !== uid);
+    const kind =
+      rawKind === 'activity' || rawKind === 'group' ? rawKind : 'direct';
+    const recipientIds = participantIds.filter(
+      (participantId) => participantId !== uid,
+    );
     if (recipientIds.length === 0 && kind !== 'group') {
-      throw new HttpsError('internal', 'The conversation participants are invalid.');
+      throw new HttpsError(
+        'internal',
+        'The conversation participants are invalid.',
+      );
     }
-    if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
-      throw new HttpsError('failed-precondition', 'Accept the invitation before sending messages.');
+    if (
+      (kind === 'activity' || kind === 'group') &&
+      invitationStatus(conversation, uid) !== 'accepted'
+    ) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Accept the invitation before sending messages.',
+      );
     }
     const userRef = db.collection('users').doc(uid);
-    const recipientRefs = recipientIds.map((recipientId) => db.collection('users').doc(recipientId));
+    const recipientRefs = recipientIds.map((recipientId) =>
+      db.collection('users').doc(recipientId),
+    );
     const directRecipientId = recipientIds[0] ?? '';
     const [user, existingMessage, ...participantReads] = await Promise.all([
       transaction.get(userRef),
       transaction.get(messageRef),
       ...recipientRefs.map((recipientRef) => transaction.get(recipientRef)),
-      ...(kind === 'direct' ? [
-        transaction.get(userRef.collection('following').doc(directRecipientId)),
-        transaction.get(db.collection('users').doc(directRecipientId).collection('following').doc(uid)),
-      ] : []),
+      ...(kind === 'direct'
+        ? [
+            transaction.get(
+              userRef.collection('following').doc(directRecipientId),
+            ),
+            transaction.get(
+              db
+                .collection('users')
+                .doc(directRecipientId)
+                .collection('following')
+                .doc(uid),
+            ),
+          ]
+        : []),
     ]);
     if (existingMessage.exists) return;
     if (!user.exists || user.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
     const recipientProfiles = participantReads.slice(0, recipientIds.length);
-    if (recipientProfiles.some((recipient) => !recipient?.exists || recipient.get('status') !== 'active')) {
-      throw new HttpsError('not-found', 'One of the conversation participants was not found.');
+    if (
+      recipientProfiles.some(
+        (recipient) =>
+          !recipient?.exists || recipient.get('status') !== 'active',
+      )
+    ) {
+      throw new HttpsError(
+        'not-found',
+        'One of the conversation participants was not found.',
+      );
     }
     const followReads = participantReads.slice(recipientIds.length);
-    if (kind === 'direct' && (!followReads[0]?.exists || !followReads[1]?.exists)) {
-      throw new HttpsError('permission-denied', 'Conversations require a mutual follow.', {
-        reason: 'mutual-follow-required',
-      });
+    if (
+      kind === 'direct' &&
+      (!followReads[0]?.exists || !followReads[1]?.exists)
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Conversations require a mutual follow.',
+        {
+          reason: 'mutual-follow-required',
+        },
+      );
     }
 
-    await enforceRateLimit(transaction, uid, 'send-message', MESSAGE_RATE_LIMIT, MESSAGE_RATE_WINDOW_MS);
+    await enforceRateLimit(
+      transaction,
+      uid,
+      'send-message',
+      MESSAGE_RATE_LIMIT,
+      MESSAGE_RATE_WINDOW_MS,
+    );
     const now = FieldValue.serverTimestamp();
     transaction.create(messageRef, {
       conversationId: conversationRef.id,
       senderId: uid,
       senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
-      senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
+      senderPhotoUrl: user.get('photoUrl')
+        ? String(user.get('photoUrl'))
+        : null,
       recipientId: recipientIds.length === 1 ? recipientIds[0] : '',
       recipientIds,
       text: input.text,
@@ -376,30 +590,47 @@ export const sendMessage = onCall(callableOptions, async (request) => {
     for (const recipientId of recipientIds) {
       transaction.update(
         conversationRef,
-        new FieldPath('unreadCounts', recipientId), FieldValue.increment(1),
+        new FieldPath('unreadCounts', recipientId),
+        FieldValue.increment(1),
       );
     }
     transaction.update(
       conversationRef,
-      'lastMessage', {
+      'lastMessage',
+      {
         id: messageRef.id,
         senderId: uid,
         senderDisplayName: String(user.get('displayName') ?? 'Tastes user'),
-        senderPhotoUrl: user.get('photoUrl') ? String(user.get('photoUrl')) : null,
+        senderPhotoUrl: user.get('photoUrl')
+          ? String(user.get('photoUrl'))
+          : null,
         text: input.text,
         createdAt: now,
       },
-      'messageCount', FieldValue.increment(1),
-      'updatedAt', now,
-      'hiddenFor', FieldValue.arrayRemove(...participantIds),
+      'messageCount',
+      FieldValue.increment(1),
+      'updatedAt',
+      now,
+      'hiddenFor',
+      FieldValue.arrayRemove(...participantIds),
     );
     if (hasTypingStatus(conversation, uid)) {
-      transaction.update(conversationRef, new FieldPath('typing', uid), FieldValue.delete());
+      transaction.update(
+        conversationRef,
+        new FieldPath('typing', uid),
+        FieldValue.delete(),
+      );
     }
     for (const recipientId of recipientIds) {
-      const notificationRef = db.collection('notifications').doc(
-        idempotentDocumentId(recipientId, 'message-notification', messageRef.id),
-      );
+      const notificationRef = db
+        .collection('notifications')
+        .doc(
+          idempotentDocumentId(
+            recipientId,
+            'message-notification',
+            messageRef.id,
+          ),
+        );
       transaction.create(notificationRef, {
         recipientId,
         actorId: uid,
@@ -421,18 +652,26 @@ export const sendMessage = onCall(callableOptions, async (request) => {
 export const hideConversation = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(hideConversationInputSchema, request.data);
-  const conversationRef = db.collection('conversations').doc(input.conversationId);
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
 
   await db.runTransaction(async (transaction) => {
     const conversation = await transaction.get(conversationRef);
     requireParticipant(conversation, uid);
     transaction.update(
       conversationRef,
-      'hiddenFor', FieldValue.arrayUnion(uid),
-      new FieldPath('unreadCounts', uid), 0,
+      'hiddenFor',
+      FieldValue.arrayUnion(uid),
+      new FieldPath('unreadCounts', uid),
+      0,
     );
     if (hasTypingStatus(conversation, uid)) {
-      transaction.update(conversationRef, new FieldPath('typing', uid), FieldValue.delete());
+      transaction.update(
+        conversationRef,
+        new FieldPath('typing', uid),
+        FieldValue.delete(),
+      );
     }
   });
 
@@ -442,23 +681,32 @@ export const hideConversation = onCall(callableOptions, async (request) => {
 export const markConversationRead = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(markConversationReadInputSchema, request.data);
-  const conversationRef = db.collection('conversations').doc(input.conversationId);
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
 
   await db.runTransaction(async (transaction) => {
     const conversation = await transaction.get(conversationRef);
     requireParticipant(conversation, uid);
     const currentLastMessage = lastMessage(conversation);
     if (currentLastMessage?.id !== input.throughMessageId) {
-      throw new HttpsError('failed-precondition', 'New messages are available. Refresh before marking the conversation read.', {
-        reason: 'new-messages-available',
-      });
+      throw new HttpsError(
+        'failed-precondition',
+        'New messages are available. Refresh before marking the conversation read.',
+        {
+          reason: 'new-messages-available',
+        },
+      );
     }
     const now = FieldValue.serverTimestamp();
     transaction.update(
       conversationRef,
-      new FieldPath('unreadCounts', uid), 0,
-      new FieldPath('lastReadAt', uid), now,
-      new FieldPath('lastReadMessageIds', uid), input.throughMessageId,
+      new FieldPath('unreadCounts', uid),
+      0,
+      new FieldPath('lastReadAt', uid),
+      now,
+      new FieldPath('lastReadMessageIds', uid),
+      input.throughMessageId,
     );
   });
 
@@ -468,17 +716,31 @@ export const markConversationRead = onCall(callableOptions, async (request) => {
 export const setTypingStatus = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(setTypingStatusInputSchema, request.data);
-  const conversationRef = db.collection('conversations').doc(input.conversationId);
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
   const conversation = await conversationRef.get();
   requireParticipant(conversation, uid);
   const kind = conversation.get('kind');
-  if ((kind === 'activity' || kind === 'group') && invitationStatus(conversation, uid) !== 'accepted') {
-    throw new HttpsError('failed-precondition', 'Accept the invitation before updating typing status.');
+  if (
+    (kind === 'activity' || kind === 'group') &&
+    invitationStatus(conversation, uid) !== 'accepted'
+  ) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Accept the invitation before updating typing status.',
+    );
   }
   if (input.typing) {
-    await conversationRef.set({ typing: { [uid]: Timestamp.now() } }, { merge: true });
+    await conversationRef.set(
+      { typing: { [uid]: Timestamp.now() } },
+      { merge: true },
+    );
   } else if (hasTypingStatus(conversation, uid)) {
-    await conversationRef.update(new FieldPath('typing', uid), FieldValue.delete());
+    await conversationRef.update(
+      new FieldPath('typing', uid),
+      FieldValue.delete(),
+    );
   }
   return { conversationId: input.conversationId, typing: input.typing };
 });
@@ -499,21 +761,36 @@ export const registerPushToken = onCall(callableOptions, async (request) => {
       transaction.get(tokenRef),
     ]);
     if (!profile.exists || profile.get('status') !== 'active') {
-      throw new HttpsError('failed-precondition', 'An active user profile is required.');
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
     }
-    const previousOwnerId = registry.exists ? String(registry.get('uid') ?? '') : '';
+    const previousOwnerId = registry.exists
+      ? String(registry.get('uid') ?? '')
+      : '';
     if (previousOwnerId && previousOwnerId !== uid) {
-      transaction.delete(db.collection('users').doc(previousOwnerId).collection('pushTokens').doc(tokenId));
+      transaction.delete(
+        db
+          .collection('users')
+          .doc(previousOwnerId)
+          .collection('pushTokens')
+          .doc(tokenId),
+      );
     }
     const now = FieldValue.serverTimestamp();
-    transaction.set(tokenRef, {
-      token: input.token,
-      platform: input.platform,
-      provider: 'expo',
-      active: true,
-      createdAt: existing.exists ? existing.get('createdAt') : now,
-      updatedAt: now,
-    }, { merge: true });
+    transaction.set(
+      tokenRef,
+      {
+        token: input.token,
+        platform: input.platform,
+        provider: 'expo',
+        active: true,
+        createdAt: existing.exists ? existing.get('createdAt') : now,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
     transaction.set(registryRef, { uid, updatedAt: now });
     isNewDevice = !existing.exists;
   });
@@ -537,12 +814,17 @@ export const unregisterPushToken = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(unregisterPushTokenInputSchema, request.data);
   const tokenId = pushTokenId(input.token);
-  const tokenRef = db.collection('users').doc(uid).collection('pushTokens').doc(tokenId);
+  const tokenRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('pushTokens')
+    .doc(tokenId);
   const registryRef = db.collection('_pushTokens').doc(tokenId);
   await db.runTransaction(async (transaction) => {
     const registry = await transaction.get(registryRef);
     transaction.delete(tokenRef);
-    if (registry.exists && registry.get('uid') === uid) transaction.delete(registryRef);
+    if (registry.exists && registry.get('uid') === uid)
+      transaction.delete(registryRef);
   });
   return { registered: false };
 });
@@ -550,85 +832,116 @@ export const unregisterPushToken = onCall(callableOptions, async (request) => {
 function ticketList(payload: unknown): ExpoPushTicket[] {
   if (!payload || typeof payload !== 'object') return [];
   const data = (payload as { data?: unknown }).data;
-  return Array.isArray(data) ? data as ExpoPushTicket[] : data ? [data as ExpoPushTicket] : [];
+  return Array.isArray(data)
+    ? (data as ExpoPushTicket[])
+    : data
+      ? [data as ExpoPushTicket]
+      : [];
 }
 
-export const pushMessageNotification = onDocumentCreated({
-  document: 'notifications/{notificationId}',
-  database: firestoreDatabaseId,
-  region: 'europe-west1',
-  retry: false,
-}, async (event) => {
-  const notification = event.data;
-  if (!notification || notification.get('type') !== 'message') return;
-  const recipientId = String(notification.get('recipientId') ?? '');
-  if (!recipientId) return;
+export const pushMessageNotification = onDocumentCreated(
+  {
+    document: 'notifications/{notificationId}',
+    database: firestoreDatabaseId,
+    region: 'europe-west1',
+    retry: false,
+  },
+  async (event) => {
+    const notification = event.data;
+    if (!notification || notification.get('type') !== 'message') return;
+    const recipientId = String(notification.get('recipientId') ?? '');
+    if (!recipientId) return;
 
-  const tokens = await db.collection('users').doc(recipientId).collection('pushTokens')
-    .where('active', '==', true)
-    .limit(MAX_PUSH_TOKENS)
-    .get();
-  if (tokens.empty) {
-    await notification.ref.update({ pushStatus: 'no-tokens', pushUpdatedAt: FieldValue.serverTimestamp() });
-    return;
-  }
+    const tokens = await db
+      .collection('users')
+      .doc(recipientId)
+      .collection('pushTokens')
+      .where('active', '==', true)
+      .limit(MAX_PUSH_TOKENS)
+      .get();
+    if (tokens.empty) {
+      await notification.ref.update({
+        pushStatus: 'no-tokens',
+        pushUpdatedAt: FieldValue.serverTimestamp(),
+      });
+      return;
+    }
 
-  const recipient = await db.collection('users').doc(recipientId).get();
-  if (!allowsNotification(notificationPreferences(recipient), 'message', 'push')) {
-    await notification.ref.update({ pushStatus: 'suppressed', pushUpdatedAt: FieldValue.serverTimestamp() });
-    return;
-  }
-  const copy = renderNotificationCopy('message', {
-    actor: String(notification.get('actorDisplayName') ?? 'Someone'),
-    text: String(notification.get('preview') ?? ''),
-  });
+    const recipient = await db.collection('users').doc(recipientId).get();
+    if (
+      !allowsNotification(notificationPreferences(recipient), 'message', 'push')
+    ) {
+      await notification.ref.update({
+        pushStatus: 'suppressed',
+        pushUpdatedAt: FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+    const copy = renderNotificationCopy('message', {
+      actor: String(notification.get('actorDisplayName') ?? 'Someone'),
+      text: String(notification.get('preview') ?? ''),
+    });
 
-  const messages = tokens.docs.map((token) => ({
-    to: String(token.get('token')),
-    sound: 'default',
-    title: copy.title,
-    body: copy.body,
-    data: {
-      type: 'message',
-      conversationId: String(notification.get('conversationId') ?? ''),
-      messageId: String(notification.get('messageId') ?? ''),
-    },
-  }));
-
-  try {
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-        ...(process.env.EXPO_ACCESS_TOKEN
-          ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` }
-          : {}),
+    const messages = tokens.docs.map((token) => ({
+      to: String(token.get('token')),
+      sound: 'default',
+      title: copy.title,
+      body: copy.body,
+      data: {
+        type: 'message',
+        conversationId: String(notification.get('conversationId') ?? ''),
+        messageId: String(notification.get('messageId') ?? ''),
       },
-      body: JSON.stringify(messages),
-      signal: AbortSignal.timeout(10_000),
-    });
-    const payload: unknown = await response.json();
-    if (!response.ok) throw new Error(`Expo Push API returned HTTP ${response.status}.`);
-    const tickets = ticketList(payload);
-    const batch = db.batch();
-    tickets.forEach((ticket, index) => {
-      if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
-        const token = tokens.docs[index];
-        if (token) batch.update(token.ref, { active: false, updatedAt: FieldValue.serverTimestamp() });
-      }
-    });
-    batch.update(notification.ref, {
-      pushStatus: tickets.some((ticket) => ticket.status === 'error') ? 'partial' : 'sent',
-      pushUpdatedAt: FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
-  } catch (error) {
-    await notification.ref.update({
-      pushStatus: 'failed',
-      pushError: error instanceof Error ? error.message.slice(0, 500) : 'Unknown push error.',
-      pushUpdatedAt: FieldValue.serverTimestamp(),
-    });
-  }
-});
+    }));
+
+    try {
+      const response = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+          ...(process.env.EXPO_ACCESS_TOKEN
+            ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` }
+            : {}),
+        },
+        body: JSON.stringify(messages),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok)
+        throw new Error(`Expo Push API returned HTTP ${response.status}.`);
+      const tickets = ticketList(payload);
+      const batch = db.batch();
+      tickets.forEach((ticket, index) => {
+        if (
+          ticket.status === 'error' &&
+          ticket.details?.error === 'DeviceNotRegistered'
+        ) {
+          const token = tokens.docs[index];
+          if (token)
+            batch.update(token.ref, {
+              active: false,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+        }
+      });
+      batch.update(notification.ref, {
+        pushStatus: tickets.some((ticket) => ticket.status === 'error')
+          ? 'partial'
+          : 'sent',
+        pushUpdatedAt: FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+    } catch (error) {
+      await notification.ref.update({
+        pushStatus: 'failed',
+        pushError:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : 'Unknown push error.',
+        pushUpdatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+  },
+);

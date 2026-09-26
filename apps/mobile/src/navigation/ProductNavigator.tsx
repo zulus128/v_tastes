@@ -23,7 +23,10 @@ import { useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
-import { CreateReviewScreen, PlaceSelector } from '../features/create-review/CreateReviewScreen';
+import {
+  CreateReviewScreen,
+  PlaceSelector,
+} from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
 import { DiscoverFiltersScreen } from '../features/discover/DiscoverFiltersScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
@@ -91,11 +94,15 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['tastes://', 'https://tastesapp.com'],
   async getInitialURL() {
     return (
-      consumePendingDeepLink() ?? (await Linking.getInitialURL()) ?? consumeInitialPushDeepLink()
+      consumePendingDeepLink() ??
+      (await Linking.getInitialURL()) ??
+      consumeInitialPushDeepLink()
     );
   },
   subscribe(listener) {
-    const linkingSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
+    const linkingSubscription = Linking.addEventListener('url', ({ url }) =>
+      listener(url),
+    );
     const unsubscribePush = subscribeToPushDeepLinks(listener);
     return () => {
       linkingSubscription.remove();
@@ -146,7 +153,9 @@ function tabOptions(
           start={{ x: 0.5, y: 0 }}
           style={styles.createIconBorder}
         >
-          <View style={[styles.createIcon, { backgroundColor: colors.primary }]}>
+          <View
+            style={[styles.createIcon, { backgroundColor: colors.primary }]}
+          >
             <CreateTabGlyph />
           </View>
         </LinearGradient>
@@ -200,10 +209,16 @@ function MainTabs({
           {({ navigation }) => (
             <HomeFeedScreen
               onExplore={() => navigation.navigate('Discover')}
-              onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
+              onOpenComments={(reviewId) =>
+                rootNavigation.navigate('Comments', { reviewId })
+              }
               onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
-              onOpenNotifications={() => rootNavigation.navigate('Notifications')}
-              onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+              onOpenNotifications={() =>
+                rootNavigation.navigate('Notifications')
+              }
+              onOpenPlace={(venueId) =>
+                rootNavigation.navigate('Place', { venueId })
+              }
             />
           )}
         </Tabs.Screen>
@@ -213,8 +228,12 @@ function MainTabs({
               appliedFilters={discoverFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
               onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
-              onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
-              onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
+              onOpenComments={(reviewId) =>
+                rootNavigation.navigate('Comments', { reviewId })
+              }
+              onOpenPlace={(venueId) =>
+                rootNavigation.navigate('Place', { venueId })
+              }
               onOpenProfile={(person: DiscoverPerson) =>
                 navigation.navigate('Profile', {
                   initialFollowing: person.following,
@@ -254,7 +273,8 @@ function MainTabs({
           options={{
             tabBarLabel: 'Chats',
             title: 'Chats',
-            tabBarBadge: unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
+            tabBarBadge:
+              unreadMessages > 0 ? Math.min(unreadMessages, 99) : undefined,
             tabBarBadgeStyle: {
               backgroundColor: colors.primary,
               color: colors.onPrimary,
@@ -276,7 +296,11 @@ function MainTabs({
         </Tabs.Screen>
         <Tabs.Screen
           listeners={({ navigation }) => ({
-            tabPress: () => navigation.setParams({ initialFollowing: undefined, userId: undefined }),
+            tabPress: () =>
+              navigation.setParams({
+                initialFollowing: undefined,
+                userId: undefined,
+              }),
           })}
           name="Profile"
           options={{ tabBarHideOnKeyboard: false }}
@@ -297,13 +321,19 @@ function MainTabs({
                   navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
-                onOpenComments={(reviewId) => rootNavigation.navigate('Comments', { reviewId })}
+                onOpenComments={(reviewId) =>
+                  rootNavigation.navigate('Comments', { reviewId })
+                }
                 onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
-                onOpenPlace={(venueId) => rootNavigation.navigate('Place', { venueId })}
-                onOpenProfile={(profileUserId, profileFollowing) => navigation.navigate('Profile', {
-                  initialFollowing: profileFollowing,
-                  userId: profileUserId,
-                })}
+                onOpenPlace={(venueId) =>
+                  rootNavigation.navigate('Place', { venueId })
+                }
+                onOpenProfile={(profileUserId, profileFollowing) =>
+                  navigation.navigate('Profile', {
+                    initialFollowing: profileFollowing,
+                    userId: profileUserId,
+                  })
+                }
                 onContinueDraft={() => navigation.navigate('Create')}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}
@@ -312,18 +342,20 @@ function MainTabs({
           }}
         </Tabs.Screen>
       </Tabs.Navigator>
-      {placeSelectorVisible ? <PlaceSelector
-        onClose={() => setPlaceSelectorVisible(false)}
-        onSelect={(venue) => {
-          setPlaceSelectorVisible(false);
-          rootNavigation.navigate('MainTabs', {
-            params: { venueId: venue.id },
-            screen: 'Create',
-          });
-        }}
-        userId={user.uid}
-        visible={placeSelectorVisible}
-      /> : null}
+      {placeSelectorVisible ? (
+        <PlaceSelector
+          onClose={() => setPlaceSelectorVisible(false)}
+          onSelect={(venue) => {
+            setPlaceSelectorVisible(false);
+            rootNavigation.navigate('MainTabs', {
+              params: { venueId: venue.id },
+              screen: 'Create',
+            });
+          }}
+          userId={user.uid}
+          visible={placeSelectorVisible}
+        />
+      ) : null}
       <ProfileSettingsSheet
         fallbackName={user.displayName ?? 'Your profile'}
         onClose={() => setSettingsVisible(false)}
@@ -360,14 +392,33 @@ export function ProductNavigator({
     };
   }, [colors, isDark]);
   return (
-    <NavigationContainer key={`${visualAuditRoute?.root ?? 'MainTabs'}:${visualAuditRoute?.tab ?? ''}`} linking={linking} theme={navigationTheme}>
-      <RootStack.Navigator initialRouteName={visualAuditRoute?.root ?? 'MainTabs'} screenOptions={{ headerShown: false }}>
+    <NavigationContainer
+      key={`${visualAuditRoute?.root ?? 'MainTabs'}:${visualAuditRoute?.tab ?? ''}`}
+      linking={linking}
+      theme={navigationTheme}
+    >
+      <RootStack.Navigator
+        initialRouteName={visualAuditRoute?.root ?? 'MainTabs'}
+        screenOptions={{ headerShown: false }}
+      >
         <RootStack.Screen name="MainTabs">
           {({ navigation }) => (
-            <MainTabs discoverFilters={discoverFilters} initialTab={visualAuditRoute?.tab} user={user} rootNavigation={navigation} />
+            <MainTabs
+              discoverFilters={discoverFilters}
+              initialTab={visualAuditRoute?.tab}
+              user={user}
+              rootNavigation={navigation}
+            />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Comments" initialParams={visualAuditRoute?.root === 'Comments' ? { reviewId: 'visual-audit-review' } : undefined}>
+        <RootStack.Screen
+          name="Comments"
+          initialParams={
+            visualAuditRoute?.root === 'Comments'
+              ? { reviewId: 'visual-audit-review' }
+              : undefined
+          }
+        >
           {({ navigation, route }) => (
             <PaginatedCommentsScreen
               commentId={route.params.commentId}
@@ -379,21 +430,41 @@ export function ProductNavigator({
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Recap" initialParams={visualAuditRoute?.root === 'Recap' ? { mode: 'ready' } : undefined}>
+        <RootStack.Screen
+          name="Recap"
+          initialParams={
+            visualAuditRoute?.root === 'Recap' ? { mode: 'ready' } : undefined
+          }
+        >
           {({ navigation, route }) => (
-            <MonthlyRecapFlow mode={route.params.mode} onClose={navigation.goBack} user={user} />
+            <MonthlyRecapFlow
+              mode={route.params.mode}
+              onClose={navigation.goBack}
+              user={user}
+            />
           )}
         </RootStack.Screen>
         <RootStack.Screen name="Leaderboard">
           {({ navigation }) => (
             <PaginatedLeaderboardScreen
-              onAddFriends={() => navigation.navigate('MainTabs', { screen: 'Discover' })}
+              onAddFriends={() =>
+                navigation.navigate('MainTabs', { screen: 'Discover' })
+              }
               onBack={navigation.goBack}
-              onEditProfile={() => navigation.navigate('MainTabs', { screen: 'Profile' })}
+              onEditProfile={() =>
+                navigation.navigate('MainTabs', { screen: 'Profile' })
+              }
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Place" initialParams={visualAuditRoute?.root === 'Place' ? { venueId: 'visual-audit-venue' } : undefined}>
+        <RootStack.Screen
+          name="Place"
+          initialParams={
+            visualAuditRoute?.root === 'Place'
+              ? { venueId: 'visual-audit-venue' }
+              : undefined
+          }
+        >
           {({ navigation, route }) => (
             <PlaceScreen
               onBack={() => {
@@ -406,13 +477,22 @@ export function ProductNavigator({
                   params: { venueId: route.params.venueId },
                 })
               }
-              onOpenComments={(reviewId) => navigation.navigate('Comments', { reviewId })}
+              onOpenComments={(reviewId) =>
+                navigation.navigate('Comments', { reviewId })
+              }
               userId={user.uid}
               venueId={route.params.venueId}
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="Conversation" initialParams={visualAuditRoute?.root === 'Conversation' ? { conversationId: 'visual-audit-conversation' } : undefined}>
+        <RootStack.Screen
+          name="Conversation"
+          initialParams={
+            visualAuditRoute?.root === 'Conversation'
+              ? { conversationId: 'visual-audit-conversation' }
+              : undefined
+          }
+        >
           {({ navigation, route }) => (
             <ChatScreen
               conversationId={route.params.conversationId}
@@ -420,8 +500,12 @@ export function ProductNavigator({
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Dialog' });
               }}
-              onOpenActivityDetails={(activityId) => navigation.navigate('ActivityDetails', { activityId })}
-              onOpenGroupDetails={(groupId) => navigation.navigate('GroupDetails', { groupId })}
+              onOpenActivityDetails={(activityId) =>
+                navigation.navigate('ActivityDetails', { activityId })
+              }
+              onOpenGroupDetails={(groupId) =>
+                navigation.navigate('GroupDetails', { groupId })
+              }
               userId={user.uid}
             />
           )}
@@ -439,7 +523,14 @@ export function ProductNavigator({
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="ActivityDetails" initialParams={visualAuditRoute?.root === 'ActivityDetails' ? { activityId: 'visual-audit-activity' } : undefined}>
+        <RootStack.Screen
+          name="ActivityDetails"
+          initialParams={
+            visualAuditRoute?.root === 'ActivityDetails'
+              ? { activityId: 'visual-audit-activity' }
+              : undefined
+          }
+        >
           {({ navigation, route }) => (
             <ActivityDetailsScreen
               activityId={route.params.activityId}
@@ -456,7 +547,8 @@ export function ProductNavigator({
                 switch (item.targetType) {
                   case 'comments':
                   case 'review':
-                    if (targetId) navigation.navigate('Comments', { reviewId: targetId });
+                    if (targetId)
+                      navigation.navigate('Comments', { reviewId: targetId });
                     break;
                   case 'profile':
                     if (targetId)
@@ -466,13 +558,20 @@ export function ProductNavigator({
                       });
                     break;
                   case 'activity':
-                    if (targetId) navigation.navigate('ActivityDetails', { activityId: targetId });
+                    if (targetId)
+                      navigation.navigate('ActivityDetails', {
+                        activityId: targetId,
+                      });
                     break;
                   case 'place':
-                    if (targetId) navigation.navigate('Place', { venueId: targetId });
+                    if (targetId)
+                      navigation.navigate('Place', { venueId: targetId });
                     break;
                   case 'chat':
-                    if (targetId) navigation.navigate('Conversation', { conversationId: targetId });
+                    if (targetId)
+                      navigation.navigate('Conversation', {
+                        conversationId: targetId,
+                      });
                     break;
                   case 'recap':
                     navigation.navigate('Recap', { mode: 'ready' });
@@ -510,7 +609,9 @@ export function ProductNavigator({
           {({ navigation }) => (
             <TastesAIScreen
               onBack={navigation.goBack}
-              onOpenPlace={(venueId) => navigation.navigate('Place', { venueId })}
+              onOpenPlace={(venueId) =>
+                navigation.navigate('Place', { venueId })
+              }
               userId={user.uid}
             />
           )}
@@ -522,16 +623,27 @@ export function ProductNavigator({
           {({ navigation }) => (
             <NewGroupScreen
               onBack={navigation.goBack}
-              onCreated={(groupId) => navigation.replace('GroupDetails', { groupId, admin: true })}
+              onCreated={(groupId) =>
+                navigation.replace('GroupDetails', { groupId, admin: true })
+              }
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="GroupDetails" initialParams={visualAuditRoute?.root === 'GroupDetails' ? { groupId: 'visual-audit-group', admin: true } : undefined}>
+        <RootStack.Screen
+          name="GroupDetails"
+          initialParams={
+            visualAuditRoute?.root === 'GroupDetails'
+              ? { groupId: 'visual-audit-group', admin: true }
+              : undefined
+          }
+        >
           {({ navigation, route }) => (
             <GroupDetailsScreen
               groupId={route.params.groupId}
               onBack={navigation.goBack}
-              onOpenConversation={(conversationId) => navigation.navigate('Conversation', { conversationId })}
+              onOpenConversation={(conversationId) =>
+                navigation.navigate('Conversation', { conversationId })
+              }
             />
           )}
         </RootStack.Screen>

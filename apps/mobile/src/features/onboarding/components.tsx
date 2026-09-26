@@ -18,15 +18,28 @@ import patternLight from '../../../assets/figma-backgrounds/home-feed-pattern.pn
 import { onboardingTheme as theme } from './theme';
 import { useAppTheme } from '../../ui/ThemeProvider';
 import { PatternBackgroundLift } from '../../ui/components';
-import { responsiveStyleSheet, responsiveValue, useResponsiveMetrics } from '../../ui/responsive';
+import {
+  responsiveStyleSheet,
+  responsiveValue,
+  useResponsiveMetrics,
+} from '../../ui/responsive';
 
-export function PatternScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
+export function PatternScreen({
+  children,
+  style,
+}: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { colors, isDark } = useAppTheme();
   // The dark asset is the exact Figma composite: #080808 plus white linework
   // at 4%. Keep it fully opaque; applying another opacity would double-fade
   // the pattern. The light asset uses transparent dark linework instead.
   return (
-    <View style={[styles.screen, { backgroundColor: isDark ? colors.background : colors.canvas }, style]}>
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: isDark ? colors.background : colors.canvas },
+        style,
+      ]}
+    >
       <ImageBackground
         imageStyle={{ opacity: isDark ? 1 : 0.06 }}
         resizeMode="cover"
@@ -35,7 +48,11 @@ export function PatternScreen({ children, style }: PropsWithChildren<{ style?: S
       >
         {isDark ? (
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            <Image resizeMode="cover" source={patternLight} style={styles.darkPatternBoost} />
+            <Image
+              resizeMode="cover"
+              source={patternLight}
+              style={styles.darkPatternBoost}
+            />
           </View>
         ) : null}
         <PatternBackgroundLift />
@@ -57,7 +74,10 @@ export function BackButton({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
     >
-      <Image source={backIcon} style={[styles.backIcon, { tintColor: colors.text }]} />
+      <Image
+        source={backIcon}
+        style={[styles.backIcon, { tintColor: colors.text }]}
+      />
     </Pressable>
   );
 }
@@ -85,7 +105,11 @@ export function PrimaryButton({
   const { scale } = useResponsiveMetrics();
   return (
     <View
-      style={[styles.primaryButtonGlow, (disabled || loading) && styles.disabled, style]}
+      style={[
+        styles.primaryButtonGlow,
+        (disabled || loading) && styles.disabled,
+        style,
+      ]}
       testID="onboarding-primary-button-glow"
     >
       <Pressable
@@ -97,7 +121,29 @@ export function PrimaryButton({
           pressed && styles.pressed,
         ]}
       >
-        {loading ? <ActivityIndicator color={colors.onPrimary} /> : <View style={[styles.primaryContent, { gap: responsiveValue(contentGap, scale) }]}>{icon ? <Image source={icon} style={{ width: responsiveValue(iconSize, scale), height: responsiveValue(iconSize, scale) }} /> : null}<Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>{label}</Text></View>}
+        {loading ? (
+          <ActivityIndicator color={colors.onPrimary} />
+        ) : (
+          <View
+            style={[
+              styles.primaryContent,
+              { gap: responsiveValue(contentGap, scale) },
+            ]}
+          >
+            {icon ? (
+              <Image
+                source={icon}
+                style={{
+                  width: responsiveValue(iconSize, scale),
+                  height: responsiveValue(iconSize, scale),
+                }}
+              />
+            ) : null}
+            <Text style={[styles.primaryLabel, { color: colors.onPrimary }]}>
+              {label}
+            </Text>
+          </View>
+        )}
       </Pressable>
     </View>
   );
@@ -146,7 +192,11 @@ const styles = responsiveStyleSheet({
     shadowRadius: 7,
   },
   primaryLabel: { fontSize: 14, fontWeight: '500', letterSpacing: 0.6 },
-  primaryContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  primaryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   disabled: { opacity: 0.35 },
   pressed: { opacity: 0.82 },
 });

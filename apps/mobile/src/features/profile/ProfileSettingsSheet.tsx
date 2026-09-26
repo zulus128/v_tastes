@@ -40,15 +40,24 @@ import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
-import { SideSlideScreen, type SideSlideScreenHandle, useSideSlideTransition } from '../../ui/SideSlideScreen';
+import {
+  SideSlideScreen,
+  type SideSlideScreenHandle,
+  useSideSlideTransition,
+} from '../../ui/SideSlideScreen';
 import { PatternBackgroundLift } from '../../ui/components';
-import { type ThemeColors, type ThemePreference, useAppTheme } from '../../ui/ThemeProvider';
+import {
+  type ThemeColors,
+  type ThemePreference,
+  useAppTheme,
+} from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
 
-type EditableField = 'displayName' | 'username' | 'bio' | 'favoriteDish' | 'city';
+type EditableField =
+  'displayName' | 'username' | 'bio' | 'favoriteDish' | 'city';
 
 const labels: Record<EditableField, string> = {
   displayName: 'Name',
@@ -58,8 +67,16 @@ const labels: Record<EditableField, string> = {
   city: 'City',
 };
 
-const appearanceOptions: readonly { label: string; description: string; value: ThemePreference }[] = [
-  { label: 'System', description: 'Match your iPhone appearance', value: 'system' },
+const appearanceOptions: readonly {
+  label: string;
+  description: string;
+  value: ThemePreference;
+}[] = [
+  {
+    label: 'System',
+    description: 'Match your iPhone appearance',
+    value: 'system',
+  },
   { label: 'Light', description: 'Always use the light theme', value: 'light' },
   { label: 'Dark', description: 'Always use the dark theme', value: 'dark' },
 ];
@@ -90,7 +107,10 @@ export function ProfileSettingsSheet({
     [colors, isDark, settingsScale],
   );
   const { profile } = useProfile(userId, fallbackName);
-  const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '—';
+  const appVersion =
+    Application.nativeApplicationVersion ??
+    Constants.expoConfig?.version ??
+    '—';
   const buildVersion = Application.nativeBuildVersion;
   const otaRevision = String(Constants.expoConfig?.extra?.otaRevision ?? '0');
   const updateId = Updates.updateId ? Updates.updateId.slice(0, 8) : null;
@@ -107,17 +127,21 @@ export function ProfileSettingsSheet({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationPreferences>(defaultNotificationPreferences);
-  const { close: closeAppearance, translateX: appearanceTranslateX } = useSideSlideTransition({
-    frameWidth: viewportWidth,
-    onRequestClose: () => setAppearanceOpen(false),
-    visible: appearanceOpen,
-  });
-  const { close: closeNotifications, translateX: notificationTranslateX } = useSideSlideTransition({
-    frameWidth: viewportWidth,
-    onRequestClose: () => setNotificationsOpen(false),
-    visible: notificationsOpen,
-  });
+  const [notifications, setNotifications] = useState<NotificationPreferences>(
+    defaultNotificationPreferences,
+  );
+  const { close: closeAppearance, translateX: appearanceTranslateX } =
+    useSideSlideTransition({
+      frameWidth: viewportWidth,
+      onRequestClose: () => setAppearanceOpen(false),
+      visible: appearanceOpen,
+    });
+  const { close: closeNotifications, translateX: notificationTranslateX } =
+    useSideSlideTransition({
+      frameWidth: viewportWidth,
+      onRequestClose: () => setNotificationsOpen(false),
+      visible: notificationsOpen,
+    });
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
   const citySlide = useRef<SideSlideScreenHandle>(null);
@@ -134,10 +158,17 @@ export function ProfileSettingsSheet({
       return;
     }
     let active = true;
-    void api.getPlace({ venueId: profile.favoriteVenueId })
-      .then((response) => { if (active) setFavoritePlace(response.data.venue.name); })
-      .catch(() => { if (active) setFavoritePlace('Select a place'); });
-    return () => { active = false; };
+    void api
+      .getPlace({ venueId: profile.favoriteVenueId })
+      .then((response) => {
+        if (active) setFavoritePlace(response.data.venue.name);
+      })
+      .catch(() => {
+        if (active) setFavoritePlace('Select a place');
+      });
+    return () => {
+      active = false;
+    };
   }, [api, profile?.favoriteVenueId, visible]);
 
   useEffect(() => {
@@ -148,9 +179,12 @@ export function ProfileSettingsSheet({
     }
     const timeout = setTimeout(() => {
       setSearching(true);
-      void api.searchVenues({ query, limit: 10 })
+      void api
+        .searchVenues({ query, limit: 10 })
         .then((response) => setPlaces(response.data.items))
-        .catch((error) => Alert.alert('Could not search places', apiErrorMessage(error)))
+        .catch((error) =>
+          Alert.alert('Could not search places', apiErrorMessage(error)),
+        )
         .finally(() => setSearching(false));
     }, 300);
     return () => clearTimeout(timeout);
@@ -158,11 +192,16 @@ export function ProfileSettingsSheet({
 
   function beginEdit(field: EditableField) {
     if (!profile) return;
-    const value = field === 'displayName' ? profile.displayName
-      : field === 'username' ? profile.username ?? ''
-        : field === 'bio' ? profile.bio ?? ''
-        : field === 'favoriteDish' ? profile.favoriteDish ?? ''
-          : profile.city ?? '';
+    const value =
+      field === 'displayName'
+        ? profile.displayName
+        : field === 'username'
+          ? (profile.username ?? '')
+          : field === 'bio'
+            ? (profile.bio ?? '')
+            : field === 'favoriteDish'
+              ? (profile.favoriteDish ?? '')
+              : (profile.city ?? '');
     setDraft(value);
     setEditing(field);
   }
@@ -188,12 +227,25 @@ export function ProfileSettingsSheet({
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', `Allow ${camera ? 'camera' : 'photo library'} access to update your profile photo.`);
+      Alert.alert(
+        'Permission needed',
+        `Allow ${camera ? 'camera' : 'photo library'} access to update your profile photo.`,
+      );
       return;
     }
     const result = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
@@ -201,20 +253,31 @@ export function ProfileSettingsSheet({
     const photoPath = `profile-images/${userId}/avatar-${Date.now()}.jpg`;
     setUploadingPhoto(true);
     try {
-      const optimized = await manipulateAsync(asset.uri, [
-        { crop: {
-          originX: Math.max(0, (asset.width - cropSize) / 2),
-          originY: Math.max(0, (asset.height - cropSize) / 2),
-          width: cropSize,
-          height: cropSize,
-        } },
-        { resize: { width: 512, height: 512 } },
-      ], { compress: 0.78, format: SaveFormat.JPEG });
+      const optimized = await manipulateAsync(
+        asset.uri,
+        [
+          {
+            crop: {
+              originX: Math.max(0, (asset.width - cropSize) / 2),
+              originY: Math.max(0, (asset.height - cropSize) / 2),
+              width: cropSize,
+              height: cropSize,
+            },
+          },
+          { resize: { width: 512, height: 512 } },
+        ],
+        { compress: 0.78, format: SaveFormat.JPEG },
+      );
       const response = await fetch(optimized.uri);
-      await uploadBytes(storageRef(storage, photoPath), await response.blob(), { contentType: 'image/jpeg' });
+      await uploadBytes(storageRef(storage, photoPath), await response.blob(), {
+        contentType: 'image/jpeg',
+      });
       await api.updateProfilePhoto({ photoPath });
       if (profile.photoPath && profile.photoPath !== photoPath) {
-        void deleteObject(storageRef(storage, profile.photoPath)).catch((error) => captureException(error, { operation: 'delete-old-profile-photo' }));
+        void deleteObject(storageRef(storage, profile.photoPath)).catch(
+          (error) =>
+            captureException(error, { operation: 'delete-old-profile-photo' }),
+        );
       }
     } catch (error) {
       Alert.alert('Could not update photo', apiErrorMessage(error));
@@ -226,43 +289,62 @@ export function ProfileSettingsSheet({
   function editPhoto() {
     Alert.alert('Edit photo', undefined, [
       { text: 'Take Photo', onPress: () => void chooseProfilePhoto(true) },
-      { text: 'Choose from Library', onPress: () => void chooseProfilePhoto(false) },
+      {
+        text: 'Choose from Library',
+        onPress: () => void chooseProfilePhoto(false),
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
   async function saveField() {
     if (!editing) return;
-    const value = editing === 'username' ? draft.trim().replace(/^@/, '') : draft.trim();
+    const value =
+      editing === 'username' ? draft.trim().replace(/^@/, '') : draft.trim();
     if (!value && editing !== 'bio') {
-      Alert.alert(`${labels[editing]} is required`, 'Enter a value before saving.');
+      Alert.alert(
+        `${labels[editing]} is required`,
+        'Enter a value before saving.',
+      );
       return;
     }
     await save({ [editing]: value });
   }
 
   function confirmLogout() {
-    Alert.alert('Sign out?', 'You will need to sign in with your phone number again.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void onLogout() },
-    ]);
+    Alert.alert(
+      'Sign out?',
+      'You will need to sign in with your phone number again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: () => void onLogout(),
+        },
+      ],
+    );
   }
 
   function confirmDeleteAccount() {
-    Alert.alert('Delete account?', 'This will permanently delete your account and all your data. This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          if (onDeleteAccount) {
-            void onDeleteAccount();
-          } else {
-            void onLogout();
-          }
+    Alert.alert(
+      'Delete account?',
+      'This will permanently delete your account and all your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            if (onDeleteAccount) {
+              void onDeleteAccount();
+            } else {
+              void onLogout();
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   function openAppearance() {
@@ -272,315 +354,981 @@ export function ProfileSettingsSheet({
   function openNotifications() {
     setNotificationsOpen(true);
     setNotificationsLoading(true);
-    void api.getProfileExtras({ targetUserId: userId })
+    void api
+      .getProfileExtras({ targetUserId: userId })
       .then((result) => {
         const preferences = result.data.notificationPreferences;
         setNotifications({
           ...defaultNotificationPreferences,
           ...preferences,
-          categories: { ...defaultNotificationPreferences.categories, ...preferences.categories },
+          categories: {
+            ...defaultNotificationPreferences.categories,
+            ...preferences.categories,
+          },
         });
       })
-      .catch(() => Alert.alert('Could not load notification settings', 'Please try again.'))
+      .catch(() =>
+        Alert.alert(
+          'Could not load notification settings',
+          'Please try again.',
+        ),
+      )
       .finally(() => setNotificationsLoading(false));
   }
 
   function saveNotifications(next: NotificationPreferences) {
     const previous = notifications;
     setNotifications(next);
-    void api.updateNotificationPreferences(next)
-      .catch(() => {
-        setNotifications(previous);
-        Alert.alert('Could not save notification settings', 'Please try again.');
-      });
+    void api.updateNotificationPreferences(next).catch(() => {
+      setNotifications(previous);
+      Alert.alert('Could not save notification settings', 'Please try again.');
+    });
   }
 
   function saveCategory(category: NotificationSettingCategory, value: boolean) {
-    saveNotifications({ ...notifications, categories: { ...notifications.categories, [category]: value } });
+    saveNotifications({
+      ...notifications,
+      categories: { ...notifications.categories, [category]: value },
+    });
   }
 
-  const rows: Array<{ field?: EditableField; label: string; value?: string; valueFlag?: ReturnType<typeof cityFlag>; onPress?: () => void }> = profile ? [
-    { field: 'displayName', label: 'Name', value: profile.displayName },
-    { field: 'username', label: 'Username', value: profile.username ? `@${profile.username}` : 'Add username' },
-    { field: 'bio', label: 'Bio', value: profile.bio?.replace(/\s+/g, ' ').trim() || 'Add bio' },
-    { field: 'favoriteDish', label: 'Favourite Dish', value: profile.favoriteDish ?? 'Select a dish' },
-    { label: 'Favourite place', value: favoritePlace, onPress: () => setPlaceOpen(true) },
-    { label: 'City', value: profile.city ?? 'Select a city', valueFlag: cityFlag(profile.city ?? ''), onPress: () => setCityOpen(true) },
-    { label: 'Appearance', value: appearanceOptions.find((option) => option.value === preference)?.label ?? 'System', onPress: openAppearance },
-    { label: 'Notifications', onPress: openNotifications },
-  ] : [];
+  const rows: Array<{
+    field?: EditableField;
+    label: string;
+    value?: string;
+    valueFlag?: ReturnType<typeof cityFlag>;
+    onPress?: () => void;
+  }> = profile
+    ? [
+        { field: 'displayName', label: 'Name', value: profile.displayName },
+        {
+          field: 'username',
+          label: 'Username',
+          value: profile.username ? `@${profile.username}` : 'Add username',
+        },
+        {
+          field: 'bio',
+          label: 'Bio',
+          value: profile.bio?.replace(/\s+/g, ' ').trim() || 'Add bio',
+        },
+        {
+          field: 'favoriteDish',
+          label: 'Favourite Dish',
+          value: profile.favoriteDish ?? 'Select a dish',
+        },
+        {
+          label: 'Favourite place',
+          value: favoritePlace,
+          onPress: () => setPlaceOpen(true),
+        },
+        {
+          label: 'City',
+          value: profile.city ?? 'Select a city',
+          valueFlag: cityFlag(profile.city ?? ''),
+          onPress: () => setCityOpen(true),
+        },
+        {
+          label: 'Appearance',
+          value:
+            appearanceOptions.find((option) => option.value === preference)
+              ?.label ?? 'System',
+          onPress: openAppearance,
+        },
+        { label: 'Notifications', onPress: openNotifications },
+      ]
+    : [];
 
   return (
     <>
-    <SideSlideScreen onRequestClose={appearanceOpen ? closeAppearance : notificationsOpen ? closeNotifications : onClose} ref={settingsSlide} visible={visible}>
-      <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.screen}>
-        {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
-        <PatternBackgroundLift />
-        <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-          <Pressable accessibilityLabel="Back" hitSlop={8} onPress={() => settingsSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
-          <Text style={styles.title}>Settings</Text>
-          <View style={styles.headerButton} />
-        </View>
-        {!profile ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
+      <SideSlideScreen
+        onRequestClose={
+          appearanceOpen
+            ? closeAppearance
+            : notificationsOpen
+              ? closeNotifications
+              : onClose
+        }
+        ref={settingsSlide}
+        visible={visible}
+      >
+        <ImageBackground
+          imageStyle={styles.patternImage}
+          resizeMode="stretch"
+          source={isDark ? pattern : homeFeedPattern}
+          style={styles.screen}
+        >
+          {isDark ? (
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <Image
+                resizeMode="cover"
+                source={homeFeedPattern}
+                style={styles.darkPatternBoost}
+              />
+            </View>
+          ) : null}
+          <PatternBackgroundLift />
+          <View
+            style={[
+              styles.header,
+              {
+                height: responsiveSize(48) + insets.top,
+                paddingTop: insets.top,
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Back"
+              hitSlop={8}
+              onPress={() => settingsSlide.current?.close()}
+              style={styles.headerButton}
+            >
+              <Image source={backIcon} style={styles.backIcon} />
+            </Pressable>
+            <Text style={styles.title}>Settings</Text>
+            <View style={styles.headerButton} />
+          </View>
+          {!profile ? (
+            <ActivityIndicator color={colors.primary} style={styles.loader} />
+          ) : (
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               style={styles.contentScroll}
-              contentContainerStyle={[styles.content, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]}
+              contentContainerStyle={[
+                styles.content,
+                { paddingBottom: Math.max(responsiveSize(24), insets.bottom) },
+              ]}
               testID="profile-settings-scroll"
             >
-            <Pressable accessibilityLabel="Edit profile photo" disabled={uploadingPhoto} onPress={editPhoto}>
-              <ProfileAvatar profile={profile} style={[styles.avatar, uploadingPhoto && styles.photoUploading]} />
-              {uploadingPhoto ? <ActivityIndicator color="#FFFFFF" style={styles.photoLoader} /> : null}
-            </Pressable>
-            <Pressable disabled={uploadingPhoto} onPress={editPhoto}><Text style={styles.editPhoto}>Edit photo</Text></Pressable>
-            <View style={styles.rows}>
-              {rows.map((row) => (
+              <Pressable
+                accessibilityLabel="Edit profile photo"
+                disabled={uploadingPhoto}
+                onPress={editPhoto}
+              >
+                <ProfileAvatar
+                  profile={profile}
+                  style={[
+                    styles.avatar,
+                    uploadingPhoto && styles.photoUploading,
+                  ]}
+                />
+                {uploadingPhoto ? (
+                  <ActivityIndicator
+                    color="#FFFFFF"
+                    style={styles.photoLoader}
+                  />
+                ) : null}
+              </Pressable>
+              <Pressable disabled={uploadingPhoto} onPress={editPhoto}>
+                <Text style={styles.editPhoto}>Edit photo</Text>
+              </Pressable>
+              <View style={styles.rows}>
+                {rows.map((row) => (
+                  <Pressable
+                    accessibilityLabel={`Edit ${row.label}`}
+                    accessibilityRole="button"
+                    key={row.label}
+                    onPress={() => {
+                      if (row.onPress) row.onPress();
+                      else if (row.field) beginEdit(row.field);
+                    }}
+                    style={({ pressed }) => [
+                      styles.row,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View pointerEvents="none" style={styles.rowContent}>
+                      <Text style={styles.rowLabel}>{row.label}</Text>
+                      {row.value ? (
+                        <Text numberOfLines={1} style={styles.rowValue}>
+                          {row.value}
+                        </Text>
+                      ) : null}
+                      {row.valueFlag ? (
+                        <Image source={row.valueFlag} style={styles.cityFlag} />
+                      ) : null}
+                      <Text style={styles.chevron}>›</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+              <View
+                style={styles.accountActions}
+                testID="profile-settings-account-actions"
+              >
                 <Pressable
-                  accessibilityLabel={`Edit ${row.label}`}
+                  accessibilityLabel="Log out"
                   accessibilityRole="button"
-                  key={row.label}
-                  onPress={() => {
-                    if (row.onPress) row.onPress();
-                    else if (row.field) beginEdit(row.field);
-                  }}
-                  style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                  hitSlop={8}
+                  onPress={confirmLogout}
                 >
-                  <View pointerEvents="none" style={styles.rowContent}>
-                    <Text style={styles.rowLabel}>{row.label}</Text>
-                    {row.value ? <Text numberOfLines={1} style={styles.rowValue}>{row.value}</Text> : null}
-                    {row.valueFlag ? <Image source={row.valueFlag} style={styles.cityFlag} /> : null}
-                    <Text style={styles.chevron}>›</Text>
-                  </View>
+                  <Text style={styles.logout}>Log out</Text>
                 </Pressable>
-              ))}
-            </View>
-            <View style={styles.accountActions} testID="profile-settings-account-actions">
-              <Pressable accessibilityLabel="Log out" accessibilityRole="button" hitSlop={8} onPress={confirmLogout}>
-                <Text style={styles.logout}>Log out</Text>
-              </Pressable>
-              <Pressable accessibilityLabel="Delete account" accessibilityRole="button" hitSlop={8} onPress={confirmDeleteAccount}>
-                <Text style={styles.deleteAccount}>Delete account</Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  accessibilityLabel="Delete account"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={confirmDeleteAccount}
+                >
+                  <Text style={styles.deleteAccount}>Delete account</Text>
+                </Pressable>
+              </View>
             </ScrollView>
-        )}
-        <LinearGradient colors={[isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)', colors.canvas]} pointerEvents="box-none" style={[styles.actions, { paddingBottom: Math.max(responsiveSize(24), insets.bottom) }]} testID="profile-settings-footer">
-          <Text accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''} OTA ${otaRevision}`} style={styles.version}>
-            Version {appVersion}{buildVersion ? ` (${buildVersion}` : ''}{buildVersion ? ` · OTA ${otaRevision})` : ` (OTA ${otaRevision})`}{updateId ? ` · ${updateId}` : ''}
-          </Text>
+          )}
           <LinearGradient
-            colors={isDark ? [colors.primaryBorder, colors.primaryBorder] : ['#FFFFFF', '#FED1D0']}
-            end={{ x: 0.5, y: 1 }}
-            start={{ x: 0.5, y: 0 }}
-            style={styles.inviteRing}
+            colors={[
+              isDark ? 'rgba(22,22,22,0)' : 'rgba(242,239,234,0)',
+              colors.canvas,
+            ]}
+            pointerEvents="box-none"
+            style={[
+              styles.actions,
+              { paddingBottom: Math.max(responsiveSize(24), insets.bottom) },
+            ]}
+            testID="profile-settings-footer"
           >
-            <Pressable onPress={() => void Share.share({ message: 'Join me on Tastes: https://tastesapp.com' })} style={({ pressed }) => [styles.invite, pressed && styles.pressed]}>
-              <InviteUsersIcon height={responsiveSize(24)} width={responsiveSize(24)} />
-              <Text style={styles.inviteText}>Invite a Friend</Text>
-            </Pressable>
+            <Text
+              accessibilityLabel={`App version ${appVersion}${buildVersion ? ` build ${buildVersion}` : ''} OTA ${otaRevision}`}
+              style={styles.version}
+            >
+              Version {appVersion}
+              {buildVersion ? ` (${buildVersion}` : ''}
+              {buildVersion
+                ? ` · OTA ${otaRevision})`
+                : ` (OTA ${otaRevision})`}
+              {updateId ? ` · ${updateId}` : ''}
+            </Text>
+            <LinearGradient
+              colors={
+                isDark
+                  ? [colors.primaryBorder, colors.primaryBorder]
+                  : ['#FFFFFF', '#FED1D0']
+              }
+              end={{ x: 0.5, y: 1 }}
+              start={{ x: 0.5, y: 0 }}
+              style={styles.inviteRing}
+            >
+              <Pressable
+                onPress={() =>
+                  void Share.share({
+                    message: 'Join me on Tastes: https://tastesapp.com',
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.invite,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <InviteUsersIcon
+                  height={responsiveSize(24)}
+                  width={responsiveSize(24)}
+                />
+                <Text style={styles.inviteText}>Invite a Friend</Text>
+              </Pressable>
+            </LinearGradient>
           </LinearGradient>
-        </LinearGradient>
-        <Animated.View
-          testID="notification-settings-pane"
-          pointerEvents={notificationsOpen ? 'auto' : 'none'}
-          style={[styles.notificationsScreen, { transform: [{ translateX: notificationTranslateX }] }]}
-        >
-          <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.notificationBackground}>
-            {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
-            <PatternBackgroundLift />
-            <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeNotifications()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
-              <Text style={styles.title}>Notifications</Text>
-              <View style={styles.headerButton} />
-            </View>
-            {notificationsLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : (
-              <ScrollView contentContainerStyle={[styles.notificationSettings, { paddingBottom: responsiveSize(30) + insets.bottom }]}>
-                <NotificationSetting label="Enable notifications" onChange={(enabled) => saveNotifications({ ...notifications, enabled })} styles={styles} value={notifications.enabled} />
-                <NotificationSetting disabled={!notifications.enabled} label="Push notifications" onChange={(push) => saveNotifications({ ...notifications, push })} styles={styles} value={notifications.push} />
-                <NotificationSetting disabled={!notifications.enabled} label="Email notifications" onChange={(email) => saveNotifications({ ...notifications, email })} styles={styles} value={notifications.email} />
-                <NotificationSetting disabled={!notifications.enabled} label="SMS notifications" onChange={(sms) => saveNotifications({ ...notifications, sms })} styles={styles} value={notifications.sms} />
-                <Text style={styles.notificationSectionTitle}>What you hear about</Text>
-                {notificationSettingCategories.map((category) => (
+          <Animated.View
+            testID="notification-settings-pane"
+            pointerEvents={notificationsOpen ? 'auto' : 'none'}
+            style={[
+              styles.notificationsScreen,
+              { transform: [{ translateX: notificationTranslateX }] },
+            ]}
+          >
+            <ImageBackground
+              imageStyle={styles.patternImage}
+              resizeMode="stretch"
+              source={isDark ? pattern : homeFeedPattern}
+              style={styles.notificationBackground}
+            >
+              {isDark ? (
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <Image
+                    resizeMode="cover"
+                    source={homeFeedPattern}
+                    style={styles.darkPatternBoost}
+                  />
+                </View>
+              ) : null}
+              <PatternBackgroundLift />
+              <View
+                style={[
+                  styles.header,
+                  {
+                    height: responsiveSize(48) + insets.top,
+                    paddingTop: insets.top,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Back to settings"
+                  hitSlop={8}
+                  onPress={() => closeNotifications()}
+                  style={styles.headerButton}
+                >
+                  <Image source={backIcon} style={styles.backIcon} />
+                </Pressable>
+                <Text style={styles.title}>Notifications</Text>
+                <View style={styles.headerButton} />
+              </View>
+              {notificationsLoading ? (
+                <ActivityIndicator
+                  color={colors.primary}
+                  style={styles.loader}
+                />
+              ) : (
+                <ScrollView
+                  contentContainerStyle={[
+                    styles.notificationSettings,
+                    { paddingBottom: responsiveSize(30) + insets.bottom },
+                  ]}
+                >
+                  <NotificationSetting
+                    label="Enable notifications"
+                    onChange={(enabled) =>
+                      saveNotifications({ ...notifications, enabled })
+                    }
+                    styles={styles}
+                    value={notifications.enabled}
+                  />
                   <NotificationSetting
                     disabled={!notifications.enabled}
-                    key={category}
-                    label={notificationCategoryLabels[category]}
-                    onChange={(value) => saveCategory(category, value)}
+                    label="Push notifications"
+                    onChange={(push) =>
+                      saveNotifications({ ...notifications, push })
+                    }
                     styles={styles}
-                    value={notifications.categories[category] !== false}
+                    value={notifications.push}
                   />
-                ))}
-                <Text style={styles.notificationFootnote}>
-                  Security, account and moderation messages are always delivered.
-                </Text>
-              </ScrollView>
-            )}
-          </ImageBackground>
-        </Animated.View>
-        <Animated.View
-          testID="appearance-settings-pane"
-          pointerEvents={appearanceOpen ? 'auto' : 'none'}
-          style={[styles.notificationsScreen, { transform: [{ translateX: appearanceTranslateX }] }]}
-        >
-          <ImageBackground imageStyle={styles.patternImage} resizeMode="stretch" source={isDark ? pattern : homeFeedPattern} style={styles.notificationBackground}>
-            {isDark ? <View pointerEvents="none" style={StyleSheet.absoluteFill}><Image resizeMode="cover" source={homeFeedPattern} style={styles.darkPatternBoost} /></View> : null}
-            <PatternBackgroundLift />
-            <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}>
-              <Pressable accessibilityLabel="Back to settings" hitSlop={8} onPress={() => closeAppearance()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
-              <Text style={styles.title}>Appearance</Text>
-              <View style={styles.headerButton} />
-            </View>
-            <View style={styles.appearanceContent}>
-              <Text style={styles.appearanceIntro}>Choose how Tastes looks on this device.</Text>
-              <View style={styles.rows}>
-                {appearanceOptions.map((option) => {
-                  const selected = preference === option.value;
-                  return (
-                    <Pressable
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selected }}
-                      key={option.value}
-                      onPress={() => {
-                        void setPreference(option.value);
-                        closeAppearance();
-                      }}
-                      style={({ pressed }) => [styles.appearanceRow, selected && styles.appearanceRowSelected, pressed && styles.pressed]}
-                    >
-                      <View style={styles.appearanceCopy}>
-                        <Text style={styles.appearanceLabel}>{option.label}</Text>
-                        <Text style={styles.appearanceDescription}>{option.description}</Text>
-                      </View>
-                      <View style={[styles.selectionCircle, selected && styles.selectionCircleSelected]}>
-                        {selected ? <View style={styles.selectionDot} /> : null}
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                  <NotificationSetting
+                    disabled={!notifications.enabled}
+                    label="Email notifications"
+                    onChange={(email) =>
+                      saveNotifications({ ...notifications, email })
+                    }
+                    styles={styles}
+                    value={notifications.email}
+                  />
+                  <NotificationSetting
+                    disabled={!notifications.enabled}
+                    label="SMS notifications"
+                    onChange={(sms) =>
+                      saveNotifications({ ...notifications, sms })
+                    }
+                    styles={styles}
+                    value={notifications.sms}
+                  />
+                  <Text style={styles.notificationSectionTitle}>
+                    What you hear about
+                  </Text>
+                  {notificationSettingCategories.map((category) => (
+                    <NotificationSetting
+                      disabled={!notifications.enabled}
+                      key={category}
+                      label={notificationCategoryLabels[category]}
+                      onChange={(value) => saveCategory(category, value)}
+                      styles={styles}
+                      value={notifications.categories[category] !== false}
+                    />
+                  ))}
+                  <Text style={styles.notificationFootnote}>
+                    Security, account and moderation messages are always
+                    delivered.
+                  </Text>
+                </ScrollView>
+              )}
+            </ImageBackground>
+          </Animated.View>
+          <Animated.View
+            testID="appearance-settings-pane"
+            pointerEvents={appearanceOpen ? 'auto' : 'none'}
+            style={[
+              styles.notificationsScreen,
+              { transform: [{ translateX: appearanceTranslateX }] },
+            ]}
+          >
+            <ImageBackground
+              imageStyle={styles.patternImage}
+              resizeMode="stretch"
+              source={isDark ? pattern : homeFeedPattern}
+              style={styles.notificationBackground}
+            >
+              {isDark ? (
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <Image
+                    resizeMode="cover"
+                    source={homeFeedPattern}
+                    style={styles.darkPatternBoost}
+                  />
+                </View>
+              ) : null}
+              <PatternBackgroundLift />
+              <View
+                style={[
+                  styles.header,
+                  {
+                    height: responsiveSize(48) + insets.top,
+                    paddingTop: insets.top,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Back to settings"
+                  hitSlop={8}
+                  onPress={() => closeAppearance()}
+                  style={styles.headerButton}
+                >
+                  <Image source={backIcon} style={styles.backIcon} />
+                </Pressable>
+                <Text style={styles.title}>Appearance</Text>
+                <View style={styles.headerButton} />
               </View>
-            </View>
-          </ImageBackground>
-        </Animated.View>
-        {editing !== null ? (
-          <View style={styles.editorOverlay}>
-            <Pressable onPress={() => setEditing(null)} style={styles.modalBackdrop}>
-              <Pressable onPress={(event) => event.stopPropagation()} style={styles.editor}>
-                <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
-                <TextInput
-                  autoCapitalize={editing === 'username' ? 'none' : 'sentences'}
-                  autoFocus
-                  maxLength={editing === 'bio' ? 80 : undefined}
-                  multiline={editing === 'bio'}
-                  onChangeText={setDraft}
-                  placeholderTextColor={colors.textMuted}
-                  style={[styles.input, editing === 'bio' && styles.bioInput]}
-                  textAlignVertical={editing === 'bio' ? 'top' : 'center'}
-                  value={draft}
-                />
-                {editing === 'bio' ? <Text style={styles.characterCount}>{draft.length}/80</Text> : null}
-                <Pressable disabled={saving} onPress={() => void saveField()} style={styles.saveButton}>
-                  {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Save</Text>}
+              <View style={styles.appearanceContent}>
+                <Text style={styles.appearanceIntro}>
+                  Choose how Tastes looks on this device.
+                </Text>
+                <View style={styles.rows}>
+                  {appearanceOptions.map((option) => {
+                    const selected = preference === option.value;
+                    return (
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected }}
+                        key={option.value}
+                        onPress={() => {
+                          void setPreference(option.value);
+                          closeAppearance();
+                        }}
+                        style={({ pressed }) => [
+                          styles.appearanceRow,
+                          selected && styles.appearanceRowSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.appearanceCopy}>
+                          <Text style={styles.appearanceLabel}>
+                            {option.label}
+                          </Text>
+                          <Text style={styles.appearanceDescription}>
+                            {option.description}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.selectionCircle,
+                            selected && styles.selectionCircleSelected,
+                          ]}
+                        >
+                          {selected ? (
+                            <View style={styles.selectionDot} />
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </ImageBackground>
+          </Animated.View>
+          {editing !== null ? (
+            <View style={styles.editorOverlay}>
+              <Pressable
+                onPress={() => setEditing(null)}
+                style={styles.modalBackdrop}
+              >
+                <Pressable
+                  onPress={(event) => event.stopPropagation()}
+                  style={styles.editor}
+                >
+                  <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
+                  <TextInput
+                    autoCapitalize={
+                      editing === 'username' ? 'none' : 'sentences'
+                    }
+                    autoFocus
+                    maxLength={editing === 'bio' ? 80 : undefined}
+                    multiline={editing === 'bio'}
+                    onChangeText={setDraft}
+                    placeholderTextColor={colors.textMuted}
+                    style={[styles.input, editing === 'bio' && styles.bioInput]}
+                    textAlignVertical={editing === 'bio' ? 'top' : 'center'}
+                    value={draft}
+                  />
+                  {editing === 'bio' ? (
+                    <Text style={styles.characterCount}>{draft.length}/80</Text>
+                  ) : null}
+                  <Pressable
+                    disabled={saving}
+                    onPress={() => void saveField()}
+                    style={styles.saveButton}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.saveText}>Save</Text>
+                    )}
+                  </Pressable>
                 </Pressable>
               </Pressable>
-            </Pressable>
-          </View>
-        ) : null}
-      </ImageBackground>
-    </SideSlideScreen>
+            </View>
+          ) : null}
+        </ImageBackground>
+      </SideSlideScreen>
 
-      <SideSlideScreen onRequestClose={() => setPlaceOpen(false)} ref={placeSlide} visible={placeOpen}>
+      <SideSlideScreen
+        onRequestClose={() => setPlaceOpen(false)}
+        ref={placeSlide}
+        visible={placeOpen}
+      >
         <View style={styles.screen}>
-          <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}><Pressable onPress={() => placeSlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>Favourite place</Text><View style={styles.headerButton} /></View>
+          <View
+            style={[
+              styles.header,
+              {
+                height: responsiveSize(48) + insets.top,
+                paddingTop: insets.top,
+              },
+            ]}
+          >
+            <Pressable
+              onPress={() => placeSlide.current?.close()}
+              style={styles.headerButton}
+            >
+              <Image source={backIcon} style={styles.backIcon} />
+            </Pressable>
+            <Text style={styles.title}>Favourite place</Text>
+            <View style={styles.headerButton} />
+          </View>
           <View style={styles.placeContent}>
-            <TextInput autoFocus onChangeText={setPlaceQuery} placeholder="Search places" placeholderTextColor={colors.textMuted} style={styles.searchInput} value={placeQuery} />
-            {searching ? <ActivityIndicator color={colors.primary} style={styles.searchLoader} /> : places.map((place) => (
-              <Pressable key={place.id} onPress={() => { setFavoritePlace(place.name); void save({ favoriteVenueId: place.id }); }} style={styles.placeRow}>
-                <View style={styles.placeCopy}><Text style={styles.placeName}>{place.name}</Text><Text style={styles.placeMeta}>{place.city}{place.address ? ` · ${place.address}` : ''}</Text></View><Text style={styles.chevron}>›</Text>
-              </Pressable>
-            ))}
+            <TextInput
+              autoFocus
+              onChangeText={setPlaceQuery}
+              placeholder="Search places"
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              value={placeQuery}
+            />
+            {searching ? (
+              <ActivityIndicator
+                color={colors.primary}
+                style={styles.searchLoader}
+              />
+            ) : (
+              places.map((place) => (
+                <Pressable
+                  key={place.id}
+                  onPress={() => {
+                    setFavoritePlace(place.name);
+                    void save({ favoriteVenueId: place.id });
+                  }}
+                  style={styles.placeRow}
+                >
+                  <View style={styles.placeCopy}>
+                    <Text style={styles.placeName}>{place.name}</Text>
+                    <Text style={styles.placeMeta}>
+                      {place.city}
+                      {place.address ? ` · ${place.address}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              ))
+            )}
           </View>
         </View>
       </SideSlideScreen>
 
-      <SideSlideScreen onRequestClose={() => setCityOpen(false)} ref={citySlide} visible={cityOpen}>
+      <SideSlideScreen
+        onRequestClose={() => setCityOpen(false)}
+        ref={citySlide}
+        visible={cityOpen}
+      >
         <View style={styles.screen}>
-          <View style={[styles.header, { height: responsiveSize(48) + insets.top, paddingTop: insets.top }]}><Pressable onPress={() => citySlide.current?.close()} style={styles.headerButton}><Image source={backIcon} style={styles.backIcon} /></Pressable><Text style={styles.title}>City</Text><View style={styles.headerButton} /></View>
-          <CityPicker onSelect={(name) => void save({ city: name })} topPadding={24} />
+          <View
+            style={[
+              styles.header,
+              {
+                height: responsiveSize(48) + insets.top,
+                paddingTop: insets.top,
+              },
+            ]}
+          >
+            <Pressable
+              onPress={() => citySlide.current?.close()}
+              style={styles.headerButton}
+            >
+              <Image source={backIcon} style={styles.backIcon} />
+            </Pressable>
+            <Text style={styles.title}>City</Text>
+            <View style={styles.headerButton} />
+          </View>
+          <CityPicker
+            onSelect={(name) => void save({ city: name })}
+            topPadding={24}
+          />
         </View>
       </SideSlideScreen>
     </>
   );
 }
 
-function NotificationSetting({ disabled = false, label, onChange, styles, value }: { disabled?: boolean; label: string; onChange: (value: boolean) => void; styles: ReturnType<typeof createStyles>; value: boolean }) {
-  return <View style={[styles.notificationRow, disabled && styles.notificationDisabled]}><Text style={styles.notificationLabel}>{label}</Text><Switch disabled={disabled} onValueChange={onChange} style={styles.notificationSwitch} thumbColor="#FFFFFF" trackColor={{ false: '#5A5B60', true: '#C8322D' }} value={value} /></View>;
+function NotificationSetting({
+  disabled = false,
+  label,
+  onChange,
+  styles,
+  value,
+}: {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+  styles: ReturnType<typeof createStyles>;
+  value: boolean;
+}) {
+  return (
+    <View
+      style={[styles.notificationRow, disabled && styles.notificationDisabled]}
+    >
+      <Text style={styles.notificationLabel}>{label}</Text>
+      <Switch
+        disabled={disabled}
+        onValueChange={onChange}
+        style={styles.notificationSwitch}
+        thumbColor="#FFFFFF"
+        trackColor={{ false: '#5A5B60', true: '#C8322D' }}
+        value={value}
+      />
+    </View>
+  );
 }
 
-function createStyles(colors: ThemeColors, isDark: boolean, settingsScale: number) {
+function createStyles(
+  colors: ThemeColors,
+  isDark: boolean,
+  settingsScale: number,
+) {
   const s = (value: number) => Math.round(value * settingsScale);
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     contentScroll: { flex: 1 },
     patternImage: { opacity: isDark ? 1 : 0.08 },
-    darkPatternBoost: { width: '100%', height: '100%', opacity: 0.025, tintColor: '#FFFFFF' },
-    header: { zIndex: 2, height: 48, paddingTop: 0, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background },
-    headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    darkPatternBoost: {
+      width: '100%',
+      height: '100%',
+      opacity: 0.025,
+      tintColor: '#FFFFFF',
+    },
+    header: {
+      zIndex: 2,
+      height: 48,
+      paddingTop: 0,
+      paddingHorizontal: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      backgroundColor: colors.background,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     backIcon: { width: 24, height: 24, tintColor: colors.text },
-    title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.43, textAlign: 'center' },
+    title: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 17,
+      lineHeight: 22,
+      fontWeight: '600',
+      letterSpacing: -0.43,
+      textAlign: 'center',
+    },
     loader: { flex: 1 },
-    content: { paddingHorizontal: 16, paddingTop: s(24), paddingBottom: s(24) + s(70), alignItems: 'center' },
-    avatar: { width: s(120), height: s(120), borderRadius: s(60), backgroundColor: colors.canvas },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: s(24),
+      paddingBottom: s(24) + s(70),
+      alignItems: 'center',
+    },
+    avatar: {
+      width: s(120),
+      height: s(120),
+      borderRadius: s(60),
+      backgroundColor: colors.canvas,
+    },
     photoUploading: { opacity: 0.55 },
     photoLoader: { position: 'absolute', inset: 0 },
-    editPhoto: { marginTop: s(10), marginBottom: s(10), color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textDecorationLine: 'underline' },
+    editPhoto: {
+      marginTop: s(10),
+      marginBottom: s(10),
+      color: colors.text,
+      fontSize: s(16),
+      lineHeight: s(22),
+      fontWeight: '400',
+      letterSpacing: -0.41,
+      textDecorationLine: 'underline',
+    },
     rows: { width: '100%', gap: s(6) },
-    accountActions: { width: '100%', marginTop: s(32), gap: s(16), alignItems: 'center' },
-    logout: { color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center', textDecorationLine: 'underline' },
-    deleteAccount: { color: colors.danger, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41, textAlign: 'center' },
-    version: { marginBottom: s(8), color: colors.textMuted, fontSize: s(12), lineHeight: s(16), textAlign: 'center' },
-    row: { width: '100%', height: s(50), borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
-    rowContent: { flex: 1, paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center' },
-    rowLabel: { flex: 1, color: colors.text, fontSize: s(16), lineHeight: s(22), fontWeight: '400', letterSpacing: -0.41 },
-    rowValue: { maxWidth: '55%', marginLeft: s(8), color: colors.textMuted, fontSize: s(15), fontWeight: '500', textAlign: 'right' },
+    accountActions: {
+      width: '100%',
+      marginTop: s(32),
+      gap: s(16),
+      alignItems: 'center',
+    },
+    logout: {
+      color: colors.text,
+      fontSize: s(16),
+      lineHeight: s(22),
+      fontWeight: '400',
+      letterSpacing: -0.41,
+      textAlign: 'center',
+      textDecorationLine: 'underline',
+    },
+    deleteAccount: {
+      color: colors.danger,
+      fontSize: s(16),
+      lineHeight: s(22),
+      fontWeight: '400',
+      letterSpacing: -0.41,
+      textAlign: 'center',
+    },
+    version: {
+      marginBottom: s(8),
+      color: colors.textMuted,
+      fontSize: s(12),
+      lineHeight: s(16),
+      textAlign: 'center',
+    },
+    row: {
+      width: '100%',
+      height: s(50),
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 100,
+      backgroundColor: colors.background,
+    },
+    rowContent: {
+      flex: 1,
+      paddingHorizontal: s(16),
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    rowLabel: {
+      flex: 1,
+      color: colors.text,
+      fontSize: s(16),
+      lineHeight: s(22),
+      fontWeight: '400',
+      letterSpacing: -0.41,
+    },
+    rowValue: {
+      maxWidth: '55%',
+      marginLeft: s(8),
+      color: colors.textMuted,
+      fontSize: s(15),
+      fontWeight: '500',
+      textAlign: 'right',
+    },
     cityFlag: { width: s(18), height: s(18), marginLeft: s(5) },
-    chevron: { width: s(8), marginLeft: s(8), color: colors.textMuted, fontSize: s(27), lineHeight: s(29) },
-    actions: { width: '100%', flexShrink: 0, paddingTop: s(16), paddingBottom: s(24), alignItems: 'center', justifyContent: 'center' },
-    notificationsScreen: { position: 'absolute', zIndex: 10, top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.canvas },
+    chevron: {
+      width: s(8),
+      marginLeft: s(8),
+      color: colors.textMuted,
+      fontSize: s(27),
+      lineHeight: s(29),
+    },
+    actions: {
+      width: '100%',
+      flexShrink: 0,
+      paddingTop: s(16),
+      paddingBottom: s(24),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    notificationsScreen: {
+      position: 'absolute',
+      zIndex: 10,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: colors.canvas,
+    },
     notificationBackground: { flex: 1, backgroundColor: colors.canvas },
-    notificationSettings: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 30 },
-    notificationSectionTitle: { marginTop: 18, marginBottom: 10, marginLeft: 16, color: colors.textSecondary, fontSize: 13, lineHeight: 18, letterSpacing: -0.24, textTransform: 'uppercase' },
-    notificationFootnote: { marginTop: 14, marginHorizontal: 16, color: colors.textSecondary, opacity: 0.7, fontSize: 12, lineHeight: 16 },
-    notificationRow: { height: 50, marginBottom: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 100, backgroundColor: colors.background },
+    notificationSettings: {
+      paddingTop: 20,
+      paddingHorizontal: 16,
+      paddingBottom: 30,
+    },
+    notificationSectionTitle: {
+      marginTop: 18,
+      marginBottom: 10,
+      marginLeft: 16,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      letterSpacing: -0.24,
+      textTransform: 'uppercase',
+    },
+    notificationFootnote: {
+      marginTop: 14,
+      marginHorizontal: 16,
+      color: colors.textSecondary,
+      opacity: 0.7,
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    notificationRow: {
+      height: 50,
+      marginBottom: 6,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 100,
+      backgroundColor: colors.background,
+    },
     notificationDisabled: { opacity: 0.45 },
-    notificationLabel: { flex: 1, color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41 },
-    notificationSwitch: { marginRight: -4, transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }] },
+    notificationLabel: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      lineHeight: 22,
+      letterSpacing: -0.41,
+    },
+    notificationSwitch: {
+      marginRight: -4,
+      transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }],
+    },
     appearanceContent: { paddingTop: 24, paddingHorizontal: 16 },
-    appearanceIntro: { marginBottom: 16, paddingHorizontal: 8, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-    appearanceRow: { minHeight: 66, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.hairline, borderRadius: 24, backgroundColor: colors.background },
+    appearanceIntro: {
+      marginBottom: 16,
+      paddingHorizontal: 8,
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    appearanceRow: {
+      minHeight: 66,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 24,
+      backgroundColor: colors.background,
+    },
     appearanceRowSelected: { borderColor: colors.primary },
     appearanceCopy: { flex: 1, paddingVertical: 10 },
-    appearanceLabel: { color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: '500', letterSpacing: -0.41 },
-    appearanceDescription: { marginTop: 2, color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-    selectionCircle: { width: 20, height: 20, marginLeft: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.textMuted, borderRadius: 10 },
+    appearanceLabel: {
+      color: colors.text,
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: '500',
+      letterSpacing: -0.41,
+    },
+    appearanceDescription: {
+      marginTop: 2,
+      color: colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    selectionCircle: {
+      width: 20,
+      height: 20,
+      marginLeft: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.textMuted,
+      borderRadius: 10,
+    },
     selectionCircleSelected: { borderColor: colors.primary },
-    selectionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-    inviteRing: { width: s(330), height: s(54), padding: s(5), borderRadius: s(36) },
-    invite: { flex: 1, paddingHorizontal: s(20), flexDirection: 'row', gap: s(8), alignItems: 'center', justifyContent: 'center', borderRadius: s(31), backgroundColor: '#B82F29' },
-    inviteText: { color: '#FFFFFF', fontSize: s(14), fontWeight: '500', letterSpacing: 0.6 },
+    selectionDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.primary,
+    },
+    inviteRing: {
+      width: s(330),
+      height: s(54),
+      padding: s(5),
+      borderRadius: s(36),
+    },
+    invite: {
+      flex: 1,
+      paddingHorizontal: s(20),
+      flexDirection: 'row',
+      gap: s(8),
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: s(31),
+      backgroundColor: '#B82F29',
+    },
+    inviteText: {
+      color: '#FFFFFF',
+      fontSize: s(14),
+      fontWeight: '500',
+      letterSpacing: 0.6,
+    },
     pressed: { opacity: 0.72 },
     editorOverlay: { position: 'absolute', zIndex: 30, inset: 0 },
-    modalBackdrop: { flex: 1, padding: 16, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.76)' },
+    modalBackdrop: {
+      flex: 1,
+      padding: 16,
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.76)',
+    },
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
     editorTitle: { color: colors.text, fontSize: 19, fontWeight: '700' },
-    input: { height: 50, marginTop: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 14, color: colors.text, backgroundColor: colors.canvas },
+    input: {
+      height: 50,
+      marginTop: 16,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      color: colors.text,
+      backgroundColor: colors.canvas,
+    },
     bioInput: { height: 112, paddingTop: 14, paddingBottom: 14 },
-    characterCount: { marginTop: 6, marginRight: 4, color: colors.textMuted, fontSize: 12, lineHeight: 16, textAlign: 'right' },
-    saveButton: { height: 48, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: colors.primary },
+    characterCount: {
+      marginTop: 6,
+      marginRight: 4,
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
+      textAlign: 'right',
+    },
+    saveButton: {
+      height: 48,
+      marginTop: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 24,
+      backgroundColor: colors.primary,
+    },
     saveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
     placeContent: { flex: 1, padding: 16 },
-    searchInput: { height: 48, paddingHorizontal: 16, borderRadius: 24, color: colors.text, backgroundColor: colors.surface },
+    searchInput: {
+      height: 48,
+      paddingHorizontal: 16,
+      borderRadius: 24,
+      color: colors.text,
+      backgroundColor: colors.surface,
+    },
     searchLoader: { marginTop: 30 },
-    placeRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    placeRow: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
     placeCopy: { flex: 1 },
     placeName: { color: colors.text, fontSize: 15, fontWeight: '600' },
     placeMeta: { marginTop: 4, color: colors.textSecondary, fontSize: 12 },

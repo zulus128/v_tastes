@@ -24,7 +24,11 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
-import { activitySubtitle, compareConversations, reservationCountdown } from './presentation';
+import {
+  activitySubtitle,
+  compareConversations,
+  reservationCountdown,
+} from './presentation';
 import { useTastesApi } from '../../session/SessionProvider';
 
 function relativeTime(iso: string): string {
@@ -36,7 +40,10 @@ function relativeTime(iso: string): string {
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 function ConversationRow({
@@ -53,86 +60,191 @@ function ConversationRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   const participant = conversation.otherParticipant;
-  const title = conversation.kind === 'activity'
-    ? conversation.title ?? 'Activity'
-    : conversation.kind === 'group'
-      ? `${conversation.title ?? 'Group'} · ${conversation.memberCount}`
-      : participant?.displayName ?? 'Tastes user';
+  const title =
+    conversation.kind === 'activity'
+      ? (conversation.title ?? 'Activity')
+      : conversation.kind === 'group'
+        ? `${conversation.title ?? 'Group'} · ${conversation.memberCount}`
+        : (participant?.displayName ?? 'Tastes user');
   const unread = conversation.unreadCount > 0;
   const activity = conversation.kind === 'activity';
   const group = conversation.kind === 'group';
-  const countdown = activity ? reservationCountdown(conversation.activityStartsAt) : null;
-  const senderPrefix = group && conversation.lastMessage?.senderDisplayName
-    ? `${conversation.lastMessage.senderDisplayName}: `
-    : conversation.kind === 'direct' && conversation.lastMessage && conversation.lastMessage.senderId !== participant?.userId
-      ? 'You: '
-      : '';
+  const countdown = activity
+    ? reservationCountdown(conversation.activityStartsAt)
+    : null;
+  const senderPrefix =
+    group && conversation.lastMessage?.senderDisplayName
+      ? `${conversation.lastMessage.senderDisplayName}: `
+      : conversation.kind === 'direct' &&
+          conversation.lastMessage &&
+          conversation.lastMessage.senderId !== participant?.userId
+        ? 'You: '
+        : '';
   const translateX = useMemo(() => new Animated.Value(0), []);
   const deleteActionWidth = responsiveSize(82);
   const deleteThreshold = responsiveSize(64);
   const swipeStartThreshold = responsiveSize(8);
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy)
-    ),
-    onPanResponderMove: (_, gesture) => {
-      translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-      }).start(() => {
-        if (gesture.dx < -deleteThreshold && !deleting) onDelete();
-      });
-    },
-    onPanResponderTerminate: () => {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-    },
-  }), [deleteActionWidth, deleteThreshold, deleting, onDelete, swipeStartThreshold, translateX]);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dx < -swipeStartThreshold &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderMove: (_, gesture) => {
+          translateX.setValue(
+            Math.max(-deleteActionWidth, Math.min(0, gesture.dx)),
+          );
+        },
+        onPanResponderRelease: (_, gesture) => {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start(() => {
+            if (gesture.dx < -deleteThreshold && !deleting) onDelete();
+          });
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [
+      deleteActionWidth,
+      deleteThreshold,
+      deleting,
+      onDelete,
+      swipeStartThreshold,
+      translateX,
+    ],
+  );
   return (
     <View style={styles.swipeRow}>
-      <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
-        <Pressable accessibilityLabel={`Delete conversation with ${title}`} accessibilityRole="button" disabled={deleting} onPress={onDelete} style={styles.deleteButton}>
-          {deleting ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.deleteIcon}>⌫</Text><Text style={styles.deleteText}>Delete</Text></>}
+      <Animated.View
+        style={[styles.deleteAction, { transform: [{ translateX }] }]}
+      >
+        <Pressable
+          accessibilityLabel={`Delete conversation with ${title}`}
+          accessibilityRole="button"
+          disabled={deleting}
+          onPress={onDelete}
+          style={styles.deleteButton}
+        >
+          {deleting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.deleteIcon}>⌫</Text>
+              <Text style={styles.deleteText}>Delete</Text>
+            </>
+          )}
         </Pressable>
       </Animated.View>
-      <Animated.View style={[styles.swipeContent, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
-        <Pressable accessibilityRole="button" onPress={onOpen} style={({ pressed }) => [styles.row, activity && styles.activityRow, pressed && styles.rowPressed]}>
+      <Animated.View
+        style={[styles.swipeContent, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpen}
+          style={({ pressed }) => [
+            styles.row,
+            activity && styles.activityRow,
+            pressed && styles.rowPressed,
+          ]}
+        >
           {activity || group ? (
             <View style={styles.avatarStack}>
-              {conversation.imageUrl || conversation.lastMessage?.senderPhotoUrl ? (
-                <Image source={{ uri: conversation.imageUrl ?? conversation.lastMessage?.senderPhotoUrl ?? '' }} style={styles.avatar} />
+              {conversation.imageUrl ||
+              conversation.lastMessage?.senderPhotoUrl ? (
+                <Image
+                  source={{
+                    uri:
+                      conversation.imageUrl ??
+                      conversation.lastMessage?.senderPhotoUrl ??
+                      '',
+                  }}
+                  style={styles.avatar}
+                />
               ) : (
-                <View style={styles.avatarFallback}><Text style={styles.avatarInitial}>{title.slice(0, 1).toUpperCase()}</Text></View>
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarInitial}>
+                    {title.slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
               )}
               <View style={styles.stackedAvatarFallback}>
-                <Text style={styles.stackedAvatarInitial}>{conversation.lastMessage?.senderDisplayName?.slice(0, 1).toUpperCase() ?? conversation.memberCount}</Text>
+                <Text style={styles.stackedAvatarInitial}>
+                  {conversation.lastMessage?.senderDisplayName
+                    ?.slice(0, 1)
+                    .toUpperCase() ?? conversation.memberCount}
+                </Text>
               </View>
             </View>
           ) : participant?.photoUrl ? (
-            <Image source={{ uri: participant.photoUrl }} style={styles.avatar} />
+            <Image
+              source={{ uri: participant.photoUrl }}
+              style={styles.avatar}
+            />
           ) : (
             <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitial}>{conversation.kind === 'activity' ? '◷' : title.slice(0, 1).toUpperCase()}</Text>
+              <Text style={styles.avatarInitial}>
+                {conversation.kind === 'activity'
+                  ? '◷'
+                  : title.slice(0, 1).toUpperCase()}
+              </Text>
             </View>
           )}
           <View style={[styles.rowCopy, activity && styles.activityRowCopy]}>
             <View style={styles.rowHeading}>
-              {activity ? <Text style={styles.activityBadge}>ACTIVITY</Text> : null}
+              {activity ? (
+                <Text style={styles.activityBadge}>ACTIVITY</Text>
+              ) : null}
             </View>
             <View style={styles.rowHeading}>
-              <Text numberOfLines={1} style={[styles.name, unread && styles.unreadName]}>{title}</Text>
-              <Text style={[styles.time, (unread || countdown) && styles.unreadTime]}>{countdown ?? relativeTime(conversation.updatedAt)}</Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.name, unread && styles.unreadName]}
+              >
+                {title}
+              </Text>
+              <Text
+                style={[
+                  styles.time,
+                  (unread || countdown) && styles.unreadTime,
+                ]}
+              >
+                {countdown ?? relativeTime(conversation.updatedAt)}
+              </Text>
             </View>
-            {activity ? <Text numberOfLines={1} style={styles.activityMeta}>{activitySubtitle(conversation.activityStartsAt, conversation.memberCount)}</Text> : null}
+            {activity ? (
+              <Text numberOfLines={1} style={styles.activityMeta}>
+                {activitySubtitle(
+                  conversation.activityStartsAt,
+                  conversation.memberCount,
+                )}
+              </Text>
+            ) : null}
             <View style={styles.previewRow}>
-              <Text numberOfLines={1} style={[styles.preview, unread && styles.unreadPreview]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.preview, unread && styles.unreadPreview]}
+              >
                 {senderPrefix}
-                {conversation.lastMessage?.text ?? (conversation.kind === 'activity' ? 'Activity created' : conversation.kind === 'group' ? 'Group created' : 'Conversation started')}
+                {conversation.lastMessage?.text ??
+                  (conversation.kind === 'activity'
+                    ? 'Activity created'
+                    : conversation.kind === 'group'
+                      ? 'Group created'
+                      : 'Conversation started')}
               </Text>
               {unread ? (
-                <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(conversation.unreadCount, 99)}</Text></View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {Math.min(conversation.unreadCount, 99)}
+                  </Text>
+                </View>
               ) : null}
             </View>
           </View>
@@ -161,7 +273,9 @@ export function ConversationsScreen({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
-  const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(null);
+  const [suppressedInviteId, setSuppressedInviteId] = useState<string | null>(
+    null,
+  );
   const [requestCount, setRequestCount] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // This only feeds the badge count next to the Requests button, and the
@@ -169,62 +283,79 @@ export function ConversationsScreen({
   // transient failure here must fail quietly rather than interrupt whatever
   // screen the user is actually looking at. RequestsScreen alerts on its own
   // load failure since that one is a direct result of the user opening it.
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    void api.listRequests()
-      .then((response) => {
-        if (active) setRequestCount(response.data.length);
-      })
-      .catch(() => {
-        if (active) setRequestCount(0);
-      });
-    return () => {
-      active = false;
-    };
-  }, [api]));
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void api
+        .listRequests()
+        .then((response) => {
+          if (active) setRequestCount(response.data.length);
+        })
+        .catch(() => {
+          if (active) setRequestCount(0);
+        });
+      return () => {
+        active = false;
+      };
+    }, [api]),
+  );
   const inbox = useConversationInbox(userId);
   const conversationHistory = useInfiniteQuery({
     queryKey: ['conversations', userId, 'history'],
     initialPageParam: null as string | null,
-    queryFn: async ({ pageParam }) => (
-      await api.listConversations({ cursor: pageParam, limit: 50 })
-    ).data,
+    queryFn: async ({ pageParam }) =>
+      (await api.listConversations({ cursor: pageParam, limit: 50 })).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
   const inboxItems = useMemo(() => {
     const byId = new Map<string, ConversationSummary>();
-    conversationHistory.data?.pages.flatMap((page) => page.items).forEach((conversation) => byId.set(conversation.id, conversation));
-    inbox.data.forEach((conversation) => byId.set(conversation.id, conversation));
-    return [...byId.values()].sort((left, right) => compareConversations(left, right));
+    conversationHistory.data?.pages
+      .flatMap((page) => page.items)
+      .forEach((conversation) => byId.set(conversation.id, conversation));
+    inbox.data.forEach((conversation) =>
+      byId.set(conversation.id, conversation),
+    );
+    return [...byId.values()].sort((left, right) =>
+      compareConversations(left, right),
+    );
   }, [conversationHistory.data?.pages, inbox.data]);
-  const pendingInvitation = inboxItems.find((conversation) => (
-    conversation.kind === 'activity'
-    && conversation.invitationStatus === 'pending'
-    && conversation.activityId !== suppressedInviteId
-  ));
+  const pendingInvitation = inboxItems.find(
+    (conversation) =>
+      conversation.kind === 'activity' &&
+      conversation.invitationStatus === 'pending' &&
+      conversation.activityId !== suppressedInviteId,
+  );
   const pendingActivityId = pendingInvitation?.activityId ?? null;
   const closeInvitation = useCallback(() => {
     if (pendingActivityId) setSuppressedInviteId(pendingActivityId);
   }, [pendingActivityId]);
   const normalizedSearch = search.trim().toLowerCase();
-  const conversations = inboxItems.filter((conversation) => (
-    !normalizedSearch
-    || conversation.title?.toLowerCase().includes(normalizedSearch)
-    || conversation.otherParticipant?.displayName.toLowerCase().includes(normalizedSearch)
-    || conversation.otherParticipant?.username?.toLowerCase().includes(normalizedSearch)
-  ));
+  const conversations = inboxItems.filter(
+    (conversation) =>
+      !normalizedSearch ||
+      conversation.title?.toLowerCase().includes(normalizedSearch) ||
+      conversation.otherParticipant?.displayName
+        .toLowerCase()
+        .includes(normalizedSearch) ||
+      conversation.otherParticipant?.username
+        ?.toLowerCase()
+        .includes(normalizedSearch),
+  );
 
-  const deleteConversation = useCallback(async (conversationId: string) => {
-    setDeletingId(conversationId);
-    try {
-      await api.hideConversation({ conversationId });
-      await conversationHistory.refetch();
-    } catch {
-      Alert.alert('Could not delete chat', 'Please try again.');
-    } finally {
-      setDeletingId(null);
-    }
-  }, [api, conversationHistory]);
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      setDeletingId(conversationId);
+      try {
+        await api.hideConversation({ conversationId });
+        await conversationHistory.refetch();
+      } catch {
+        Alert.alert('Could not delete chat', 'Please try again.');
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [api, conversationHistory],
+  );
 
   return (
     <Screen style={styles.screen}>
@@ -232,18 +363,43 @@ export function ConversationsScreen({
         <View style={styles.titleRow}>
           <View style={styles.headerButton} />
           <Text style={styles.title}>Chats</Text>
-          <Pressable accessibilityLabel="New chat" onPress={() => setNewDialogOpen(true)} style={styles.headerButton}>
-            <View style={styles.addCircle}><Text style={styles.addText}>+</Text></View>
+          <Pressable
+            accessibilityLabel="New chat"
+            onPress={() => setNewDialogOpen(true)}
+            style={styles.headerButton}
+          >
+            <View style={styles.addCircle}>
+              <Text style={styles.addText}>+</Text>
+            </View>
           </Pressable>
         </View>
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>⌕</Text>
-            <TextInput autoCorrect={false} onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={search} />
+            <TextInput
+              autoCorrect={false}
+              onChangeText={setSearch}
+              placeholder="Search"
+              placeholderTextColor={colors.placeholder}
+              style={styles.searchInput}
+              value={search}
+            />
           </View>
-          <Pressable accessibilityLabel={requestCount > 0 ? `Requests, ${requestCount} unread` : 'Requests'} onPress={onOpenRequests} style={styles.requestsButton}>
+          <Pressable
+            accessibilityLabel={
+              requestCount > 0 ? `Requests, ${requestCount} unread` : 'Requests'
+            }
+            onPress={onOpenRequests}
+            style={styles.requestsButton}
+          >
             <Text style={styles.requests}>Requests</Text>
-            {requestCount > 0 ? <View style={styles.requestsBadge}><Text style={styles.requestsBadgeText}>{Math.min(requestCount, 99)}</Text></View> : null}
+            {requestCount > 0 ? (
+              <View style={styles.requestsBadge}>
+                <Text style={styles.requestsBadgeText}>
+                  {Math.min(requestCount, 99)}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
       </View>
@@ -255,38 +411,69 @@ export function ConversationsScreen({
       >
         <PatternBackgroundLift />
         {inbox.loading && conversationHistory.isPending ? (
-          <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
-        ) : (inbox.error ?? conversationHistory.error) && inboxItems.length === 0 ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (inbox.error ?? conversationHistory.error) &&
+          inboxItems.length === 0 ? (
           <View style={styles.center}>
             <Text style={styles.stateTitle}>Could not load messages</Text>
-            <Text style={styles.stateCopy}>{(inbox.error ?? conversationHistory.error)?.message}</Text>
+            <Text style={styles.stateCopy}>
+              {(inbox.error ?? conversationHistory.error)?.message}
+            </Text>
           </View>
         ) : (
           <FlatList
             style={styles.list}
-            contentContainerStyle={[styles.listContent, conversations.length === 0 && styles.emptyContent]}
+            contentContainerStyle={[
+              styles.listContent,
+              conversations.length === 0 && styles.emptyContent,
+            ]}
             data={conversations}
             initialNumToRender={10}
             keyExtractor={(item) => item.id}
             maxToRenderPerBatch={10}
             keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={(
+            ListEmptyComponent={
               <View style={styles.empty}>
-                <View style={styles.emptyGlyph}><Text style={styles.emptyGlyphText}>···</Text></View>
-                <Text style={styles.stateTitle}>{search ? 'No conversations found' : 'No messages yet'}</Text>
+                <View style={styles.emptyGlyph}>
+                  <Text style={styles.emptyGlyphText}>···</Text>
+                </View>
+                <Text style={styles.stateTitle}>
+                  {search ? 'No conversations found' : 'No messages yet'}
+                </Text>
                 <Text style={styles.stateCopy}>
-                  {search ? 'Try another name or username.' : 'Conversations with mutual followers will appear here.'}
+                  {search
+                    ? 'Try another name or username.'
+                    : 'Conversations with mutual followers will appear here.'}
                 </Text>
               </View>
-            )}
-            ListFooterComponent={conversationHistory.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: responsiveSize(20) }} /> : null}
+            }
+            ListFooterComponent={
+              conversationHistory.isFetchingNextPage ? (
+                <ActivityIndicator
+                  color={colors.primary}
+                  style={{ paddingVertical: responsiveSize(20) }}
+                />
+              ) : null
+            }
             onEndReached={() => {
-              if (conversationHistory.hasNextPage && !conversationHistory.isFetchingNextPage) void conversationHistory.fetchNextPage();
+              if (
+                conversationHistory.hasNextPage &&
+                !conversationHistory.isFetchingNextPage
+              )
+                void conversationHistory.fetchNextPage();
             }}
             onEndReachedThreshold={0.5}
             windowSize={7}
             renderItem={({ item }) => (
-              <ConversationRow conversation={item} deleting={deletingId === item.id} onDelete={() => void deleteConversation(item.id)} onOpen={() => onOpenConversation(item.id)} styles={styles} />
+              <ConversationRow
+                conversation={item}
+                deleting={deletingId === item.id}
+                onDelete={() => void deleteConversation(item.id)}
+                onOpen={() => onOpenConversation(item.id)}
+                styles={styles}
+              />
             )}
             showsVerticalScrollIndicator={false}
           />
@@ -313,19 +500,84 @@ function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
-    header: { paddingTop: 0, paddingBottom: 12, paddingHorizontal: 16, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: colors.background === '#080808' ? colors.background : colors.surface },
+    header: {
+      paddingTop: 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      backgroundColor:
+        colors.background === '#080808' ? colors.background : colors.surface,
+    },
     titleRow: { height: 51, flexDirection: 'row', alignItems: 'center' },
-    title: { flex: 1, color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: '600', textAlign: 'center', letterSpacing: -0.4 },
-    headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-    addCircle: { width: 22, height: 22, borderWidth: 1.5, borderColor: colors.text, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.text, fontSize: 19, lineHeight: 19, fontWeight: '300' },
+    title: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 17,
+      lineHeight: 22,
+      fontWeight: '600',
+      textAlign: 'center',
+      letterSpacing: -0.4,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addCircle: {
+      width: 22,
+      height: 22,
+      borderWidth: 1.5,
+      borderColor: colors.text,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addText: {
+      color: colors.text,
+      fontSize: 19,
+      lineHeight: 19,
+      fontWeight: '300',
+    },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     requestsButton: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    searchBox: { flex: 1, height: 39, paddingHorizontal: 10, borderRadius: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceRaised },
-    searchIcon: { color: colors.textSecondary, fontSize: 22, marginRight: 8, marginTop: -2 },
-    searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    searchBox: {
+      flex: 1,
+      height: 39,
+      paddingHorizontal: 10,
+      borderRadius: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    searchIcon: {
+      color: colors.textSecondary,
+      fontSize: 22,
+      marginRight: 8,
+      marginTop: -2,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      paddingVertical: 0,
+    },
     requests: { color: colors.textSecondary, fontSize: 14 },
-    requestsBadge: { minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-    requestsBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+    requestsBadge: {
+      minWidth: 20,
+      height: 20,
+      paddingHorizontal: 5,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    requestsBadgeText: {
+      color: colors.onPrimary,
+      fontSize: 11,
+      fontWeight: '800',
+    },
     listContent: { paddingTop: 10, paddingBottom: 24 },
     list: { flex: 1 },
     emptyContent: { flexGrow: 1 },
@@ -336,24 +588,78 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     swipeContent: {},
-    deleteAction: { position: 'absolute', top: 0, right: -82, bottom: 0, width: 82, backgroundColor: colors.danger },
+    deleteAction: {
+      position: 'absolute',
+      top: 0,
+      right: -82,
+      bottom: 0,
+      width: 82,
+      backgroundColor: colors.danger,
+    },
     deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     deleteIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 24 },
-    deleteText: { marginTop: 2, color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-    row: { minHeight: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+    deleteText: {
+      marginTop: 2,
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    row: {
+      minHeight: 76,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     activityRow: { minHeight: 101 },
     rowPressed: { backgroundColor: colors.surfaceRaised },
-    avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.skeleton },
-    avatarFallback: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    avatar: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      backgroundColor: colors.skeleton,
+    },
+    avatarFallback: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
     avatarInitial: { color: colors.onPrimary, fontSize: 21, fontWeight: '700' },
     avatarStack: { width: 49, height: 57 },
-    stackedAvatarFallback: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderWidth: 2, borderColor: colors.canvas, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-    stackedAvatarInitial: { color: colors.onPrimary, fontSize: 10, fontWeight: '700' },
+    stackedAvatarFallback: {
+      position: 'absolute',
+      right: 0,
+      bottom: 0,
+      width: 30,
+      height: 30,
+      borderWidth: 2,
+      borderColor: colors.canvas,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    stackedAvatarInitial: {
+      color: colors.onPrimary,
+      fontSize: 10,
+      fontWeight: '700',
+    },
     rowCopy: { flex: 1, height: 64, marginLeft: 13, justifyContent: 'center' },
     activityRowCopy: { height: 86 },
     rowHeading: { flexDirection: 'row', alignItems: 'center' },
     name: { flex: 1, color: colors.text, fontSize: 16, fontWeight: '600' },
-    activityBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', color: colors.primary, backgroundColor: 'rgba(230,57,70,0.16)', fontSize: 9, fontWeight: '700' },
+    activityBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 6,
+      overflow: 'hidden',
+      color: colors.primary,
+      backgroundColor: 'rgba(230,57,70,0.16)',
+      fontSize: 9,
+      fontWeight: '700',
+    },
     activityMeta: { color: colors.textSecondary, marginTop: 2, fontSize: 13 },
     unreadName: { fontWeight: '800' },
     time: { color: colors.textMuted, marginLeft: 10, fontSize: 12 },
@@ -361,13 +667,56 @@ function createStyles(colors: ThemeColors) {
     previewRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center' },
     preview: { flex: 1, color: colors.textMuted, fontSize: 14 },
     unreadPreview: { color: colors.textSecondary, fontWeight: '600' },
-    badge: { minWidth: 21, height: 21, marginLeft: 8, paddingHorizontal: 6, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    badge: {
+      minWidth: 21,
+      height: 21,
+      marginLeft: 8,
+      paddingHorizontal: 6,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
     badgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
-    center: { flex: 1, padding: 32, alignItems: 'center', justifyContent: 'center' },
-    empty: { flex: 1, paddingHorizontal: 42, alignItems: 'center', justifyContent: 'center' },
-    emptyGlyph: { width: 68, height: 68, marginBottom: 18, borderRadius: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
-    emptyGlyphText: { color: colors.primary, fontSize: 27, fontWeight: '800', marginTop: -10 },
-    stateTitle: { color: colors.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
-    stateCopy: { color: colors.textMuted, marginTop: 7, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+    center: {
+      flex: 1,
+      padding: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    empty: {
+      flex: 1,
+      paddingHorizontal: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyGlyph: {
+      width: 68,
+      height: 68,
+      marginBottom: 18,
+      borderRadius: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    emptyGlyphText: {
+      color: colors.primary,
+      fontSize: 27,
+      fontWeight: '800',
+      marginTop: -10,
+    },
+    stateTitle: {
+      color: colors.text,
+      fontSize: 19,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    stateCopy: {
+      color: colors.textMuted,
+      marginTop: 7,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
   });
 }

@@ -9,7 +9,12 @@ export type TasteHighlight = {
   value: string;
 };
 
-const GENERIC_PLACE_CATEGORIES = new Set(['bar', 'cafe', 'coffee', 'restaurant']);
+const GENERIC_PLACE_CATEGORIES = new Set([
+  'bar',
+  'cafe',
+  'coffee',
+  'restaurant',
+]);
 
 function displayLabel(value: string) {
   return value
@@ -21,8 +26,14 @@ function displayLabel(value: string) {
 
 function mostCommon(values: readonly string[]) {
   const counts = new Map<string, number>();
-  values.filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
-  return [...counts].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0] ?? null;
+  values
+    .filter(Boolean)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+  return (
+    [...counts].sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )[0] ?? null
+  );
 }
 
 function vibeEmoji(value: string) {
@@ -31,7 +42,8 @@ function vibeEmoji(value: string) {
   if (normalized.includes('fancy')) return '🥂';
   if (normalized.includes('quick')) return '⚡';
   if (normalized.includes('birthday')) return '🎂';
-  if (normalized.includes('children') || normalized.includes('family')) return '👨‍👩‍👧';
+  if (normalized.includes('children') || normalized.includes('family'))
+    return '👨‍👩‍👧';
   return '🍽️';
 }
 
@@ -58,19 +70,47 @@ export function buildTasteHighlights({
   const venuesById = new Map(venues.map((venue) => [venue.id, venue]));
   const cuisines = reviews.flatMap((review) => {
     const category = venuesById.get(review.venueId)?.category?.trim();
-    return category && !GENERIC_PLACE_CATEGORIES.has(category.toLocaleLowerCase()) ? [category] : [];
+    return category &&
+      !GENERIC_PLACE_CATEGORIES.has(category.toLocaleLowerCase())
+      ? [category]
+      : [];
   });
   const topCuisine = mostCommon(cuisines);
   const topVibe = mostCommon(reviews.flatMap((review) => review.tags));
-  const cuisineValue = topCuisine?.[0] ?? profile.favoriteCuisines[0] ?? 'Not set';
+  const cuisineValue =
+    topCuisine?.[0] ?? profile.favoriteCuisines[0] ?? 'Not set';
   const vibeValue = topVibe?.[0] ?? 'Not set';
   const dishValue = profile.favoriteDish ?? 'Not set';
   const placeValue = favoritePlaceName ?? 'Not set';
 
   return [
-    { id: 'cuisine', emoji: '🍝', label: 'Top cuisine', value: displayLabel(cuisineValue), meta: `${topCuisine?.[1] ?? 0} reviews` },
-    { id: 'vibe', emoji: vibeEmoji(vibeValue), label: 'Favourite vibe', value: displayLabel(vibeValue), meta: `${topVibe?.[1] ?? 0} reviews` },
-    { id: 'dish', emoji: dishEmoji(dishValue), label: 'Favourite dish', value: dishValue, meta: 'From onboarding' },
-    { id: 'place', emoji: '❤️', label: 'Favourite place', value: placeValue, meta: 'From onboarding' },
+    {
+      id: 'cuisine',
+      emoji: '🍝',
+      label: 'Top cuisine',
+      value: displayLabel(cuisineValue),
+      meta: `${topCuisine?.[1] ?? 0} reviews`,
+    },
+    {
+      id: 'vibe',
+      emoji: vibeEmoji(vibeValue),
+      label: 'Favourite vibe',
+      value: displayLabel(vibeValue),
+      meta: `${topVibe?.[1] ?? 0} reviews`,
+    },
+    {
+      id: 'dish',
+      emoji: dishEmoji(dishValue),
+      label: 'Favourite dish',
+      value: dishValue,
+      meta: 'From onboarding',
+    },
+    {
+      id: 'place',
+      emoji: '❤️',
+      label: 'Favourite place',
+      value: placeValue,
+      meta: 'From onboarding',
+    },
   ];
 }

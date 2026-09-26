@@ -41,7 +41,8 @@ import {
   useUnsaveVenue,
 } from './api';
 
-type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
+type FolderEditor =
+  { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
 
 export type SaveablePlace = {
   venueId: string;
@@ -75,12 +76,18 @@ export function FavouritesPane({
   const allPlaces = favourites.data?.places ?? [];
   const normalizedQuery = query.trim().toLocaleLowerCase('en-US');
   const places = allPlaces.filter((place) => {
-    const inFolder = selectedFolderId === null || place.folderIds.includes(selectedFolderId);
-    const matches = normalizedQuery.length === 0
-      || `${place.name} ${place.address} ${place.category}`.toLocaleLowerCase('en-US').includes(normalizedQuery);
+    const inFolder =
+      selectedFolderId === null || place.folderIds.includes(selectedFolderId);
+    const matches =
+      normalizedQuery.length === 0 ||
+      `${place.name} ${place.address} ${place.category}`
+        .toLocaleLowerCase('en-US')
+        .includes(normalizedQuery);
     return inFolder && matches && matchesPlaceFilters(place, appliedFilters);
   });
-  const selectedFolder = folders.find((folder) => folder.id === selectedFolderId);
+  const selectedFolder = folders.find(
+    (folder) => folder.id === selectedFolderId,
+  );
 
   function confirmDelete(folder: FavouriteFolder) {
     setFolderMenu(null);
@@ -106,15 +113,23 @@ export function FavouritesPane({
       {onBack || selectedFolderId ? (
         <Pressable
           accessibilityRole="button"
-          onPress={() => selectedFolderId ? setSelectedFolderId(null) : onBack?.()}
+          onPress={() =>
+            selectedFolderId ? setSelectedFolderId(null) : onBack?.()
+          }
           style={styles.favouritesBack}
         >
-          <Text style={styles.favouritesBackText}>‹ {selectedFolder?.name ?? 'Favourite'}</Text>
+          <Text style={styles.favouritesBackText}>
+            ‹ {selectedFolder?.name ?? 'Favourite'}
+          </Text>
         </Pressable>
       ) : null}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <SearchIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
+          <SearchIcon
+            color={colors.textMuted}
+            height={responsiveSize(24)}
+            width={responsiveSize(24)}
+          />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search"
@@ -122,8 +137,16 @@ export function FavouritesPane({
             style={styles.searchInput}
             value={query}
           />
-          <Pressable accessibilityLabel="Open filters" hitSlop={8} onPress={onOpenFilters}>
-            <SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
+          <Pressable
+            accessibilityLabel="Open filters"
+            hitSlop={8}
+            onPress={onOpenFilters}
+          >
+            <SearchTuneIcon
+              color={colors.textMuted}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
           </Pressable>
         </View>
       </View>
@@ -156,11 +179,24 @@ export function FavouritesPane({
         accessibilityLabel="Create Folder"
         accessibilityRole="button"
         onPress={() => setEditor({ mode: 'create' })}
-        style={({ pressed }) => [styles.createFolderButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.createFolderButton,
+          pressed && styles.pressed,
+        ]}
       >
         <View style={styles.addFolderIcon}>
-          <AddFolderCircle color="#FFFFFF" height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
-          <AddFolderPlus color="#FFFFFF" height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+          <AddFolderCircle
+            color="#FFFFFF"
+            height={responsiveSize(20)}
+            style={styles.addFolderIconPart}
+            width={responsiveSize(20)}
+          />
+          <AddFolderPlus
+            color="#FFFFFF"
+            height={responsiveSize(7)}
+            style={styles.addFolderIconPart}
+            width={responsiveSize(7)}
+          />
         </View>
         <Text style={styles.createFolderButtonText}>Create Folder</Text>
       </Pressable>
@@ -174,14 +210,24 @@ export function FavouritesPane({
       {favourites.isError ? (
         <View style={styles.centerState}>
           <Text style={styles.stateTitle}>Could not load favourites</Text>
-          <Text style={styles.stateBody}>{apiErrorMessage(favourites.error)}</Text>
-          <Pressable onPress={() => void favourites.refetch()} style={styles.retryButton}>
+          <Text style={styles.stateBody}>
+            {apiErrorMessage(favourites.error)}
+          </Text>
+          <Pressable
+            onPress={() => void favourites.refetch()}
+            style={styles.retryButton}
+          >
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
       ) : null}
       {favourites.isSuccess && places.length === 0 ? (
-        <EmptyState folderName={selectedFolder?.name} onBrowsePlaces={onBack} query={normalizedQuery} styles={styles} />
+        <EmptyState
+          folderName={selectedFolder?.name}
+          onBrowsePlaces={onBack}
+          query={normalizedQuery}
+          styles={styles}
+        />
       ) : null}
       {favourites.isSuccess && places.length > 0 ? (
         <View style={styles.placeList}>
@@ -195,9 +241,17 @@ export function FavouritesPane({
               styles={styles}
             />
           ))}
-          {favourites.hasNextPage ? <Pressable disabled={favourites.isFetchingNextPage} onPress={() => void favourites.fetchNextPage()} style={styles.loadMoreButton}>
-            <Text style={styles.loadMoreText}>{favourites.isFetchingNextPage ? 'Loading…' : 'Load more'}</Text>
-          </Pressable> : null}
+          {favourites.hasNextPage ? (
+            <Pressable
+              disabled={favourites.isFetchingNextPage}
+              onPress={() => void favourites.fetchNextPage()}
+              style={styles.loadMoreButton}
+            >
+              <Text style={styles.loadMoreText}>
+                {favourites.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -244,7 +298,11 @@ export function SaveToFolderSheet({
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
   const closeCreateFolder = useCallback(() => setCreating(false), []);
-  const createFolderSheet = useBottomSheetMotion({ closedOffset: 600, onClose: closeCreateFolder, visible: creating });
+  const createFolderSheet = useBottomSheetMotion({
+    closedOffset: 600,
+    onClose: closeCreateFolder,
+    visible: creating,
+  });
 
   useEffect(() => {
     if (visible) {
@@ -271,7 +329,10 @@ export function SaveToFolderSheet({
   async function save() {
     if (!place) return;
     try {
-      await saveVenue.mutateAsync({ venueId: place.venueId, folderIds: [...selected] });
+      await saveVenue.mutateAsync({
+        venueId: place.venueId,
+        folderIds: [...selected],
+      });
       onClose();
       onSaved?.();
     } catch (error) {
@@ -296,58 +357,140 @@ export function SaveToFolderSheet({
       >
         <View style={styles.addHeader}>
           <View style={styles.addTitleRow}>
-            <Pressable accessibilityLabel="Cancel" hitSlop={12} onPress={onClose}><Text style={styles.addBack}>‹</Text></Pressable>
+            <Pressable
+              accessibilityLabel="Cancel"
+              hitSlop={12}
+              onPress={onClose}
+            >
+              <Text style={styles.addBack}>‹</Text>
+            </Pressable>
             <Text style={styles.addTitle}>Add to Wishlist</Text>
             <View style={styles.addTitleSpacer} />
           </View>
           <View style={styles.addSearch}>
-            <SearchIcon color={colors.textMuted} height={responsiveSize(22)} width={responsiveSize(22)} />
-            <TextInput onChangeText={setQuery} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.searchInput} value={query} />
-            <SearchTuneIcon color={colors.textMuted} height={responsiveSize(24)} width={responsiveSize(24)} />
+            <SearchIcon
+              color={colors.textMuted}
+              height={responsiveSize(22)}
+              width={responsiveSize(22)}
+            />
+            <TextInput
+              onChangeText={setQuery}
+              placeholder="Search"
+              placeholderTextColor={colors.placeholder}
+              style={styles.searchInput}
+              value={query}
+            />
+            <SearchTuneIcon
+              color={colors.textMuted}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
           </View>
         </View>
-        <ScrollView contentContainerStyle={styles.selectionList} keyboardShouldPersistTaps="handled">
-          <FolderSelectionRow checked={selected.size === 0} label="All" onPress={() => setSelected(new Set())} styles={styles} />
-          {(favourites.data?.folders ?? []).filter((folder) => folder.name.toLocaleLowerCase('en-US').includes(query.trim().toLocaleLowerCase('en-US'))).map((folder) => (
-            <FolderSelectionRow
-              key={folder.id}
-              checked={selected.has(folder.id)}
-              onDelete={() => deleteFolder.mutate(folder.id)}
-              label={folder.name}
-              onPress={() => toggleFolder(folder.id)}
-              styles={styles}
-            />
-          ))}
-          <Pressable onPress={() => setCreating(true)} style={styles.newFolderButton}>
+        <ScrollView
+          contentContainerStyle={styles.selectionList}
+          keyboardShouldPersistTaps="handled"
+        >
+          <FolderSelectionRow
+            checked={selected.size === 0}
+            label="All"
+            onPress={() => setSelected(new Set())}
+            styles={styles}
+          />
+          {(favourites.data?.folders ?? [])
+            .filter((folder) =>
+              folder.name
+                .toLocaleLowerCase('en-US')
+                .includes(query.trim().toLocaleLowerCase('en-US')),
+            )
+            .map((folder) => (
+              <FolderSelectionRow
+                key={folder.id}
+                checked={selected.has(folder.id)}
+                onDelete={() => deleteFolder.mutate(folder.id)}
+                label={folder.name}
+                onPress={() => toggleFolder(folder.id)}
+                styles={styles}
+              />
+            ))}
+          <Pressable
+            onPress={() => setCreating(true)}
+            style={styles.newFolderButton}
+          >
             <View style={styles.addFolderIcon}>
-              <AddFolderCircle color={colors.text} height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
-              <AddFolderPlus color={colors.text} height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+              <AddFolderCircle
+                color={colors.text}
+                height={responsiveSize(20)}
+                style={styles.addFolderIconPart}
+                width={responsiveSize(20)}
+              />
+              <AddFolderPlus
+                color={colors.text}
+                height={responsiveSize(7)}
+                style={styles.addFolderIconPart}
+                width={responsiveSize(7)}
+              />
             </View>
             <Text style={styles.newFolderText}>Create Folder</Text>
           </Pressable>
         </ScrollView>
         <View style={styles.addFooter}>
-          <Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+          <Pressable onPress={onClose} style={styles.cancelButton}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
           <Pressable
             disabled={!place || saveVenue.isPending}
             onPress={() => void save()}
-            style={({ pressed }) => [styles.confirmButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.confirmButton,
+              pressed && styles.pressed,
+            ]}
           >
-            {saveVenue.isPending
-              ? <ActivityIndicator color="#FFFFFF" />
-              : <Text style={styles.confirmText}>✓  Confirm</Text>}
+            {saveVenue.isPending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.confirmText}>✓ Confirm</Text>
+            )}
           </Pressable>
         </View>
-        <Modal animationType="none" onRequestClose={createFolderSheet.close} transparent visible={creating}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
-            <Pressable onPress={createFolderSheet.close} style={styles.createFolderScrim} />
-            <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
-              <View style={styles.sheetDragArea} {...createFolderSheet.panHandlers}>
+        <Modal
+          animationType="none"
+          onRequestClose={createFolderSheet.close}
+          transparent
+          visible={creating}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.createFolderRoot}
+          >
+            <Pressable
+              onPress={createFolderSheet.close}
+              style={styles.createFolderScrim}
+            />
+            <Animated.View
+              style={[
+                styles.createFolderSheet,
+                { transform: [{ translateY: createFolderSheet.translateY }] },
+              ]}
+            >
+              <View
+                style={styles.sheetDragArea}
+                {...createFolderSheet.panHandlers}
+              >
                 <View style={styles.sheetHandle} />
               </View>
               <View style={styles.createFolderTitleRow}>
                 <Text style={styles.createFolderTitle}>Create Folder</Text>
-                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={createFolderSheet.close}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
+                <Pressable
+                  accessibilityLabel="Close create folder"
+                  hitSlop={10}
+                  onPress={createFolderSheet.close}
+                >
+                  <Image
+                    source={closeFolderIcon}
+                    style={styles.closeFolderIcon}
+                  />
+                </Pressable>
               </View>
               <View style={styles.createFolderField}>
                 <Text style={styles.createFolderLabel}>TITLE</Text>
@@ -364,19 +507,53 @@ export function SaveToFolderSheet({
                 />
                 <Text style={styles.folderSuggestionsLabel}>Or pick one</Text>
                 <View style={styles.folderSuggestions}>
-                  {['Brunch', 'Date night', 'Coffee', 'Cheap eats', 'Want to try', 'Special occasion'].map((suggestion) => (
+                  {[
+                    'Brunch',
+                    'Date night',
+                    'Coffee',
+                    'Cheap eats',
+                    'Want to try',
+                    'Special occasion',
+                  ].map((suggestion) => (
                     <Pressable
                       key={suggestion}
                       onPress={() => setFolderName(suggestion)}
-                      style={[styles.folderSuggestion, folderName === suggestion && styles.folderSuggestionActive]}
+                      style={[
+                        styles.folderSuggestion,
+                        folderName === suggestion &&
+                          styles.folderSuggestionActive,
+                      ]}
                     >
-                      <Text style={[styles.folderSuggestionText, folderName === suggestion && styles.folderSuggestionTextActive]}>{suggestion}</Text>
+                      <Text
+                        style={[
+                          styles.folderSuggestionText,
+                          folderName === suggestion &&
+                            styles.folderSuggestionTextActive,
+                        ]}
+                      >
+                        {suggestion}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
               </View>
-              <Pressable disabled={!folderName.trim() || createFolder.isPending} onPress={() => void createAndSelect()} style={({ pressed }) => [styles.createFolderSubmit, (!folderName.trim() || createFolder.isPending) && styles.createFolderSubmitDisabled, pressed && styles.pressed]}>
-                {createFolder.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createFolderSubmitText}>Create Folder</Text>}
+              <Pressable
+                disabled={!folderName.trim() || createFolder.isPending}
+                onPress={() => void createAndSelect()}
+                style={({ pressed }) => [
+                  styles.createFolderSubmit,
+                  (!folderName.trim() || createFolder.isPending) &&
+                    styles.createFolderSubmitDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {createFolder.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.createFolderSubmitText}>
+                    Create Folder
+                  </Text>
+                )}
               </Pressable>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -407,8 +584,16 @@ function FolderChip({
       onPress={onPress}
       style={[styles.folderChip, active && styles.folderChipActive]}
     >
-      <Icon color={active ? '#FFFFFF' : styles.folderChipText.color} height={responsiveSize(14)} width={responsiveSize(14)} />
-      <Text style={[styles.folderChipText, active && styles.folderChipTextActive]}>{label}</Text>
+      <Icon
+        color={active ? '#FFFFFF' : styles.folderChipText.color}
+        height={responsiveSize(14)}
+        width={responsiveSize(14)}
+      />
+      <Text
+        style={[styles.folderChipText, active && styles.folderChipTextActive]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -424,7 +609,11 @@ function EmptyState({
   query: string;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const title = query ? 'No places found' : folderName ? `Nothing in ${folderName} yet` : 'Nothing saved yet';
+  const title = query
+    ? 'No places found'
+    : folderName
+      ? `Nothing in ${folderName} yet`
+      : 'Nothing saved yet';
   const body = query
     ? 'Try a different search.'
     : folderName
@@ -432,11 +621,19 @@ function EmptyState({
       : 'Tap the bookmark on any place to save it here.';
   return (
     <View style={styles.emptyState}>
-      <EmptyIcon color={styles.stateTitle.color} height={responsiveSize(60)} width={responsiveSize(60)} />
+      <EmptyIcon
+        color={styles.stateTitle.color}
+        height={responsiveSize(60)}
+        width={responsiveSize(60)}
+      />
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateBody}>{body}</Text>
       {!query && onBrowsePlaces ? (
-        <Pressable accessibilityRole="button" onPress={onBrowsePlaces} style={styles.browsePlacesButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onBrowsePlaces}
+          style={styles.browsePlacesButton}
+        >
           <Text style={styles.browsePlacesText}>Browse places</Text>
         </Pressable>
       ) : null}
@@ -460,24 +657,46 @@ function FavouriteCard({
   return (
     <View style={styles.placeCard}>
       <Pressable onPress={onOpen} style={styles.cardImageWrap}>
-        <Image source={place.imageUrl ? { uri: place.imageUrl } : restaurantImage} style={styles.cardImage} />
+        <Image
+          source={place.imageUrl ? { uri: place.imageUrl } : restaurantImage}
+          style={styles.cardImage}
+        />
         {index === 0 ? <Text style={styles.popularTag}>Popular</Text> : null}
       </Pressable>
       <Pressable onPress={onOpen} style={styles.cardBody}>
-        <Text numberOfLines={1} style={styles.cardTitle}>{place.name}</Text>
-        <Text numberOfLines={1} style={styles.cardAddress}>{place.address || place.city}</Text>
+        <Text numberOfLines={1} style={styles.cardTitle}>
+          {place.name}
+        </Text>
+        <Text numberOfLines={1} style={styles.cardAddress}>
+          {place.address || place.city}
+        </Text>
         <View style={styles.ratingRow}>
-          <View style={styles.ratingPill}><Text style={styles.ratingText}>★ {place.rating.toFixed(1)}</Text></View>
+          <View style={styles.ratingPill}>
+            <Text style={styles.ratingText}>★ {place.rating.toFixed(1)}</Text>
+          </View>
           <Text style={styles.reviewCount}>{place.reviewCount} reviews</Text>
         </View>
       </Pressable>
-      <Pressable accessibilityLabel={`Remove ${place.name} from favourites`} hitSlop={10} onPress={onUnsave} style={styles.cardBookmark}>
-        <BookmarkIcon color={styles.cardTitle.color} height={responsiveSize(20)} width={responsiveSize(20)} />
+      <Pressable
+        accessibilityLabel={`Remove ${place.name} from favourites`}
+        hitSlop={10}
+        onPress={onUnsave}
+        style={styles.cardBookmark}
+      >
+        <BookmarkIcon
+          color={styles.cardTitle.color}
+          height={responsiveSize(20)}
+          width={responsiveSize(20)}
+        />
       </Pressable>
       <View style={styles.metaRow}>
         <Text style={styles.metaPill}>{place.category}</Text>
-        <Text style={styles.metaPill}>{'$'.repeat(Math.max(1, place.priceLevel))}</Text>
-        <Text style={styles.metaPill}>{place.distanceKm.toFixed(1).replace('.', ',')} km</Text>
+        <Text style={styles.metaPill}>
+          {'$'.repeat(Math.max(1, place.priceLevel))}
+        </Text>
+        <Text style={styles.metaPill}>
+          {place.distanceKm.toFixed(1).replace('.', ',')} km
+        </Text>
       </View>
     </View>
   );
@@ -500,21 +719,74 @@ function FolderSelectionRow({
   const deleteThreshold = responsiveSize(36);
   const swipeStartThreshold = responsiveSize(8);
   const translateX = useMemo(() => new Animated.Value(0), []);
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Boolean(onDelete) && gesture.dx < -swipeStartThreshold && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-    onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(-deleteActionWidth, Math.min(0, gesture.dx))),
-    onPanResponderRelease: (_, gesture) => {
-      Animated.spring(translateX, { toValue: gesture.dx < -deleteThreshold ? -deleteActionWidth : 0, useNativeDriver: true }).start();
-    },
-    onPanResponderTerminate: () => Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(),
-  }), [deleteActionWidth, deleteThreshold, onDelete, swipeStartThreshold, translateX]);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Boolean(onDelete) &&
+          gesture.dx < -swipeStartThreshold &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderMove: (_, gesture) =>
+          translateX.setValue(
+            Math.max(-deleteActionWidth, Math.min(0, gesture.dx)),
+          ),
+        onPanResponderRelease: (_, gesture) => {
+          Animated.spring(translateX, {
+            toValue: gesture.dx < -deleteThreshold ? -deleteActionWidth : 0,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () =>
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start(),
+      }),
+    [
+      deleteActionWidth,
+      deleteThreshold,
+      onDelete,
+      swipeStartThreshold,
+      translateX,
+    ],
+  );
   return (
     <View style={styles.selectionSwipe}>
-      {onDelete ? <Pressable accessibilityLabel={`Delete ${label}`} onPress={onDelete} style={styles.selectionDeleteAction}><Image source={trashIcon} style={styles.selectionDelete} /></Pressable> : null}
-      <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }] }}>
-        <Pressable onPress={() => { if ((translateX as unknown as { _value: number })._value < 0) Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(); else onPress(); }} style={styles.selectionRow}>
-          <View style={styles.selectionName}><FolderIcon color={styles.selectionLabel.color} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.selectionLabel}>{label}</Text></View>
-          <View style={[styles.radioCircle, checked && styles.radioCircleChecked]}>
+      {onDelete ? (
+        <Pressable
+          accessibilityLabel={`Delete ${label}`}
+          onPress={onDelete}
+          style={styles.selectionDeleteAction}
+        >
+          <Image source={trashIcon} style={styles.selectionDelete} />
+        </Pressable>
+      ) : null}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX }] }}
+      >
+        <Pressable
+          onPress={() => {
+            if ((translateX as unknown as { _value: number })._value < 0)
+              Animated.spring(translateX, {
+                toValue: 0,
+                useNativeDriver: true,
+              }).start();
+            else onPress();
+          }}
+          style={styles.selectionRow}
+        >
+          <View style={styles.selectionName}>
+            <FolderIcon
+              color={styles.selectionLabel.color}
+              height={responsiveSize(20)}
+              width={responsiveSize(20)}
+            />
+            <Text style={styles.selectionLabel}>{label}</Text>
+          </View>
+          <View
+            style={[styles.radioCircle, checked && styles.radioCircleChecked]}
+          >
             {checked ? <Text style={styles.checkmark}>✓</Text> : null}
           </View>
         </Pressable>
@@ -537,7 +809,11 @@ function FolderNameSheet({
   const createFolder = useCreateFolder(userId);
   const renameFolder = useRenameFolder(userId);
   const [name, setName] = useState('');
-  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: editor !== null });
+  const sheet = useBottomSheetMotion({
+    closedOffset: 600,
+    onClose,
+    visible: editor !== null,
+  });
 
   useEffect(() => {
     setName(editor?.mode === 'rename' ? editor.folder.name : '');
@@ -548,7 +824,10 @@ function FolderNameSheet({
     if (!value || !editor) return;
     try {
       if (editor.mode === 'rename') {
-        await renameFolder.mutateAsync({ folderId: editor.folder.id, name: value });
+        await renameFolder.mutateAsync({
+          folderId: editor.folder.id,
+          name: value,
+        });
       } else {
         await createFolder.mutateAsync(value);
       }
@@ -559,16 +838,35 @@ function FolderNameSheet({
   }
 
   return (
-    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={editor !== null}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
+    <Modal
+      animationType="none"
+      onRequestClose={sheet.close}
+      transparent
+      visible={editor !== null}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.modalRoot}
+      >
         <Pressable onPress={sheet.close} style={styles.scrim} />
-        <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.nameSheet,
+            { transform: [{ translateY: sheet.translateY }] },
+          ]}
+        >
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />
           </View>
           <View style={styles.sheetTitleRow}>
-            <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
-            <Pressable accessibilityLabel="Cancel folder editing" hitSlop={10} onPress={sheet.close}>
+            <Text style={styles.sheetTitle}>
+              {editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}
+            </Text>
+            <Pressable
+              accessibilityLabel="Cancel folder editing"
+              hitSlop={10}
+              onPress={sheet.close}
+            >
               <Text style={styles.sheetCancelText}>Cancel</Text>
             </Pressable>
           </View>
@@ -584,7 +882,9 @@ function FolderNameSheet({
             value={name}
           />
           <Pressable
-            disabled={!name.trim() || createFolder.isPending || renameFolder.isPending}
+            disabled={
+              !name.trim() || createFolder.isPending || renameFolder.isPending
+            }
             onPress={() => void submit()}
             style={styles.doneButton}
           >
@@ -609,12 +909,26 @@ function FolderActionSheet({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: folder !== null });
+  const sheet = useBottomSheetMotion({
+    closedOffset: 600,
+    onClose,
+    visible: folder !== null,
+  });
   return (
-    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={folder !== null}>
+    <Modal
+      animationType="none"
+      onRequestClose={sheet.close}
+      transparent
+      visible={folder !== null}
+    >
       <View style={styles.modalRoot}>
         <Pressable onPress={sheet.close} style={styles.scrim} />
-        <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.actionSheet,
+            { transform: [{ translateY: sheet.translateY }] },
+          ]}
+        >
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />
           </View>
@@ -637,105 +951,506 @@ function createStyles(colors: ThemeColors) {
     // This pane is also rendered inside ProfileScreen's outer ScrollView.
     // Let its cards participate in that scroll view's measured content height.
     pane: { backgroundColor: colors.canvas },
-    favouritesBack: { alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 16, justifyContent: 'center' },
+    favouritesBack: {
+      alignSelf: 'flex-start',
+      minHeight: 40,
+      paddingHorizontal: 16,
+      justifyContent: 'center',
+    },
     favouritesBackText: { color: colors.text, fontSize: 17, fontWeight: '600' },
-    searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
-    searchBox: { flex: 1, height: 39, paddingLeft: 10, paddingRight: 8, borderRadius: 44, backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8 },
-    searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 10,
+    },
+    searchBox: {
+      flex: 1,
+      height: 39,
+      paddingLeft: 10,
+      paddingRight: 8,
+      borderRadius: 44,
+      backgroundColor: isDark ? colors.surfaceRaised : '#FFFFFF',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      paddingVertical: 0,
+    },
     folderChipsScroll: { flexGrow: 0, flexShrink: 0, height: 48 },
-    folderChips: { gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-    folderChip: { height: 28, paddingHorizontal: 9, borderRadius: 14, borderWidth: 1, borderColor: isDark ? colors.border : 'rgba(0,0,0,0.10)', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isDark ? colors.surface : '#FFFFFF' },
-    folderChipActive: { backgroundColor: colors.primary, borderColor: 'rgba(255,255,255,0.1)' },
-    folderChipText: { color: isDark ? colors.textMuted : '#677083', fontSize: 12 },
+    folderChips: {
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 10,
+    },
+    folderChip: {
+      height: 28,
+      paddingHorizontal: 9,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? colors.border : 'rgba(0,0,0,0.10)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDark ? colors.surface : '#FFFFFF',
+    },
+    folderChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    folderChipText: {
+      color: isDark ? colors.textMuted : '#677083',
+      fontSize: 12,
+    },
     folderChipTextActive: { color: '#FFFFFF' },
-    createFolderButton: { height: 44, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 20, borderRadius: 36, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E63946', shadowColor: '#E53845', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 7, elevation: 8 },
-    createFolderButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', letterSpacing: 0.6 },
+    createFolderButton: {
+      height: 44,
+      marginHorizontal: 16,
+      marginBottom: 10,
+      paddingHorizontal: 20,
+      borderRadius: 36,
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#E63946',
+      shadowColor: '#E53845',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.55,
+      shadowRadius: 7,
+      elevation: 8,
+    },
+    createFolderButtonText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '500',
+      letterSpacing: 0.6,
+    },
     placeList: { paddingBottom: 32 },
     loadMoreButton: { alignSelf: 'center', paddingVertical: 20 },
     loadMoreText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-    placeCard: { minHeight: 188, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
-    cardImageWrap: { width: 122, height: 122, borderRadius: 12, overflow: 'hidden' },
+    placeCard: {
+      minHeight: 188,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.canvas,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 16,
+    },
+    cardImageWrap: {
+      width: 122,
+      height: 122,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
     cardImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    popularTag: { position: 'absolute', left: 4, top: 4, height: 18, color: '#FFFFFF', backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 8, fontSize: 12, lineHeight: 18 },
+    popularTag: {
+      position: 'absolute',
+      left: 4,
+      top: 4,
+      height: 18,
+      color: '#FFFFFF',
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      fontSize: 12,
+      lineHeight: 18,
+    },
     cardBody: { flex: 1, minWidth: 0, gap: 6 },
     cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
     cardAddress: { color: colors.textSecondary, fontSize: 13, lineHeight: 16 },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    ratingPill: { height: 28, paddingHorizontal: 12, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    ratingPill: {
+      height: 28,
+      paddingHorizontal: 12,
+      borderRadius: 100,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
     ratingText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-    reviewCount: { color: isDark ? colors.textMuted : 'rgba(56,64,80,0.40)', fontSize: 14 },
+    reviewCount: {
+      color: isDark ? colors.textMuted : 'rgba(56,64,80,0.40)',
+      fontSize: 14,
+    },
     cardBookmark: { position: 'absolute', right: 16, top: 16 },
-    metaRow: { position: 'absolute', left: 16, bottom: 12, flexDirection: 'row', gap: 7 },
-    metaPill: { height: 33, color: colors.text, fontSize: 15, lineHeight: 20, borderWidth: isDark ? 1 : 0, borderColor: colors.border, backgroundColor: isDark ? '#080808' : '#F6F6F6', borderRadius: 40, paddingHorizontal: 12, paddingVertical: 6 },
-    centerState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
-    emptyState: { flex: 1, minHeight: 360, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 42 },
-    browsePlacesButton: { height: 46, marginTop: 8, paddingHorizontal: 24, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    metaRow: {
+      position: 'absolute',
+      left: 16,
+      bottom: 12,
+      flexDirection: 'row',
+      gap: 7,
+    },
+    metaPill: {
+      height: 33,
+      color: colors.text,
+      fontSize: 15,
+      lineHeight: 20,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: colors.border,
+      backgroundColor: isDark ? '#080808' : '#F6F6F6',
+      borderRadius: 40,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    centerState: {
+      flex: 1,
+      minHeight: 300,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingHorizontal: 42,
+    },
+    emptyState: {
+      flex: 1,
+      minHeight: 360,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingHorizontal: 42,
+    },
+    browsePlacesButton: {
+      height: 46,
+      marginTop: 8,
+      paddingHorizontal: 24,
+      borderRadius: 23,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     browsePlacesText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-    stateTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
-    stateBody: { color: colors.textMuted, fontSize: 15, lineHeight: 20, textAlign: 'center' },
-    retryButton: { marginTop: 4, paddingHorizontal: 20, height: 42, borderRadius: 21, backgroundColor: colors.primary, justifyContent: 'center' },
+    stateTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    stateBody: {
+      color: colors.textMuted,
+      fontSize: 15,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: 4,
+      paddingHorizontal: 20,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+    },
     retryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     pressed: { opacity: 0.75 },
     modalRoot: { flex: 1, justifyContent: 'flex-end' },
     addScreen: { flex: 1, backgroundColor: colors.canvas },
-    addHeader: { paddingTop: 48, paddingBottom: 16, gap: 18, borderBottomWidth: 1, borderBottomColor: colors.border, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: '#080808' },
-    addTitleRow: { height: 34, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    addHeader: {
+      paddingTop: 48,
+      paddingBottom: 16,
+      gap: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      backgroundColor: '#080808',
+    },
+    addTitleRow: {
+      height: 34,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
     addBack: { width: 44, color: colors.text, fontSize: 36, lineHeight: 36 },
-    addTitle: { color: colors.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.4 },
+    addTitle: {
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '600',
+      letterSpacing: -0.4,
+    },
     addTitleSpacer: { width: 44 },
-    addSearch: { height: 44, marginHorizontal: 16, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 22, backgroundColor: colors.surfaceRaised },
+    addSearch: {
+      height: 44,
+      marginHorizontal: 16,
+      paddingHorizontal: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
     selectionList: { flexGrow: 1, paddingBottom: 24 },
-    addFooter: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28, flexDirection: 'row', gap: 10, backgroundColor: '#080808' },
-    cancelButton: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: 22 },
+    addFooter: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 28,
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: '#080808',
+    },
+    cancelButton: {
+      flex: 1,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 22,
+    },
     cancelText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-    confirmButton: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.primary },
+    confirmButton: {
+      flex: 1,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+    },
     confirmText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     createFolderRoot: { flex: 1, justifyContent: 'flex-end' },
-    createFolderScrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
-    createFolderSheet: { minHeight: 390, paddingBottom: 30, borderTopWidth: 1, borderTopColor: '#45474B', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', backgroundColor: '#161616' },
-    createFolderTitleRow: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    createFolderTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', letterSpacing: -0.45 },
+    createFolderScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.72)',
+    },
+    createFolderSheet: {
+      minHeight: 390,
+      paddingBottom: 30,
+      borderTopWidth: 1,
+      borderTopColor: '#45474B',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: '#161616',
+    },
+    createFolderTitleRow: {
+      height: 64,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    createFolderTitle: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: -0.45,
+    },
     closeFolderIcon: { width: 30, height: 30 },
     createFolderField: { flex: 1, padding: 16, gap: 6 },
-    createFolderLabel: { color: '#FFFFFF', opacity: 0.5, fontSize: 13, lineHeight: 16 },
-    createFolderInput: { height: 50, paddingHorizontal: 12, borderRadius: 12, color: '#FFFFFF', backgroundColor: '#080808', fontSize: 16 },
-    folderSuggestionsLabel: { marginTop: 8, color: '#FFFFFF', opacity: 0.6, fontSize: 13 },
+    createFolderLabel: {
+      color: '#FFFFFF',
+      opacity: 0.5,
+      fontSize: 13,
+      lineHeight: 16,
+    },
+    createFolderInput: {
+      height: 50,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      color: '#FFFFFF',
+      backgroundColor: '#080808',
+      fontSize: 16,
+    },
+    folderSuggestionsLabel: {
+      marginTop: 8,
+      color: '#FFFFFF',
+      opacity: 0.6,
+      fontSize: 13,
+    },
     folderSuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    folderSuggestion: { height: 30, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, borderColor: '#45474B', alignItems: 'center', justifyContent: 'center' },
-    folderSuggestionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+    folderSuggestion: {
+      height: 30,
+      paddingHorizontal: 12,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: '#45474B',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    folderSuggestionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
     folderSuggestionText: { color: '#FFFFFF', fontSize: 13 },
     folderSuggestionTextActive: { fontWeight: '700' },
-    createFolderSubmit: { width: 330, height: 54, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: '#4C1816', borderRadius: 27, backgroundColor: '#B82F29' },
+    createFolderSubmit: {
+      width: 330,
+      height: 54,
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 5,
+      borderColor: '#4C1816',
+      borderRadius: 27,
+      backgroundColor: '#B82F29',
+    },
     createFolderSubmitDisabled: { opacity: 0.45 },
-    createFolderSubmitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
-    scrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.56)' },
-    saveSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 0, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    actionSheet: { margin: 16, marginBottom: 24, padding: 16, paddingTop: 20, gap: 4, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    sheetDragArea: { height: 32, alignItems: 'center', justifyContent: 'center' },
-    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
-    sheetTitleRow: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    createFolderSubmitText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+    },
+    scrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.56)',
+    },
+    saveSheet: {
+      margin: 16,
+      marginBottom: 24,
+      padding: 24,
+      paddingTop: 20,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    nameSheet: {
+      margin: 16,
+      marginBottom: 24,
+      padding: 24,
+      paddingTop: 0,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    actionSheet: {
+      margin: 16,
+      marginBottom: 24,
+      padding: 16,
+      paddingTop: 20,
+      gap: 4,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    sheetDragArea: {
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+    },
+    sheetTitleRow: {
+      marginBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
     sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
     sheetCancelText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-    selectionSwipe: { height: 76, overflow: 'hidden', backgroundColor: colors.canvas },
-    selectionRow: { height: 76, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.canvas },
-    selectionName: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    selectionSwipe: {
+      height: 76,
+      overflow: 'hidden',
+      backgroundColor: colors.canvas,
+    },
+    selectionRow: {
+      height: 76,
+      paddingHorizontal: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      backgroundColor: colors.canvas,
+    },
+    selectionName: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
     selectionLabel: { color: colors.text, fontSize: 16 },
     selectionDelete: { width: 24, height: 24 },
-    selectionDeleteAction: { position: 'absolute', right: 0, top: 0, width: 60, height: 76, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceRaised },
-    radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: colors.textMuted, alignItems: 'center', justifyContent: 'center' },
-    radioCircleChecked: { borderColor: colors.primary, backgroundColor: colors.primary },
+    selectionDeleteAction: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      width: 60,
+      height: 76,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    radioCircle: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: colors.textMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioCircleChecked: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
     checkmark: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
     radio: { color: colors.textMuted, fontSize: 22 },
-    newFolderButton: { height: 46, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 23, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
-    addFolderIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+    newFolderButton: {
+      height: 46,
+      marginHorizontal: 16,
+      marginTop: 16,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.primary,
+      borderRadius: 23,
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addFolderIcon: {
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     addFolderIconPart: { position: 'absolute' },
     newFolderText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-    doneButton: { height: 50, marginTop: 4, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    doneButton: {
+      height: 50,
+      marginTop: 4,
+      borderRadius: 25,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    nameInput: { height: 50, marginBottom: 16, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 16 },
+    nameInput: {
+      height: 50,
+      marginBottom: 16,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      color: colors.text,
+      fontSize: 16,
+    },
     actionHeading: { color: colors.textMuted, fontSize: 13, padding: 12 },
-    actionButton: { height: 52, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+    actionButton: {
+      height: 52,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     actionText: { color: colors.text, fontSize: 16, fontWeight: '600' },
     deleteText: { color: '#FF453A', fontSize: 16, fontWeight: '600' },
   });

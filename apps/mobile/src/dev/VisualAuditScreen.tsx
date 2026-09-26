@@ -1,12 +1,18 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
-import { OnboardingFlow, type OnboardingScreen } from '../features/onboarding/OnboardingFlow';
+import {
+  OnboardingFlow,
+  type OnboardingScreen,
+} from '../features/onboarding/OnboardingFlow';
 import {
   PostSignupOnboardingFlow,
   type PostSignupScreen,
 } from '../features/onboarding/PostSignupOnboardingFlow';
-import { MonthlyRecapFlow, type RecapStep } from '../features/recap/MonthlyRecapFlow';
+import {
+  MonthlyRecapFlow,
+  type RecapStep,
+} from '../features/recap/MonthlyRecapFlow';
 import {
   ProductNavigator,
   type MainTabParamList,
@@ -24,7 +30,13 @@ const visualAuditUser = {
   photoURL: null,
 } as unknown as User;
 
-const onboardingScreens: OnboardingScreen[] = ['entry', 'consent', 'phone', 'country', 'otp'];
+const onboardingScreens: OnboardingScreen[] = [
+  'entry',
+  'consent',
+  'phone',
+  'country',
+  'otp',
+];
 const postSignupScreens: PostSignupScreen[] = [
   'profile',
   'city',
@@ -118,13 +130,18 @@ function visualAuditCaseFromUrl(url: string | null): string | null {
   const marker = 'visual-audit/';
   const markerIndex = url.indexOf(marker);
   if (markerIndex < 0) return null;
-  const encodedCase = url.slice(markerIndex + marker.length).split(/[?#]/, 1)[0];
+  const encodedCase = url
+    .slice(markerIndex + marker.length)
+    .split(/[?#]/, 1)[0];
   return encodedCase ? decodeURIComponent(encodedCase) : null;
 }
 
 export function useVisualAuditCase() {
-  const automaticallyCycle = process.env.EXPO_PUBLIC_VISUAL_AUDIT_AUTOCYCLE === 'true';
-  const [auditCase, setAuditCase] = useState<string | null>(automaticallyCycle ? primaryVisualAuditCases[0]! : null);
+  const automaticallyCycle =
+    process.env.EXPO_PUBLIC_VISUAL_AUDIT_AUTOCYCLE === 'true';
+  const [auditCase, setAuditCase] = useState<string | null>(
+    automaticallyCycle ? primaryVisualAuditCases[0]! : null,
+  );
 
   useEffect(() => {
     if (!__DEV__) return undefined;
@@ -165,15 +182,25 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
   const { colors } = useAppTheme();
   const [group, name] = auditCase.split('/');
 
-  if (group === 'onboarding' && onboardingScreens.includes(name as OnboardingScreen)) {
+  if (
+    group === 'onboarding' &&
+    onboardingScreens.includes(name as OnboardingScreen)
+  ) {
     return (
       <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
-        <OnboardingFlow key={auditCase} initialScreen={name as OnboardingScreen} visualAudit />
+        <OnboardingFlow
+          key={auditCase}
+          initialScreen={name as OnboardingScreen}
+          visualAudit
+        />
       </SessionStateOverrideProvider>
     );
   }
 
-  if (group === 'post-signup' && postSignupScreens.includes(name as PostSignupScreen)) {
+  if (
+    group === 'post-signup' &&
+    postSignupScreens.includes(name as PostSignupScreen)
+  ) {
     return (
       <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
         <PostSignupOnboardingFlow
@@ -189,13 +216,16 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
     );
   }
 
-  if (group === 'recap' && (recapSteps.includes(name as RecapStep) || name === 'close')) {
+  if (
+    group === 'recap' &&
+    (recapSteps.includes(name as RecapStep) || name === 'close')
+  ) {
     return (
       <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
         <MonthlyRecapFlow
           key={auditCase}
           initialConfirmingClose={name === 'close'}
-          initialStep={name === 'close' ? 'intro' : name as RecapStep}
+          initialStep={name === 'close' ? 'intro' : (name as RecapStep)}
           onClose={() => undefined}
           user={visualAuditUser}
         />
@@ -208,11 +238,16 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
     const root = productRoots[name];
     const visualAuditRoute: ProductVisualAuditRoute | undefined = tab
       ? { root: 'MainTabs', tab }
-      : root ? { root } : undefined;
+      : root
+        ? { root }
+        : undefined;
     if (visualAuditRoute) {
       return (
         <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
-          <ProductNavigator user={visualAuditUser} visualAuditRoute={visualAuditRoute} />
+          <ProductNavigator
+            user={visualAuditUser}
+            visualAuditRoute={visualAuditRoute}
+          />
         </SessionStateOverrideProvider>
       );
     }
@@ -220,14 +255,23 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
 
   return (
     <View style={[styles.missing, { backgroundColor: colors.canvas }]}>
-      <Text style={[styles.missingTitle, { color: colors.text }]}>Unknown visual audit case</Text>
-      <Text style={[styles.missingCase, { color: colors.textMuted }]}>{auditCase}</Text>
+      <Text style={[styles.missingTitle, { color: colors.text }]}>
+        Unknown visual audit case
+      </Text>
+      <Text style={[styles.missingCase, { color: colors.textMuted }]}>
+        {auditCase}
+      </Text>
     </View>
   );
 }
 
 const styles = responsiveStyleSheet({
-  missing: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  missing: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
   missingTitle: { fontSize: 20, fontWeight: '700' },
   missingCase: { fontSize: 14, marginTop: 8 },
 });

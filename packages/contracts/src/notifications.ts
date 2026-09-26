@@ -30,21 +30,24 @@ export const notificationCategories = [
 export type NotificationCategory = (typeof notificationCategories)[number];
 
 export const notificationSettingCategories = notificationCategories.filter(
-  (category): category is Exclude<NotificationCategory, 'always'> => category !== 'always',
+  (category): category is Exclude<NotificationCategory, 'always'> =>
+    category !== 'always',
 );
-export type NotificationSettingCategory = (typeof notificationSettingCategories)[number];
+export type NotificationSettingCategory =
+  (typeof notificationSettingCategories)[number];
 
-export const notificationCategoryLabels: Record<NotificationCategory, string> = {
-  follows: 'New followers & friend requests',
-  likesComments: 'Likes & comments',
-  friendReviews: "Friends' new reviews",
-  messages: 'Messages',
-  recap: 'Monthly recap',
-  savedPlaces: 'Saved places',
-  reminders: 'Reminders',
-  promotions: 'Promotions & offers',
-  always: 'Always delivered',
-};
+export const notificationCategoryLabels: Record<NotificationCategory, string> =
+  {
+    follows: 'New followers & friend requests',
+    likesComments: 'Likes & comments',
+    friendReviews: "Friends' new reviews",
+    messages: 'Messages',
+    recap: 'Monthly recap',
+    savedPlaces: 'Saved places',
+    reminders: 'Reminders',
+    promotions: 'Promotions & offers',
+    always: 'Always delivered',
+  };
 
 export const notificationChannels = ['inApp', 'push', 'email', 'sms'] as const;
 export type NotificationChannel = (typeof notificationChannels)[number];
@@ -116,7 +119,8 @@ export const notificationTypes = [
 export type NotificationType = (typeof notificationTypes)[number];
 
 /** Legacy buckets the notifications list still groups rows by. */
-export type NotificationKind = 'comment' | 'follow' | 'invite' | 'reward' | 'system';
+export type NotificationKind =
+  'comment' | 'follow' | 'invite' | 'reward' | 'system';
 
 export interface NotificationCopyParams {
   actor?: string | null;
@@ -154,7 +158,10 @@ const emailOnly = ['inApp', 'email'] as const;
 const inAppOnly = ['inApp'] as const;
 const smsOnly = ['sms'] as const;
 
-export const notificationCatalog: Record<NotificationType, NotificationDefinition> = {
+export const notificationCatalog: Record<
+  NotificationType,
+  NotificationDefinition
+> = {
   'follow-new': {
     type: 'follow-new',
     group: 'follows',
@@ -591,19 +598,26 @@ export function isNotificationType(value: unknown): value is NotificationType {
 }
 
 /** Fills `{placeholder}` tokens, drops the ones without a value, and tidies the leftovers. */
-export function renderNotificationTemplate(template: string, params: NotificationCopyParams = {}): string {
-  return template
-    .replace(/\{(\w+)\}/g, (_match, key: string) => {
-      const value = (params as Record<string, unknown>)[key];
-      return value === undefined || value === null || value === '' ? '' : String(value);
-    })
-    .replace(/[“"']{2}/g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.!?])/g, '$1')
-    .replace(/(^[\s—–-]+)|([\s—–-]+$)/g, '')
-    // A dropped placeholder can leave the sentence hanging on its preposition.
-    .replace(/\s+(in|at|on|of|for|to|from)$/i, '')
-    .trim();
+export function renderNotificationTemplate(
+  template: string,
+  params: NotificationCopyParams = {},
+): string {
+  return (
+    template
+      .replace(/\{(\w+)\}/g, (_match, key: string) => {
+        const value = (params as Record<string, unknown>)[key];
+        return value === undefined || value === null || value === ''
+          ? ''
+          : String(value);
+      })
+      .replace(/[“"']{2}/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.!?])/g, '$1')
+      .replace(/(^[\s—–-]+)|([\s—–-]+$)/g, '')
+      // A dropped placeholder can leave the sentence hanging on its preposition.
+      .replace(/\s+(in|at|on|of|for|to|from)$/i, '')
+      .trim()
+  );
 }
 
 export function renderNotificationCopy(
@@ -617,7 +631,10 @@ export function renderNotificationCopy(
   };
 }
 
-export type NotificationCategoryPreferences = Record<NotificationSettingCategory, boolean>;
+export type NotificationCategoryPreferences = Record<
+  NotificationSettingCategory,
+  boolean
+>;
 
 export const defaultNotificationCategoryPreferences: NotificationCategoryPreferences =
   Object.fromEntries(
@@ -626,7 +643,10 @@ export const defaultNotificationCategoryPreferences: NotificationCategoryPrefere
 
 export const notificationCategoryPreferencesSchema = z.object(
   Object.fromEntries(
-    notificationSettingCategories.map((category) => [category, z.boolean().default(true)]),
+    notificationSettingCategories.map((category) => [
+      category,
+      z.boolean().default(true),
+    ]),
   ) as Record<NotificationSettingCategory, z.ZodDefault<z.ZodBoolean>>,
 );
 

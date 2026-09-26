@@ -50,7 +50,10 @@ describe('rating curve geometry', () => {
     expect(layout.outerRadius - layout.ratingArc.radius).toBe(gap);
     expect(layout.straightBottom).toBe(380);
     expect(layout.ratingArc.centerX).toBe(832);
-    expect(layout.ratingArc.centerY).toBeCloseTo(layout.arcDepth - layout.outerRadius, 8);
+    expect(layout.ratingArc.centerY).toBeCloseTo(
+      layout.arcDepth - layout.outerRadius,
+      8,
+    );
   });
 
   it('moves the outer arc endpoints below the venue card', () => {
@@ -70,7 +73,9 @@ describe('rating curve geometry', () => {
     expect(layout.arcDepth).toBe(width / 2);
     expect(middle.y).toBeGreaterThan(left.y);
     expect(middle.y).toBeGreaterThan(right.y);
-    expect(middle.y).toBeCloseTo(layout.ratingArc.centerY + layout.ratingArc.radius, 8);
+    expect(middle.y).toBeCloseTo(
+      layout.ratingArc.centerY + layout.ratingArc.radius,
+      8,
+    );
   });
-
 });

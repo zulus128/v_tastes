@@ -11,7 +11,8 @@ import {
 
 export * from './notifications';
 
-const usernameCharactersError = 'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
+const usernameCharactersError =
+  'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
 
 export const userProfileSchema = z.object({
   uid: z.string().min(1),
@@ -23,10 +24,14 @@ export const userProfileSchema = z.object({
 });
 
 export const createUserProfileInputSchema = z.object({
-  displayName: z.string().trim()
+  displayName: z
+    .string()
+    .trim()
     .min(2, 'Your name must be at least 2 characters long.')
     .max(80, 'Your name must be at most 80 characters long.'),
-  username: z.string().trim()
+  username: z
+    .string()
+    .trim()
     .min(2, 'The username must be at least 2 characters long.')
     .max(40, 'The username must be at most 40 characters long.')
     .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError)
@@ -37,28 +42,49 @@ export const createUserProfileInputSchema = z.object({
 });
 
 export const checkUsernameAvailabilityInputSchema = z.object({
-  username: z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
+  username: z
+    .string()
+    .trim()
+    .min(2)
+    .max(40)
+    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
 });
 
 export const updateProfilePhotoInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512),
 });
 
-export const updateProfileSettingsInputSchema = z.object({
-  displayName: z.string().trim().min(2).max(80),
-  username: z.string().trim().min(2).max(40)
-    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
-  city: z.string().trim().min(2).max(120),
-  favoriteDish: z.string().trim().min(1).max(80),
-  favoriteVenueId: z.string().trim().min(1).max(128),
-}).partial().refine((input) => Object.keys(input).length > 0, 'Provide at least one profile field.');
+export const updateProfileSettingsInputSchema = z
+  .object({
+    displayName: z.string().trim().min(2).max(80),
+    username: z
+      .string()
+      .trim()
+      .min(2)
+      .max(40)
+      .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
+    city: z.string().trim().min(2).max(120),
+    favoriteDish: z.string().trim().min(1).max(80),
+    favoriteVenueId: z.string().trim().min(1).max(128),
+  })
+  .partial()
+  .refine(
+    (input) => Object.keys(input).length > 0,
+    'Provide at least one profile field.',
+  );
 
 export const searchPeopleInputSchema = z.object({
   query: z.string().trim().min(2).max(80),
   limit: z.number().int().min(1).max(50).default(20),
 });
 
-export const discoverTagSchema = z.enum(['trending', 'most-reviewed', 'new', 'for-you', 'hidden-gem']);
+export const discoverTagSchema = z.enum([
+  'trending',
+  'most-reviewed',
+  'new',
+  'for-you',
+  'hidden-gem',
+]);
 
 export const venueSchema = z.object({
   id: z.string().min(1),
@@ -89,20 +115,48 @@ export const reviewSchema = z.object({
   cuisine: z.string().min(1).optional(),
   rating: z.number().min(1).max(5),
   text: z.string().min(1).max(2_000),
-  tags: z.array(z.enum(['quick-bites', 'casual', 'fancy', 'night-out', 'date-night', 'birthday', 'children'])).max(4).default([]),
-  dishReviews: z.array(z.object({
-    id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
-    title: z.string().trim().min(1).max(120),
-    rating: z.number().min(0.5).max(5),
-    photoPath: z.string().trim().min(1).max(512),
-    photoUrl: z.string().url().optional(),
-  })).max(5).default([]),
+  tags: z
+    .array(
+      z.enum([
+        'quick-bites',
+        'casual',
+        'fancy',
+        'night-out',
+        'date-night',
+        'birthday',
+        'children',
+      ]),
+    )
+    .max(4)
+    .default([]),
+  dishReviews: z
+    .array(
+      z.object({
+        id: z
+          .string()
+          .trim()
+          .min(1)
+          .max(128)
+          .regex(/^[a-zA-Z0-9._:-]+$/),
+        title: z.string().trim().min(1).max(120),
+        rating: z.number().min(0.5).max(5),
+        photoPath: z.string().trim().min(1).max(512),
+        photoUrl: z.string().url().optional(),
+      }),
+    )
+    .max(5)
+    .default([]),
   status: z.enum(['published', 'hidden', 'deleted']),
   commentCount: z.number().int().nonnegative(),
   reactionCount: z.number().int().nonnegative(),
 });
 
-export const idempotencyKeySchema = z.string().trim().min(16).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
+export const idempotencyKeySchema = z
+  .string()
+  .trim()
+  .min(16)
+  .max(128)
+  .regex(/^[a-zA-Z0-9._:-]+$/);
 
 // Keep the previous values readable for existing reviews while the composer exposes only
 // the four current visit-context choices.
@@ -117,15 +171,26 @@ export const reviewTagSchema = z.enum([
 ]);
 
 export const dishReviewInputSchema = z.object({
-  id: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
-  title: z.string().trim()
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(/^[a-zA-Z0-9._:-]+$/),
+  title: z
+    .string()
+    .trim()
     .min(1, 'Enter the dish name.')
     .max(120, 'The dish name must be at most 120 characters long.'),
   rating: z.number().min(0.5).max(5),
-  photoPath: z.string().trim()
+  photoPath: z
+    .string()
+    .trim()
     .min(1)
     .max(512)
-    .regex(/^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/),
+    .regex(
+      /^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/,
+    ),
 });
 
 export const createReviewInputSchema = z.object({
@@ -137,12 +202,16 @@ export const createReviewInputSchema = z.object({
   dishReviews: z.array(dishReviewInputSchema).max(5).default([]),
 });
 
-export const editReviewInputSchema = createReviewInputSchema.omit({
-  idempotencyKey: true,
-  venueId: true,
-}).extend({ reviewId: z.string().min(1).max(128) });
+export const editReviewInputSchema = createReviewInputSchema
+  .omit({
+    idempotencyKey: true,
+    venueId: true,
+  })
+  .extend({ reviewId: z.string().min(1).max(128) });
 
-export const deleteReviewInputSchema = z.object({ reviewId: z.string().min(1).max(128) });
+export const deleteReviewInputSchema = z.object({
+  reviewId: z.string().min(1).max(128),
+});
 export const setReviewPinnedInputSchema = z.object({
   reviewId: z.string().min(1).max(128),
   pinned: z.boolean(),
@@ -203,26 +272,36 @@ export const reportReviewInputSchema = z.object({
   details: z.string().trim().max(300).optional(),
 });
 
-export const reactToContentInputSchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
-  targetType: z.enum(['review', 'comment']),
-  reviewId: z.string().min(1).max(128),
-  commentId: z.string().min(1).max(128).optional(),
-  reaction: z.enum(['like']),
-}).refine((input) => input.targetType === 'review' || Boolean(input.commentId), {
-  message: 'A comment id is required for comment reactions.',
-});
+export const reactToContentInputSchema = z
+  .object({
+    idempotencyKey: idempotencyKeySchema,
+    targetType: z.enum(['review', 'comment']),
+    reviewId: z.string().min(1).max(128),
+    commentId: z.string().min(1).max(128).optional(),
+    reaction: z.enum(['like']),
+  })
+  .refine(
+    (input) => input.targetType === 'review' || Boolean(input.commentId),
+    {
+      message: 'A comment id is required for comment reactions.',
+    },
+  );
 
-export const reportContentInputSchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
-  targetType: z.enum(['review', 'comment']),
-  reviewId: z.string().min(1).max(128),
-  commentId: z.string().min(1).max(128).optional(),
-  reason: reportReasonSchema,
-  details: z.string().trim().max(300).optional(),
-}).refine((input) => input.targetType === 'review' || Boolean(input.commentId), {
-  message: 'A comment id is required for comment reports.',
-});
+export const reportContentInputSchema = z
+  .object({
+    idempotencyKey: idempotencyKeySchema,
+    targetType: z.enum(['review', 'comment']),
+    reviewId: z.string().min(1).max(128),
+    commentId: z.string().min(1).max(128).optional(),
+    reason: reportReasonSchema,
+    details: z.string().trim().max(300).optional(),
+  })
+  .refine(
+    (input) => input.targetType === 'review' || Boolean(input.commentId),
+    {
+      message: 'A comment id is required for comment reports.',
+    },
+  );
 
 export const followUserInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
@@ -236,15 +315,17 @@ export const createConversationInputSchema = z.object({
   targetUserId: z.string().min(1).max(128),
 });
 
-export const createActivityInputSchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
-  venueId: z.string().trim().min(1).max(128),
-  startsAt: z.string().datetime(),
-  memberIds: z.array(z.string().min(1).max(128)).min(1).max(20),
-}).refine(
-  (input) => new Set(input.memberIds).size === input.memberIds.length,
-  { message: 'Choose each member only once.', path: ['memberIds'] },
-);
+export const createActivityInputSchema = z
+  .object({
+    idempotencyKey: idempotencyKeySchema,
+    venueId: z.string().trim().min(1).max(128),
+    startsAt: z.string().datetime(),
+    memberIds: z.array(z.string().min(1).max(128)).min(1).max(20),
+  })
+  .refine((input) => new Set(input.memberIds).size === input.memberIds.length, {
+    message: 'Choose each member only once.',
+    path: ['memberIds'],
+  });
 
 export const respondToActivityInvitationInputSchema = z.object({
   activityId: z.string().min(1).max(128),
@@ -267,12 +348,19 @@ export const markConversationReadInputSchema = conversationInputSchema.extend({
   throughMessageId: z.string().min(1).max(128),
 });
 
-export const setTypingStatusInputSchema = conversationInputSchema.extend({ typing: z.boolean() });
+export const setTypingStatusInputSchema = conversationInputSchema.extend({
+  typing: z.boolean(),
+});
 
-export const expoPushTokenSchema = z.string().trim().min(20).max(512).regex(
-  /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9._~+/=-]+\]$/,
-  'The Expo push token is invalid.',
-);
+export const expoPushTokenSchema = z
+  .string()
+  .trim()
+  .min(20)
+  .max(512)
+  .regex(
+    /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9._~+/=-]+\]$/,
+    'The Expo push token is invalid.',
+  );
 
 export const registerPushTokenInputSchema = z.object({
   token: expoPushTokenSchema,
@@ -283,7 +371,9 @@ export const unregisterPushTokenInputSchema = z.object({
   token: expoPushTokenSchema,
 });
 
-export const folderNameSchema = z.string().trim()
+export const folderNameSchema = z
+  .string()
+  .trim()
   .min(1, 'Enter a folder name.')
   .max(40, 'The folder name must be at most 40 characters long.');
 
@@ -347,47 +437,69 @@ export const getLeaderboardInputSchema = pageInputSchema.extend({
   audience: z.enum(['all', 'friends', 'local']).default('all'),
 });
 
-export const getVenuesInputSchema = pageInputSchema.extend({
-  category: z.string().trim().min(1).max(60).optional(),
-  tag: discoverTagSchema.optional(),
-}).refine(
-  (input) => !(input.category && input.tag),
-  'Choose either a category or a Discover tag.',
-);
+export const getVenuesInputSchema = pageInputSchema
+  .extend({
+    category: z.string().trim().min(1).max(60).optional(),
+    tag: discoverTagSchema.optional(),
+  })
+  .refine(
+    (input) => !(input.category && input.tag),
+    'Choose either a category or a Discover tag.',
+  );
 
 export const getPlaceInputSchema = z.object({
   venueId: z.string().trim().min(1).max(128),
 });
 
-export const searchVenuesInputSchema = z.object({
-  query: z.string().trim().min(2).max(160),
-  limit: z.number().int().min(1).max(20).default(10),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
-  message: 'Latitude and longitude must be provided together.',
-});
+export const searchVenuesInputSchema = z
+  .object({
+    query: z.string().trim().min(2).max(160),
+    limit: z.number().int().min(1).max(20).default(10),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (input) =>
+      (input.latitude === undefined) === (input.longitude === undefined),
+    {
+      message: 'Latitude and longitude must be provided together.',
+    },
+  );
 
-export const venueMutationInputSchema = z.object({
-  name: z.string().trim().min(2).max(160),
-  city: z.string().trim().min(2).max(120),
-  address: z.string().trim().min(2).max(300),
-  category: z.string().trim().min(2).max(80),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  googlePlaceId: z.string().trim().min(1).max(256).optional(),
-}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
-  message: 'Latitude and longitude must be provided together.',
-});
+export const venueMutationInputSchema = z
+  .object({
+    name: z.string().trim().min(2).max(160),
+    city: z.string().trim().min(2).max(120),
+    address: z.string().trim().min(2).max(300),
+    category: z.string().trim().min(2).max(80),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    googlePlaceId: z.string().trim().min(1).max(256).optional(),
+  })
+  .refine(
+    (input) =>
+      (input.latitude === undefined) === (input.longitude === undefined),
+    {
+      message: 'Latitude and longitude must be provided together.',
+    },
+  );
 
 export const submitUserVenueInputSchema = venueMutationInputSchema;
 
-export const placeReviewSortSchema = z.enum(['highest', 'lowest', 'popular', 'recent', 'oldest']);
+export const placeReviewSortSchema = z.enum([
+  'highest',
+  'lowest',
+  'popular',
+  'recent',
+  'oldest',
+]);
 
-export const getPlaceReviewsInputSchema = getPlaceInputSchema.merge(pageInputSchema).extend({
-  sort: placeReviewSortSchema.default('recent'),
-  scope: z.enum(['all', 'friends']).default('all'),
-});
+export const getPlaceReviewsInputSchema = getPlaceInputSchema
+  .merge(pageInputSchema)
+  .extend({
+    sort: placeReviewSortSchema.default('recent'),
+    scope: z.enum(['all', 'friends']).default('all'),
+  });
 
 export const completeOnboardingInputSchema = z.object({
   version: z.number().int().positive(),
@@ -397,17 +509,25 @@ export const completeOnboardingInputSchema = z.object({
   appearance: z.enum(['light', 'dark', 'system']).default('system'),
 });
 
-export const askTastesAiInputSchema = z.object({
-  prompt: z.string().trim().min(1).max(500),
-  context: z.array(z.string().trim().min(1).max(500)).max(10).optional(),
-  location: z.string().trim().min(1).max(120).optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-}).refine((input) => (input.latitude === undefined) === (input.longitude === undefined), {
-  message: 'Latitude and longitude must be provided together.',
-});
+export const askTastesAiInputSchema = z
+  .object({
+    prompt: z.string().trim().min(1).max(500),
+    context: z.array(z.string().trim().min(1).max(500)).max(10).optional(),
+    location: z.string().trim().min(1).max(120).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (input) =>
+      (input.latitude === undefined) === (input.longitude === undefined),
+    {
+      message: 'Latitude and longitude must be provided together.',
+    },
+  );
 
-export const notificationInputSchema = z.object({ notificationId: z.string().min(1).max(128) });
+export const notificationInputSchema = z.object({
+  notificationId: z.string().min(1).max(128),
+});
 export const sendCampaignNotificationInputSchema = z.object({
   type: z.enum(['city-launched', 'new-feature', 'partner-offer']),
   city: z.string().trim().min(2).max(120).optional(),
@@ -420,15 +540,25 @@ export const savedPlaceProximityInputSchema = z.object({
   venueId: z.string().trim().min(1).max(128),
   event: z.enum(['arrived', 'left']),
 });
-export const requestInputSchema = z.object({ requestId: z.string().min(1).max(128), response: z.enum(['accepted', 'declined']) });
+export const requestInputSchema = z.object({
+  requestId: z.string().min(1).max(128),
+  response: z.enum(['accepted', 'declined']),
+});
 export const createGroupInputSchema = z.object({
   name: z.string().trim().min(2).max(60),
   memberIds: z.array(z.string().min(1).max(128)).min(1).max(50),
 });
-export const groupInputSchema = z.object({ groupId: z.string().min(1).max(128) });
-export const updateGroupMembersInputSchema = groupInputSchema.extend({ memberIds: z.array(z.string().min(1).max(128)).max(50) });
+export const groupInputSchema = z.object({
+  groupId: z.string().min(1).max(128),
+});
+export const updateGroupMembersInputSchema = groupInputSchema.extend({
+  memberIds: z.array(z.string().min(1).max(128)).max(50),
+});
 export const updateNotificationPreferencesInputSchema = z.object({
-  enabled: z.boolean(), push: z.boolean(), email: z.boolean(), sms: z.boolean(),
+  enabled: z.boolean(),
+  push: z.boolean(),
+  email: z.boolean(),
+  sms: z.boolean(),
   categories: notificationCategoryPreferencesSchema.optional(),
 });
 export const reportCommentInputSchema = z.object({
@@ -439,17 +569,25 @@ export const reportCommentInputSchema = z.object({
   details: z.string().trim().max(300).optional(),
 });
 
-export const phoneNumberSchema = z.string().trim().regex(
-  /^\+[1-9]\d{7,14}$/,
-  'The phone number must use E.164 format, for example +905551234567.',
-);
+export const phoneNumberSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\+[1-9]\d{7,14}$/,
+    'The phone number must use E.164 format, for example +905551234567.',
+  );
 
-export const importContactsInputSchema = z.object({
-  phoneNumbers: z.array(phoneNumberSchema).max(500).default([]),
-  emails: z.array(z.string().trim().toLowerCase().email().max(254)).max(500).default([]),
-}).refine((input) => input.phoneNumbers.length + input.emails.length > 0, {
-  message: 'Provide at least one contact.',
-});
+export const importContactsInputSchema = z
+  .object({
+    phoneNumbers: z.array(phoneNumberSchema).max(500).default([]),
+    emails: z
+      .array(z.string().trim().toLowerCase().email().max(254))
+      .max(500)
+      .default([]),
+  })
+  .refine((input) => input.phoneNumbers.length + input.emails.length > 0, {
+    message: 'Provide at least one contact.',
+  });
 
 export const requestPhoneOtpInputSchema = z.object({
   phoneNumber: phoneNumberSchema,
@@ -457,7 +595,9 @@ export const requestPhoneOtpInputSchema = z.object({
 
 export const verifyPhoneOtpInputSchema = z.object({
   challengeId: z.string().min(16).max(128),
-  code: z.string().regex(/^\d{4}$/, 'The verification code must contain 4 digits.'),
+  code: z
+    .string()
+    .regex(/^\d{4}$/, 'The verification code must contain 4 digits.'),
 });
 
 export const healthCheckResultSchema = z.object({
@@ -467,10 +607,18 @@ export const healthCheckResultSchema = z.object({
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
-export type CreateUserProfileInput = z.infer<typeof createUserProfileInputSchema>;
-export type CheckUsernameAvailabilityInput = z.infer<typeof checkUsernameAvailabilityInputSchema>;
-export type UpdateProfilePhotoInput = z.infer<typeof updateProfilePhotoInputSchema>;
-export type UpdateProfileSettingsInput = z.infer<typeof updateProfileSettingsInputSchema>;
+export type CreateUserProfileInput = z.infer<
+  typeof createUserProfileInputSchema
+>;
+export type CheckUsernameAvailabilityInput = z.infer<
+  typeof checkUsernameAvailabilityInputSchema
+>;
+export type UpdateProfilePhotoInput = z.infer<
+  typeof updateProfilePhotoInputSchema
+>;
+export type UpdateProfileSettingsInput = z.infer<
+  typeof updateProfileSettingsInputSchema
+>;
 export type SearchPeopleInput = z.infer<typeof searchPeopleInputSchema>;
 export type DiscoverTag = z.infer<typeof discoverTagSchema>;
 export type Venue = z.infer<typeof venueSchema>;
@@ -499,16 +647,26 @@ export type ReactToContentInput = z.infer<typeof reactToContentInputSchema>;
 export type ReportContentInput = z.infer<typeof reportContentInputSchema>;
 export type FollowUserInput = z.infer<typeof followUserInputSchema>;
 export type RemoveFollowerInput = z.infer<typeof removeFollowerInputSchema>;
-export type CreateConversationInput = z.infer<typeof createConversationInputSchema>;
+export type CreateConversationInput = z.infer<
+  typeof createConversationInputSchema
+>;
 export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
-export type RespondToActivityInvitationInput = z.infer<typeof respondToActivityInvitationInputSchema>;
+export type RespondToActivityInvitationInput = z.infer<
+  typeof respondToActivityInvitationInputSchema
+>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type HideConversationInput = z.infer<typeof hideConversationInputSchema>;
-export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
+export type MarkConversationReadInput = z.infer<
+  typeof markConversationReadInputSchema
+>;
 export type SetTypingStatusInput = z.infer<typeof setTypingStatusInputSchema>;
-export type RegisterPushTokenInput = z.infer<typeof registerPushTokenInputSchema>;
-export type UnregisterPushTokenInput = z.infer<typeof unregisterPushTokenInputSchema>;
+export type RegisterPushTokenInput = z.infer<
+  typeof registerPushTokenInputSchema
+>;
+export type UnregisterPushTokenInput = z.infer<
+  typeof unregisterPushTokenInputSchema
+>;
 export type CreateFolderInput = z.infer<typeof createFolderInputSchema>;
 export type RenameFolderInput = z.infer<typeof renameFolderInputSchema>;
 export type DeleteFolderInput = z.infer<typeof deleteFolderInputSchema>;
@@ -518,22 +676,40 @@ export type GetFavouritesInput = z.infer<typeof getFavouritesInputSchema>;
 export type PageInput = z.infer<typeof pageInputSchema>;
 export type GetFeedInput = z.infer<typeof getFeedInputSchema>;
 export type GetCommentsInput = z.infer<typeof getCommentsInputSchema>;
-export type GetCommentRepliesInput = z.infer<typeof getCommentRepliesInputSchema>;
-export type GetCommentContextInput = z.infer<typeof getCommentContextInputSchema>;
-export type ListNotificationsInput = z.infer<typeof listNotificationsInputSchema>;
-export type ListConversationsInput = z.infer<typeof listConversationsInputSchema>;
+export type GetCommentRepliesInput = z.infer<
+  typeof getCommentRepliesInputSchema
+>;
+export type GetCommentContextInput = z.infer<
+  typeof getCommentContextInputSchema
+>;
+export type ListNotificationsInput = z.infer<
+  typeof listNotificationsInputSchema
+>;
+export type ListConversationsInput = z.infer<
+  typeof listConversationsInputSchema
+>;
 export type GetMessagesInput = z.infer<typeof getMessagesInputSchema>;
 export type GetLeaderboardInput = z.infer<typeof getLeaderboardInputSchema>;
-export type CompleteOnboardingInput = z.infer<typeof completeOnboardingInputSchema>;
+export type CompleteOnboardingInput = z.infer<
+  typeof completeOnboardingInputSchema
+>;
 export type AskTastesAiInput = z.infer<typeof askTastesAiInputSchema>;
 export type NotificationInput = z.infer<typeof notificationInputSchema>;
-export type SavedPlaceProximityInput = z.infer<typeof savedPlaceProximityInputSchema>;
-export type SendCampaignNotificationInput = z.infer<typeof sendCampaignNotificationInputSchema>;
+export type SavedPlaceProximityInput = z.infer<
+  typeof savedPlaceProximityInputSchema
+>;
+export type SendCampaignNotificationInput = z.infer<
+  typeof sendCampaignNotificationInputSchema
+>;
 export type RequestInput = z.infer<typeof requestInputSchema>;
 export type CreateGroupInput = z.infer<typeof createGroupInputSchema>;
 export type GroupInput = z.infer<typeof groupInputSchema>;
-export type UpdateGroupMembersInput = z.infer<typeof updateGroupMembersInputSchema>;
-export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesInputSchema>;
+export type UpdateGroupMembersInput = z.infer<
+  typeof updateGroupMembersInputSchema
+>;
+export type UpdateNotificationPreferencesInput = z.infer<
+  typeof updateNotificationPreferencesInputSchema
+>;
 export type ReportCommentInput = z.infer<typeof reportCommentInputSchema>;
 export type ProfileExtrasInput = z.infer<typeof profileExtrasInputSchema>;
 export type SetUserBlockedInput = z.infer<typeof setUserBlockedInputSchema>;
@@ -587,9 +763,28 @@ export interface AppNotification {
   unread: boolean;
   createdAt: string;
 }
-export interface AppRequest { id: string; kind: 'activity' | 'group'; title: string; body: string; senderName: string; targetId: string; createdAt: string; }
-export interface MonthlyRecapPlace { venueId: string; name: string; address: string; rating: number; imageUrl: string | null; area: string; }
-export interface MonthlyRecapDish { name: string; rating: number; imageUrl: string | null; }
+export interface AppRequest {
+  id: string;
+  kind: 'activity' | 'group';
+  title: string;
+  body: string;
+  senderName: string;
+  targetId: string;
+  createdAt: string;
+}
+export interface MonthlyRecapPlace {
+  venueId: string;
+  name: string;
+  address: string;
+  rating: number;
+  imageUrl: string | null;
+  area: string;
+}
+export interface MonthlyRecapDish {
+  name: string;
+  rating: number;
+  imageUrl: string | null;
+}
 export interface MonthlyRecapResult {
   month: string;
   previousMonth: string;
@@ -605,10 +800,36 @@ export interface MonthlyRecapResult {
   topPlaces: MonthlyRecapPlace[];
   topDishes: MonthlyRecapDish[];
 }
-export interface GroupMember { userId: string; displayName: string; username: string | null; photoUrl: string | null; admin: boolean; }
-export interface TastesGroup { id: string; name: string; adminId: string; members: GroupMember[]; pendingMembers: GroupMember[]; createdAt: string; }
-export interface ProfileConnection { userId: string; displayName: string; username: string | null; photoUrl: string | null; following: boolean; }
-export interface ProfileExtrasResult { blocked: boolean; followers: ProfileConnection[]; following: ProfileConnection[]; level: number; xp: number; notificationPreferences: NotificationPreferences; }
+export interface GroupMember {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
+  admin: boolean;
+}
+export interface TastesGroup {
+  id: string;
+  name: string;
+  adminId: string;
+  members: GroupMember[];
+  pendingMembers: GroupMember[];
+  createdAt: string;
+}
+export interface ProfileConnection {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  photoUrl: string | null;
+  following: boolean;
+}
+export interface ProfileExtrasResult {
+  blocked: boolean;
+  followers: ProfileConnection[];
+  following: ProfileConnection[];
+  level: number;
+  xp: number;
+  notificationPreferences: NotificationPreferences;
+}
 
 export interface Page<T> {
   items: T[];
@@ -772,7 +993,9 @@ export interface ProfilePhotoResult {
   photoUrl: string;
 }
 
-export interface UsernameAvailabilityResult { available: boolean; }
+export interface UsernameAvailabilityResult {
+  available: boolean;
+}
 
 export interface ActivityCandidate {
   userId: string;

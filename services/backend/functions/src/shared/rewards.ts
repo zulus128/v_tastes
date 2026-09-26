@@ -6,7 +6,11 @@ export function levelForXp(xp: number): number {
 }
 
 /** Raises the level-up notification when an XP change crosses a level boundary. */
-export async function notifyLevelChange(profileId: string, previousXp: number, nextXp: number): Promise<void> {
+export async function notifyLevelChange(
+  profileId: string,
+  previousXp: number,
+  nextXp: number,
+): Promise<void> {
   const previousLevel = levelForXp(previousXp);
   const nextLevel = levelForXp(nextXp);
   if (nextLevel <= previousLevel) return;

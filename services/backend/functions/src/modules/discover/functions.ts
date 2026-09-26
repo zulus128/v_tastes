@@ -1,4 +1,9 @@
-import { getPlaceInputSchema, getPlaceReviewsInputSchema, getVenuesInputSchema, searchPeopleInputSchema } from '@tastes/contracts';
+import {
+  getPlaceInputSchema,
+  getPlaceReviewsInputSchema,
+  getVenuesInputSchema,
+  searchPeopleInputSchema,
+} from '@tastes/contracts';
 import type {
   DiscoverFeed,
   DiscoverPeopleResult,
@@ -10,48 +15,97 @@ import type {
   Page,
   Venue,
 } from '@tastes/contracts';
-import { FieldPath, Timestamp, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  Timestamp,
+  type QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
-import { cursorDate, decodeCursor, encodeCursor } from '../../shared/pagination';
+import {
+  cursorDate,
+  decodeCursor,
+  encodeCursor,
+} from '../../shared/pagination';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
-import { calculateRecommendationMatch, isRecommendation } from './recommendations';
+import {
+  calculateRecommendationMatch,
+  isRecommendation,
+} from './recommendations';
 import { userSearchCandidateTokens, userSearchScore } from '../users/search';
 
-function toVenue(document: QueryDocumentSnapshot, matchPercent?: number): Venue {
+function toVenue(
+  document: QueryDocumentSnapshot,
+  matchPercent?: number,
+): Venue {
   return {
     id: document.id,
     name: String(document.get('name') ?? ''),
     city: String(document.get('city') ?? ''),
     status: document.get('status') as Venue['status'],
-    address: document.get('address') ? String(document.get('address')) : undefined,
-    category: document.get('category') ? String(document.get('category')) : undefined,
-    imageUrl: document.get('imageUrl') ? String(document.get('imageUrl')) : undefined,
-    priceLevel: document.get('priceLevel') != null ? Number(document.get('priceLevel')) : undefined,
-    distanceKm: document.get('distanceKm') != null ? Number(document.get('distanceKm')) : undefined,
-    rating: document.get('rating') != null ? Number(document.get('rating')) : undefined,
-    reviewCount: document.get('reviewCount') != null ? Number(document.get('reviewCount')) : undefined,
+    address: document.get('address')
+      ? String(document.get('address'))
+      : undefined,
+    category: document.get('category')
+      ? String(document.get('category'))
+      : undefined,
+    imageUrl: document.get('imageUrl')
+      ? String(document.get('imageUrl'))
+      : undefined,
+    priceLevel:
+      document.get('priceLevel') != null
+        ? Number(document.get('priceLevel'))
+        : undefined,
+    distanceKm:
+      document.get('distanceKm') != null
+        ? Number(document.get('distanceKm'))
+        : undefined,
+    rating:
+      document.get('rating') != null
+        ? Number(document.get('rating'))
+        : undefined,
+    reviewCount:
+      document.get('reviewCount') != null
+        ? Number(document.get('reviewCount'))
+        : undefined,
     ...(matchPercent == null ? {} : { matchPercent }),
-    latitude: document.get('latitude') != null ? Number(document.get('latitude')) : undefined,
-    longitude: document.get('longitude') != null ? Number(document.get('longitude')) : undefined,
+    latitude:
+      document.get('latitude') != null
+        ? Number(document.get('latitude'))
+        : undefined,
+    longitude:
+      document.get('longitude') != null
+        ? Number(document.get('longitude'))
+        : undefined,
     discoverTags: Array.isArray(document.get('discoverTags'))
-      ? (document.get('discoverTags') as unknown[]).filter((value): value is string => typeof value === 'string') as DiscoverTag[]
+      ? ((document.get('discoverTags') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        ) as DiscoverTag[])
       : [],
   };
 }
 
-function toDiscoverPerson(document: QueryDocumentSnapshot, following: boolean): DiscoverPerson {
+function toDiscoverPerson(
+  document: QueryDocumentSnapshot,
+  following: boolean,
+): DiscoverPerson {
   return {
     userId: document.id,
     displayName: String(document.get('displayName') ?? ''),
-    username: document.get('username') ? String(document.get('username')) : null,
-    photoUrl: document.get('photoUrl') ? String(document.get('photoUrl')) : null,
+    username: document.get('username')
+      ? String(document.get('username'))
+      : null,
+    photoUrl: document.get('photoUrl')
+      ? String(document.get('photoUrl'))
+      : null,
     bio: String(document.get('bio') ?? ''),
     favoriteCuisines: Array.isArray(document.get('favoriteCuisines'))
-      ? (document.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string')
+      ? (document.get('favoriteCuisines') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
       : [],
     weeklyFollowerGrowth: Number(document.get('weeklyFollowerGrowth') ?? 0),
     followerCount: Number(document.get('followerCount') ?? 0),
@@ -68,7 +122,8 @@ async function fetchTaggedVenues(
   direction: FirebaseFirestore.OrderByDirection,
   take: number,
 ): Promise<Venue[]> {
-  const snapshot = await db.collection('venues')
+  const snapshot = await db
+    .collection('venues')
     .where('status', '==', 'active')
     .where('discoverTags', 'array-contains', tag)
     .orderBy(orderField, direction)
@@ -82,8 +137,11 @@ interface RecommendationCandidate {
   venue: Venue;
 }
 
-async function fetchRecommendationCandidates(take: number): Promise<RecommendationCandidate[]> {
-  const snapshot = await db.collection('venues')
+async function fetchRecommendationCandidates(
+  take: number,
+): Promise<RecommendationCandidate[]> {
+  const snapshot = await db
+    .collection('venues')
     .where('status', '==', 'active')
     .where('discoverTags', 'array-contains', 'for-you')
     .orderBy('rating', 'desc')
@@ -92,19 +150,28 @@ async function fetchRecommendationCandidates(take: number): Promise<Recommendati
 
   return snapshot.docs.map((document) => {
     const placeTags = Array.isArray(document.get('placeTags'))
-      ? (document.get('placeTags') as unknown[]).filter((value): value is string => typeof value === 'string')
+      ? (document.get('placeTags') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
       : [];
     const popularDishes = Array.isArray(document.get('popularDishes'))
       ? (document.get('popularDishes') as unknown[]).flatMap((value) => {
-        if (!value || typeof value !== 'object') return [];
-        const name = (value as { name?: unknown }).name;
-        return typeof name === 'string' ? [name] : [];
-      })
+          if (!value || typeof value !== 'object') return [];
+          const name = (value as { name?: unknown }).name;
+          return typeof name === 'string' ? [name] : [];
+        })
       : [];
     const venue = toVenue(document);
     return {
       venue,
-      searchableText: [venue.name, venue.category, ...placeTags, ...popularDishes].filter(Boolean).join(' '),
+      searchableText: [
+        venue.name,
+        venue.category,
+        ...placeTags,
+        ...popularDishes,
+      ]
+        .filter(Boolean)
+        .join(' '),
     };
   });
 }
@@ -112,132 +179,293 @@ async function fetchRecommendationCandidates(take: number): Promise<Recommendati
 export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const userProfile = await db.collection('users').doc(uid).get();
-  const userCity = String(userProfile.get('city') ?? '').trim().toLocaleLowerCase();
+  const userCity = String(userProfile.get('city') ?? '')
+    .trim()
+    .toLocaleLowerCase();
   const favoriteCuisines = Array.isArray(userProfile.get('favoriteCuisines'))
-    ? (userProfile.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string').map((value) => value.toLocaleLowerCase())
+    ? (userProfile.get('favoriteCuisines') as unknown[])
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.toLocaleLowerCase())
     : [];
-  const favoriteDish = String((userProfile.get('tastePreferences') as { favoriteDish?: unknown } | undefined)?.favoriteDish ?? '').trim().toLocaleLowerCase();
+  const favoriteDish = String(
+    (
+      userProfile.get('tastePreferences') as
+        { favoriteDish?: unknown } | undefined
+    )?.favoriteDish ?? '',
+  )
+    .trim()
+    .toLocaleLowerCase();
   const userRef = db.collection('users').doc(uid);
-  const [trending, newSpots, mostReviewed, forYouCandidates, hiddenGems, reviewsSnapshot, topReviewerSnapshot, ownReviews, savedVenues, following] = await Promise.all([
+  const [
+    trending,
+    newSpots,
+    mostReviewed,
+    forYouCandidates,
+    hiddenGems,
+    reviewsSnapshot,
+    topReviewerSnapshot,
+    ownReviews,
+    savedVenues,
+    following,
+  ] = await Promise.all([
     fetchTaggedVenues('trending', 'rating', 'desc', 3),
     fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
     fetchTaggedVenues('most-reviewed', 'reviewCount', 'desc', 6),
     fetchRecommendationCandidates(12),
     fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
-    db.collection('reviews').where('status', '==', 'published').orderBy('reactionCount', 'desc').limit(3).get(),
-    db.collection('users').where('status', '==', 'active').orderBy('reviewCount', 'desc').limit(10).get(),
-    db.collection('reviews').where('authorId', '==', uid).where('status', '==', 'published').limit(100).get(),
+    db
+      .collection('reviews')
+      .where('status', '==', 'published')
+      .orderBy('reactionCount', 'desc')
+      .limit(3)
+      .get(),
+    db
+      .collection('users')
+      .where('status', '==', 'active')
+      .orderBy('reviewCount', 'desc')
+      .limit(10)
+      .get(),
+    db
+      .collection('reviews')
+      .where('authorId', '==', uid)
+      .where('status', '==', 'published')
+      .limit(100)
+      .get(),
     userRef.collection('savedVenues').limit(100).get(),
     userRef.collection('following').limit(50).get(),
   ]);
-  const preferenceVenueIds = [...new Set([
-    ...ownReviews.docs.map((review) => String(review.get('venueId') ?? '')),
-    ...savedVenues.docs.map((saved) => String(saved.get('venueId') ?? saved.id)),
-  ].filter(Boolean))];
+  const preferenceVenueIds = [
+    ...new Set(
+      [
+        ...ownReviews.docs.map((review) => String(review.get('venueId') ?? '')),
+        ...savedVenues.docs.map((saved) =>
+          String(saved.get('venueId') ?? saved.id),
+        ),
+      ].filter(Boolean),
+    ),
+  ];
   const [preferenceVenues, followedProfiles] = await Promise.all([
     preferenceVenueIds.length > 0
-      ? db.getAll(...preferenceVenueIds.map((id) => db.collection('venues').doc(id)))
+      ? db.getAll(
+          ...preferenceVenueIds.map((id) => db.collection('venues').doc(id)),
+        )
       : Promise.resolve([]),
     following.docs.length > 0
-      ? db.getAll(...following.docs.map((edge) => db.collection('users').doc(edge.id)))
+      ? db.getAll(
+          ...following.docs.map((edge) => db.collection('users').doc(edge.id)),
+        )
       : Promise.resolve([]),
   ]);
-  const categoryByVenue = new Map(preferenceVenues.map((venue) => [venue.id, String(venue.get('category') ?? '')]));
+  const categoryByVenue = new Map(
+    preferenceVenues.map((venue) => [
+      venue.id,
+      String(venue.get('category') ?? ''),
+    ]),
+  );
   const cuisineWeights = new Map<string, number>();
-  favoriteCuisines.forEach((cuisine) => cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 1));
+  favoriteCuisines.forEach((cuisine) =>
+    cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 1),
+  );
   ownReviews.docs.forEach((review) => {
-    const cuisine = String(review.get('cuisine') ?? categoryByVenue.get(String(review.get('venueId') ?? '')) ?? '').trim().toLocaleLowerCase();
-    if (cuisine) cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 3);
+    const cuisine = String(
+      review.get('cuisine') ??
+        categoryByVenue.get(String(review.get('venueId') ?? '')) ??
+        '',
+    )
+      .trim()
+      .toLocaleLowerCase();
+    if (cuisine)
+      cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 3);
   });
   savedVenues.docs.forEach((saved) => {
-    const cuisine = String(categoryByVenue.get(String(saved.get('venueId') ?? saved.id)) ?? '').trim().toLocaleLowerCase();
-    if (cuisine) cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 2);
+    const cuisine = String(
+      categoryByVenue.get(String(saved.get('venueId') ?? saved.id)) ?? '',
+    )
+      .trim()
+      .toLocaleLowerCase();
+    if (cuisine)
+      cuisineWeights.set(cuisine, (cuisineWeights.get(cuisine) ?? 0) + 2);
   });
   const moodWeights = new Map<string, number>();
   ownReviews.docs.forEach((review) => {
-    const tags = Array.isArray(review.get('tags')) ? review.get('tags') as unknown[] : [];
-    tags.filter((tag): tag is string => typeof tag === 'string').forEach((tag) => moodWeights.set(tag, (moodWeights.get(tag) ?? 0) + 1));
+    const tags = Array.isArray(review.get('tags'))
+      ? (review.get('tags') as unknown[])
+      : [];
+    tags
+      .filter((tag): tag is string => typeof tag === 'string')
+      .forEach((tag) => moodWeights.set(tag, (moodWeights.get(tag) ?? 0) + 1));
   });
   const friendTastes = followedProfiles.flatMap((profile) => {
     const cuisines = Array.isArray(profile.get('favoriteCuisines'))
-      ? (profile.get('favoriteCuisines') as unknown[]).filter((value): value is string => typeof value === 'string')
+      ? (profile.get('favoriteCuisines') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
       : [];
-    return cuisines.map((cuisine) => ({ cuisine: cuisine.toLocaleLowerCase(), name: String(profile.get('displayName') ?? 'A friend') }));
+    return cuisines.map((cuisine) => ({
+      cuisine: cuisine.toLocaleLowerCase(),
+      name: String(profile.get('displayName') ?? 'A friend'),
+    }));
   });
-  const rankedCuisines = [...cuisineWeights.entries()].sort((a, b) => b[1] - a[1]);
+  const rankedCuisines = [...cuisineWeights.entries()].sort(
+    (a, b) => b[1] - a[1],
+  );
   const rankedMoods = [...moodWeights.entries()].sort((a, b) => b[1] - a[1]);
   const forYou = forYouCandidates
-    .filter(({ venue }) => !userCity || venue.city.trim().toLocaleLowerCase() === userCity)
+    .filter(
+      ({ venue }) =>
+        !userCity || venue.city.trim().toLocaleLowerCase() === userCity,
+    )
     .map(({ venue, searchableText }) => {
-      const match = calculateRecommendationMatch({ favoriteCuisines: rankedCuisines.map(([cuisine]) => cuisine), favoriteDish, rating: venue.rating, searchableText });
+      const match = calculateRecommendationMatch({
+        favoriteCuisines: rankedCuisines.map(([cuisine]) => cuisine),
+        favoriteDish,
+        rating: venue.rating,
+        searchableText,
+      });
       const normalized = searchableText.toLocaleLowerCase();
-      const cuisine = rankedCuisines.find(([value]) => normalized.includes(value));
-      const mood = rankedMoods.find(([value]) => normalized.includes(value.replace('-', ' ')) || normalized.includes(value));
-      const friend = friendTastes.find(({ cuisine: value }) => normalized.includes(value));
+      const cuisine = rankedCuisines.find(([value]) =>
+        normalized.includes(value),
+      );
+      const mood = rankedMoods.find(
+        ([value]) =>
+          normalized.includes(value.replace('-', ' ')) ||
+          normalized.includes(value),
+      );
+      const friend = friendTastes.find(({ cuisine: value }) =>
+        normalized.includes(value),
+      );
       const preferenceScore = cuisine?.[1] ?? 0;
       const moodScore = mood?.[1] ?? 0;
       const friendScore = friend ? 1 : 0;
       const recommendationReason = cuisine
         ? `Because you ❤️ ${venue.category ?? cuisine[0]}`
-        : mood ? `Saved for ${mood[0].replace('-', ' ')}`
-          : friend ? `Matches ${friend.name}’s tastes`
-            : venue.category ? `Because you ❤️ ${venue.category}` : 'Popular near you';
-      return { venue, match, preferenceScore, moodScore, friendScore, recommendationReason };
+        : mood
+          ? `Saved for ${mood[0].replace('-', ' ')}`
+          : friend
+            ? `Matches ${friend.name}’s tastes`
+            : venue.category
+              ? `Because you ❤️ ${venue.category}`
+              : 'Popular near you';
+      return {
+        venue,
+        match,
+        preferenceScore,
+        moodScore,
+        friendScore,
+        recommendationReason,
+      };
     })
-    .filter(({ match, preferenceScore, moodScore, friendScore }) => isRecommendation(match) || preferenceScore > 0 || moodScore > 0 || friendScore > 0)
-    .sort((left, right) => right.preferenceScore - left.preferenceScore
-      || right.moodScore - left.moodScore
-      || right.friendScore - left.friendScore
-      || right.match.matchPercent - left.match.matchPercent
-      || (right.venue.rating ?? 0) - (left.venue.rating ?? 0))
+    .filter(
+      ({ match, preferenceScore, moodScore, friendScore }) =>
+        isRecommendation(match) ||
+        preferenceScore > 0 ||
+        moodScore > 0 ||
+        friendScore > 0,
+    )
+    .sort(
+      (left, right) =>
+        right.preferenceScore - left.preferenceScore ||
+        right.moodScore - left.moodScore ||
+        right.friendScore - left.friendScore ||
+        right.match.matchPercent - left.match.matchPercent ||
+        (right.venue.rating ?? 0) - (left.venue.rating ?? 0),
+    )
     .slice(0, 3)
-    .map(({ venue, match, recommendationReason }) => ({ ...venue, matchPercent: match.matchPercent, recommendationReason }));
+    .map(({ venue, match, recommendationReason }) => ({
+      ...venue,
+      matchPercent: match.matchPercent,
+      recommendationReason,
+    }));
 
-  const reviewVenueIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('venueId'))))];
-  const reviewAuthorIds = [...new Set(reviewsSnapshot.docs.map((document) => String(document.get('authorId'))))];
-  const [reviewVenueDocs, reviewAuthorDocs] = reviewVenueIds.length > 0 || reviewAuthorIds.length > 0
-    ? await Promise.all([
-      reviewVenueIds.length > 0
-        ? db.getAll(...reviewVenueIds.map((id) => db.collection('venues').doc(id)))
-        : Promise.resolve([]),
-      reviewAuthorIds.length > 0
-        ? db.getAll(...reviewAuthorIds.map((id) => db.collection('users').doc(id)))
-        : Promise.resolve([]),
-    ])
-    : [[], []];
+  const reviewVenueIds = [
+    ...new Set(
+      reviewsSnapshot.docs.map((document) => String(document.get('venueId'))),
+    ),
+  ];
+  const reviewAuthorIds = [
+    ...new Set(
+      reviewsSnapshot.docs.map((document) => String(document.get('authorId'))),
+    ),
+  ];
+  const [reviewVenueDocs, reviewAuthorDocs] =
+    reviewVenueIds.length > 0 || reviewAuthorIds.length > 0
+      ? await Promise.all([
+          reviewVenueIds.length > 0
+            ? db.getAll(
+                ...reviewVenueIds.map((id) => db.collection('venues').doc(id)),
+              )
+            : Promise.resolve([]),
+          reviewAuthorIds.length > 0
+            ? db.getAll(
+                ...reviewAuthorIds.map((id) => db.collection('users').doc(id)),
+              )
+            : Promise.resolve([]),
+        ])
+      : [[], []];
   const venueDetailsById = new Map(
-    reviewVenueDocs.map((document) => [document.id, {
-      category: document.exists ? String(document.get('category') ?? '') : '',
-      city: document.exists ? String(document.get('city') ?? '') : '',
-      imageUrl: document.exists && document.get('imageUrl') ? String(document.get('imageUrl')) : null,
-    }]),
+    reviewVenueDocs.map((document) => [
+      document.id,
+      {
+        category: document.exists ? String(document.get('category') ?? '') : '',
+        city: document.exists ? String(document.get('city') ?? '') : '',
+        imageUrl:
+          document.exists && document.get('imageUrl')
+            ? String(document.get('imageUrl'))
+            : null,
+      },
+    ]),
   );
   const photoUrlByAuthorId = new Map(
-    reviewAuthorDocs.map((document) => [document.id, document.exists && document.get('photoUrl') ? String(document.get('photoUrl')) : null]),
+    reviewAuthorDocs.map((document) => [
+      document.id,
+      document.exists && document.get('photoUrl')
+        ? String(document.get('photoUrl'))
+        : null,
+    ]),
   );
-  const popularReviews: DiscoverReview[] = reviewsSnapshot.docs.map((document) => ({
-    id: document.id,
-    authorId: String(document.get('authorId')),
-    authorDisplayName: String(document.get('authorDisplayName')),
-    authorPhotoUrl: photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
-    venueId: String(document.get('venueId')),
-    venueName: String(document.get('venueName')),
-    venueCity: venueDetailsById.get(String(document.get('venueId')))?.city ?? String(document.get('venueCity') ?? ''),
-    venueCategory: venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
-    cuisine: String(document.get('cuisine') ?? venueDetailsById.get(String(document.get('venueId')))?.category ?? ''),
-    venueImageUrl: venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
-    rating: Number(document.get('rating')),
-    text: String(document.get('text')),
-    reactionCount: Number(document.get('reactionCount') ?? 0),
-    commentCount: Number(document.get('commentCount') ?? 0),
-    tags: Array.isArray(document.get('tags')) ? document.get('tags') as DiscoverReview['tags'] : [],
-    createdAt: timestampToIso(document.get('createdAt')),
-  }));
+  const popularReviews: DiscoverReview[] = reviewsSnapshot.docs.map(
+    (document) => ({
+      id: document.id,
+      authorId: String(document.get('authorId')),
+      authorDisplayName: String(document.get('authorDisplayName')),
+      authorPhotoUrl:
+        photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
+      venueId: String(document.get('venueId')),
+      venueName: String(document.get('venueName')),
+      venueCity:
+        venueDetailsById.get(String(document.get('venueId')))?.city ??
+        String(document.get('venueCity') ?? ''),
+      venueCategory:
+        venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
+      cuisine: String(
+        document.get('cuisine') ??
+          venueDetailsById.get(String(document.get('venueId')))?.category ??
+          '',
+      ),
+      venueImageUrl:
+        venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
+      rating: Number(document.get('rating')),
+      text: String(document.get('text')),
+      reactionCount: Number(document.get('reactionCount') ?? 0),
+      commentCount: Number(document.get('commentCount') ?? 0),
+      tags: Array.isArray(document.get('tags'))
+        ? (document.get('tags') as DiscoverReview['tags'])
+        : [],
+      createdAt: timestampToIso(document.get('createdAt')),
+    }),
+  );
 
-  const topReviewerDoc = topReviewerSnapshot.docs.find((document) => document.id !== uid);
+  const topReviewerDoc = topReviewerSnapshot.docs.find(
+    (document) => document.id !== uid,
+  );
   let topReviewer: DiscoverPerson | null = null;
   if (topReviewerDoc) {
-    const followingDoc = await db.collection('users').doc(uid).collection('following').doc(topReviewerDoc.id).get();
+    const followingDoc = await db
+      .collection('users')
+      .doc(uid)
+      .collection('following')
+      .doc(topReviewerDoc.id)
+      .get();
     topReviewer = toDiscoverPerson(topReviewerDoc, followingDoc.exists);
   }
 
@@ -259,7 +487,8 @@ async function fetchPeople(
   take: number,
   excludeUserId: string,
 ): Promise<QueryDocumentSnapshot[]> {
-  const snapshot = await db.collection('users')
+  const snapshot = await db
+    .collection('users')
     .where('status', '==', 'active')
     .orderBy(orderField, 'desc')
     .limit(take + 1)
@@ -276,14 +505,30 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
     fetchPeople('createdAt', 6, uid),
     fetchPeople('followerCount', 6, uid),
   ]);
-  const candidateIds = [...new Set([...trendingDocs, ...freshDocs, ...suggestedDocs].map((document) => document.id))];
-  const followingDocs = candidateIds.length > 0
-    ? await db.getAll(...candidateIds.map((id) => db.collection('users').doc(uid).collection('following').doc(id)))
-    : [];
-  const followingIds = new Set(followingDocs.filter((document) => document.exists).map((document) => document.id));
-  const toPeople = (documents: QueryDocumentSnapshot[]) => documents.map(
-    (document) => toDiscoverPerson(document, followingIds.has(document.id)),
+  const candidateIds = [
+    ...new Set(
+      [...trendingDocs, ...freshDocs, ...suggestedDocs].map(
+        (document) => document.id,
+      ),
+    ),
+  ];
+  const followingDocs =
+    candidateIds.length > 0
+      ? await db.getAll(
+          ...candidateIds.map((id) =>
+            db.collection('users').doc(uid).collection('following').doc(id),
+          ),
+        )
+      : [];
+  const followingIds = new Set(
+    followingDocs
+      .filter((document) => document.exists)
+      .map((document) => document.id),
   );
+  const toPeople = (documents: QueryDocumentSnapshot[]) =>
+    documents.map((document) =>
+      toDiscoverPerson(document, followingIds.has(document.id)),
+    );
 
   const result: DiscoverPeopleResult = {
     trending: toPeople(trendingDocs),
@@ -299,7 +544,8 @@ export const searchPeople = onCall(callableOptions, async (request) => {
   const candidateTokens = userSearchCandidateTokens(input.query);
   if (candidateTokens.length === 0) return [];
 
-  const snapshot = await db.collection('users')
+  const snapshot = await db
+    .collection('users')
     .where('status', '==', 'active')
     .where('searchTokens', 'array-contains-any', candidateTokens)
     .limit(100)
@@ -314,16 +560,35 @@ export const searchPeople = onCall(callableOptions, async (request) => {
       );
       return score == null ? [] : [{ document, score }];
     })
-    .sort((left, right) => left.score - right.score
-      || Number(right.document.get('followerCount') ?? 0) - Number(left.document.get('followerCount') ?? 0)
-      || left.document.id.localeCompare(right.document.id))
+    .sort(
+      (left, right) =>
+        left.score - right.score ||
+        Number(right.document.get('followerCount') ?? 0) -
+          Number(left.document.get('followerCount') ?? 0) ||
+        left.document.id.localeCompare(right.document.id),
+    )
     .slice(0, input.limit);
 
-  const followingDocs = ranked.length > 0
-    ? await db.getAll(...ranked.map(({ document }) => db.collection('users').doc(uid).collection('following').doc(document.id)))
-    : [];
-  const followingIds = new Set(followingDocs.filter((document) => document.exists).map((document) => document.id));
-  return ranked.map(({ document }) => toDiscoverPerson(document, followingIds.has(document.id)));
+  const followingDocs =
+    ranked.length > 0
+      ? await db.getAll(
+          ...ranked.map(({ document }) =>
+            db
+              .collection('users')
+              .doc(uid)
+              .collection('following')
+              .doc(document.id),
+          ),
+        )
+      : [];
+  const followingIds = new Set(
+    followingDocs
+      .filter((document) => document.exists)
+      .map((document) => document.id),
+  );
+  return ranked.map(({ document }) =>
+    toDiscoverPerson(document, followingIds.has(document.id)),
+  );
 });
 
 export const getVenues = onCall(callableOptions, async (request) => {
@@ -331,12 +596,18 @@ export const getVenues = onCall(callableOptions, async (request) => {
   const input = parseInput(getVenuesInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
 
-  let venuesQuery = db.collection('venues').where('status', '==', 'active') as FirebaseFirestore.Query;
+  let venuesQuery = db
+    .collection('venues')
+    .where('status', '==', 'active') as FirebaseFirestore.Query;
   if (input.category) {
     venuesQuery = venuesQuery.where('category', '==', input.category);
   }
   if (input.tag) {
-    venuesQuery = venuesQuery.where('discoverTags', 'array-contains', input.tag);
+    venuesQuery = venuesQuery.where(
+      'discoverTags',
+      'array-contains',
+      input.tag,
+    );
   }
   venuesQuery = venuesQuery
     .orderBy('rating', 'desc')
@@ -357,26 +628,33 @@ export const getVenues = onCall(callableOptions, async (request) => {
     // index had not propagated yet. Keep the Places tab usable while the
     // index catches up; the normal indexed query remains the fast path.
     if (!input.category || cursor) throw error;
-    const fallbackSnapshot = await db.collection('venues')
+    const fallbackSnapshot = await db
+      .collection('venues')
       .where('status', '==', 'active')
       .where('category', '==', input.category)
       .limit(Math.max(input.limit, 100))
       .get();
-    const fallbackDocs = [...fallbackSnapshot.docs]
-      .sort((left, right) => Number(right.get('rating') ?? 0) - Number(left.get('rating') ?? 0));
+    const fallbackDocs = [...fallbackSnapshot.docs].sort(
+      (left, right) =>
+        Number(right.get('rating') ?? 0) - Number(left.get('rating') ?? 0),
+    );
     return {
       items: fallbackDocs.slice(0, input.limit).map(toVenue),
       nextCursor: null,
     };
   }
-  const pageDocs = snapshot.docs.slice(0, input.limit) as QueryDocumentSnapshot[];
+  const pageDocs = snapshot.docs.slice(
+    0,
+    input.limit,
+  ) as QueryDocumentSnapshot[];
   const last = pageDocs.at(-1);
 
   return {
     items: pageDocs.map(toVenue),
-    nextCursor: snapshot.docs.length > input.limit && last
-      ? encodeCursor({ id: last.id, value: Number(last.get('rating') ?? 0) })
-      : null,
+    nextCursor:
+      snapshot.docs.length > input.limit && last
+        ? encodeCursor({ id: last.id, value: Number(last.get('rating') ?? 0) })
+        : null,
   };
 });
 
@@ -389,21 +667,21 @@ export const getPlace = onCall(callableOptions, async (request) => {
   }
   const openingHours = Array.isArray(document.get('openingHours'))
     ? (document.get('openingHours') as unknown[]).flatMap((value) => {
-      if (!value || typeof value !== 'object') return [];
-      const item = value as { day?: unknown; hours?: unknown };
-      return typeof item.day === 'string' && typeof item.hours === 'string'
-        ? [{ day: item.day, hours: item.hours }]
-        : [];
-    })
+        if (!value || typeof value !== 'object') return [];
+        const item = value as { day?: unknown; hours?: unknown };
+        return typeof item.day === 'string' && typeof item.hours === 'string'
+          ? [{ day: item.day, hours: item.hours }]
+          : [];
+      })
     : [];
   const popularDishes = Array.isArray(document.get('popularDishes'))
     ? (document.get('popularDishes') as unknown[]).flatMap((value) => {
-      if (!value || typeof value !== 'object') return [];
-      const item = value as { name?: unknown; rating?: unknown };
-      return typeof item.name === 'string' && typeof item.rating === 'number'
-        ? [{ name: item.name, rating: item.rating }]
-        : [];
-    })
+        if (!value || typeof value !== 'object') return [];
+        const item = value as { name?: unknown; rating?: unknown };
+        return typeof item.name === 'string' && typeof item.rating === 'number'
+          ? [{ name: item.name, rating: item.rating }]
+          : [];
+      })
     : [];
   const details: PlaceDetails = {
     venue: toVenue(document as QueryDocumentSnapshot),
@@ -411,11 +689,15 @@ export const getPlace = onCall(callableOptions, async (request) => {
     website: document.get('website') ? String(document.get('website')) : null,
     openingHours,
     photoUrls: Array.isArray(document.get('photoUrls'))
-      ? (document.get('photoUrls') as unknown[]).filter((value): value is string => typeof value === 'string')
+      ? (document.get('photoUrls') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
       : [],
     photoCount: Math.max(0, Number(document.get('photoCount') ?? 0)),
     chips: Array.isArray(document.get('placeTags'))
-      ? (document.get('placeTags') as unknown[]).filter((value): value is string => typeof value === 'string')
+      ? (document.get('placeTags') as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
       : [],
     popularDishes,
   };
@@ -437,67 +719,102 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
     popular: { field: 'reactionCount', direction: 'desc' },
     recent: { field: 'createdAt', direction: 'desc' },
     oldest: { field: 'createdAt', direction: 'asc' },
-  }[sort] as { field: 'rating' | 'reactionCount' | 'createdAt'; direction: FirebaseFirestore.OrderByDirection };
-  let reviewsQuery = db.collection('reviews')
+  }[sort] as {
+    field: 'rating' | 'reactionCount' | 'createdAt';
+    direction: FirebaseFirestore.OrderByDirection;
+  };
+  let reviewsQuery = db
+    .collection('reviews')
     .where('venueId', '==', venueId)
     .where('status', '==', 'published')
     .orderBy(ordering.field, ordering.direction)
     .orderBy(FieldPath.documentId(), ordering.direction);
   if (cursor) {
-    const value = ordering.field === 'createdAt'
-      ? Timestamp.fromDate(cursorDate(cursor.value))
-      : cursor.value;
+    const value =
+      ordering.field === 'createdAt'
+        ? Timestamp.fromDate(cursorDate(cursor.value))
+        : cursor.value;
     if (ordering.field !== 'createdAt' && typeof value !== 'number') {
-      throw new HttpsError('invalid-argument', 'The place reviews cursor is invalid.');
+      throw new HttpsError(
+        'invalid-argument',
+        'The place reviews cursor is invalid.',
+      );
     }
     reviewsQuery = reviewsQuery.startAfter(value, cursor.id);
   }
   const reviews = await reviewsQuery.limit(input.limit + 1).get();
   const pageDocs = reviews.docs.slice(0, input.limit);
-  const authors = [...new Set(pageDocs.map((document) => String(document.get('authorId'))))];
-  const authorDocs = authors.length > 0
-    ? await db.getAll(...authors.map((id) => db.collection('users').doc(id)))
-    : [];
-  const authorById = new Map(authorDocs.map((document) => [document.id, document]));
-  const friendIds = scope === 'friends'
-    ? new Set((await db.collection('users').doc(uid).collection('following').get()).docs.map((document) => document.id))
-    : null;
-  const items: PlaceReview[] = pageDocs.filter((document) => !friendIds || friendIds.has(String(document.get('authorId')))).map((document) => {
-    const author = authorById.get(String(document.get('authorId')));
-    return {
-      id: document.id,
-      authorId: String(document.get('authorId')),
-      authorDisplayName: String(document.get('authorDisplayName') ?? ''),
-      authorUsername: author?.exists && author.get('username') ? String(author.get('username')) : null,
-      authorPhotoUrl: author?.exists && author.get('photoUrl') ? String(author.get('photoUrl')) : null,
-      venueCity: String(document.get('venueCity') ?? venue.get('city') ?? ''),
-      cuisine: String(document.get('cuisine') ?? venue.get('category') ?? ''),
-      rating: Number(document.get('rating') ?? 0),
-      text: String(document.get('text') ?? ''),
-      reactionCount: Number(document.get('reactionCount') ?? 0),
-      commentCount: Number(document.get('commentCount') ?? 0),
-      createdAt: timestampToIso(document.get('createdAt')),
-      tag: document.get('tag') ? String(document.get('tag')) : null,
-      dishNames: Array.isArray(document.get('dishNames'))
-        ? (document.get('dishNames') as unknown[]).filter((value): value is string => typeof value === 'string')
-        : [],
-      tags: Array.isArray(document.get('tags')) ? document.get('tags') as PlaceReview['tags'] : [],
-      dishReviews: Array.isArray(document.get('dishReviews'))
-        ? document.get('dishReviews') as PlaceReview['dishReviews']
-        : [],
-    };
-  });
+  const authors = [
+    ...new Set(pageDocs.map((document) => String(document.get('authorId')))),
+  ];
+  const authorDocs =
+    authors.length > 0
+      ? await db.getAll(...authors.map((id) => db.collection('users').doc(id)))
+      : [];
+  const authorById = new Map(
+    authorDocs.map((document) => [document.id, document]),
+  );
+  const friendIds =
+    scope === 'friends'
+      ? new Set(
+          (
+            await db.collection('users').doc(uid).collection('following').get()
+          ).docs.map((document) => document.id),
+        )
+      : null;
+  const items: PlaceReview[] = pageDocs
+    .filter(
+      (document) =>
+        !friendIds || friendIds.has(String(document.get('authorId'))),
+    )
+    .map((document) => {
+      const author = authorById.get(String(document.get('authorId')));
+      return {
+        id: document.id,
+        authorId: String(document.get('authorId')),
+        authorDisplayName: String(document.get('authorDisplayName') ?? ''),
+        authorUsername:
+          author?.exists && author.get('username')
+            ? String(author.get('username'))
+            : null,
+        authorPhotoUrl:
+          author?.exists && author.get('photoUrl')
+            ? String(author.get('photoUrl'))
+            : null,
+        venueCity: String(document.get('venueCity') ?? venue.get('city') ?? ''),
+        cuisine: String(document.get('cuisine') ?? venue.get('category') ?? ''),
+        rating: Number(document.get('rating') ?? 0),
+        text: String(document.get('text') ?? ''),
+        reactionCount: Number(document.get('reactionCount') ?? 0),
+        commentCount: Number(document.get('commentCount') ?? 0),
+        createdAt: timestampToIso(document.get('createdAt')),
+        tag: document.get('tag') ? String(document.get('tag')) : null,
+        dishNames: Array.isArray(document.get('dishNames'))
+          ? (document.get('dishNames') as unknown[]).filter(
+              (value): value is string => typeof value === 'string',
+            )
+          : [],
+        tags: Array.isArray(document.get('tags'))
+          ? (document.get('tags') as PlaceReview['tags'])
+          : [],
+        dishReviews: Array.isArray(document.get('dishReviews'))
+          ? (document.get('dishReviews') as PlaceReview['dishReviews'])
+          : [],
+      };
+    });
   const last = pageDocs.at(-1);
   const result: Page<PlaceReview> = {
     items,
-    nextCursor: reviews.size > input.limit && last
-      ? encodeCursor({
-          id: last.id,
-          value: ordering.field === 'createdAt'
-            ? timestampToIso(last.get(ordering.field))
-            : Number(last.get(ordering.field) ?? 0),
-        })
-      : null,
+    nextCursor:
+      reviews.size > input.limit && last
+        ? encodeCursor({
+            id: last.id,
+            value:
+              ordering.field === 'createdAt'
+                ? timestampToIso(last.get(ordering.field))
+                : Number(last.get(ordering.field) ?? 0),
+          })
+        : null,
   };
   return result;
 });
