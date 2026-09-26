@@ -1151,6 +1151,7 @@ function PlacesMap({
 
   const sheetPanResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
       onPanResponderGrant: () => {
         sheetHeight.stopAnimation();
@@ -1186,6 +1187,8 @@ function PlacesMap({
         detents.sort((left, right) => left.distance - right.distance);
         settleSheet(detents[0].target);
       },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     }),
   ).current;
 
