@@ -344,7 +344,7 @@ function PeopleYouKnowTeaser({
     { action: 'Follow', detail: 'In your contacts', name: 'Tom Hale' },
   ];
   return (
-    <View style={styles.peopleTeaser}>
+    <View style={styles.peopleTeaser} testID="onboarding-people-teaser">
       <Text style={styles.peopleTeaserTitle}>People you know</Text>
       <Text style={styles.peopleTeaserCount}>
         3 of your contacts are on Tastes
@@ -417,7 +417,10 @@ function NotificationExample({
   title: string;
 }) {
   return (
-    <View style={styles.notificationCard}>
+    <View
+      style={styles.notificationCard}
+      testID={`onboarding-notification-card-${meta}`}
+    >
       <Image source={tastesAppIcon} style={styles.notificationIcon} />
       <View style={styles.notificationCopy}>
         <Text style={styles.notificationApp}>TASTES</Text>
@@ -952,7 +955,10 @@ export function PostSignupOnboardingFlow({
                 {displayName || 'Your name'}{' '}
                 {username ? `@${username}` : '@username'}
               </Text>
-              <View style={styles.profileFieldsCard}>
+              <View
+                style={styles.profileFieldsCard}
+                testID="onboarding-profile-fields-card"
+              >
                 <View style={styles.profileField}>
                   <Text style={styles.profileFieldLabel}>Name</Text>
                   <TextInput
@@ -1826,9 +1832,13 @@ const createStyles = (
       justifyContent: 'center',
     },
     stepSegment: { width: 26, height: 4, borderRadius: 2 },
-    stepSegmentDone: { backgroundColor: 'rgba(255,255,255,0.9)' },
+    stepSegmentDone: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.82)',
+    },
     stepSegmentCurrent: { backgroundColor: '#FF4757' },
-    stepSegmentUpcoming: { backgroundColor: 'rgba(255,255,255,0.18)' },
+    stepSegmentUpcoming: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)',
+    },
     stepTitle: {
       marginTop: 44,
       fontSize: 24,
@@ -1936,9 +1946,9 @@ const createStyles = (
       width: '100%',
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: colors.border,
       borderRadius: 18,
-      backgroundColor: '#161616',
+      backgroundColor: colors.surface,
     },
     profileField: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
     profileBioField: { paddingBottom: 16, gap: 12 },
@@ -1955,7 +1965,7 @@ const createStyles = (
       fontSize: 16,
     },
     profilePlaceholder: { color: colors.placeholder },
-    profileSeparator: { height: 1, backgroundColor: '#2A2A2A' },
+    profileSeparator: { height: 1, backgroundColor: colors.hairline },
     profileLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
     bioCounter: { color: colors.placeholder, fontSize: 12 },
     usernameChecking: { color: colors.textMuted, fontSize: 12 },
@@ -1971,9 +1981,9 @@ const createStyles = (
       height: 30,
       paddingHorizontal: 12,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: colors.border,
       borderRadius: 15,
-      backgroundColor: '#1F1F22',
+      backgroundColor: colors.surfaceRaised,
       justifyContent: 'center',
     },
     bioSuggestionText: { color: colors.text, fontSize: 13 },
@@ -2482,9 +2492,9 @@ const createStyles = (
       paddingTop: 15,
       paddingHorizontal: 15,
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: colors.border,
       borderRadius: 18,
-      backgroundColor: '#1A1A1A',
+      backgroundColor: colors.surface,
     },
     peopleTeaserTitle: {
       color: colors.text,
@@ -2538,17 +2548,17 @@ const createStyles = (
       width: 100,
       height: 34,
       borderRadius: 17,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: isDark ? '#FFFFFF' : colors.surfaceRaised,
       opacity: 0.78,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#FFFFFF',
+      shadowColor: isDark ? '#FFFFFF' : colors.surfaceRaised,
       shadowRadius: 6,
       shadowOpacity: 0.55,
     },
     teaserActionMuted: {
-      backgroundColor: '#2A2A2C',
-      shadowColor: '#2A2A2C',
+      backgroundColor: isDark ? '#2A2A2C' : colors.surfaceMuted,
+      shadowColor: isDark ? '#2A2A2C' : colors.surfaceMuted,
     },
     teaserActionText: {
       color: 'rgba(10,10,10,0.14)',
@@ -2567,9 +2577,9 @@ const createStyles = (
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#2A2A2A',
+      borderColor: colors.border,
       borderRadius: 16,
-      backgroundColor: '#1A1A1A',
+      backgroundColor: colors.surface,
     },
     notificationIcon: {
       width: 36,
@@ -2697,7 +2707,7 @@ const createStyles = (
     readyCopyLandscape: { marginTop: 0 },
     readyTitle: {
       width: '100%',
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 24,
       lineHeight: 29,
       fontWeight: '700',
@@ -2706,7 +2716,7 @@ const createStyles = (
     },
     readySubtitle: {
       width: '100%',
-      color: '#AAB2C5',
+      color: colors.textSecondary,
       fontSize: 15,
       lineHeight: 18,
       letterSpacing: -0.41,

@@ -293,6 +293,56 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
+  it.each([
+    ['profile', 'onboarding-profile-fields-card'],
+    ['contactsPermission', 'onboarding-people-teaser'],
+    ['notifications', 'onboarding-notification-card-now'],
+  ] as const)(
+    'uses a light surface for the %s card',
+    async (initialScreen, testID) => {
+      resize(402, 874);
+      await render(
+        <PostSignupOnboardingFlow
+          initialScreen={initialScreen}
+          onAuthenticationRequired={jest.fn()}
+          onComplete={jest.fn()}
+          visualAudit
+        />,
+        { wrapper: Providers },
+      );
+
+      expect(
+        StyleSheet.flatten(screen.getByTestId(testID).props.style),
+      ).toMatchObject({
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E4E4E4',
+      });
+    },
+  );
+
+  it('uses readable completion copy in the light theme', async () => {
+    resize(402, 874);
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="ready"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+    expect(
+      StyleSheet.flatten(screen.getByText('You’re ready!').props.style),
+    ).toMatchObject({ color: '#000000' });
+    expect(
+      StyleSheet.flatten(
+        screen.getByText(
+          'Write your first 3 reviews to unlock personalized recommendations',
+        ).props.style,
+      ),
+    ).toMatchObject({ color: '#677083' });
+  });
+
   it('shows an error border on all OTP cells after an incorrect code', async () => {
     resize(402, 874);
     await render(<OnboardingFlow initialScreen="otp" visualAudit />, {
