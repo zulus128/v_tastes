@@ -21,7 +21,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -1492,9 +1491,13 @@ export function PostSignupOnboardingFlow({
                   Follows your phone’s light/dark setting
                 </Text>
               </View>
-              <Switch
-                value={automatic}
-                onValueChange={(value) => {
+              <Pressable
+                accessibilityLabel="Match my device"
+                accessibilityRole="switch"
+                accessibilityState={{ checked: automatic }}
+                hitSlop={8}
+                onPress={() => {
+                  const value = !automatic;
                   setAutomatic(value);
                   const currentIsDark = resolvedTheme === 'dark';
                   setDarkMode(currentIsDark);
@@ -1502,9 +1505,13 @@ export function PostSignupOnboardingFlow({
                     value ? 'system' : currentIsDark ? 'dark' : 'light',
                   );
                 }}
-                trackColor={{ false: colors.switchTrack, true: colors.primary }}
-                thumbColor={colors.switchThumb}
-              />
+                style={[
+                  styles.appearanceSwitch,
+                  automatic && styles.appearanceSwitchOn,
+                ]}
+              >
+                <View style={styles.appearanceSwitchThumb} />
+              </Pressable>
             </View>
             <Text style={styles.livePreviewCaption}>
               Live preview — the whole app changes as you tap.
@@ -2434,6 +2441,26 @@ const createStyles = (
     },
     automaticText: { color: colors.text, fontSize: 15 },
     automaticSubtitle: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+    appearanceSwitch: {
+      width: 51,
+      height: 28,
+      padding: 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      borderRadius: 14,
+      backgroundColor: colors.switchTrack,
+    },
+    appearanceSwitchOn: {
+      justifyContent: 'flex-end',
+      backgroundColor: colors.primary,
+    },
+    appearanceSwitchThumb: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.switchThumb,
+    },
     livePreviewCaption: {
       marginTop: 34,
       color: colors.textMuted,
