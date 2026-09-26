@@ -97,7 +97,7 @@ describe('onboarding in resizable windows', () => {
       expect(choices).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
 
       await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-      expect(await screen.findByText('Find your friends')).toBeOnTheScreen();
+      expect(await screen.findByText('Find your people')).toBeOnTheScreen();
     },
   );
 
@@ -108,6 +108,9 @@ describe('onboarding in resizable windows', () => {
     const permissionBody = screen.getByTestId('onboarding-permission-scroll');
     expect(StyleSheet.flatten(permissionBody.props.style).bottom).toBeGreaterThan(0);
     expect(permissionBody).not.toContainElement(screen.getByRole('button', { name: 'Allow Contacts' }));
+    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.getByText('People you know')).toBeOnTheScreen();
+    expect(screen.getByText('3 of your contacts are on Tastes')).toBeOnTheScreen();
     await fireEvent.press(screen.getByText('Skip'));
 
     const invitations = screen.getByTestId('onboarding-invite-scroll');

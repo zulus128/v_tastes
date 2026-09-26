@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
   Animated,
@@ -179,6 +179,24 @@ function Header({ onBack, onSkip }: { onBack: () => void; onSkip?: () => void })
   return <View pointerEvents="box-none" style={styles.header}><BackButton onPress={onBack} />{onSkip ? <Pressable onPress={onSkip} style={styles.skip}><Text style={styles.skipText}>Skip</Text></Pressable> : null}</View>;
 }
 
+function StepProgress({ step }: { step: number }) {
+  const styles = useOnboardingStyles();
+  return <View accessibilityLabel={`Step ${step} of 7`} style={styles.stepProgressOverlay}>
+    <View style={styles.stepProgress}>
+      {[1, 2, 3, 4, 5, 6, 7].map((index) => (
+        <View key={index} style={[
+          styles.stepSegment,
+          index < step
+            ? styles.stepSegmentDone
+            : index === step
+              ? styles.stepSegmentCurrent
+              : styles.stepSegmentUpcoming,
+        ]} />
+      ))}
+    </View>
+  </View>;
+}
+
 function StepDots({ step }: { step: number }) {
   const styles = useOnboardingStyles();
   return <View style={styles.stepDots}>
@@ -197,19 +215,44 @@ function StepHeader({ landscape = false, step, title, subtitle }: { landscape?: 
   </View>;
 }
 
-function PermissionScreen({ icon, title, subtitle, button, onBack, onSkip, onPress }: {
-  icon: ImageSourcePropType; title: string; subtitle: string; button: string; onBack: () => void; onSkip: () => void; onPress: () => void;
+function PermissionScreen({ button, children, icon, onBack, onPress, onSkip, step, subtitle, title }: {
+  button: string; children?: ReactNode; icon: ImageSourcePropType; onBack: () => void; onPress: () => void; onSkip: () => void; step?: number; subtitle: string; title: string;
 }) {
   const styles = useOnboardingStyles();
   return <PatternScreen>
     <Header onBack={onBack} onSkip={onSkip} />
-    <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={styles.permissionScroll} testID="onboarding-permission-scroll">
+    {step ? <StepProgress step={step} /> : null}
+    <ScrollView contentContainerStyle={styles.permissionContent} showsVerticalScrollIndicator={false} style={[styles.permissionScroll, step === 6 && styles.contactsPermissionScroll]} testID="onboarding-permission-scroll">
       <Image source={icon} style={styles.permissionIcon} />
       <Text style={[styles.title, styles.permissionTitle]}>{title}</Text>
       <Text style={[styles.subtitle, styles.permissionSubtitle, styles.permissionBodyText]}>{subtitle}</Text>
+      {children}
     </ScrollView>
     <PrimaryButton label={button} onPress={onPress} style={styles.bottomButton} />
   </PatternScreen>;
+}
+
+function PeopleYouKnowTeaser() {
+  const styles = useOnboardingStyles();
+  const people = [
+    { action: 'Following', detail: '4 mutual friends', name: 'Jonas Weber' },
+    { action: 'Follow', detail: '2 mutual friends', name: 'Sofia Reyes' },
+    { action: 'Follow', detail: 'In your contacts', name: 'Tom Hale' },
+  ];
+  return <View style={styles.peopleTeaser}>
+    <Text style={styles.peopleTeaserTitle}>People you know</Text>
+    <Text style={styles.peopleTeaserCount}>3 of your contacts are on Tastes</Text>
+    {people.map((person, index) => <View accessibilityElementsHidden key={person.name} style={styles.teaserPerson}>
+      <View style={styles.teaserAvatar} />
+      <View style={styles.teaserCopy}>
+        <Text style={styles.teaserBlurred}>{person.name}</Text>
+        <Text style={styles.teaserBlurredSmall}>{person.detail}</Text>
+      </View>
+      <View style={[styles.teaserAction, index === 0 && styles.teaserActionMuted]}>
+        <Text style={[styles.teaserActionText, index === 0 && styles.teaserActionMutedText]}>{person.action}</Text>
+      </View>
+    </View>)}
+  </View>;
 }
 
 export function PostSignupOnboardingFlow({
@@ -695,7 +738,7 @@ export function PostSignupOnboardingFlow({
     </PatternScreen>;
   }
 
-  if (screen === 'contactsPermission') return <PermissionScreen icon={permissionContacts} title="Find your friends" subtitle="Connect your contacts to find people you know already on Tastes." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts} />;
+  if (screen === 'contactsPermission') return <PermissionScreen step={6} icon={permissionContacts} title="Find your people" subtitle="Your feed is only as good as who you follow." button="Allow Contacts" onBack={back} onSkip={() => navigate('invite')} onPress={requestContacts}><PeopleYouKnowTeaser /></PermissionScreen>;
 
   if (screen === 'contacts') {
     return <PatternScreen>
@@ -749,6 +792,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   title: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
   subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   bottomButton: { position: 'absolute', left: 36, right: 36, bottom: bottomGutter },
+  stepProgressOverlay: { position: 'absolute', top: 66, left: 0, right: 0, zIndex: 4, alignItems: 'center' },
+  stepProgress: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stepSegment: { width: 26, height: 4, borderRadius: 2 },
+  stepSegmentDone: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  stepSegmentCurrent: { backgroundColor: '#FF4757' },
+  stepSegmentUpcoming: { backgroundColor: 'rgba(255,255,255,0.18)' },
   stepHeader: { position: 'absolute', top: 118, left: 16, right: 16, alignItems: 'center' },
   stepHeaderLandscape: { top: 64 },
   stepRow: { height: 17, flexDirection: 'row', gap: 7, alignItems: 'center' },
@@ -759,6 +808,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   stepTitle: { marginTop: 7, fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   stepSubtitle: { marginTop: 7, fontSize: 15, lineHeight: 18, letterSpacing: -0.41, color: colors.textSecondary },
   permissionScroll: { position: 'absolute', top: landscape ? 80 : 132, left: 26, right: 26, bottom: Math.max(94, bottomGutter + 70) },
+  contactsPermissionScroll: { top: landscape ? 80 : 130, left: 16, right: 16 },
   permissionContent: { alignItems: 'center', paddingBottom: 16 },
   permissionIcon: { width: 60, height: 60, marginBottom: 25, tintColor: colors.text },
   permissionTitle: { fontSize: 24, lineHeight: 29 },
@@ -877,6 +927,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   styleSelection: { width: 24, height: 24, marginTop: 8 },
   automaticRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, marginTop: 20, paddingTop: 13 },
   automaticText: { color: colors.text, fontSize: 15 },
+  peopleTeaser: { width: '100%', height: 272, marginTop: 42, paddingTop: 15, paddingHorizontal: 15, borderWidth: 1, borderColor: '#2A2A2A', borderRadius: 18, backgroundColor: '#1A1A1A' },
+  peopleTeaserTitle: { color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: '600' },
+  peopleTeaserCount: { marginTop: 3, marginBottom: 10, color: colors.textSecondary, fontSize: 13, lineHeight: 16 },
+  teaserPerson: { height: 64, flexDirection: 'row', alignItems: 'center', filter: [{ blur: 6 }] },
+  teaserAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#777777', opacity: 0.58, shadowColor: '#777777', shadowRadius: 6, shadowOpacity: 1 },
+  teaserCopy: { flex: 1, marginLeft: 12 },
+  teaserBlurred: { color: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)', fontSize: 15, lineHeight: 19, fontWeight: '600', textShadowColor: colors.text, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserBlurredSmall: { marginTop: 2, color: isDark ? 'rgba(170,178,197,0.14)' : 'rgba(75,80,90,0.14)', fontSize: 13, lineHeight: 16, textShadowColor: colors.textSecondary, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserAction: { width: 100, height: 34, borderRadius: 17, backgroundColor: '#FFFFFF', opacity: 0.78, alignItems: 'center', justifyContent: 'center', shadowColor: '#FFFFFF', shadowRadius: 6, shadowOpacity: 0.55 },
+  teaserActionMuted: { backgroundColor: '#2A2A2C', shadowColor: '#2A2A2C' },
+  teaserActionText: { color: 'rgba(10,10,10,0.14)', fontSize: 14, lineHeight: 17, fontWeight: '500', textShadowColor: '#0A0A0A', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  teaserActionMutedText: { textShadowColor: colors.text },
   contactRow: { height: 62, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontSize: 11, fontWeight: '600' },
