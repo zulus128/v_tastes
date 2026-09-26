@@ -1,6 +1,6 @@
 import type { ActivityCandidate, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -700,49 +700,81 @@ function MemberSelector({
   );
   const sheetHeight = useRef(new Animated.Value(collapsedHeight)).current;
   const dragStartHeight = useRef(collapsedHeight);
+  const dragCurrentHeight = useRef(collapsedHeight);
+  const dragDistanceY = useRef(0);
+  const dragVelocityY = useRef(0);
+  const dragging = useRef(false);
   useEffect(() => {
     if (visible) {
       setDraft(selectedIds);
+      dragCurrentHeight.current = collapsedHeight;
       sheetHeight.setValue(collapsedHeight);
     }
   }, [collapsedHeight, selectedIds, sheetHeight, visible]);
+  const animateTo = useCallback(
+    (height: number) => {
+      dragCurrentHeight.current = height;
+      Animated.spring(sheetHeight, {
+        damping: 24,
+        mass: 0.8,
+        stiffness: 230,
+        toValue: height,
+        useNativeDriver: false,
+      }).start();
+    },
+    [sheetHeight],
+  );
+  const settleDrag = useCallback(
+    (distanceY = dragDistanceY.current, velocityY = dragVelocityY.current) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      if (
+        (distanceY > responsiveSize(90) || velocityY > 1) &&
+        dragStartHeight.current <= collapsedHeight + responsiveSize(8)
+      ) {
+        onClose();
+        return;
+      }
+      const midpoint = (collapsedHeight + expandedHeight) / 2;
+      const expand =
+        velocityY < -0.35 ||
+        (velocityY <= 0.35 && dragCurrentHeight.current >= midpoint);
+      animateTo(expand ? expandedHeight : collapsedHeight);
+    },
+    [animateTo, collapsedHeight, expandedHeight, onClose],
+  );
   const drag = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dy) > responsiveSize(4),
         onPanResponderGrant: () => {
+          dragging.current = true;
+          dragDistanceY.current = 0;
+          dragVelocityY.current = 0;
           sheetHeight.stopAnimation((value) => {
             dragStartHeight.current = value;
+            dragCurrentHeight.current = value;
           });
         },
         onPanResponderMove: (_, gesture) => {
-          sheetHeight.setValue(
-            Math.max(
-              collapsedHeight,
-              Math.min(expandedHeight, dragStartHeight.current - gesture.dy),
-            ),
+          dragDistanceY.current = gesture.dy;
+          dragVelocityY.current = gesture.vy;
+          const height = Math.max(
+            collapsedHeight,
+            Math.min(expandedHeight, dragStartHeight.current - gesture.dy),
           );
+          dragCurrentHeight.current = height;
+          sheetHeight.setValue(height);
         },
-        onPanResponderRelease: (_, gesture) => {
-          if (
-            gesture.dy > responsiveSize(90) &&
-            dragStartHeight.current <= collapsedHeight + responsiveSize(8)
-          ) {
-            onClose();
-            return;
-          }
-          const expand = gesture.dy < responsiveSize(-32) || gesture.vy < -0.35;
-          Animated.spring(sheetHeight, {
-            damping: 24,
-            mass: 0.8,
-            stiffness: 230,
-            toValue: expand ? expandedHeight : collapsedHeight,
-            useNativeDriver: false,
-          }).start();
-        },
+        onPanResponderRelease: (_, gesture) =>
+          settleDrag(gesture.dy, gesture.vy),
+        onPanResponderTerminate: () => settleDrag(),
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
       }),
-    [collapsedHeight, expandedHeight, onClose, sheetHeight],
+    [collapsedHeight, expandedHeight, settleDrag, sheetHeight],
   );
   const query = search.trim().toLowerCase();
   const filtered = candidates.filter(
@@ -767,6 +799,10 @@ function MemberSelector({
         >
           <View
             accessibilityLabel="Drag to resize member selector"
+            onPointerCancel={() => settleDrag()}
+            onPointerUp={() => settleDrag()}
+            onTouchCancel={() => settleDrag()}
+            onTouchEnd={() => settleDrag()}
             style={styles.sheetGrabArea}
             {...drag.panHandlers}
           >
