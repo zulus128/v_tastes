@@ -72,6 +72,7 @@ import {
 import { useFavourites } from '../favourites/api';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import {
   responsiveSize,
   responsiveStyleSheet,
@@ -641,6 +642,7 @@ function PlacesMap({
   const [sheetDismissed, setSheetDismissed] = useState(false);
   const [sort, setSort] = useState<PlaceSort>('best-match');
   const [sortOpen, setSortOpen] = useState(false);
+  const sortSheet = useBottomSheetMotion({ onClose: () => setSortOpen(false), visible: sortOpen });
   const mapRef = useRef<MapView | null>(null);
   const searchRowRef = useRef<View | null>(null);
   const [region, setRegion] = useState<Region>({ latitude: 41.02, longitude: 29.0, latitudeDelta: 0.13, longitudeDelta: 0.12 });
@@ -1143,18 +1145,18 @@ function PlacesMap({
         )}
       </Animated.View>
       <Modal
-        animationType="fade"
-        onRequestClose={() => setSortOpen(false)}
+        animationType="none"
+        onRequestClose={sortSheet.close}
         transparent
         visible={sortOpen}
       >
         <View style={styles.sortModalScrim}>
-          <Pressable accessibilityLabel="Close sort options" onPress={() => setSortOpen(false)} style={StyleSheet.absoluteFill} />
-          <View accessibilityViewIsModal style={styles.sortSheet}>
-            <View style={styles.sortSheetHandle} />
+          <Pressable accessibilityLabel="Close sort options" onPress={sortSheet.close} style={StyleSheet.absoluteFill} />
+          <Animated.View accessibilityViewIsModal style={[styles.sortSheet, { transform: [{ translateY: sortSheet.translateY }] }]}>
+            <View style={styles.sortSheetDragArea} {...sortSheet.panHandlers}><View style={styles.sortSheetHandle} /></View>
             <View style={styles.sortSheetHeader}>
               <Text style={styles.sortSheetTitle}>Sort by</Text>
-              <Pressable accessibilityLabel="Close" hitSlop={8} onPress={() => setSortOpen(false)} style={styles.sortSheetClose}>
+              <Pressable accessibilityLabel="Close" hitSlop={8} onPress={sortSheet.close} style={styles.sortSheetClose}>
                 <Text style={styles.sortSheetCloseText}>×</Text>
               </Pressable>
             </View>
@@ -1167,7 +1169,7 @@ function PlacesMap({
                   key={option.value}
                   onPress={() => {
                     setSort(option.value);
-                    setSortOpen(false);
+                    sortSheet.close();
                   }}
                   style={[styles.sortSheetRow, index === placeSortOptions.length - 1 && styles.sortSheetRowLast]}
                 >
@@ -1178,7 +1180,7 @@ function PlacesMap({
                 </Pressable>
               );
             })}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -2118,6 +2120,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   mapSortChevron: { marginTop: -3, color: colors.textSecondary, fontSize: 13 },
   sortModalScrim: { flex: 1, paddingHorizontal: 16, paddingBottom: 24, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   sortSheet: { height: 340, paddingHorizontal: 24, borderRadius: 22, backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
+  sortSheetDragArea: { position: 'absolute', top: 0, right: 0, left: 0, height: 28, alignItems: 'center', justifyContent: 'center' },
   sortSheetHandle: { position: 'absolute', top: 10, left: '50%', width: 36, height: 4, marginLeft: -18, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   sortSheetHeader: { height: 65, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sortSheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },

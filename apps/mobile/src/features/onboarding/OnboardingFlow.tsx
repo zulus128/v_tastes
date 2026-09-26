@@ -64,6 +64,19 @@ function errorDetails(error: unknown): Record<string, unknown> {
   return typeof details === 'object' && details !== null ? details as Record<string, unknown> : {};
 }
 
+function phoneRequestErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : '';
+  const code = typeof error === 'object' && error !== null
+    ? String((error as { code?: unknown }).code ?? '')
+    : '';
+
+  if (message.toLowerCase() === 'internal' || code.endsWith('/internal')) {
+    return 'Could not send the code. Try again.';
+  }
+
+  return message || 'Could not send the code. Try again.';
+}
+
 function displayPhone(country: Country, digits: string): string {
   return `${country.callingCode} ${digits.replace(/(\d{3})(?=\d)/g, '$1 ').trim()}`;
 }
@@ -239,7 +252,7 @@ export function OnboardingFlow({ initialScreen, visualAudit = false }: { initial
       if (details.reason === 'resend-too-soon' && typeof details.resendAvailableAt === 'string') {
         setChallenge((current) => current ? { ...current, resendAvailableAt: details.resendAvailableAt as string } : current);
       } else {
-        setPhoneError(error instanceof Error ? error.message : 'Could not send the code');
+        setPhoneError(phoneRequestErrorMessage(error));
       }
     } finally {
       setBusy(false);

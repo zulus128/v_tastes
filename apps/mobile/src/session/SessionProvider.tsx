@@ -128,6 +128,8 @@ function visualAuditData(operation: string): unknown {
     case 'listRequests':
     case 'listActivityCandidates':
       return [];
+    case 'getUnreadNotificationCount':
+      return { count: 0 };
     case 'getFavourites':
       return { folders: [], places: [], nextCursor: null };
     case 'getMonthlyRecap':

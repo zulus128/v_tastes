@@ -123,6 +123,7 @@ describe('onboarding in resizable windows', () => {
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-0').props.style)).toMatchObject({
       backgroundColor: '#FFFFFF',
       borderColor: '#000000',
+      borderWidth: 1,
     });
     expect(StyleSheet.flatten(screen.getByTestId('onboarding-otp-cell-2').props.style)).toMatchObject({
       borderColor: '#E63946',
@@ -190,6 +191,45 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
+  it('shows an error border on all OTP cells after an incorrect code', async () => {
+    resize(402, 874);
+    await render(<OnboardingFlow initialScreen="otp" visualAudit />, { wrapper: Providers });
+    const input = screen.getByDisplayValue('');
+    await fireEvent.changeText(input, '1331');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Incorrect code. Try again.')).toBeOnTheScreen();
+    for (const index of [0, 1, 2, 3]) {
+      expect(StyleSheet.flatten(screen.getByTestId(`onboarding-otp-cell-${index}`).props.style)).toMatchObject({ borderWidth: 2 });
+    }
+  });
+
+  it.each([
+    ['country', 'Your phone number'],
+    ['phone', 'Discover the best places!'],
+    ['otp', 'Your phone number'],
+  ] as const)('navigates back from the directly opened %s sign-in screen', async (initialScreen, expectedTitle) => {
+    await render(<OnboardingFlow initialScreen={initialScreen} visualAudit />, { wrapper: Providers });
+    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText(expectedTitle)).toBeOnTheScreen();
+  });
+
+  it.each([
+    ['city', 'Create your profile'],
+    ['dish', 'Create your profile'],
+    ['location', 'Your favourite dish!'],
+    ['locationDenied', 'See what’s good near you'],
+    ['place', 'See what’s good near you'],
+    ['style', 'Choose your favourite place'],
+    ['contactsPermission', 'Pick your look'],
+    ['contacts', 'Find your people'],
+    ['invite', 'Find your people'],
+    ['notifications', 'Invite your friends'],
+  ] as const)('navigates back from the directly opened %s post-signup screen', async (initialScreen, expectedTitle) => {
+    await render(<PostSignupOnboardingFlow initialScreen={initialScreen} onAuthenticationRequired={jest.fn()} onComplete={jest.fn()} visualAudit />, { wrapper: Providers });
+    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText(expectedTitle)).toBeOnTheScreen();
+  });
+
   it.each([[393, 852], [667, 375], [800, 500], [600, 600], [1024, 600]])(
     'keeps appearance choices scrollable above Continue at %sx%s',
     async (width, height) => {
@@ -216,12 +256,24 @@ describe('onboarding in resizable windows', () => {
     const permissionBody = screen.getByTestId('onboarding-permission-scroll');
     expect(StyleSheet.flatten(permissionBody.props.style).bottom).toBeGreaterThan(0);
     expect(permissionBody).not.toContainElement(screen.getByRole('button', { name: 'Allow Contacts' }));
+    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.getByText('People you know')).toBeOnTheScreen();
+    expect(screen.getByText('3 of your contacts are on Tastes')).toBeOnTheScreen();
     await fireEvent.press(screen.getByText('Skip'));
 
     const invitations = screen.getByTestId('onboarding-invite-scroll');
     expect(StyleSheet.flatten(invitations.props.style).bottom).toBeGreaterThan(0);
     expect(invitations).not.toContainElement(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.queryByText('1 of 3 friends invited')).not.toBeOnTheScreen();
     expect(screen.getByText('Invite from your contacts')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Stay in the loop')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
+    expect(screen.getByText('Amara rated Sabor ★ 4.9')).toBeOnTheScreen();
+    expect(screen.getByText('Marco started following you')).toBeOnTheScreen();
+    expect(screen.getByText('Change these anytime in Settings.')).toBeOnTheScreen();
   });
 
   it('resizes the ready illustration without squeezing out the completion action', async () => {

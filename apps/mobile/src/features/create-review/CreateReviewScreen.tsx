@@ -48,6 +48,7 @@ import { cancelDraftReminder, scheduleDraftReminder } from '../../infrastructure
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useFavourites } from '../favourites/api';
@@ -1410,6 +1411,7 @@ function DishEditor({
   const [draft, setDraft] = useState<DishReviewDraft | null>(value);
 
   useEffect(() => setDraft(value), [value]);
+  const sheet = useBottomSheetMotion({ onClose, visible });
 
   async function choosePhoto(camera: boolean) {
     if (!draft) return;
@@ -1441,13 +1443,14 @@ function DishEditor({
   if (!draft) return null;
   const valid = Boolean(draft.photoUri && draft.title.trim() && draft.rating >= 0.5);
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
       {/* Same double-compensation risk as the main review screen: the
           ScrollView below already adjusts for the iOS keyboard itself. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? undefined : 'height'} style={styles.modalScreen}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom) }]}>
-        <View style={styles.header}><Text style={styles.title}>Add Dish</Text><Pressable onPress={onClose}><Text style={styles.close}>⊗</Text></Pressable></View>
+        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(10, insets.bottom), transform: [{ translateY: sheet.translateY }] }]}>
+        <View style={styles.dragArea} {...sheet.panHandlers}><View style={styles.handle} /></View>
+        <View style={styles.header}><Text style={styles.title}>Add Dish</Text><Pressable onPress={sheet.close}><Text style={styles.close}>⊗</Text></Pressable></View>
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentContainerStyle={styles.body}
@@ -1468,15 +1471,15 @@ function DishEditor({
           <TextInput maxLength={120} onChangeText={(title) => setDraft({ ...draft, title })} placeholder="Enter text" placeholderTextColor={colors.placeholder} style={styles.input} value={draft.title} />
         </ScrollView>
         <View style={styles.actions}>
-          <Pressable onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
-          <Pressable disabled={!valid} onPress={() => onSave(draft)} style={[styles.save, !valid && styles.disabled]}>
+          <Pressable onPress={sheet.close} style={styles.cancel}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+          <Pressable disabled={!valid} onPress={() => sheet.closeThen(() => onSave(draft))} style={[styles.save, !valid && styles.disabled]}>
             <View style={styles.saveContent}>
               <View style={styles.saveIcon}><SaveCheck height={responsiveSize(14.2724)} width={responsiveSize(19.9891)} /></View>
               <Text style={styles.saveText}>Save</Text>
             </View>
           </Pressable>
         </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -1505,26 +1508,27 @@ function ReviewConfirmationSheet({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createConfirmationStyles(colors), [colors]);
+  const sheet = useBottomSheetMotion({ onClose, visible });
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
       <View style={styles.backdrop}>
-        <Pressable accessibilityLabel="Close confirmation" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <Pressable accessibilityLabel="Close confirmation" onPress={sheet.close} style={StyleSheet.absoluteFill} />
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.dragArea} {...sheet.panHandlers}><View style={styles.handle} /></View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.body}>{body}</Text>
-          <Pressable accessibilityRole="button" onPress={onPrimary} style={styles.primary}>
+          <Pressable accessibilityRole="button" onPress={() => sheet.closeThen(onPrimary === onClose ? undefined : onPrimary)} style={styles.primary}>
             <Text style={styles.primaryText}>{primaryLabel}</Text>
           </Pressable>
           {secondaryLabel ? (
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondary}>
+            <Pressable accessibilityRole="button" onPress={sheet.close} style={styles.secondary}>
               <Text style={styles.secondaryText}>{secondaryLabel}</Text>
             </Pressable>
           ) : null}
-          <Pressable accessibilityRole="button" onPress={onDanger} style={styles.danger}>
+          <Pressable accessibilityRole="button" onPress={() => sheet.closeThen(onDanger)} style={styles.danger}>
             <Text style={styles.dangerText}>{dangerLabel}</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -1656,6 +1660,8 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) => responsiveSty
   modalScreen: { flex: 1 },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { position: 'absolute', right: 0, bottom: 0, left: 0, height: '92%', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: isDark ? colors.border : '#45474B', backgroundColor: isDark ? colors.canvas : colors.surface },
+  dragArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   header: { height: 64, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }, title: { flex: 1, color: colors.text, fontSize: 20, lineHeight: 25, fontWeight: '600', letterSpacing: -0.45 }, close: { color: colors.text, fontSize: 27 },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 16, paddingBottom: 16 },
@@ -1669,6 +1675,7 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) => responsiveSty
 const createConfirmationStyles = (colors: ThemeColors) => responsiveStyleSheet({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: { paddingTop: 32, paddingHorizontal: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, alignItems: 'center', backgroundColor: colors.surfaceRaised },
+  dragArea: { position: 'absolute', top: 0, right: 0, left: 0, height: 28, alignItems: 'center', justifyContent: 'center' },
   handle: { position: 'absolute', top: 10, width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
   title: { color: colors.text, fontSize: 18, fontWeight: '600', textAlign: 'center' },
   body: { maxWidth: 310, marginTop: 9, color: colors.textMuted, fontSize: 14, lineHeight: 18, textAlign: 'center' },

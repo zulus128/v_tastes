@@ -8,6 +8,7 @@ import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Alert,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -64,6 +65,7 @@ import { CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import {
   DESIGN_VIEWPORT,
   responsiveStyleSheet,
@@ -84,6 +86,19 @@ export type PostSignupScreen =
   | 'contacts'
   | 'notifications'
   | 'ready';
+
+const previousPostSignupScreen: Partial<Record<PostSignupScreen, PostSignupScreen>> = {
+  city: 'profile',
+  dish: 'profile',
+  location: 'dish',
+  locationDenied: 'location',
+  place: 'location',
+  style: 'place',
+  contactsPermission: 'style',
+  contacts: 'contactsPermission',
+  invite: 'contactsPermission',
+  notifications: 'invite',
+};
 
 interface PostSignupOnboardingFlowProps {
   initialScreen?: PostSignupScreen;
@@ -258,6 +273,7 @@ export function PostSignupOnboardingFlow({
   const [bio, setBio] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
+  const photoSheetMotion = useBottomSheetMotion({ onClose: () => setPhotoSheet(false), visible: photoSheet });
   const [dish, setDish] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null);
   const [placeQuery, setPlaceQuery] = useState('');
@@ -307,7 +323,7 @@ export function PostSignupOnboardingFlow({
   }
 
   function back() {
-    const previous = history.at(-1);
+    const previous = history.at(-1) ?? previousPostSignupScreen[screen];
     if (!previous) return;
     setHistory((items) => items.slice(0, -1));
     setScreen(previous);
@@ -585,16 +601,17 @@ export function PostSignupOnboardingFlow({
             <Text style={styles.changeLater}>You can change all of this later.</Text>
           </View>
         </View>
-        <Modal animationType="slide" transparent visible={photoSheet} onRequestClose={() => setPhotoSheet(false)}>
-          <Pressable onPress={() => setPhotoSheet(false)} style={styles.modalBackdrop}>
-            <View style={styles.sheetWrap}>
+        <Modal animationType="none" transparent visible={photoSheet} onRequestClose={photoSheetMotion.close}>
+          <Pressable onPress={photoSheetMotion.close} style={styles.modalBackdrop}>
+            <Animated.View style={[styles.sheetWrap, { transform: [{ translateY: photoSheetMotion.translateY }] }]}>
+              <View style={styles.sheetDragArea} {...photoSheetMotion.panHandlers}><View style={styles.sheetHandle} /></View>
               <View style={styles.sheet}>
-                <Pressable onPress={() => choosePhoto(true)} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
-                <Pressable onPress={() => choosePhoto(false)} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
-                <Pressable onPress={() => { setPhotoUri(null); setPhotoSheet(false); }} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => void choosePhoto(true))} style={styles.sheetAction}><Text style={styles.sheetText}>Take Photo</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => void choosePhoto(false))} style={styles.sheetAction}><Text style={styles.sheetText}>Choose from Library</Text></Pressable>
+                <Pressable onPress={() => photoSheetMotion.closeThen(() => setPhotoUri(null))} style={styles.sheetAction}><Text style={styles.destructive}>Remove Photo</Text></Pressable>
               </View>
-              <Pressable onPress={() => setPhotoSheet(false)} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
-            </View>
+                <Pressable onPress={photoSheetMotion.close} style={[styles.sheet, styles.cancel]}><Text style={styles.sheetText}>Cancel</Text></Pressable>
+            </Animated.View>
           </Pressable>
         </Modal>
       </PatternScreen>
@@ -847,6 +864,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   locationChevron: { width: 8, height: 16, marginLeft: 2 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', padding: 16, paddingBottom: Platform.OS === 'ios' ? 30 : 18 },
   sheetWrap: { gap: 9 },
+  sheetDragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   sheet: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   sheetAction: { height: 56, alignItems: 'center', justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
   sheetText: { color: colors.text, fontSize: 16 },
@@ -978,17 +997,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean, landscape: boolean, 
   inviteButton: { borderRadius: 16, paddingVertical: 7, paddingHorizontal: 13, backgroundColor: colors.primary },
   invitedButton: { backgroundColor: colors.surfaceRaised },
   inviteText: { color: colors.onPrimary, fontSize: 11 },
-  inviteScroll: { position: 'absolute', top: landscape ? 80 : 131, left: 0, right: 0, bottom: Math.max(94, bottomGutter + 70) },
-  invitePage: { paddingHorizontal: 18, paddingBottom: 16, alignItems: 'center' },
+  inviteScroll: { position: 'absolute', top: landscape ? 80 : 130, left: 0, right: 0, bottom: Math.max(94, bottomGutter + 70) },
+  invitePage: { paddingHorizontal: 16, paddingBottom: 16, alignItems: 'center' },
   peopleIcon: { width: 118, height: 46, marginBottom: 22 },
+  inviteTitle: { fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
   progressText: { color: '#e0453c', fontSize: 12, fontWeight: '600', marginTop: 12 },
   progressDots: { height: 8, flexDirection: 'row', gap: 6, marginTop: 7 },
   progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surfaceRaised },
   progressDotActive: { backgroundColor: colors.primary },
-  inviteActions: { width: '100%', gap: 9, marginTop: 30 },
-  actionRow: { height: 46, borderRadius: 23, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 17 },
+  inviteActions: { width: '100%', gap: 10, marginTop: 24 },
+  actionRow: { height: 50, borderRadius: 25, borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
   actionIcon: { width: 18, height: 18, marginRight: 12, tintColor: colors.text },
-  actionText: { color: colors.text, fontSize: 13, flex: 1 },
+  actionText: { color: colors.text, fontSize: 16, lineHeight: 22, letterSpacing: -0.41, flex: 1 },
   actionChevron: { width: 8, height: 16, opacity: 0.7 },
   ready: { flex: 1 },
   readyContent: { flexGrow: 1, paddingTop: 170, paddingBottom: 24, alignItems: 'center' },

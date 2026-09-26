@@ -1,6 +1,6 @@
 import type { FavouriteFolder, FavouritePlace } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,13 +21,15 @@ import FolderActiveIcon from '../../../assets/favourites/folder-active.svg';
 import FolderIcon from '../../../assets/favourites/folder.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import AddFolderCircle from '../../../assets/create-review/select-place-circle.svg';
+import AddFolderPlus from '../../../assets/create-review/select-place-plus.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import addFolderIcon from '../../../assets/favourites/add-folder.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
 import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { matchesPlaceFilters } from '../discover/placeFilters';
 import {
   useCreateFolder,
@@ -156,7 +158,10 @@ export function FavouritesPane({
         onPress={() => setEditor({ mode: 'create' })}
         style={({ pressed }) => [styles.createFolderButton, pressed && styles.pressed]}
       >
-        <Image source={addFolderIcon} style={styles.addFolderIcon} />
+        <View style={styles.addFolderIcon}>
+          <AddFolderCircle color="#FFFFFF" height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
+          <AddFolderPlus color="#FFFFFF" height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+        </View>
         <Text style={styles.createFolderButtonText}>Create Folder</Text>
       </Pressable>
 
@@ -238,6 +243,8 @@ export function SaveToFolderSheet({
   const [creating, setCreating] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [query, setQuery] = useState('');
+  const closeCreateFolder = useCallback(() => setCreating(false), []);
+  const createFolderSheet = useBottomSheetMotion({ closedOffset: 600, onClose: closeCreateFolder, visible: creating });
 
   useEffect(() => {
     if (visible) {
@@ -312,7 +319,11 @@ export function SaveToFolderSheet({
             />
           ))}
           <Pressable onPress={() => setCreating(true)} style={styles.newFolderButton}>
-            <Image source={addFolderIcon} style={styles.addFolderIcon} /><Text style={styles.newFolderText}>Create Folder</Text>
+            <View style={styles.addFolderIcon}>
+              <AddFolderCircle color={colors.text} height={responsiveSize(20)} style={styles.addFolderIconPart} width={responsiveSize(20)} />
+              <AddFolderPlus color={colors.text} height={responsiveSize(7)} style={styles.addFolderIconPart} width={responsiveSize(7)} />
+            </View>
+            <Text style={styles.newFolderText}>Create Folder</Text>
           </Pressable>
         </ScrollView>
         <View style={styles.addFooter}>
@@ -327,13 +338,16 @@ export function SaveToFolderSheet({
               : <Text style={styles.confirmText}>✓  Confirm</Text>}
           </Pressable>
         </View>
-        <Modal animationType="slide" onRequestClose={() => setCreating(false)} transparent visible={creating}>
+        <Modal animationType="none" onRequestClose={createFolderSheet.close} transparent visible={creating}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
-            <Pressable onPress={() => setCreating(false)} style={styles.createFolderScrim} />
-            <View style={styles.createFolderSheet}>
+            <Pressable onPress={createFolderSheet.close} style={styles.createFolderScrim} />
+            <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
+              <View style={styles.sheetDragArea} {...createFolderSheet.panHandlers}>
+                <View style={styles.sheetHandle} />
+              </View>
               <View style={styles.createFolderTitleRow}>
                 <Text style={styles.createFolderTitle}>Create Folder</Text>
-                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={() => setCreating(false)}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
+                <Pressable accessibilityLabel="Close create folder" hitSlop={10} onPress={createFolderSheet.close}><Image source={closeFolderIcon} style={styles.closeFolderIcon} /></Pressable>
               </View>
               <View style={styles.createFolderField}>
                 <Text style={styles.createFolderLabel}>TITLE</Text>
@@ -364,7 +378,7 @@ export function SaveToFolderSheet({
               <Pressable disabled={!folderName.trim() || createFolder.isPending} onPress={() => void createAndSelect()} style={({ pressed }) => [styles.createFolderSubmit, (!folderName.trim() || createFolder.isPending) && styles.createFolderSubmitDisabled, pressed && styles.pressed]}>
                 {createFolder.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createFolderSubmitText}>Create Folder</Text>}
               </Pressable>
-            </View>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
       </KeyboardAvoidingView>
@@ -523,6 +537,7 @@ function FolderNameSheet({
   const createFolder = useCreateFolder(userId);
   const renameFolder = useRenameFolder(userId);
   const [name, setName] = useState('');
+  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: editor !== null });
 
   useEffect(() => {
     setName(editor?.mode === 'rename' ? editor.folder.name : '');
@@ -544,12 +559,19 @@ function FolderNameSheet({
   }
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={editor !== null}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={editor !== null}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={styles.nameSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
+        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}>
+            <View style={styles.sheetHandle} />
+          </View>
+          <View style={styles.sheetTitleRow}>
+            <Text style={styles.sheetTitle}>{editor?.mode === 'rename' ? 'Rename folder' : 'Create folder'}</Text>
+            <Pressable accessibilityLabel="Cancel folder editing" hitSlop={10} onPress={sheet.close}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
           <TextInput
             autoFocus
             maxLength={40}
@@ -568,7 +590,7 @@ function FolderNameSheet({
           >
             <Text style={styles.doneText}>Done</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -587,12 +609,15 @@ function FolderActionSheet({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const sheet = useBottomSheetMotion({ closedOffset: 600, onClose, visible: folder !== null });
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={folder !== null}>
+    <Modal animationType="none" onRequestClose={sheet.close} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>
-        <Pressable onPress={onClose} style={styles.scrim} />
-        <View style={styles.actionSheet}>
-          <View style={styles.sheetHandle} />
+        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...sheet.panHandlers}>
+            <View style={styles.sheetHandle} />
+          </View>
           <Text style={styles.actionHeading}>{folder?.name}</Text>
           <Pressable onPress={onRename} style={styles.actionButton}>
             <Text style={styles.actionText}>Rename folder</Text>
@@ -600,7 +625,7 @@ function FolderActionSheet({
           <Pressable onPress={onDelete} style={styles.actionButton}>
             <Text style={styles.deleteText}>Delete folder</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -685,11 +710,13 @@ function createStyles(colors: ThemeColors) {
     createFolderSubmitText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', letterSpacing: 0.6 },
     scrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.56)' },
     saveSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 20, gap: 16, borderRadius: 22, backgroundColor: colors.surfaceRaised },
+    nameSheet: { margin: 16, marginBottom: 24, padding: 24, paddingTop: 0, borderRadius: 22, backgroundColor: colors.surfaceRaised },
     actionSheet: { margin: 16, marginBottom: 24, padding: 16, paddingTop: 20, gap: 4, borderRadius: 22, backgroundColor: colors.surfaceRaised },
-    sheetHandle: { alignSelf: 'center', width: 36, height: 4, marginBottom: 12, borderRadius: 2, backgroundColor: colors.border },
-    sheetTitleRow: { marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sheetDragArea: { height: 32, alignItems: 'center', justifyContent: 'center' },
+    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
+    sheetTitleRow: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+    sheetCancelText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
     selectionSwipe: { height: 76, overflow: 'hidden', backgroundColor: colors.canvas },
     selectionRow: { height: 76, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.canvas },
     selectionName: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -701,11 +728,12 @@ function createStyles(colors: ThemeColors) {
     checkmark: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
     radio: { color: colors.textMuted, fontSize: 22 },
     newFolderButton: { height: 46, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: 23, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
-    addFolderIcon: { width: 20, height: 20 },
+    addFolderIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+    addFolderIconPart: { position: 'absolute' },
     newFolderText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     doneButton: { height: 50, marginTop: 4, borderRadius: 25, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    nameInput: { height: 50, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 16 },
+    nameInput: { height: 50, marginBottom: 16, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text, fontSize: 16 },
     actionHeading: { color: colors.textMuted, fontSize: 13, padding: 12 },
     actionButton: { height: 52, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
     actionText: { color: colors.text, fontSize: 16, fontWeight: '600' },

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -35,6 +36,7 @@ import { ErrorState, ListFooter, LoadingState, Screen } from '../../ui/component
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import { useAddComment, useComments, useDeleteComment, useReactToComment } from './api';
 import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
@@ -121,6 +123,7 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
   const insets = useSafeAreaInsets();
   const dishModalHeight = Math.max(0, Math.min(responsiveSize(550), viewportHeight - insets.top));
   const [selectedDish, setSelectedDish] = useState<CommentReview['dishReviews'][number] | null>(null);
+  const dishSheet = useBottomSheetMotion({ onClose: () => setSelectedDish(null), visible: selectedDish !== null });
   return <View style={styles.mainReview}>
     <View style={styles.reviewAuthorRow}>
       {review.authorPhotoUrl ? <Image source={{ uri: review.authorPhotoUrl }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><Text style={styles.reviewAvatarInitial}>{review.authorDisplayName.slice(0, 1).toUpperCase()}</Text></View>}
@@ -133,15 +136,16 @@ function MainReview({ onReact, reacting, review }: { onReact: () => void; reacti
       <Text style={styles.reviewText}>{review.text}</Text>
       <View style={styles.reviewActions}><Pressable disabled={reacting} onPress={onReact} style={styles.reviewActionIconRow}><HeartIcon color={review.reacted ? colors.primary : colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.reactionCount}</Text></Pressable><View style={styles.reviewActionIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.reviewActionCount}>{review.commentCount}</Text></View><Pressable accessibilityLabel="Share review" onPress={() => void Share.share({ message: `${review.authorDisplayName} on Tastes: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments` })} style={styles.reviewActionIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
     </View>
-    <Modal animationType="slide" onRequestClose={() => setSelectedDish(null)} transparent visible={selectedDish !== null}>
+    <Modal animationType="none" onRequestClose={dishSheet.close} transparent visible={selectedDish !== null}>
       <View style={styles.dishModalScrim}>
-        <Pressable onPress={() => setSelectedDish(null)} style={StyleSheet.absoluteFill} />
-        <View style={[styles.dishModal, { height: dishModalHeight, paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
-          <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={() => setSelectedDish(null)} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
+        <Pressable onPress={dishSheet.close} style={StyleSheet.absoluteFill} />
+        <Animated.View style={[styles.dishModal, { height: dishModalHeight, paddingBottom: Math.max(responsiveSize(16), insets.bottom), transform: [{ translateY: dishSheet.translateY }] }]}>
+          <View style={styles.sheetDragArea} {...dishSheet.panHandlers}><View style={styles.sheetHandle} /></View>
+          <View style={styles.dishModalHeader}><Text style={styles.dishModalTitle}>Dish Review</Text><Pressable accessibilityLabel="Close dish review" onPress={dishSheet.close} style={styles.dishModalClose}><Text style={styles.dishModalCloseText}>×</Text></Pressable></View>
           <ScrollView contentContainerStyle={styles.dishModalContent} showsVerticalScrollIndicator={false}>
             {selectedDish ? <><View style={styles.dishModalImage}><DishPhoto path={selectedDish.photoPath} styles={styles} url={selectedDish.photoUrl} /></View><Text style={styles.dishModalRating}>★ {selectedDish.rating.toFixed(1)}</Text><Text style={styles.dishModalName}>{selectedDish.title}</Text></> : null}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   </View>;
@@ -219,6 +223,7 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
   const [reportDetails, setReportDetails] = useState('');
   const [reporting, setReporting] = useState(false);
   const [reportSent, setReportSent] = useState(false);
+  const reportSheet = useBottomSheetMotion({ onClose: () => setReportCommentId(null), visible: reportCommentId !== null });
   const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const [hiddenReplies, setHiddenReplies] = useState<Set<string>>(new Set());
   const [extraReplies, setExtraReplies] = useState<Record<string, { items: Comment[]; nextCursor: string | null | undefined }>>({});
@@ -423,7 +428,20 @@ export function PaginatedCommentsScreen({ commentId, reviewId, onBack }: { comme
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      <Modal animationType="slide" transparent visible={reportCommentId !== null} onRequestClose={() => setReportCommentId(null)}><View style={styles.reportScrim}><Pressable onPress={() => setReportCommentId(null)} style={StyleSheet.absoluteFill} /><View style={[styles.reportSheet, { maxHeight: Math.max(0, windowDimensions.height - insets.top - responsiveSize(12)) }]}><ScrollView contentContainerStyle={styles.reportContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><Text style={styles.reportTitle}>Why are you reporting this comment?</Text>{commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}{reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}<Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable></ScrollView></View></View></Modal>
+      <Modal animationType="none" transparent visible={reportCommentId !== null} onRequestClose={reportSheet.close}>
+        <View style={styles.reportScrim}>
+          <Pressable onPress={reportSheet.close} style={StyleSheet.absoluteFill} />
+          <Animated.View style={[styles.reportSheet, { maxHeight: Math.max(0, windowDimensions.height - insets.top - responsiveSize(12)), transform: [{ translateY: reportSheet.translateY }] }]}>
+            <View style={styles.sheetDragArea} {...reportSheet.panHandlers}><View style={styles.sheetHandle} /></View>
+            <ScrollView contentContainerStyle={styles.reportContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.reportTitle}>Why are you reporting this comment?</Text>
+              {commentReportReasons.map((reason) => <Pressable key={reason.value} onPress={() => setReportReason(reason.value)} style={styles.reportRow}><Text style={styles.reportLabel}>{reason.label}</Text><Text style={styles.reportRadio}>{reportReason === reason.value ? '●' : '○'}</Text></Pressable>)}
+              {reportReason === 'Something else' ? <View><TextInput maxLength={300} multiline onChangeText={setReportDetails} placeholder="Tell us what happened…" placeholderTextColor={colors.textMuted} style={styles.reportInput} value={reportDetails} /><Text style={styles.reportCounter}>{reportDetails.length}/300</Text></View> : null}
+              <Pressable disabled={reporting} onPress={() => void submitReport()} style={styles.reportButton}><Text style={styles.reportButtonText}>{reporting ? 'Submitting…' : 'Submit report'}</Text></Pressable>
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
       <Modal animationType="fade" onRequestClose={() => setReportSent(false)} visible={reportSent}><View style={styles.sent}><View style={styles.sentIcon}><Text style={styles.sentCheck}>✓</Text></View><Text style={styles.sentTitle}>Report sent</Text><Text style={styles.sentCopy}>Thanks for helping keep Tastes safe. Our team will review this shortly.</Text><Pressable onPress={() => setReportSent(false)} style={styles.sentDone}><Text style={styles.sentDoneText}>Done</Text></Pressable></View></Modal>
     </Screen>
   );
@@ -467,6 +485,8 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   dishRating: { position: 'absolute', left: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, borderTopRightRadius: 12, color: '#fff', fontSize: 13, fontWeight: '700', backgroundColor: 'rgba(0,0,0,0.55)' },
   dishModalScrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
   dishModal: { padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border, backgroundColor: colors.surface },
+  sheetDragArea: { height: 24, marginTop: -10, alignItems: 'center', justifyContent: 'center' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
   dishModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center' },
   dishModalContent: { paddingBottom: 8 },
   dishModalTitle: { flex: 1, color: colors.text, fontSize: 20, fontWeight: '700' },

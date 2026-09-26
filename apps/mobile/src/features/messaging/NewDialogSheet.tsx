@@ -9,6 +9,7 @@ import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 
 const ACTIONS_HEIGHT = 124;
 const SHEET_HEIGHT_RATIO = 0.8;
@@ -38,6 +39,7 @@ export function NewDialogSheet({
   const actionsTranslateY = responsiveSize(72);
   const actionsInitiallyVisible = windowHeight * SHEET_HEIGHT_RATIO - fixedContentHeight >= minResultsHeight;
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const motion = useBottomSheetMotion({ closedOffset: windowHeight, onClose, visible });
   const api = useTastesApi();
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -146,8 +148,7 @@ export function NewDialogSheet({
     closing.current = true;
     try {
       await dismissKeyboard();
-      onClose();
-      afterClose?.();
+      motion.closeThen(afterClose);
     } finally {
       closing.current = false;
     }
@@ -187,19 +188,21 @@ export function NewDialogSheet({
   ));
 
   return (
-    <Modal animationType="slide" onDismiss={resetSheetAfterDismiss} onRequestClose={() => void closeSheet()} transparent visible={visible}>
+    <Modal animationType="none" onDismiss={resetSheetAfterDismiss} onRequestClose={() => void closeSheet()} transparent visible={visible}>
       <Pressable onPress={() => void closeSheet()} style={styles.backdrop}>
-        <AnimatedPressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.sheet,
-            {
-              height: sheetHeight,
-              marginBottom: sheetBottom,
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}
-        >
+        <Animated.View style={[styles.motionWrapper, { transform: [{ translateY: motion.translateY }] }]}>
+          <AnimatedPressable
+            onPress={(event) => event.stopPropagation()}
+            style={[
+              styles.sheet,
+              {
+                height: sheetHeight,
+                marginBottom: sheetBottom,
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+          >
+            <View style={styles.dragArea} {...motion.panHandlers}><View style={styles.sheetHandle} /></View>
             <View style={styles.header}>
               <Text style={styles.title}>New Chat</Text>
               <Pressable accessibilityLabel="Close" onPress={() => void closeSheet()} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
@@ -246,7 +249,8 @@ export function NewDialogSheet({
                 style={styles.results}
               />
             )}
-        </AnimatedPressable>
+          </AnimatedPressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
@@ -263,7 +267,10 @@ function BellIcon({ color }: { color: string }) {
 function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.72)' },
+    motionWrapper: { width: '100%' },
     sheet: { paddingHorizontal: 16, overflow: 'hidden', borderTopWidth: 1, borderColor: colors.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.canvas },
+    dragArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
+    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border },
     header: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, title: { color: colors.text, fontSize: 20, fontWeight: '700' }, close: { width: 28, height: 28, borderWidth: 2, borderColor: colors.text, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 20, lineHeight: 21 },
     searchBox: { height: 40, paddingLeft: 10, paddingRight: 8, borderRadius: 22, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: colors.surfaceRaised }, searchInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 0 },
     actions: { overflow: 'hidden' },

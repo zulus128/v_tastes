@@ -2,6 +2,7 @@ import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -39,6 +40,7 @@ import { NotificationsGlyph, StatsGlyph, TastesLogo } from '../../ui/FigmaIcons'
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { responsiveSize, responsiveStyleSheet, useOrientationDimensions } from '../../ui/responsive';
 import type { FeedItem, ReportReason } from '@tastes/contracts';
 import {
@@ -184,6 +186,7 @@ function FeedCard({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(null);
+  const dishReviewSheet = useBottomSheetMotion({ onClose: () => setSelectedDishIndex(null), visible: selectedDishIndex !== null });
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
   const primaryTag = tags[0] ? tagInfo[tags[0]] ?? { label: tags[0] } : null;
@@ -326,24 +329,25 @@ function FeedCard({
       </View>
       </Pressable>
       <Modal
-        animationType="slide"
+        animationType="none"
         transparent
         visible={selectedDishIndex !== null}
-        onRequestClose={() => setSelectedDishIndex(null)}
+        onRequestClose={dishReviewSheet.close}
       >
         <View style={overlayStyles.dishReviewScrim}>
           <Pressable
             accessibilityLabel="Close dish review"
-            onPress={() => setSelectedDishIndex(null)}
+            onPress={dishReviewSheet.close}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[overlayStyles.dishReviewSheet, { paddingBottom: Math.max(30, insets.bottom) }]}>
+          <Animated.View style={[overlayStyles.dishReviewSheet, { paddingBottom: Math.max(30, insets.bottom), transform: [{ translateY: dishReviewSheet.translateY }] }]}>
+            <View style={overlayStyles.dragArea} {...dishReviewSheet.panHandlers}><View style={overlayStyles.sheetHandle} /></View>
             <View style={overlayStyles.dishReviewHeader}>
               <Text style={overlayStyles.dishReviewTitle}>Dish Review</Text>
               <Pressable
                 accessibilityLabel="Close dish review"
                 hitSlop={10}
-                onPress={() => setSelectedDishIndex(null)}
+                onPress={dishReviewSheet.close}
                 style={overlayStyles.dishReviewClose}
               >
                 <Text style={overlayStyles.dishReviewCloseText}>×</Text>
@@ -381,7 +385,7 @@ function FeedCard({
                 </View>
               </ScrollView>
             ) : null}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </>
@@ -395,25 +399,27 @@ function ActionSheet({
   actions: Array<{ label: string; destructive?: boolean; onPress: () => void }>;
   onCancel: () => void;
 }) {
+  const motion = useBottomSheetMotion({ onClose: onCancel, visible: true });
   return (
     <View style={overlayStyles.scrim}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-      <View style={overlayStyles.sheet}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={motion.close} />
+      <Animated.View style={[overlayStyles.sheet, { transform: [{ translateY: motion.translateY }] }]}>
+        <View style={overlayStyles.dragArea} {...motion.panHandlers}><View style={overlayStyles.sheetHandle} /></View>
         <View style={overlayStyles.sheetGroup}>
           {actions.map((action, index) => (
             <Pressable
               key={action.label}
-              onPress={action.onPress}
+              onPress={() => motion.closeThen(action.onPress)}
               style={[overlayStyles.sheetAction, index > 0 && overlayStyles.sheetDivider]}
             >
               <Text style={[overlayStyles.sheetActionText, action.destructive && overlayStyles.destructive]}>{action.label}</Text>
             </Pressable>
           ))}
         </View>
-        <Pressable onPress={onCancel} style={overlayStyles.sheetCancel}>
+        <Pressable onPress={motion.close} style={overlayStyles.sheetCancel}>
           <Text style={overlayStyles.sheetCancelText}>Cancel</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -436,10 +442,12 @@ function ReportSheet({
   submitting: boolean;
 }) {
   const showDetails = selectedReason === 'Something else';
+  const motion = useBottomSheetMotion({ onClose: onCancel, visible: true });
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={overlayStyles.scrim}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-      <View style={overlayStyles.reportSheet}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={motion.close} />
+      <Animated.View style={[overlayStyles.reportSheet, { transform: [{ translateY: motion.translateY }] }]}>
+        <View style={overlayStyles.dragArea} {...motion.panHandlers}><View style={overlayStyles.sheetHandle} /></View>
         <Text style={overlayStyles.sheetTitle}>Why are you reporting this post?</Text>
         {reportReasons.map((reason) => (
           <Pressable
@@ -468,11 +476,11 @@ function ReportSheet({
           <Pressable disabled={submitting} onPress={onSubmit} style={[overlayStyles.primaryButton, submitting && overlayStyles.disabledButton]}>
             <Text style={overlayStyles.primaryButtonText}>{submitting ? 'Submitting…' : 'Submit report'}</Text>
           </Pressable>
-          <Pressable style={overlayStyles.secondaryButton} onPress={onCancel}>
+          <Pressable style={overlayStyles.secondaryButton} onPress={motion.close}>
             <Text style={overlayStyles.secondaryButtonText}>Cancel</Text>
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -902,6 +910,8 @@ const stylesStatic = responsiveStyleSheet({
 const overlayStyles = responsiveStyleSheet({
   scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 30, justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { gap: 8 },
+  dragArea: { height: 24, alignItems: 'center', justifyContent: 'center' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.28)' },
   sheetGroup: { overflow: 'hidden', borderRadius: 16, backgroundColor: '#272727' },
   sheetAction: { height: 54, alignItems: 'center', justifyContent: 'center' },
   sheetDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#484848' },
