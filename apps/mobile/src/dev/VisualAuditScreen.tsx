@@ -180,7 +180,9 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
           key={auditCase}
           initialScreen={name as PostSignupScreen}
           onAuthenticationRequired={async () => undefined}
-          onComplete={async () => undefined}
+          onComplete={async () => {
+            await Linking.openURL('tastes://visual-audit/product/create');
+          }}
           visualAudit
         />
       </SessionStateOverrideProvider>
