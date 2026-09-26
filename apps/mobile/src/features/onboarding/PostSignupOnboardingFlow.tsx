@@ -98,6 +98,19 @@ export type PostSignupScreen =
   | 'notifications'
   | 'ready';
 
+const previousPostSignupScreen: Partial<Record<PostSignupScreen, PostSignupScreen>> = {
+  city: 'profile',
+  dish: 'profile',
+  location: 'dish',
+  locationDenied: 'location',
+  place: 'location',
+  style: 'place',
+  contactsPermission: 'style',
+  contacts: 'contactsPermission',
+  invite: 'contactsPermission',
+  notifications: 'invite',
+};
+
 interface PostSignupOnboardingFlowProps {
   initialScreen?: PostSignupScreen;
   onAuthenticationRequired: () => Promise<void>;
@@ -342,7 +355,7 @@ export function PostSignupOnboardingFlow({
   }
 
   function back() {
-    const previous = history.at(-1);
+    const previous = history.at(-1) ?? previousPostSignupScreen[screen];
     if (!previous) return;
     setHistory((items) => items.slice(0, -1));
     setScreen(previous);
