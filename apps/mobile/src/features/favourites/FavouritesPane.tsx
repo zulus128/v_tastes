@@ -42,6 +42,7 @@ import {
 } from './api';
 
 type FolderEditor = { mode: 'create' } | { mode: 'rename'; folder: FavouriteFolder };
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type SaveablePlace = {
   venueId: string;
@@ -329,7 +330,13 @@ export function SaveToFolderSheet({
         </View>
         <Modal animationType="none" onRequestClose={createFolderSheet.close} transparent visible={creating}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createFolderRoot}>
-            <Pressable onPress={createFolderSheet.close} style={styles.createFolderScrim} />
+            <AnimatedPressable
+              onPress={createFolderSheet.close}
+              style={[
+                styles.createFolderScrim,
+                { opacity: createFolderSheet.backdropOpacity },
+              ]}
+            />
             <Animated.View style={[styles.createFolderSheet, { transform: [{ translateY: createFolderSheet.translateY }] }]}>
               <View style={styles.sheetDragArea} {...createFolderSheet.panHandlers}>
                 <View style={styles.sheetHandle} />
@@ -531,7 +538,10 @@ function FolderNameSheet({
   return (
     <Modal animationType="none" onRequestClose={sheet.close} transparent visible={editor !== null}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalRoot}>
-        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <AnimatedPressable
+          onPress={sheet.close}
+          style={[styles.scrim, { opacity: sheet.backdropOpacity }]}
+        />
         <Animated.View style={[styles.nameSheet, { transform: [{ translateY: sheet.translateY }] }]}>
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />
@@ -583,7 +593,10 @@ function FolderActionSheet({
   return (
     <Modal animationType="none" onRequestClose={sheet.close} transparent visible={folder !== null}>
       <View style={styles.modalRoot}>
-        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <AnimatedPressable
+          onPress={sheet.close}
+          style={[styles.scrim, { opacity: sheet.backdropOpacity }]}
+        />
         <Animated.View style={[styles.actionSheet, { transform: [{ translateY: sheet.translateY }] }]}>
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>
             <View style={styles.sheetHandle} />

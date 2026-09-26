@@ -15,6 +15,7 @@ import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 
 const LIGHT_MAP_TILES = 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 const DARK_MAP_TILES = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function mapVenueIcon(venue: Venue, active: boolean) {
   const category = venue.category?.toLowerCase() ?? '';
@@ -53,7 +54,11 @@ export function ProfileMapSheet({
   return (
     <Modal animationType="none" onRequestClose={sheet.close} transparent visible={visible}>
       <View style={styles.root}>
-        <Pressable accessibilityLabel="Close reviewed places map" onPress={sheet.close} style={styles.backdrop} />
+        <AnimatedPressable
+          accessibilityLabel="Close reviewed places map"
+          onPress={sheet.close}
+          style={[styles.backdrop, { opacity: sheet.backdropOpacity }]}
+        />
         <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY: sheet.translateY }] }]}>
           <View accessibilityLabel="Drag map sheet" style={styles.dragArea} {...sheet.panHandlers}>
             <View style={styles.grabber} />
