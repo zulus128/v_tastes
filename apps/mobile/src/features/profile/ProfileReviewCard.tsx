@@ -1,4 +1,5 @@
 import type { FeedItem } from '@tastes/contracts';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
@@ -19,7 +20,10 @@ import { ProfileAvatar } from './avatar';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
-import DishIcon from '../../../assets/create-review/add-dish.svg';
+import RecommendationStar from '../../../assets/home/recommendation-star.svg';
+import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
+import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
+import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import PinnedIndicator from '../../../assets/profile/pinned-indicator.svg';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 
@@ -136,12 +140,21 @@ function RatingStars({
         const fill = Math.max(0, Math.min(1, clamped - star + 1));
         return (
           <View key={star} style={styles.ratingStarCell}>
-            <Text style={[styles.reviewStars, styles.emptyStars]}>★</Text>
+            <ReviewStarOutline
+              color="#B82F29"
+              height={responsiveSize(17.9166)}
+              opacity={0.3}
+              width={responsiveSize(17.9179)}
+            />
             {fill > 0 ? (
               <View
                 style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}
               >
-                <Text style={styles.reviewStars}>★</Text>
+                <ReviewStarFilled
+                  color="#B82F29"
+                  height={responsiveSize(16.6666)}
+                  width={responsiveSize(16.6671)}
+                />
               </View>
             ) : null}
           </View>
@@ -174,12 +187,14 @@ export function ProfileReviewCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const dishes = item.dishReviews ?? [];
   const tags = item.tags ?? [];
+  const [expanded, setExpanded] = useState(false);
   const [selectedDish, setSelectedDish] = useState<
     (typeof dishes)[number] | null
   >(null);
+  const isLongText = item.text.length > 120;
 
   return (
-    <View style={styles.reviewCard}>
+    <View style={styles.reviewCard} testID="profile-review-card">
       <View style={styles.reviewHeader}>
         <ProfileAvatar profile={profile} style={styles.reviewAvatar} />
         <View style={styles.reviewAuthorCopy}>
@@ -225,6 +240,7 @@ export function ProfileReviewCard({
             contentContainerStyle={styles.dishRow}
             horizontal
             showsHorizontalScrollIndicator={false}
+            testID="profile-review-dishes"
           >
             {dishes.map((dish) => (
               <Pressable
@@ -238,23 +254,61 @@ export function ProfileReviewCard({
                   path={dish.photoPath}
                   url={dish.photoUrl}
                 />
-                <Text numberOfLines={1} style={styles.dishTitle}>
-                  {dish.title}
-                </Text>
-                <Text style={styles.dishRating}>
-                  ★ {dish.rating.toFixed(1)}
-                </Text>
+                <LinearGradient
+                  colors={['#161616', 'rgba(22,22,22,0)']}
+                  locations={[0.0167, 0.3067]}
+                  style={styles.dishGradient}
+                />
+                <View style={styles.dishTitleRow}>
+                  <Text numberOfLines={1} style={styles.dishTitle}>
+                    {dish.title}
+                  </Text>
+                </View>
+                <View style={styles.dishRatingBadge}>
+                  <RecommendationStar
+                    height={responsiveSize(14)}
+                    width={responsiveSize(14)}
+                  />
+                  <Text style={styles.dishRatingValue}>
+                    {dish.rating.toFixed(1)}
+                  </Text>
+                </View>
               </Pressable>
             ))}
           </ScrollView>
         ) : null}
-        <Text numberOfLines={4} style={styles.reviewText}>
-          {item.text}
-        </Text>
+        {item.text ? (
+          <Pressable
+            onPress={() => setExpanded((value) => !value)}
+            style={styles.reviewPressable}
+          >
+            <Text
+              numberOfLines={expanded ? undefined : 2}
+              style={styles.reviewText}
+            >
+              {item.text}
+            </Text>
+            {!expanded && isLongText ? (
+              <LinearGradient
+                colors={['rgba(22,22,22,0)', colors.surface, colors.surface]}
+                locations={[0, 0.37, 1]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.seeMoreFade}
+              >
+                <Text style={styles.seeMore}>See more</Text>
+              </LinearGradient>
+            ) : null}
+          </Pressable>
+        ) : null}
         <ReviewMetaRow cuisine={item.cuisine} mood={tags[0]} />
         <View style={styles.metrics}>
           <View style={styles.metricActions}>
-            <Pressable onPress={onReact} style={styles.metricIconRow}>
+            <Pressable
+              accessibilityLabel="Like review"
+              onPress={onReact}
+              style={styles.metricIconRow}
+            >
               <HeartIcon
                 color={reacted ? colors.primary : colors.text}
                 height={responsiveSize(15.5978)}
@@ -290,14 +344,12 @@ export function ProfileReviewCard({
           </View>
           {dishes.length > 0 ? (
             <View style={styles.dishCountTag}>
-              <DishIcon
-                color={colors.text}
-                height={responsiveSize(10.8392)}
-                width={responsiveSize(12)}
+              <TopRatedDishesIcon
+                color={colors.primary}
+                height={responsiveSize(14)}
+                width={responsiveSize(14)}
               />
-              <Text style={styles.dishCountText}>
-                {dishes.length} {dishes.length === 1 ? 'dish' : 'dishes'}
-              </Text>
+              <Text style={styles.dishCountText}>Dishes ({dishes.length})</Text>
             </View>
           ) : null}
         </View>
@@ -391,10 +443,16 @@ const createStyles = (colors: ThemeColors) =>
     moreGlyph: { color: colors.textMuted, fontSize: 24, lineHeight: 28 },
     reviewBody: { padding: 16, gap: 16 },
     reviewVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    reviewVenueCopy: { flex: 1, gap: 3 },
+    reviewVenueCopy: { flex: 1, gap: 10 },
     reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '600' },
-    ratingStars: { flexDirection: 'row', gap: 1 },
-    ratingStarCell: { width: 14, height: 14, overflow: 'hidden' },
+    ratingStars: { flexDirection: 'row', gap: 2 },
+    ratingStarCell: {
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
     ratingStarFill: {
       position: 'absolute',
       left: 0,
@@ -402,18 +460,6 @@ const createStyles = (colors: ThemeColors) =>
       bottom: 0,
       overflow: 'hidden',
     },
-    reviewStars: { color: '#D33B35', fontSize: 14, lineHeight: 14 },
-    emptyStars: { color: '#D33B35', opacity: 0.3 },
-    visitTag: {
-      height: 24,
-      paddingHorizontal: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      borderRadius: 40,
-      backgroundColor: colors.surfaceRaised,
-    },
-    visitTagText: { color: colors.text, fontSize: 12 },
     dishRow: { gap: 9 },
     dishCard: {
       width: 150,
@@ -423,35 +469,57 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: 'rgba(255,255,255,0.1)',
       borderRadius: 16,
       backgroundColor: colors.surfaceRaised,
+      position: 'relative',
+    },
+    dishGradient: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    },
+    dishTitleRow: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 10,
+      paddingTop: 8,
+      paddingBottom: 6,
     },
     dishTitle: {
-      position: 'absolute',
-      top: 8,
-      left: 10,
-      right: 10,
       color: '#FFFFFF',
       fontSize: 13,
       fontWeight: '600',
       textAlign: 'center',
     },
-    dishRating: {
+    dishRatingBadge: {
       position: 'absolute',
-      bottom: 5,
+      bottom: 0,
       left: 0,
+      minHeight: 24,
       paddingHorizontal: 10,
       paddingVertical: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
       borderTopRightRadius: 16,
-      overflow: 'hidden',
       backgroundColor: 'rgba(22,22,22,0.72)',
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '600',
     },
+    dishRatingValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    reviewPressable: { position: 'relative' },
     reviewText: {
       color: colors.text,
       fontSize: 14,
       lineHeight: 18,
       letterSpacing: -0.24,
+    },
+    seeMoreFade: { position: 'absolute', right: 0, bottom: 0, paddingLeft: 26 },
+    seeMore: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+      lineHeight: 18,
     },
     metrics: {
       flexDirection: 'row',

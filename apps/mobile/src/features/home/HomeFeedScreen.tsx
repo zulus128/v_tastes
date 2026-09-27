@@ -32,8 +32,6 @@ import RecommendationStar from '../../../assets/home/recommendation-star.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
-import BirthdayTagIcon from '../../../assets/create-review/tag-birthday.svg';
-import NightTagIcon from '../../../assets/create-review/tag-night.svg';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import {
@@ -71,16 +69,6 @@ import {
 import { useProfile } from '../profile/api';
 import { UserAvatar } from '../profile/avatar';
 import { useUnreadNotificationCount } from '../notifications/api';
-
-const tagInfo: Record<string, { label: string }> = {
-  'quick-bites': { label: '⚡ Quick bites' },
-  casual: { label: 'Casual' },
-  fancy: { label: '🥂 Fancy' },
-  'night-out': { label: '🌙 Night out' },
-  'date-night': { label: 'Date night' },
-  birthday: { label: 'Birthday' },
-  children: { label: 'With children' },
-};
 
 const cuisineFlags: Record<string, string> = {
   french: '🇫🇷',
@@ -257,13 +245,6 @@ function FeedCard({
   });
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
-  const primaryTag = tags[0] ? (tagInfo[tags[0]] ?? { label: tags[0] }) : null;
-  const PrimaryTagIcon =
-    tags[0] === 'date-night'
-      ? NightTagIcon
-      : tags[0] === 'birthday'
-        ? BirthdayTagIcon
-        : null;
   const username = item.authorUsername
     ? `@${item.authorUsername}`
     : `@${item.authorDisplayName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
@@ -311,18 +292,6 @@ function FeedCard({
           </View>
           <View style={styles.ratingTagRow}>
             <RatingStars rating={item.rating} styles={styles} />
-            {primaryTag ? (
-              <View style={styles.tagBadge}>
-                {PrimaryTagIcon ? (
-                  <PrimaryTagIcon
-                    color={colors.text}
-                    height={responsiveSize(12)}
-                    width={responsiveSize(12)}
-                  />
-                ) : null}
-                <Text style={styles.tagBadgeText}>{primaryTag.label}</Text>
-              </View>
-            ) : null}
           </View>
         </View>
 
@@ -1523,7 +1492,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '700',
       letterSpacing: 1,
     },
-    venueSection: { paddingHorizontal: 16, gap: 4 },
+    venueSection: { paddingHorizontal: 16, gap: 10 },
     venueTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',

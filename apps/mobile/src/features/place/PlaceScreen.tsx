@@ -887,9 +887,9 @@ function ReviewCard({
       <View style={styles.reviewBody}>
         <View style={styles.reviewSummary}>
           <RatingStars rating={review.rating} styles={styles} />
-          <ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} />
         </View>
         <Text style={styles.reviewText}>{review.text}</Text>
+        <ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} />
         {review.dishReviews.length > 0 ? (
           <View style={styles.reviewPhotoGrid}>
             {review.dishReviews.map((dish) => (
