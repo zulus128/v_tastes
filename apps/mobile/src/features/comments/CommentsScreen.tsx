@@ -8,6 +8,7 @@ import {
   Animated,
   FlatList,
   Image,
+  type ImageSourcePropType,
   KeyboardAvoidingView,
   type LayoutChangeEvent,
   Platform,
@@ -32,6 +33,10 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import SendIcon from '../../../assets/ai/send.svg';
+import avatarKristin from '../../../assets/discover/avatar-kristin.png';
+import loungePhoto from '../../../assets/discover/lounge.png';
+import restaurantPhoto from '../../../assets/discover/restaurant.png';
+import sushiPhoto from '../../../assets/discover/sushi.jpg';
 import {
   ErrorState,
   ListFooter,
@@ -78,15 +83,19 @@ const tagLabels: Record<string, string> = {
   children: 'With children',
 };
 
+const seededDishPhotos = [sushiPhoto, restaurantPhoto, loungePhoto];
+
 function commentShareUrl(reviewId: string, commentId: string) {
   return `https://tastesapp.com/reviews/${encodeURIComponent(reviewId)}/comments?commentId=${encodeURIComponent(commentId)}`;
 }
 
 function DishPhoto({
+  fallbackSource,
   path,
   styles,
   url,
 }: {
+  fallbackSource?: ImageSourcePropType;
   path?: string;
   styles: ReturnType<typeof createStyles>;
   url?: string;
@@ -150,8 +159,16 @@ function DishPhoto({
   if (state.uri)
     return (
       <Image
-        resizeMode="contain"
+        resizeMode="cover"
         source={{ uri: state.uri }}
+        style={styles.dishImage}
+      />
+    );
+  if (fallbackSource && (!normalizedPath || state.failed))
+    return (
+      <Image
+        resizeMode="cover"
+        source={fallbackSource}
         style={styles.dishImage}
       />
     );
@@ -222,6 +239,10 @@ function MainReview({
     onClose: () => setSelectedDish(null),
     visible: selectedDish !== null,
   });
+  const seededReview = review.id.startsWith('seed-own-');
+  const selectedDishIndex = selectedDish
+    ? review.dishReviews.findIndex((dish) => dish.id === selectedDish.id)
+    : -1;
   return (
     <View style={styles.mainReview}>
       <View style={styles.reviewAuthorRow}>
@@ -230,6 +251,8 @@ function MainReview({
             source={{ uri: review.authorPhotoUrl }}
             style={styles.reviewAvatar}
           />
+        ) : seededReview ? (
+          <Image source={avatarKristin} style={styles.reviewAvatar} />
         ) : (
           <View style={styles.reviewAvatarFallback}>
             <Text style={styles.reviewAvatarInitial}>
@@ -268,12 +291,17 @@ function MainReview({
               data={review.dishReviews}
               horizontal
               keyExtractor={(dish) => dish.id}
-              renderItem={({ item: dish }) => (
+              renderItem={({ index, item: dish }) => (
                 <Pressable
                   onPress={() => setSelectedDish(dish)}
                   style={styles.dishCard}
                 >
                   <DishPhoto
+                    fallbackSource={
+                      seededReview
+                        ? seededDishPhotos[index % seededDishPhotos.length]
+                        : undefined
+                    }
                     path={dish.photoPath}
                     styles={styles}
                     url={dish.photoUrl}
@@ -372,6 +400,13 @@ function MainReview({
                 <>
                   <View style={styles.dishModalImage}>
                     <DishPhoto
+                      fallbackSource={
+                        seededReview && selectedDishIndex >= 0
+                          ? seededDishPhotos[
+                              selectedDishIndex % seededDishPhotos.length
+                            ]
+                          : undefined
+                      }
                       path={selectedDish.photoPath}
                       styles={styles}
                       url={selectedDish.photoUrl}
