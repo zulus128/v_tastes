@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   concentricRatingLayout,
+  dishRatingArcGeometry,
   ratingCurvePoint,
   ratingForCurvePoint,
   ratingForLinearPoint,
+  ratingCircle,
   snapRating,
 } from '../src/features/create-review/ratingCurveGeometry';
 
@@ -41,6 +43,29 @@ describe('rating curve geometry', () => {
     expect(ratingForLinearPoint(40, 360)).toBe(1);
     expect(ratingForLinearPoint(180, 360)).toBe(3);
     expect(ratingForLinearPoint(380, 360)).toBe(5);
+  });
+
+  it('keeps the standalone dish arc aligned to the Figma canvas', () => {
+    const geometry = dishRatingArcGeometry(402);
+    const left = ratingCurvePoint(1, geometry);
+    const middle = ratingCurvePoint(3, geometry);
+    const right = ratingCurvePoint(5, geometry);
+
+    expect(left.x).toBeCloseTo(39, 3);
+    expect(left.y).toBeCloseTo(43, 3);
+    expect(middle.x).toBeCloseTo(201, 3);
+    expect(middle.y).toBeCloseTo(167, 3);
+    expect(right.x).toBeCloseTo(363, 3);
+    expect(right.y).toBeCloseTo(43, 3);
+  });
+
+  it('scales the dish arc proportionally on narrower screens', () => {
+    const geometry = dishRatingArcGeometry(201);
+    const middle = ratingCurvePoint(3, geometry);
+
+    expect(geometry.radius).toBeCloseTo(ratingCircle.radius / 2, 4);
+    expect(middle.x).toBeCloseTo(100.5, 3);
+    expect(middle.y).toBeCloseTo(83.5, 3);
   });
 
   it('keeps a constant radial gap on wide screens', () => {

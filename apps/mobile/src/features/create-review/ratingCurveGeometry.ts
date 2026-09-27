@@ -28,6 +28,22 @@ const defaultRatingArc: RatingArcGeometry = {
   rightAngle: Math.atan2(7 - ratingCircle.centerY, 331 - ratingCircle.centerX),
 };
 
+/**
+ * Rating arc used by the standalone Add Dish sheet in the 402pt Figma canvas.
+ * It is the review arc translated 32pt right and 36pt down, then scaled to the
+ * actual sheet width so the endpoints and deepest point keep their proportions.
+ */
+export function dishRatingArcGeometry(width: number): RatingArcGeometry {
+  const scale = width > 0 ? width / 402 : 1;
+  return {
+    centerX: 201 * scale,
+    centerY: -0.8226 * scale,
+    leftAngle: defaultRatingArc.leftAngle,
+    radius: ratingCircle.radius * scale,
+    rightAngle: defaultRatingArc.rightAngle,
+  };
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }

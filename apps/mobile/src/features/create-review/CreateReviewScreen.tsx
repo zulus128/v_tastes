@@ -40,8 +40,8 @@ import Svg, {
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
+import CameraIcon from '../../../assets/create-review/camera.svg';
 import DeleteDishIcon from '../../../assets/create-review/delete-dish.svg';
-import PhotoAddLightIcon from '../../../assets/create-review/photo-add-light.svg';
 import RatingPin from '../../../assets/create-review/rating-pin.svg';
 import RatingScale from '../../../assets/create-review/rating-scale.svg';
 import RatingScaleLight from '../../../assets/create-review/rating-scale-light.svg';
@@ -52,6 +52,8 @@ import successGlow from '../../../assets/create-review/success-glow.png';
 import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import successPattern from '../../../assets/create-review/success-pattern.png';
+import CloseCircle from '../../../assets/recap/story/close-circle.svg';
+import CloseX from '../../../assets/recap/story/close-x.svg';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import {
   cancelDraftReminder,
@@ -69,6 +71,7 @@ import { type DishReviewDraft, useCreateReview } from './api';
 import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
+  dishRatingArcGeometry,
   ratingCurvePoint,
   ratingForCurvePoint,
   ratingForLinearPoint,
@@ -599,7 +602,7 @@ export function CreateReviewScreen({
                 setDishEditor({
                   id: createIdempotencyKey('dish'),
                   photoUri: '',
-                  rating: 0.5,
+                  rating: 1,
                   title: '',
                 })
               }
@@ -878,6 +881,7 @@ function RatingCurve({
   minimumStraightBottom = 0,
   onChange,
   onGestureActiveChange,
+  standaloneArc = false,
   value,
 }: {
   heroHeight?: number;
@@ -886,6 +890,7 @@ function RatingCurve({
   minimumStraightBottom?: number;
   onChange: (value: number) => void;
   onGestureActiveChange?: (active: boolean) => void;
+  standaloneArc?: boolean;
   value: number;
 }) {
   const { isDark } = useAppTheme();
@@ -896,12 +901,13 @@ function RatingCurve({
   // narrower screens (e.g. iPhone SE). Measure the space actually available
   // and scale the design-space marker positions to fit it instead.
   const [scaleWidth, setScaleWidth] = useState(0);
+  const [standaloneWidth, setStandaloneWidth] = useState(0);
   const [visualRating, setVisualRating] = useState(value);
   const minimumRating = linear ? 0.5 : 1;
   const reduceMotion = useRef(false);
   const markerScale = scaleWidth / 359.903;
   const curvedLayout =
-    !linear && heroWidth > 0 && heroHeight > 0
+    !linear && !standaloneArc && heroWidth > 0 && heroHeight > 0
       ? concentricRatingLayout(
           heroWidth,
           heroHeight,
@@ -909,7 +915,10 @@ function RatingCurve({
           responsiveSize(heroCurveGap),
         )
       : null;
-  const arcGeometry = curvedLayout?.ratingArc;
+  const arcGeometry =
+    standaloneArc && standaloneWidth > 0
+      ? dishRatingArcGeometry(standaloneWidth)
+      : curvedLayout?.ratingArc;
   const selectedPoint =
     visualRating >= 1 ? ratingCurvePoint(visualRating, arcGeometry) : null;
   const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
@@ -1139,6 +1148,11 @@ function RatingCurve({
     : responsiveSize(167);
   return (
     <View
+      onLayout={
+        standaloneArc
+          ? (event) => setStandaloneWidth(event.nativeEvent.layout.width)
+          : undefined
+      }
       style={[
         ratingStyles.wrap,
         curvedLayout && {
@@ -1158,6 +1172,7 @@ function RatingCurve({
         style={[
           ratingStyles.value,
           curvedLayout && { top: innerBottom - responsiveSize(149) },
+          standaloneArc && { top: innerBottom - responsiveSize(141) },
         ]}
       >
         {visualRating >= minimumRating
@@ -1170,6 +1185,7 @@ function RatingCurve({
         style={[
           ratingStyles.stars,
           curvedLayout && { top: innerBottom - responsiveSize(106) },
+          standaloneArc && { top: innerBottom - responsiveSize(96) },
         ]}
       >
         {Array.from({ length: 5 }, (_, index) => {
@@ -1299,25 +1315,34 @@ function RatingCurve({
             </>
           ) : null}
         </View>
-      ) : curvedLayout && arcGeometry ? (
+      ) : arcGeometry && (curvedLayout || standaloneArc) ? (
         <View
           style={[
             ratingStyles.curve,
-            { height: curvedLayout.arcDepth, width: heroWidth },
+            {
+              height: standaloneArc
+                ? responsiveSize(198)
+                : curvedLayout?.arcDepth,
+              width: standaloneArc ? standaloneWidth : heroWidth,
+            },
           ]}
           {...curvePanResponder.panHandlers}
         >
           <Svg
-            height={curvedLayout.arcDepth}
+            height={
+              standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth
+            }
             pointerEvents="none"
             style={StyleSheet.absoluteFill}
-            viewBox={`0 0 ${heroWidth} ${curvedLayout.arcDepth}`}
-            width={heroWidth}
+            viewBox={`0 0 ${standaloneArc ? standaloneWidth : heroWidth} ${standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth}`}
+            width={standaloneArc ? standaloneWidth : heroWidth}
           >
             <Defs>
               <ClipPath id="review-rating-progress">
                 <Rect
-                  height={curvedLayout.arcDepth}
+                  height={
+                    standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth
+                  }
                   width={selectedPoint?.x ?? 0}
                   x={0}
                   y={0}
@@ -1325,14 +1350,14 @@ function RatingCurve({
               </ClipPath>
             </Defs>
             <Path
-              d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
+              d={`M${ratingCurvePoint(1, arcGeometry).x} ${ratingCurvePoint(1, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
               fill="none"
               stroke={curveBase}
               strokeLinecap="round"
               strokeWidth={responsiveSize(4)}
             />
             <Path
-              d={`M${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
+              d={`M${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} ${ratingCurvePoint(5, arcGeometry).y}`}
               fill="none"
               stroke={curveBase}
               strokeLinecap="round"
@@ -1341,7 +1366,7 @@ function RatingCurve({
             {selectedPoint ? (
               <Path
                 clipPath="url(#review-rating-progress)"
-                d={`M${ratingCurvePoint(1, arcGeometry).x} 0 A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} 0`}
+                d={`M${ratingCurvePoint(1, arcGeometry).x} ${ratingCurvePoint(1, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} ${ratingCurvePoint(5, arcGeometry).y}`}
                 fill="none"
                 stroke={accent}
                 strokeLinecap="round"
@@ -2021,7 +2046,7 @@ function DishEditor({
 
   if (!draft) return null;
   const valid = Boolean(
-    draft.photoUri && draft.title.trim() && draft.rating >= 0.5,
+    draft.photoUri && draft.title.trim() && draft.rating >= 1,
   );
   return (
     <Modal
@@ -2036,7 +2061,15 @@ function DishEditor({
         behavior={Platform.OS === 'ios' ? undefined : 'height'}
         style={styles.modalScreen}
       >
-        <Pressable onPress={sheet.close} style={styles.scrim} />
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: sheet.backdropOpacity }]}
+        >
+          <Pressable
+            accessibilityLabel="Close Add Dish"
+            onPress={sheet.close}
+            style={styles.scrim}
+          />
+        </Animated.View>
         <Animated.View
           style={[
             styles.sheet,
@@ -2046,13 +2079,33 @@ function DishEditor({
             },
           ]}
         >
-          <View style={styles.dragArea} {...sheet.panHandlers}>
-            <View style={styles.handle} />
+          <View
+            accessibilityLabel="Dismiss Add Dish"
+            accessibilityRole="adjustable"
+            style={styles.dragArea}
+            {...sheet.panHandlers}
+          >
+            <View style={styles.dragHandle} />
           </View>
           <View style={styles.header}>
             <Text style={styles.title}>Add Dish</Text>
-            <Pressable onPress={sheet.close}>
-              <Text style={styles.close}>⊗</Text>
+            <Pressable
+              accessibilityLabel="Close"
+              hitSlop={12}
+              onPress={sheet.close}
+              style={styles.closeButton}
+            >
+              <CloseCircle
+                color={colors.text}
+                height={responsiveSize(30)}
+                width={responsiveSize(30)}
+              />
+              <CloseX
+                color={colors.text}
+                height={responsiveSize(9)}
+                style={styles.closeX}
+                width={responsiveSize(9)}
+              />
             </Pressable>
           </View>
           <ScrollView
@@ -2063,36 +2116,41 @@ function DishEditor({
             showsVerticalScrollIndicator={false}
             style={styles.scroll}
           >
-            <Pressable onPress={pickSource} style={styles.photo}>
+            <Pressable
+              onPress={pickSource}
+              style={[styles.photo, draft.photoUri && styles.photoSelected]}
+            >
               {draft.photoUri ? (
                 <Image
                   source={{ uri: draft.photoUri }}
                   style={styles.photoImage}
                 />
-              ) : isDark ? (
-                <Text style={styles.photoAdd}>⊕</Text>
               ) : (
-                <PhotoAddLightIcon
-                  color={colors.text}
-                  height={responsiveSize(23.3333)}
-                  width={responsiveSize(23.3333)}
-                />
+                <View style={styles.photoEmpty}>
+                  <CameraIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(30)}
+                  />
+                  <Text style={styles.photoAdd}>Add photo</Text>
+                </View>
               )}
             </Pressable>
             <RatingCurve
-              linear
               onChange={(rating) => setDraft({ ...draft, rating })}
+              standaloneArc
               value={draft.rating}
             />
-            <SectionLabel label="Title" />
-            <TextInput
-              maxLength={120}
-              onChangeText={(title) => setDraft({ ...draft, title })}
-              placeholder="Enter text"
-              placeholderTextColor={colors.placeholder}
-              style={styles.input}
-              value={draft.title}
-            />
+            <View style={styles.fieldSection}>
+              <Text style={styles.fieldLabel}>TITLE</Text>
+              <TextInput
+                maxLength={120}
+                onChangeText={(title) => setDraft({ ...draft, title })}
+                placeholder="Enter text"
+                placeholderTextColor={colors.placeholder}
+                style={styles.input}
+                value={draft.title}
+              />
+            </View>
           </ScrollView>
           <View style={styles.actions}>
             <Pressable onPress={sheet.close} style={styles.cancel}>
@@ -2101,7 +2159,7 @@ function DishEditor({
             <Pressable
               disabled={!valid}
               onPress={() => sheet.closeThen(() => onSave(draft))}
-              style={[styles.save, !valid && styles.disabled]}
+              style={[styles.save, !valid && styles.saveDisabled]}
             >
               <View style={styles.saveContent}>
                 <View style={styles.saveIcon}>
@@ -2654,20 +2712,29 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) =>
       right: 0,
       bottom: 0,
       left: 0,
-      height: '92%',
+      height: 629,
       overflow: 'hidden',
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       borderTopWidth: 1,
-      borderColor: isDark ? colors.border : '#45474B',
-      backgroundColor: isDark ? colors.canvas : colors.surface,
+      borderColor: isDark ? '#45474B' : colors.border,
+      backgroundColor: isDark ? '#161616' : colors.surface,
     },
-    dragArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
-    handle: {
+    dragArea: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      zIndex: 10,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dragHandle: {
       width: 36,
       height: 4,
       borderRadius: 2,
-      backgroundColor: colors.border,
+      backgroundColor: 'rgba(255,255,255,0.25)',
     },
     header: {
       height: 64,
@@ -2683,23 +2750,46 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '600',
       letterSpacing: -0.45,
     },
-    close: { color: colors.text, fontSize: 27 },
+    closeButton: {
+      position: 'relative',
+      width: 30,
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeX: { position: 'absolute' },
     scroll: { flex: 1 },
-    body: { paddingHorizontal: 16, paddingBottom: 16 },
+    body: { paddingBottom: 12, gap: 12, alignItems: 'center' },
     photo: {
-      width: '100%',
-      aspectRatio: 1,
-      maxHeight: 370,
+      width: 150,
+      height: 150,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderStyle: 'dashed',
+      borderColor: '#45474B',
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: isDark ? '#0E0E10' : colors.surfaceRaised,
     },
-    photoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    photoAdd: { color: colors.textMuted, fontSize: 32 },
+    photoSelected: { borderWidth: 0, backgroundColor: 'transparent' },
+    photoImage: { width: 150, height: 150, resizeMode: 'cover' },
+    photoEmpty: { alignItems: 'center', gap: 8 },
+    photoAdd: { color: '#AAB2C5', fontSize: 13 },
+    fieldSection: {
+      width: '100%',
+      padding: 16,
+      paddingTop: 0,
+      gap: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: 'rgba(255,255,255,0.1)',
+    },
+    fieldLabel: {
+      color: colors.text,
+      opacity: 0.5,
+      fontSize: 13,
+      lineHeight: 16,
+    },
     input: {
       height: 50,
       borderRadius: 12,
@@ -2709,23 +2799,24 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) =>
       fontSize: 16,
     },
     actions: {
+      minHeight: 79,
       paddingTop: 16,
       paddingHorizontal: 16,
       flexDirection: 'row',
       gap: 10,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
-      backgroundColor: isDark ? colors.canvas : colors.surface,
+      backgroundColor: isDark ? '#080808' : colors.surface,
     },
     cancel: {
       flex: 1,
-      height: isDark ? 52 : 40,
+      height: 40,
       borderWidth: 1,
-      borderColor: colors.primary,
-      borderRadius: 26,
+      borderColor: '#45474B',
+      borderRadius: 36,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? 'transparent' : colors.surface,
+      backgroundColor: isDark ? '#161616' : colors.surface,
     },
     cancelText: {
       color: colors.text,
@@ -2735,12 +2826,13 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     save: {
       flex: 1,
-      height: isDark ? 52 : 40,
-      borderRadius: 26,
+      height: 40,
+      borderRadius: 36,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#B82F29',
+      backgroundColor: '#E63946',
     },
+    saveDisabled: { backgroundColor: '#2F2F33', opacity: 0.5 },
     saveContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     saveIcon: {
       width: 24,
@@ -2754,7 +2846,6 @@ const createDishStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '500',
       letterSpacing: 0.6,
     },
-    disabled: { opacity: 0.5 },
   });
 
 const createConfirmationStyles = (colors: ThemeColors) =>
