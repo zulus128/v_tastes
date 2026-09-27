@@ -1649,7 +1649,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: 10,
       paddingVertical: 4,
       color: '#FFFFFF',
-      backgroundColor: 'rgba(22,22,22,0.72)',
+      backgroundColor: 'rgba(255,255,255,0.03)',
       fontSize: 13,
       fontWeight: '600',
     },
