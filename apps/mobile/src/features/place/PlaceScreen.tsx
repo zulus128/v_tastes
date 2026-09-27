@@ -765,13 +765,13 @@ function ReviewPhoto({
   styles,
   title,
 }: {
-  path: string;
+  path?: string | null;
   rating: number;
   single: boolean;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
-  const normalizedPath = path.trim().replace(/^\/+|\/+$/g, '');
+  const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 

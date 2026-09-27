@@ -21,7 +21,11 @@ export function normalizePlaceReviewPage(page: unknown): PlaceReview[] {
         // Normalize them at the API boundary so every Place card stays safe.
         dishNames: Array.isArray(review.dishNames) ? review.dishNames : [],
         dishReviews: Array.isArray(review.dishReviews)
-          ? review.dishReviews
+          ? review.dishReviews.map((dish) => ({
+              ...dish,
+              photoPath:
+                typeof dish.photoPath === 'string' ? dish.photoPath : '',
+            }))
           : [],
         tags: Array.isArray(review.tags) ? review.tags : [],
       }))
