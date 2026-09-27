@@ -19,6 +19,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
+import avatarCameron from '../../../assets/discover/avatar-cameron.jpg';
+import avatarKristin from '../../../assets/discover/avatar-kristin.png';
+import avatarWade from '../../../assets/discover/avatar-wade.png';
 import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
@@ -33,6 +36,8 @@ import CaretDownIcon from '../../../assets/comments/caret-down.svg';
 import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import RecommendationPlusIcon from '../../../assets/home/recommendation-plus.svg';
+import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
+import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import {
   SaveToFolderSheet,
@@ -66,6 +71,8 @@ const sorts: Record<PlaceReviewSort, string> = {
 function placeImage(url: string | null | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
 }
+
+const seededReviewAvatars = [avatarKristin, avatarCameron, avatarWade];
 export function PlaceScreen({
   onBack,
   onOpenComments,
@@ -746,12 +753,21 @@ function RatingStars({
         const fill = Math.max(0, Math.min(1, clamped - star + 1));
         return (
           <View key={star} style={styles.ratingStarCell}>
-            <Text style={[styles.stars, styles.emptyStar]}>★</Text>
+            <ReviewStarOutline
+              color="#B82F29"
+              height={responsiveSize(17.9166)}
+              opacity={0.3}
+              width={responsiveSize(17.9179)}
+            />
             {fill > 0 ? (
               <View
                 style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}
               >
-                <Text style={styles.stars}>★</Text>
+                <ReviewStarFilled
+                  color="#B82F29"
+                  height={responsiveSize(16.6666)}
+                  width={responsiveSize(16.6671)}
+                />
               </View>
             ) : null}
           </View>
@@ -888,6 +904,10 @@ function ReviewCard({
   venueName: string;
 }) {
   const { colors } = useAppTheme();
+  const seededAvatar =
+    !review.authorPhotoUrl && reviewIndex < 3
+      ? seededReviewAvatars[reviewIndex % seededReviewAvatars.length]
+      : null;
   const displayDishes = review.dishReviews.map((dish, dishIndex) => ({
     ...dish,
     fallbackUri: fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex),
@@ -920,11 +940,15 @@ function ReviewCard({
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}>
-        <UserAvatar
-          displayName={review.authorDisplayName}
-          photoUrl={review.authorPhotoUrl}
-          style={styles.avatar}
-        />
+        {seededAvatar ? (
+          <Image source={seededAvatar} style={styles.avatar} />
+        ) : (
+          <UserAvatar
+            displayName={review.authorDisplayName}
+            photoUrl={review.authorPhotoUrl}
+            style={styles.avatar}
+          />
+        )}
         <View style={styles.author}>
           <Text style={styles.authorName}>{review.authorDisplayName}</Text>
           <Text style={styles.authorHandle}>
@@ -1570,13 +1594,11 @@ const createStyles = (colors: ThemeColors) =>
     },
     ratingStarFill: {
       position: 'absolute',
-      left: 0,
-      top: 0,
-      bottom: 0,
+      left: 1.6665,
+      top: 1.6667,
+      height: 16.6666,
       overflow: 'hidden',
     },
-    stars: { color: colors.primary, fontSize: 16 },
-    emptyStar: { color: colors.textMuted },
     reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 },
     dishes: { color: colors.text, fontSize: 12, fontWeight: '600' },
     reviewPhotoRow: { gap: 9 },
