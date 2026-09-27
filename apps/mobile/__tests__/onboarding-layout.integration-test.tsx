@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OnboardingFlow } from '../src/features/onboarding/OnboardingFlow';
 import { PostSignupOnboardingFlow } from '../src/features/onboarding/PostSignupOnboardingFlow';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
-import readyCollageLight from '../assets/onboarding/ready-collage-light.png';
+import readyCardLightCenter from '../assets/onboarding/ready-card-light-center.png';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual(
@@ -543,7 +543,9 @@ describe('onboarding in resizable windows', () => {
     );
 
     const collage = screen.getByTestId('onboarding-ready-collage');
-    expect(collage.props.source).toBe(readyCollageLight);
+    expect(
+      screen.getByTestId('onboarding-ready-card-center').props.source,
+    ).toBe(readyCardLightCenter);
     expect(StyleSheet.flatten(collage.props.style).width).toBeLessThan(400);
     await act(async () => resize(600, 600));
     const scroll = screen.getByTestId('onboarding-ready-scroll');

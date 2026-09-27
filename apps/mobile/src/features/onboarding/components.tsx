@@ -91,6 +91,7 @@ export function PrimaryButton({
   disabled = false,
   onPress,
   style,
+  buttonStyle,
 }: {
   label: string;
   icon?: ImageSourcePropType;
@@ -100,6 +101,7 @@ export function PrimaryButton({
   disabled?: boolean;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
+  buttonStyle?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useAppTheme();
   const { scale } = useResponsiveMetrics();
@@ -118,6 +120,7 @@ export function PrimaryButton({
         onPress={onPress}
         style={({ pressed }) => [
           styles.primaryButton,
+          buttonStyle,
           pressed && styles.pressed,
         ]}
       >

@@ -60,10 +60,15 @@ import placeUnselected from '../../../assets/onboarding/place-unselected.png';
 import placeWasabi from '../../../assets/onboarding/place-wasabi.png';
 import PlaceSearchIcon from '../../../assets/onboarding/place-search.svg';
 import ratingStar from '../../../assets/onboarding/rating-star.png';
-import readyCollage from '../../../assets/onboarding/ready-collage.png';
-import readyCollageLight from '../../../assets/onboarding/ready-collage-light.png';
+import readyCardDarkCenter from '../../../assets/onboarding/ready-card-dark-center.png';
+import readyCardDarkLeft from '../../../assets/onboarding/ready-card-dark-left.png';
+import readyCardDarkRight from '../../../assets/onboarding/ready-card-dark-right.png';
+import readyCardLightCenter from '../../../assets/onboarding/ready-card-light-center.png';
+import readyCardLightLeft from '../../../assets/onboarding/ready-card-light-left.png';
+import readyCardLightRight from '../../../assets/onboarding/ready-card-light-right.png';
 import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
+import readyPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import { auth, storage } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -437,6 +442,107 @@ function NotificationExample({
   );
 }
 
+const READY_COLLAGE_WIDTH = 402;
+const READY_COLLAGE_HEIGHT = 288;
+
+const readyCardFrames = [
+  {
+    key: 'left',
+    left: 0,
+    top: 36,
+    width: 183,
+    height: 216,
+    radius: 13,
+    assetWidth: 199,
+    assetHeight: 248,
+    assetLeft: 0,
+    assetTop: -16,
+  },
+  {
+    key: 'right',
+    left: 216,
+    top: 34,
+    width: 186,
+    height: 218,
+    radius: 13,
+    assetWidth: 202,
+    assetHeight: 250,
+    assetLeft: -16,
+    assetTop: -16,
+  },
+  {
+    key: 'center',
+    left: 78,
+    top: 9,
+    width: 245,
+    height: 268,
+    radius: 16,
+    assetWidth: 277,
+    assetHeight: 288,
+    assetLeft: -16,
+    assetTop: -10,
+  },
+] as const;
+
+function ReadyCollage({ dark, width }: { dark: boolean; width: number }) {
+  const scale = width / READY_COLLAGE_WIDTH;
+  const sources = dark
+    ? [readyCardDarkLeft, readyCardDarkRight, readyCardDarkCenter]
+    : [readyCardLightLeft, readyCardLightRight, readyCardLightCenter];
+
+  return (
+    <View
+      style={{
+        height: READY_COLLAGE_HEIGHT * scale,
+        position: 'relative',
+        width,
+      }}
+      testID="onboarding-ready-collage"
+    >
+      {readyCardFrames.map((frame, index) => (
+        <View
+          key={frame.key}
+          style={{
+            backgroundColor: dark ? '#161616' : '#FFFFFF',
+            borderRadius: frame.radius * scale,
+            height: frame.height * scale,
+            left: frame.left * scale,
+            position: 'absolute',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.47,
+            shadowRadius: 15 * scale,
+            top: frame.top * scale,
+            width: frame.width * scale,
+            zIndex: index === 2 ? 2 : 1,
+          }}
+        >
+          <View
+            style={{
+              borderRadius: frame.radius * scale,
+              flex: 1,
+              overflow: 'hidden',
+            }}
+          >
+            <Image
+              resizeMode="stretch"
+              source={sources[index]}
+              testID={`onboarding-ready-card-${frame.key}`}
+              style={{
+                height: frame.assetHeight * scale,
+                left: frame.assetLeft * scale,
+                position: 'absolute',
+                top: frame.assetTop * scale,
+                width: frame.assetWidth * scale,
+              }}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function PostSignupOnboardingFlow({
   initialScreen,
   onAuthenticationRequired,
@@ -455,7 +561,6 @@ export function PostSignupOnboardingFlow({
     DESIGN_VIEWPORT.width * layoutScale,
     contentWidth,
   );
-  const collageHeight = 288 * (collageWidth / DESIGN_VIEWPORT.width);
   const landscape = orientation.width > orientation.height;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
@@ -1709,17 +1814,30 @@ export function PostSignupOnboardingFlow({
     0,
     Math.min(collageWidth, (contentWidth - 76 * layoutScale) * 0.46),
   );
-  const landscapeCollageHeight =
-    288 * (landscapeCollageWidth / DESIGN_VIEWPORT.width);
+  const readyIsDark = resolvedTheme === 'dark';
   return (
     <LinearGradient
       colors={
-        resolvedTheme === 'dark'
+        readyIsDark
           ? ['#560E0B', '#080808']
-          : ['#F7E8E4', colors.canvas]
+          : ['rgba(184,47,41,0.7)', '#F2EFEA', '#F2EFEA']
       }
-      style={styles.ready}
+      locations={readyIsDark ? [0, 1] : [0, 0.42449, 1]}
+      style={[
+        styles.ready,
+        { backgroundColor: readyIsDark ? '#080808' : '#F2EFEA' },
+      ]}
     >
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Image
+          resizeMode="stretch"
+          source={readyPattern}
+          style={[
+            styles.readyPattern,
+            { tintColor: readyIsDark ? '#FFFFFF' : '#000000' },
+          ]}
+        />
+      </View>
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.ready}>
         <StepProgress complete overlay step={7} />
         <ScrollView
@@ -1730,14 +1848,9 @@ export function PostSignupOnboardingFlow({
           showsVerticalScrollIndicator={false}
           testID="onboarding-ready-scroll"
         >
-          <Image
-            source={resolvedTheme === 'dark' ? readyCollage : readyCollageLight}
-            resizeMode="contain"
-            testID="onboarding-ready-collage"
-            style={{
-              height: landscape ? landscapeCollageHeight : collageHeight,
-              width: landscape ? landscapeCollageWidth : collageWidth,
-            }}
+          <ReadyCollage
+            dark={readyIsDark}
+            width={landscape ? landscapeCollageWidth : collageWidth}
           />
           <View
             style={[
@@ -1755,6 +1868,7 @@ export function PostSignupOnboardingFlow({
               </Text>
             </View>
             <PrimaryButton
+              buttonStyle={styles.readyButtonSurface}
               contentGap={8}
               icon={startRating}
               iconSize={24}
@@ -2680,6 +2794,7 @@ const createStyles = (
     },
     actionChevron: { width: 8, height: 16, opacity: 0.7 },
     ready: { flex: 1 },
+    readyPattern: { width: '100%', height: '100%', opacity: 0.04 },
     readyContent: {
       flexGrow: 1,
       paddingTop: 170,
@@ -2723,6 +2838,19 @@ const createStyles = (
       letterSpacing: -0.41,
       textAlign: 'center',
     },
-    readyButton: { width: '90%', maxWidth: 330, marginTop: 24 },
+    readyButton: {
+      width: '90%',
+      maxWidth: 330,
+      marginTop: 24,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    readyButtonSurface: {
+      backgroundColor: '#B82F29',
+      borderWidth: 5,
+      borderColor: isDark ? '#4C1816' : '#FFFFFF',
+      shadowOpacity: 0,
+      elevation: 0,
+    },
     readyButtonLandscape: { width: '100%' },
   });
