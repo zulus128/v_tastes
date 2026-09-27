@@ -45,6 +45,7 @@ export function PatternScreen({
         resizeMode="cover"
         source={isDark ? patternDark : patternLight}
         style={styles.pattern}
+        testID="onboarding-pattern-background"
       >
         {isDark ? (
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>

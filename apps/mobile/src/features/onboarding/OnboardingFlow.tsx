@@ -468,6 +468,7 @@ function EntryScreen() {
           tintColor: isDark ? '#FFFFFF' : '#000000',
         }}
         style={styles.centered}
+        testID="onboarding-entry-pattern"
       >
         <TastesLogo width={responsiveSize(189)} />
       </ImageBackground>
@@ -595,6 +596,7 @@ function ConsentScreen({
                 isDark ? styles.panelPatternDark : styles.panelPattern
               }
               style={styles.consentPanelBackground}
+              testID={`onboarding-consent-pattern-${index}`}
             >
               <SafeAreaView
                 edges={

@@ -1836,6 +1836,7 @@ export function PostSignupOnboardingFlow({
             styles.readyPattern,
             { tintColor: readyIsDark ? '#FFFFFF' : '#000000' },
           ]}
+          testID="onboarding-ready-pattern"
         />
       </View>
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.ready}>

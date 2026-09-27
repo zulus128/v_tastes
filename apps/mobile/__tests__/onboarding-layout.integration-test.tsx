@@ -5,10 +5,19 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { OnboardingFlow } from '../src/features/onboarding/OnboardingFlow';
-import { PostSignupOnboardingFlow } from '../src/features/onboarding/PostSignupOnboardingFlow';
+import {
+  OnboardingFlow,
+  type OnboardingScreen,
+} from '../src/features/onboarding/OnboardingFlow';
+import {
+  PostSignupOnboardingFlow,
+  type PostSignupScreen,
+} from '../src/features/onboarding/PostSignupOnboardingFlow';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
+import authPattern from '../assets/onboarding/pattern.png';
+import patternDark from '../assets/onboarding/pattern-screen.png';
 import readyCardLightCenter from '../assets/onboarding/ready-card-light-center.png';
+import patternLight from '../assets/figma-backgrounds/home-feed-pattern.png';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual(
@@ -57,6 +66,34 @@ function Providers({ children }: PropsWithChildren) {
 const originalWindow = Dimensions.get('window');
 const originalScreen = Dimensions.get('screen');
 
+const onboardingPatternCases = [
+  ['onboarding', 'entry', 'entry'],
+  ['onboarding', 'consent', 'consent'],
+  ['onboarding', 'phone', 'shared'],
+  ['onboarding', 'country', 'shared'],
+  ['onboarding', 'otp', 'shared'],
+  ['postSignup', 'profile', 'shared'],
+  ['postSignup', 'city', 'shared'],
+  ['postSignup', 'dish', 'shared'],
+  ['postSignup', 'location', 'shared'],
+  ['postSignup', 'locationDenied', 'shared'],
+  ['postSignup', 'place', 'shared'],
+  ['postSignup', 'style', 'shared'],
+  ['postSignup', 'contactsPermission', 'shared'],
+  ['postSignup', 'invite', 'shared'],
+  ['postSignup', 'contacts', 'shared'],
+  ['postSignup', 'notifications', 'shared'],
+  ['postSignup', 'ready', 'ready'],
+] as const;
+
+const themedOnboardingPatternCases = (['light', 'dark'] as const).flatMap(
+  (theme) =>
+    onboardingPatternCases.map(
+      ([group, initialScreen, patternKind]) =>
+        [theme, group, initialScreen, patternKind] as const,
+    ),
+);
+
 function resize(width: number, height: number) {
   const dimensions = { width, height, scale: 2, fontScale: 1 };
   Dimensions.set({ window: dimensions, screen: dimensions });
@@ -74,6 +111,57 @@ describe('onboarding in resizable windows', () => {
       Dimensions.set({ window: originalWindow, screen: originalScreen }),
     );
   });
+
+  it.each(themedOnboardingPatternCases)(
+    'keeps the onboarding pattern on %s %s/%s',
+    async (theme, group, initialScreen, patternKind) => {
+      resize(402, 874);
+      await AsyncStorage.setItem('@tastes/theme-preference', theme);
+
+      if (group === 'onboarding') {
+        await render(
+          <OnboardingFlow
+            initialScreen={initialScreen as OnboardingScreen}
+            visualAudit
+          />,
+          { wrapper: Providers },
+        );
+      } else {
+        await render(
+          <PostSignupOnboardingFlow
+            initialScreen={initialScreen as PostSignupScreen}
+            onAuthenticationRequired={jest.fn()}
+            onComplete={jest.fn()}
+            visualAudit
+          />,
+          { wrapper: Providers },
+        );
+      }
+
+      const testID =
+        patternKind === 'entry'
+          ? 'onboarding-entry-pattern'
+          : patternKind === 'consent'
+            ? 'onboarding-consent-pattern-0'
+            : patternKind === 'ready'
+              ? 'onboarding-ready-pattern'
+              : 'onboarding-pattern-background';
+      const pattern = screen.getByTestId(testID);
+      const expectedSource =
+        patternKind === 'entry' || patternKind === 'consent'
+          ? authPattern
+          : patternKind === 'ready' || theme === 'light'
+            ? patternLight
+            : patternDark;
+
+      expect(pattern.props.source).toBe(expectedSource);
+      if (patternKind === 'ready') {
+        expect(StyleSheet.flatten(pattern.props.style).opacity).toBeGreaterThan(
+          0,
+        );
+      }
+    },
+  );
 
   it('fits the phone field above the action when a landscape keyboard shrinks the scroll viewport', async () => {
     resize(667, 375);
