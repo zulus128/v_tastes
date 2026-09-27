@@ -1155,6 +1155,7 @@ function RatingCurve({
       }
       style={[
         ratingStyles.wrap,
+        standaloneArc && ratingStyles.standaloneWrap,
         curvedLayout && {
           bottom: 0,
           height: curvedLayout.arcDepth,
@@ -2000,8 +2001,12 @@ function DishEditor({
   );
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<DishReviewDraft | null>(value);
+  const [ratingGestureActive, setRatingGestureActive] = useState(false);
 
-  useEffect(() => setDraft(value), [value]);
+  useEffect(() => {
+    setDraft(value);
+    setRatingGestureActive(false);
+  }, [value]);
   const sheet = useBottomSheetMotion({ onClose, visible });
 
   async function choosePhoto(camera: boolean) {
@@ -2113,6 +2118,7 @@ function DishEditor({
             contentContainerStyle={styles.body}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
+            scrollEnabled={!ratingGestureActive}
             showsVerticalScrollIndicator={false}
             style={styles.scroll}
           >
@@ -2137,6 +2143,7 @@ function DishEditor({
             </Pressable>
             <RatingCurve
               onChange={(rating) => setDraft({ ...draft, rating })}
+              onGestureActiveChange={setRatingGestureActive}
               standaloneArc
               value={draft.rating}
             />
@@ -2307,6 +2314,10 @@ const sectionStyles = responsiveStyleSheet({
 });
 const ratingStyles = responsiveStyleSheet({
   wrap: { height: 198, position: 'relative', alignItems: 'center' },
+  // The sheet's body centers its children. Since the arc and markers are
+  // absolutely positioned, they contribute no intrinsic width; explicitly
+  // fill the sheet so onLayout can build the Figma-sized arc geometry.
+  standaloneWrap: { width: '100%' },
   value: {
     position: 'absolute',
     top: 18,
