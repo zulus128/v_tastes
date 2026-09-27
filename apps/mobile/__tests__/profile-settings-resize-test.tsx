@@ -27,17 +27,24 @@ jest.mock('firebase/storage', () => ({
   uploadBytes: jest.fn(),
   deleteObject: jest.fn(),
 }));
+const mockUpdateProfileSettings = jest.fn();
+
 jest.mock('../src/session/SessionProvider', () => {
   const api = {
     getProfileExtras: async () => ({
       data: { notificationPreferences: { categories: {} } },
     }),
+    updateProfileSettings: mockUpdateProfileSettings,
   };
   return { useIsVisualAudit: () => true, useTastesApi: () => api };
 });
 jest.mock('../src/features/profile/api', () => ({
   useProfile: () => ({
-    profile: { displayName: 'Test User', username: 'tester' },
+    profile: {
+      bio: 'Initial bio',
+      displayName: 'Test User',
+      username: 'tester',
+    },
   }),
 }));
 jest.mock('../src/ui/SideSlideScreen', () => ({
@@ -64,6 +71,8 @@ function Providers({ children }: PropsWithChildren) {
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  mockUpdateProfileSettings.mockReset();
+  mockUpdateProfileSettings.mockResolvedValue({ data: {} });
   resize(600);
 });
 
@@ -94,6 +103,30 @@ it('keeps account actions inside the scroll area above the fixed footer', async 
   );
   expect(footerStyle.position).not.toBe('absolute');
   expect(footerStyle.flexShrink).toBe(0);
+});
+
+it('opens the Bio editor and accepts the full 80-character value', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getByLabelText('Edit Bio'));
+  const input = screen.getByTestId('profile-bio-input');
+  const bio = 'A'.repeat(80);
+  await fireEvent.changeText(input, bio);
+
+  expect(input.props.multiline).toBe(true);
+  expect(input.props.maxLength).toBe(80);
+  expect(input.props.textAlignVertical).toBe('top');
+  expect(screen.getByText('80/80')).toBeTruthy();
+  expect(screen.getByLabelText('Save Bio')).toBeTruthy();
 });
 
 it.each([

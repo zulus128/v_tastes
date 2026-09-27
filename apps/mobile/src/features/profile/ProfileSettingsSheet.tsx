@@ -833,15 +833,17 @@ export function ProfileSettingsSheet({
           {editing !== null ? (
             <View style={styles.editorOverlay}>
               <Pressable
+                accessibilityLabel="Close profile editor"
                 onPress={() => setEditing(null)}
                 style={styles.modalBackdrop}
-              >
-                <Pressable
-                  onPress={(event) => event.stopPropagation()}
-                  style={styles.editor}
-                >
+              />
+              <View pointerEvents="box-none" style={styles.editorContainer}>
+                <View style={styles.editor}>
                   <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
                   <TextInput
+                    accessibilityLabel={
+                      editing === 'bio' ? 'Bio' : labels[editing]
+                    }
                     autoCapitalize={
                       editing === 'username' ? 'none' : 'sentences'
                     }
@@ -852,15 +854,18 @@ export function ProfileSettingsSheet({
                     placeholderTextColor={colors.textMuted}
                     style={[styles.input, editing === 'bio' && styles.bioInput]}
                     textAlignVertical={editing === 'bio' ? 'top' : 'center'}
+                    testID={editing === 'bio' ? 'profile-bio-input' : undefined}
                     value={draft}
                   />
                   {editing === 'bio' ? (
                     <Text style={styles.characterCount}>{draft.length}/80</Text>
                   ) : null}
                   <Pressable
+                    accessibilityLabel={`Save ${labels[editing]}`}
                     disabled={saving}
-                    onPress={() => void saveField()}
+                    onPress={saveField}
                     style={styles.saveButton}
+                    testID="save-profile-field"
                   >
                     {saving ? (
                       <ActivityIndicator color="#FFFFFF" />
@@ -868,8 +873,8 @@ export function ProfileSettingsSheet({
                       <Text style={styles.saveText}>Save</Text>
                     )}
                   </Pressable>
-                </Pressable>
-              </Pressable>
+                </View>
+              </View>
             </View>
           ) : null}
         </ImageBackground>
@@ -1278,10 +1283,14 @@ function createStyles(
     pressed: { opacity: 0.72 },
     editorOverlay: { position: 'absolute', zIndex: 30, inset: 0 },
     modalBackdrop: {
+      position: 'absolute',
+      inset: 0,
+      backgroundColor: 'rgba(0,0,0,0.76)',
+    },
+    editorContainer: {
       flex: 1,
       padding: 16,
       justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.76)',
     },
     editor: { padding: 20, borderRadius: 24, backgroundColor: colors.surface },
     editorTitle: { color: colors.text, fontSize: 19, fontWeight: '700' },

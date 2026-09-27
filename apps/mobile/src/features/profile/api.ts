@@ -33,17 +33,29 @@ export type ProfileData = {
   xp: number;
 };
 
-function profileFromDocument(data: DocumentData | undefined, fallbackName: string): ProfileData {
+function profileFromDocument(
+  data: DocumentData | undefined,
+  fallbackName: string,
+): ProfileData {
   const cuisines = Array.isArray(data?.favoriteCuisines)
-    ? data.favoriteCuisines.filter((value: unknown): value is string => typeof value === 'string')
+    ? data.favoriteCuisines.filter(
+        (value: unknown): value is string => typeof value === 'string',
+      )
     : [];
   return {
     bio: typeof data?.bio === 'string' ? data.bio : '',
     city: typeof data?.city === 'string' ? data.city : null,
-    displayName: typeof data?.displayName === 'string' ? data.displayName : fallbackName,
+    displayName:
+      typeof data?.displayName === 'string' ? data.displayName : fallbackName,
     favoriteCuisines: cuisines,
-    favoriteDish: typeof data?.tastePreferences?.favoriteDish === 'string' ? data.tastePreferences.favoriteDish : null,
-    favoriteVenueId: typeof data?.tastePreferences?.favoriteVenueId === 'string' ? data.tastePreferences.favoriteVenueId : null,
+    favoriteDish:
+      typeof data?.tastePreferences?.favoriteDish === 'string'
+        ? data.tastePreferences.favoriteDish
+        : null,
+    favoriteVenueId:
+      typeof data?.tastePreferences?.favoriteVenueId === 'string'
+        ? data.tastePreferences.favoriteVenueId
+        : null,
     followerCount: Number(data?.followerCount ?? 0),
     followingCount: Number(data?.followingCount ?? 0),
     photoUrl: typeof data?.photoUrl === 'string' ? data.photoUrl : null,
@@ -54,7 +66,9 @@ function profileFromDocument(data: DocumentData | undefined, fallbackName: strin
   };
 }
 
-function reviewFromDocument(document: QueryDocumentSnapshot<DocumentData>): FeedItem {
+function reviewFromDocument(
+  document: QueryDocumentSnapshot<DocumentData>,
+): FeedItem {
   const data = document.data();
   const createdAt = data.createdAt as Timestamp | undefined;
   return {
@@ -71,37 +85,60 @@ function reviewFromDocument(document: QueryDocumentSnapshot<DocumentData>): Feed
     commentCount: Number(data.commentCount ?? 0),
     reactionCount: Number(data.reactionCount ?? 0),
     pinned: data.pinned === true,
-    createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : new Date().toISOString(),
+    createdAt: createdAt?.toDate
+      ? createdAt.toDate().toISOString()
+      : new Date().toISOString(),
   };
 }
 
 export function useProfile(userId: string, fallbackName: string) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [revision, setRevision] = useState(0);
+
+  const retry = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     if (__DEV__ && userId === 'visual-audit-user') {
-      setProfile(profileFromDocument({
-        city: 'London',
-        displayName: fallbackName,
-        favoriteCuisines: ['Italian', 'Japanese'],
-        favoriteDish: 'Pizza',
-        username: 'alexmorgan',
-      }, fallbackName));
+      setProfile(
+        profileFromDocument(
+          {
+            city: 'London',
+            displayName: fallbackName,
+            favoriteCuisines: ['Italian', 'Japanese'],
+            favoriteDish: 'Pizza',
+            username: 'alexmorgan',
+          },
+          fallbackName,
+        ),
+      );
       setLoading(false);
       return undefined;
     }
     return onSnapshot(
       doc(firestore, 'users', userId),
       (snapshot) => {
-        setProfile(snapshot.exists() ? profileFromDocument(snapshot.data(), fallbackName) : null);
+        setProfile(
+          snapshot.exists()
+            ? profileFromDocument(snapshot.data(), fallbackName)
+            : null,
+        );
+        setError(null);
         setLoading(false);
       },
-      () => setLoading(false),
+      (cause) => {
+        setError(
+          cause instanceof Error ? cause : new Error('Could not load profile.'),
+        );
+        setLoading(false);
+      },
     );
-  }, [fallbackName, userId]);
+  }, [fallbackName, revision, userId]);
 
-  return { loading, profile };
+  return { error, loading, profile, retry };
 }
 
 export function useProfileReviews(userId: string) {
@@ -110,17 +147,23 @@ export function useProfileReviews(userId: string) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [revision, setRevision] = useState(0);
   const lastDocument = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
   const hasLoadedMore = useRef(false);
 
-  const baseQuery = useCallback(() => query(
-      collection(firestore, 'reviews'),
-      where('status', '==', 'published'),
-      where('authorId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      orderBy(documentId(), 'desc'),
-      limit(20),
-    ), [userId]);
+  const baseQuery = useCallback(
+    () =>
+      query(
+        collection(firestore, 'reviews'),
+        where('status', '==', 'published'),
+        where('authorId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        orderBy(documentId(), 'desc'),
+        limit(20),
+      ),
+    [userId],
+  );
+  const retry = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
     hasLoadedMore.current = false;
@@ -135,37 +178,45 @@ export function useProfileReviews(userId: string) {
     }
     return onSnapshot(
       baseQuery(),
-    (snapshot) => {
-      const latest = snapshot.docs.map(reviewFromDocument);
-      setReviews((current) => {
-        const latestIds = new Set(latest.map((review) => review.id));
-        return [...latest, ...current.filter((review) => !latestIds.has(review.id))];
-      });
-      if (!hasLoadedMore.current) {
-        lastDocument.current = snapshot.docs.at(-1) ?? null;
-        setHasMore(snapshot.size === 20);
-      }
-      setError(null);
-      setLoading(false);
-    },
-      (cause) => { setError(cause); setLoading(false); },
+      (snapshot) => {
+        const latest = snapshot.docs.map(reviewFromDocument);
+        setReviews((current) => {
+          const latestIds = new Set(latest.map((review) => review.id));
+          return [
+            ...latest,
+            ...current.filter((review) => !latestIds.has(review.id)),
+          ];
+        });
+        if (!hasLoadedMore.current) {
+          lastDocument.current = snapshot.docs.at(-1) ?? null;
+          setHasMore(snapshot.size === 20);
+        }
+        setError(null);
+        setLoading(false);
+      },
+      (cause) => {
+        setError(cause);
+        setLoading(false);
+      },
     );
-  }, [baseQuery]);
+  }, [baseQuery, revision]);
 
   const loadMore = useCallback(async () => {
     if (!lastDocument.current || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
       const cursor = lastDocument.current;
-      const snapshot = await getDocs(query(
-        collection(firestore, 'reviews'),
-        where('status', '==', 'published'),
-        where('authorId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        orderBy(documentId(), 'desc'),
-        startAfter(cursor.get('createdAt'), cursor.id),
-        limit(20),
-      ));
+      const snapshot = await getDocs(
+        query(
+          collection(firestore, 'reviews'),
+          where('status', '==', 'published'),
+          where('authorId', '==', userId),
+          orderBy('createdAt', 'desc'),
+          orderBy(documentId(), 'desc'),
+          startAfter(cursor.get('createdAt'), cursor.id),
+          limit(20),
+        ),
+      );
       const next = snapshot.docs.map(reviewFromDocument);
       hasLoadedMore.current = true;
       setReviews((current) => {
@@ -176,11 +227,15 @@ export function useProfileReviews(userId: string) {
       setHasMore(snapshot.size === 20);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause : new Error('Could not load more reviews.'));
+      setError(
+        cause instanceof Error
+          ? cause
+          : new Error('Could not load more reviews.'),
+      );
     } finally {
       setLoadingMore(false);
     }
   }, [hasMore, loadingMore, userId]);
 
-  return { error, hasMore, loadMore, loading, loadingMore, reviews };
+  return { error, hasMore, loadMore, loading, loadingMore, retry, reviews };
 }

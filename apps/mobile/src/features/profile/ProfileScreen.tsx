@@ -34,7 +34,7 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
-import { useProfile, useProfileReviews } from './api';
+import { type ProfileData, useProfile, useProfileReviews } from './api';
 import { ProfileHeader, ProfileTopBar } from './ProfileHeader';
 import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileDraftCard, type ProfileReviewDraft } from './ProfileDraftCard';
@@ -53,6 +53,24 @@ const FALLBACK_MAP_REGION = {
 };
 const MAP_FOCUS_PIN_LIMIT = 5;
 const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
+
+function fallbackProfile(displayName: string): ProfileData {
+  return {
+    bio: '',
+    city: null,
+    displayName,
+    favoriteCuisines: [],
+    favoriteDish: null,
+    favoriteVenueId: null,
+    followerCount: 0,
+    followingCount: 0,
+    photoPath: null,
+    photoUrl: null,
+    reviewCount: 0,
+    username: null,
+    xp: 0,
+  };
+}
 
 function hasMapCoordinates(
   venue: Venue,
@@ -212,7 +230,12 @@ export function ProfileScreen({
   const api = useTastesApi();
   const visualAudit = useIsVisualAudit();
   const followMutation = useToggleFollow(currentUserId);
-  const { loading, profile } = useProfile(targetUserId, fallbackName);
+  const {
+    error: profileError,
+    loading,
+    profile,
+    retry: retryProfile,
+  } = useProfile(targetUserId, fallbackName);
   const profileReviews = useProfileReviews(targetUserId);
   const [activeTab, setActiveTab] = useState<ProfileTab>('reviews');
   const [following, setFollowing] = useState(initialFollowing);
@@ -586,14 +609,7 @@ export function ProfileScreen({
     ]);
   }
 
-  if (loading || !profile) {
-    return (
-      <View style={[styles.loading, { backgroundColor: colors.canvas }]}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
+  const displayedProfile = profile ?? fallbackProfile(fallbackName);
   const normalizedSearch = search.trim().toLowerCase();
   const visibleReviews = profileReviews.reviews
     .filter(
@@ -620,7 +636,7 @@ export function ProfileScreen({
   const venuesById = new Map(mapVenues.map((venue) => [venue.id, venue]));
   const tasteHighlights = buildTasteHighlights({
     favoritePlaceName,
-    profile,
+    profile: displayedProfile,
     reviews: profileReviews.reviews,
     venues: mapVenues,
   });
@@ -656,8 +672,8 @@ export function ProfileScreen({
       onFollowing={() => setExtra('following')}
       onToggleFollow={() => void toggleFollow()}
       own={own}
-      profile={profile}
-      reviewCount={profile.reviewCount}
+      profile={displayedProfile}
+      reviewCount={displayedProfile.reviewCount}
       tasteHighlights={tasteHighlights}
       uploadingPhoto={uploadingPhoto}
     />
@@ -726,10 +742,59 @@ export function ProfileScreen({
       ) : null}
     </View>
   );
+  const initialProfileState = !profile;
+  const initialReviewsError = Boolean(
+    profileReviews.error && profileReviews.reviews.length === 0,
+  );
+  const retryProfileScreen = () => {
+    retryProfile();
+    profileReviews.retry();
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
-      {blocked ? (
+      {initialProfileState ? (
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabBarHeight + responsiveSize(24) },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {profileHeader}
+          {controls}
+          <View
+            accessibilityLabel={
+              profileError ? 'Profile unavailable' : 'Loading profile'
+            }
+            style={styles.empty}
+          >
+            {loading && !profileError ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <>
+                <Text style={styles.emptyTitle}>
+                  {profileError ? 'No connection' : 'Profile unavailable'}
+                </Text>
+                <Text style={styles.emptyCopy}>
+                  {profileError
+                    ? 'Check your internet connection and try again.'
+                    : 'This profile could not be found.'}
+                </Text>
+                {profileError ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={retryProfileScreen}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryText}>Retry</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )}
+          </View>
+        </ScrollView>
+      ) : blocked ? (
         <ScrollView
           contentContainerStyle={[
             styles.content,
@@ -780,14 +845,28 @@ export function ProfileScreen({
                   <ProfileDraftCard
                     draft={draft}
                     onContinue={onContinueDraft}
-                    profile={profile}
+                    profile={displayedProfile}
                   />
                 </View>
               ) : null}
             </>
           }
           ListEmptyComponent={
-            !profileReviews.loading ? (
+            initialReviewsError ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No connection</Text>
+                <Text style={styles.emptyCopy}>
+                  Check your internet connection and try again.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={profileReviews.retry}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : !profileReviews.loading ? (
               <View style={styles.empty}>
                 <Text style={styles.emptyTitle}>No reviews yet</Text>
                 <Text style={styles.emptyCopy}>
@@ -804,7 +883,7 @@ export function ProfileScreen({
                 color={colors.primary}
                 style={styles.listLoader}
               />
-            ) : profileReviews.error ? (
+            ) : profileReviews.error && profileReviews.reviews.length > 0 ? (
               <Pressable
                 onPress={() => void profileReviews.loadMore()}
                 style={styles.retryButton}
@@ -826,7 +905,7 @@ export function ProfileScreen({
                   own
                     ? setSelectedReview(review)
                     : void Share.share({
-                        message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments`,
+                        message: `${displayedProfile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments`,
                       })
                 }
                 onReact={() =>
@@ -835,10 +914,10 @@ export function ProfileScreen({
                 reacted={profileReactions[review.id] ?? review.reacted}
                 onShare={() =>
                   void Share.share({
-                    message: `${profile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments`,
+                    message: `${displayedProfile.displayName} recommends ${review.venueName}: ${review.text}\nhttps://tastesapp.com/reviews/${review.id}/comments`,
                   })
                 }
-                profile={profile}
+                profile={displayedProfile}
               />
             </View>
           )}
@@ -883,13 +962,13 @@ export function ProfileScreen({
         onShare={() =>
           own
             ? void Share.share({
-                message: `See ${profile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
+                message: `See ${displayedProfile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
                 url: `https://tastesapp.com/users/${targetUserId}`,
               })
             : setProfileMenuOpen(true)
         }
         own={own}
-        profile={profile}
+        profile={displayedProfile}
       />
       <ProfileExtras
         onClose={() => setExtra(null)}
@@ -934,7 +1013,7 @@ export function ProfileScreen({
               onPress={() => {
                 setProfileMenuOpen(false);
                 void Share.share({
-                  message: `See ${profile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
+                  message: `See ${displayedProfile.displayName} on Tastes: https://tastesapp.com/users/${targetUserId}`,
                 });
               }}
               style={styles.actionRow}
