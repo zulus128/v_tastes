@@ -24,6 +24,7 @@ import BookmarkOutlineLightIcon from '../../../assets/activities/bookmark-body-l
 import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
+import { fallbackReviewPhoto } from '../discover/reviewNormalization';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -152,7 +153,7 @@ export function PlaceScreen({ onBack, onOpenComments, onWriteReview, userId, ven
         onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetchingNextPage) void reviews.fetchNextPage(); }}
         onEndReachedThreshold={0.5}
         windowSize={7}
-        renderItem={({ item: review }) => <ReviewCard item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}/comments` })} reacted={reactedReviews.has(review.id)} reactingId={reactingId} styles={styles} />}
+        renderItem={({ item: review, index: reviewIndex }) => <ReviewCard fallbackPhotoUrls={photos} item={review} onComments={onOpenComments} onReact={(reviewId) => void reactToReview(reviewId)} onShare={(item) => void Share.share({ message: `${item.authorDisplayName} on Tastes: ${item.text}\nhttps://tastesapp.com/reviews/${item.id}/comments` })} reacted={reactedReviews.has(review.id)} reactingId={reactingId} reviewIndex={reviewIndex} styles={styles} />}
         showsVerticalScrollIndicator={false}
       />}
       <Pressable onPress={onWriteReview} style={[styles.reviewButton, { bottom: reviewButtonBottom, left: insets.left + responsiveSize(16), right: insets.right + responsiveSize(16) }]}><Text style={styles.reviewButtonText}>＋  Review now</Text></Pressable>
@@ -256,17 +257,17 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
   </View>;
 }
 
-function ReviewPhoto({ path, rating, single, styles, title }: { path?: string | null; rating: number; single: boolean; styles: ReturnType<typeof createStyles>; title: string }) {
+function ReviewPhoto({ fallbackUri, path, rating, single, styles, title }: { fallbackUri?: string; path?: string | null; rating: number; single: boolean; styles: ReturnType<typeof createStyles>; title: string }) {
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
-  const [uri, setUri] = useState<string | null>(null);
+  const [uri, setUri] = useState<string | null>(fallbackUri ?? null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    setUri(null);
     if (!normalizedPath) {
-      setFailed(true);
+      setUri(fallbackUri ?? null);
+      setFailed(!fallbackUri);
       return () => { active = false; };
     }
     let download: Promise<string>;
@@ -274,26 +275,30 @@ function ReviewPhoto({ path, rating, single, styles, title }: { path?: string | 
       download = resolveStorageImageUrl(normalizedPath);
     } catch (error) {
       captureException(error, { operation: 'load-place-review-photo', path: normalizedPath });
-      setFailed(true);
+      setUri(fallbackUri ?? null);
+      setFailed(!fallbackUri);
       return () => { active = false; };
     }
     void download.then((value) => {
       if (active) setUri(value);
     }).catch((error) => {
       captureException(error, { operation: 'load-place-review-photo', path: normalizedPath });
-      if (active) setFailed(true);
+      if (active) {
+        setUri(fallbackUri ?? null);
+        setFailed(!fallbackUri);
+      }
     });
     return () => { active = false; };
-  }, [normalizedPath]);
+  }, [fallbackUri, normalizedPath]);
 
   return <View style={[styles.reviewPhoto, single && styles.reviewPhotoSingle]}>
-    {uri ? <Image onError={() => setFailed(true)} source={{ uri }} style={styles.reviewPhotoImage} /> : <View style={styles.reviewPhotoPlaceholder}>{failed ? <Text style={styles.reviewPhotoError}>Photo unavailable</Text> : <ActivityIndicator color={styles.primaryBadge.backgroundColor as string} />}</View>}
+    {uri ? <Image onError={() => { if (fallbackUri && uri !== fallbackUri) setUri(fallbackUri); else { setUri(null); setFailed(true); } }} source={{ uri }} style={styles.reviewPhotoImage} /> : <View style={styles.reviewPhotoPlaceholder}>{failed ? <Text style={styles.reviewPhotoError}>Photo unavailable</Text> : <ActivityIndicator color={styles.primaryBadge.backgroundColor as string} />}</View>}
     <Text numberOfLines={1} style={styles.reviewPhotoTitle}>{title}</Text>
     <Text style={styles.reviewPhotoRating}>★ {rating.toFixed(1)}</Text>
   </View>;
 }
 
-function ReviewCard({ item: review, onComments, onReact, onShare, reacted, reactingId, styles }: { item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reacted: boolean; reactingId: string | null; styles: ReturnType<typeof createStyles> }) {
+function ReviewCard({ fallbackPhotoUrls, item: review, onComments, onReact, onShare, reacted, reactingId, reviewIndex, styles }: { fallbackPhotoUrls: string[]; item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]; onComments: (reviewId: string) => void; onReact: (reviewId: string) => void; onShare: (review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number]) => void; reacted: boolean; reactingId: string | null; reviewIndex: number; styles: ReturnType<typeof createStyles> }) {
   const { colors, isDark } = useAppTheme();
   const [bookmarked, setBookmarked] = useState(false);
   const BookmarkReviewIcon = isDark ? BookmarkOutlineDarkIcon : BookmarkOutlineLightIcon;
@@ -303,7 +308,7 @@ function ReviewCard({ item: review, onComments, onReact, onShare, reacted, react
         <View style={styles.reviewSummary}><RatingStars rating={review.rating} styles={styles} /></View>
         <Text style={styles.reviewText}>{review.text}</Text>
         <ReviewMetaRow cuisine={review.cuisine} mood={review.tags?.[0]} />
-        {review.dishReviews.length > 0 ? <View style={styles.reviewPhotoGrid}>{review.dishReviews.map((dish) => <ReviewPhoto key={dish.id} path={dish.photoPath} rating={dish.rating} single={review.dishReviews.length === 1} styles={styles} title={dish.title} />)}</View> : review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}
+        {review.dishReviews.length > 0 ? <View style={styles.reviewPhotoGrid}>{review.dishReviews.map((dish, dishIndex) => <ReviewPhoto fallbackUri={fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex)} key={dish.id} path={dish.photoPath} rating={dish.rating} single={review.dishReviews.length === 1} styles={styles} title={dish.title} />)}</View> : review.dishNames.length > 0 ? <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text> : null}
         <View style={styles.reviewFooter}>
           <View style={styles.metricActions}><Pressable accessibilityLabel={reacted ? 'Unlike review' : 'Like review'} disabled={reactingId === review.id} onPress={() => onReact(review.id)} style={styles.metricIconRow}>{reacted ? <HeartBoldIcon color={colors.primary} fill={colors.primary} height={responsiveSize(14.3462)} width={responsiveSize(16.6667)} /> : <HeartIcon color={colors.text} height={responsiveSize(15.5978)} width={responsiveSize(17.9167)} />}<Text style={styles.metrics}>{review.reactionCount}</Text></Pressable><Pressable accessibilityLabel="Open comments" onPress={() => onComments(review.id)} style={styles.metricIconRow}><ChatIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /><Text style={styles.metrics}>{review.commentCount}</Text></Pressable><Pressable accessibilityLabel="Share review" onPress={() => onShare(review)} style={styles.metricIconRow}><ShareIcon color={colors.text} height={responsiveSize(20)} width={responsiveSize(20)} /></Pressable></View>
           <Pressable accessibilityLabel={bookmarked ? 'Remove review bookmark' : 'Bookmark review'} accessibilityState={{ selected: bookmarked }} onPress={() => setBookmarked((value) => !value)} style={[styles.bookmarkReview, bookmarked && styles.bookmarkReviewActive]}><BookmarkReviewIcon height={responsiveSize(18)} width={responsiveSize(16)} /></Pressable>

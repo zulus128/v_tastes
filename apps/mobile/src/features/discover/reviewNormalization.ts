@@ -31,3 +31,15 @@ export function normalizePlaceReviewPage(page: unknown): PlaceReview[] {
       }))
     : [];
 }
+
+export function fallbackReviewPhoto(
+  photoUrls: Array<string | null | undefined>,
+  reviewIndex: number,
+  dishIndex: number,
+): string | undefined {
+  const usablePhotos = photoUrls.filter(
+    (url): url is string => typeof url === 'string' && url.trim().length > 0,
+  );
+  if (usablePhotos.length === 0) return undefined;
+  return usablePhotos[(reviewIndex + dishIndex) % usablePhotos.length];
+}
