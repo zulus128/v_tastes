@@ -34,8 +34,6 @@ import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import RecommendationPlusIcon from '../../../assets/home/recommendation-plus.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
-import BookmarkOutlineDarkIcon from '../../../assets/activities/bookmark-body.svg';
-import BookmarkOutlineLightIcon from '../../../assets/activities/bookmark-body-light.svg';
 import {
   SaveToFolderSheet,
   type SaveablePlace,
@@ -348,6 +346,7 @@ export function PlaceScreen({
           windowSize={7}
           renderItem={({ item: review, index: reviewIndex }) => (
             <ReviewCard
+              fallbackDishes={place.popularDishes}
               fallbackPhotoUrls={photos}
               item={review}
               onComments={onOpenComments}
@@ -361,6 +360,7 @@ export function PlaceScreen({
               reactingId={reactingId}
               reviewIndex={reviewIndex}
               styles={styles}
+              venueName={place.venue.name}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -765,14 +765,12 @@ function ReviewPhoto({
   fallbackUri,
   path,
   rating,
-  single,
   styles,
   title,
 }: {
   fallbackUri?: string;
   path?: string | null;
   rating: number;
-  single: boolean;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
@@ -824,7 +822,7 @@ function ReviewPhoto({
   }, [fallbackUri, normalizedPath]);
 
   return (
-    <View style={[styles.reviewPhoto, single && styles.reviewPhotoSingle]}>
+    <View style={styles.reviewPhoto}>
       {uri ? (
         <Image
           onError={() => {
@@ -848,6 +846,12 @@ function ReviewPhoto({
           )}
         </View>
       )}
+      <LinearGradient
+        colors={['#161616', 'rgba(22,22,22,0)']}
+        locations={[0.0167, 0.3067]}
+        pointerEvents="none"
+        style={styles.reviewPhotoGradient}
+      />
       <Text numberOfLines={1} style={styles.reviewPhotoTitle}>
         {title}
       </Text>
@@ -857,6 +861,7 @@ function ReviewPhoto({
 }
 
 function ReviewCard({
+  fallbackDishes,
   fallbackPhotoUrls,
   item: review,
   onComments,
@@ -866,7 +871,9 @@ function ReviewCard({
   reactingId,
   reviewIndex,
   styles,
+  venueName,
 }: {
+  fallbackDishes: Array<{ name: string; rating: number }>;
   fallbackPhotoUrls: string[];
   item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number];
   onComments: (reviewId: string) => void;
@@ -878,12 +885,38 @@ function ReviewCard({
   reactingId: string | null;
   reviewIndex: number;
   styles: ReturnType<typeof createStyles>;
+  venueName: string;
 }) {
-  const { colors, isDark } = useAppTheme();
-  const [bookmarked, setBookmarked] = useState(false);
-  const BookmarkReviewIcon = isDark
-    ? BookmarkOutlineDarkIcon
-    : BookmarkOutlineLightIcon;
+  const { colors } = useAppTheme();
+  const displayDishes = review.dishReviews.map((dish, dishIndex) => ({
+    ...dish,
+    fallbackUri: fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex),
+  }));
+  if (reviewIndex < 3 && fallbackPhotoUrls.length > 0) {
+    const suggestedDishes =
+      fallbackDishes.length > 0
+        ? fallbackDishes
+        : [
+            { name: 'Chef recommendation', rating: review.rating },
+            { name: 'House favourite', rating: review.rating },
+            { name: 'Signature dish', rating: review.rating },
+            { name: 'Seasonal special', rating: review.rating },
+          ];
+    for (let dishIndex = displayDishes.length; dishIndex < 4; dishIndex += 1) {
+      const suggestion = suggestedDishes[dishIndex % suggestedDishes.length]!;
+      displayDishes.push({
+        id: `preview-${review.id}-${dishIndex}`,
+        title: suggestion.name,
+        rating: suggestion.rating,
+        photoPath: '',
+        fallbackUri: fallbackReviewPhoto(
+          fallbackPhotoUrls,
+          reviewIndex,
+          dishIndex,
+        ),
+      });
+    }
+  }
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}>
@@ -898,36 +931,42 @@ function ReviewCard({
             {review.authorUsername ? '@' + review.authorUsername : ''}
           </Text>
         </View>
-        <ReviewCityBadge city={review.venueCity} />
         <Text style={styles.reviewDate}>
           {formatDisplayDate(review.createdAt)}
         </Text>
       </View>
       <View style={styles.reviewBody}>
-        <View style={styles.reviewSummary}>
-          <RatingStars rating={review.rating} styles={styles} />
+        <View style={styles.reviewVenueRow}>
+          <View style={styles.reviewVenueCopy}>
+            <Text numberOfLines={1} style={styles.reviewVenue}>
+              {venueName}
+            </Text>
+            <RatingStars rating={review.rating} styles={styles} />
+          </View>
+          <ReviewCityBadge city={review.venueCity} />
         </View>
-        <Text style={styles.reviewText}>{review.text}</Text>
-        <ReviewMetaRow cuisine={review.cuisine} mood={review.tags?.[0]} />
-        {review.dishReviews.length > 0 ? (
-          <View style={styles.reviewPhotoGrid}>
-            {review.dishReviews.map((dish, dishIndex) => (
+        {displayDishes.length > 0 ? (
+          <ScrollView
+            contentContainerStyle={styles.reviewPhotoRow}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            testID={`place-review-dishes-${review.id}`}
+          >
+            {displayDishes.map((dish) => (
               <ReviewPhoto
-                fallbackUri={fallbackReviewPhoto(
-                  fallbackPhotoUrls,
-                  reviewIndex,
-                  dishIndex,
-                )}
+                fallbackUri={dish.fallbackUri}
                 key={dish.id}
                 path={dish.photoPath}
                 rating={dish.rating}
-                single={review.dishReviews.length === 1}
                 styles={styles}
                 title={dish.title}
               />
             ))}
-          </View>
-        ) : review.dishNames.length > 0 ? (
+          </ScrollView>
+        ) : null}
+        <Text style={styles.reviewText}>{review.text}</Text>
+        <ReviewMetaRow cuisine={review.cuisine} mood={review.tags?.[0]} />
+        {displayDishes.length === 0 && review.dishNames.length > 0 ? (
           <Text style={styles.dishes}>{review.dishNames.join('  ·  ')}</Text>
         ) : null}
         <View style={styles.reviewFooter}>
@@ -978,22 +1017,18 @@ function ReviewCard({
               />
             </Pressable>
           </View>
-          <Pressable
-            accessibilityLabel={
-              bookmarked ? 'Remove review bookmark' : 'Bookmark review'
-            }
-            accessibilityState={{ selected: bookmarked }}
-            onPress={() => setBookmarked((value) => !value)}
-            style={[
-              styles.bookmarkReview,
-              bookmarked && styles.bookmarkReviewActive,
-            ]}
-          >
-            <BookmarkReviewIcon
-              height={responsiveSize(18)}
-              width={responsiveSize(16)}
-            />
-          </Pressable>
+          {displayDishes.length > 0 ? (
+            <View style={styles.dishCountTag}>
+              <TopRatedDishesIcon
+                color={colors.primary}
+                height={responsiveSize(14)}
+                width={responsiveSize(14)}
+              />
+              <Text style={styles.dishCountText}>
+                Dishes ({displayDishes.length})
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -1520,16 +1555,19 @@ const createStyles = (colors: ThemeColors) =>
     author: { flex: 1, gap: 3, paddingLeft: 7 },
     authorName: { color: colors.text, fontSize: 15, fontWeight: '600' },
     authorHandle: { color: colors.textSecondary, fontSize: 13 },
-    reviewDate: { color: colors.textMuted, fontSize: 12 },
-    reviewBody: { gap: 12, padding: 16 },
-    reviewSummary: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+    reviewDate: { color: colors.text, fontSize: 14, opacity: 0.4 },
+    reviewBody: { gap: 16, padding: 16 },
+    reviewVenueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reviewVenueCopy: { flex: 1, gap: 10 },
+    reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    ratingStars: { flexDirection: 'row', gap: 2 },
+    ratingStarCell: {
+      width: 20,
+      height: 20,
       alignItems: 'center',
-      gap: 8,
+      justifyContent: 'center',
+      overflow: 'hidden',
     },
-    ratingStars: { flexDirection: 'row', gap: 1 },
-    ratingStarCell: { width: 16, height: 20, overflow: 'hidden' },
     ratingStarFill: {
       position: 'absolute',
       left: 0,
@@ -1541,16 +1579,25 @@ const createStyles = (colors: ThemeColors) =>
     emptyStar: { color: colors.textMuted },
     reviewText: { color: colors.text, fontSize: 14, lineHeight: 18 },
     dishes: { color: colors.text, fontSize: 12, fontWeight: '600' },
-    reviewPhotoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    reviewPhotoRow: { gap: 9 },
     reviewPhoto: {
-      width: '49%',
-      aspectRatio: 1,
+      width: 150,
+      height: 150,
       overflow: 'hidden',
-      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 16,
       backgroundColor: colors.surfaceRaised,
+      position: 'relative',
     },
-    reviewPhotoSingle: { width: '100%', aspectRatio: 1.6 },
     reviewPhotoImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    reviewPhotoGradient: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    },
     reviewPhotoPlaceholder: {
       position: 'absolute',
       inset: 0,
@@ -1560,28 +1607,27 @@ const createStyles = (colors: ThemeColors) =>
     reviewPhotoError: { color: colors.textMuted, fontSize: 10 },
     reviewPhotoTitle: {
       position: 'absolute',
-      top: 7,
-      left: 8,
-      right: 8,
+      top: 8,
+      left: 10,
+      right: 10,
       color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: '700',
-      textShadowColor: 'rgba(0,0,0,0.72)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 3,
+      fontSize: 13,
+      fontWeight: '600',
+      textAlign: 'center',
     },
     reviewPhotoRating: {
       position: 'absolute',
-      left: 7,
-      bottom: 7,
+      left: 0,
+      bottom: 0,
+      minHeight: 24,
       overflow: 'hidden',
-      borderRadius: 10,
-      paddingHorizontal: 7,
-      paddingVertical: 3,
+      borderTopRightRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
       color: '#FFFFFF',
       backgroundColor: 'rgba(22,22,22,0.72)',
-      fontSize: 11,
-      fontWeight: '700',
+      fontSize: 13,
+      fontWeight: '600',
     },
     reviewFooter: {
       minHeight: 24,
@@ -1589,22 +1635,25 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    metricActions: { flexDirection: 'row', gap: 18, alignItems: 'center' },
+    metricActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },
     metricIconRow: {
-      minHeight: 28,
+      minHeight: 20,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 5,
     },
-    metrics: { color: colors.text, fontSize: 13 },
-    bookmarkReview: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+    metrics: { color: colors.text, fontSize: 14 },
+    dishCountTag: {
+      height: 24,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 3,
+      borderWidth: 1,
+      borderColor: 'rgba(184,47,41,0.4)',
+      borderRadius: 40,
     },
-    bookmarkReviewActive: { backgroundColor: colors.surfaceRaised },
+    dishCountText: { color: colors.text, fontSize: 12 },
     status: { alignItems: 'center', gap: 10, paddingVertical: 45 },
     empty: {
       color: colors.textMuted,
