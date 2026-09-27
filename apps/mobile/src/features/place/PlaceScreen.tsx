@@ -58,6 +58,7 @@ import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { UserAvatar } from '../profile/avatar';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { PlacePhotoPager } from './PlacePhotoPager';
+import { buildGalleryPhotos } from './galleryPhotos';
 import { openingHoursForDate, openingStatus } from './openingHours';
 
 const sorts: Record<PlaceReviewSort, string> = {
@@ -158,7 +159,8 @@ export function PlaceScreen({
   const place = details.data;
   const photos =
     place.photoUrls.length > 0 ? place.photoUrls : [place.venue.imageUrl ?? ''];
-  const photoCount = place.photoCount > 0 ? place.photoCount : photos.length;
+  const galleryPhotos = buildGalleryPhotos(photos, place.photoCount);
+  const photoCount = galleryPhotos.length;
   const categoryChip = place.venue.category;
   // Seed/CMS tags duplicate the category with a trailing emoji (e.g. "Japanese 🍣"
   // alongside category "Japanese") instead of being independent tags — strip those
@@ -407,7 +409,7 @@ export function PlaceScreen({
       <Gallery
         visible={sheet === 'photos'}
         close={() => setSheet(null)}
-        photos={photos}
+        photos={galleryPhotos}
         styles={styles}
       />
       <Sort
@@ -1168,7 +1170,7 @@ function Gallery({
           <View style={styles.spacer} />
         </View>
         <ScrollView contentContainerStyle={styles.grid}>
-          {[...photos, ...photos, ...photos].map((key, index) => (
+          {photos.map((key, index) => (
             <GalleryImage
               key={key + String(index)}
               index={index}
