@@ -19,13 +19,28 @@ describe('place review normalization', () => {
           commentCount: 0,
           createdAt: '2026-09-01T12:00:00.000Z',
           tag: null,
+          dishReviews: [
+            {
+              id: 'legacy-dish',
+              title: 'Salmon nigiri',
+              rating: 4.8,
+              photoPath: null,
+            },
+          ],
         },
       ],
     });
 
     expect(review.tags).toEqual([]);
     expect(review.dishNames).toEqual([]);
-    expect(review.dishReviews).toEqual([]);
+    expect(review.dishReviews).toEqual([
+      {
+        id: 'legacy-dish',
+        title: 'Salmon nigiri',
+        rating: 4.8,
+        photoPath: '',
+      },
+    ]);
   });
 
   it('ignores malformed review entries', () => {
