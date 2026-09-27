@@ -1,4 +1,4 @@
-import type { DiscoverFeed, DiscoverTag, PlaceReview } from '@tastes/contracts';
+import type { DiscoverFeed, DiscoverTag } from '@tastes/contracts';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -7,6 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
+import { normalizePlaceReviewPage } from './reviewNormalization';
 
 export const discoverFeedQueryKey = (
   userId: string,
@@ -51,23 +52,6 @@ export function normalizeDiscoverFeed(feed: DiscoverFeed): DiscoverFeed {
       tags: Array.isArray(review.tags) ? review.tags : [],
     })),
   };
-}
-
-function isPlaceReview(value: unknown): value is PlaceReview {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { id?: unknown }).id === 'string'
-  );
-}
-
-function normalizePlaceReviewPage(page: unknown): PlaceReview[] {
-  const items = Array.isArray(page)
-    ? page
-    : typeof page === 'object' && page !== null
-      ? (page as { items?: unknown }).items
-      : [];
-  return Array.isArray(items) ? items.filter(isPlaceReview) : [];
 }
 
 export function useDiscoverFeed(userId: string, profileSignature?: string) {
