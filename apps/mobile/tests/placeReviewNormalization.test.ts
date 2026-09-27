@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePlaceReviewPage } from '../src/features/discover/reviewNormalization';
+import {
+  fallbackReviewPhoto,
+  normalizePlaceReviewPage,
+} from '../src/features/discover/reviewNormalization';
 
 describe('place review normalization', () => {
   it('keeps legacy reviews renderable when array fields are absent', () => {
@@ -47,5 +50,14 @@ describe('place review normalization', () => {
     expect(normalizePlaceReviewPage({ items: [null, {}, { id: 42 }] })).toEqual(
       [],
     );
+  });
+
+  it('rotates venue photos as fallbacks for legacy dish reviews', () => {
+    const photos = ['', 'sushi.jpg', null, 'restaurant.png'];
+
+    expect(fallbackReviewPhoto(photos, 0, 0)).toBe('sushi.jpg');
+    expect(fallbackReviewPhoto(photos, 1, 0)).toBe('restaurant.png');
+    expect(fallbackReviewPhoto(photos, 1, 1)).toBe('sushi.jpg');
+    expect(fallbackReviewPhoto([], 0, 0)).toBeUndefined();
   });
 });

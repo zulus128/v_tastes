@@ -42,6 +42,7 @@ import {
 } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
+import { fallbackReviewPhoto } from '../discover/reviewNormalization';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -345,8 +346,9 @@ export function PlaceScreen({
           }}
           onEndReachedThreshold={0.5}
           windowSize={7}
-          renderItem={({ item: review }) => (
+          renderItem={({ item: review, index: reviewIndex }) => (
             <ReviewCard
+              fallbackPhotoUrls={photos}
               item={review}
               onComments={onOpenComments}
               onReact={(reviewId) => void reactToReview(reviewId)}
@@ -357,6 +359,7 @@ export function PlaceScreen({
               }
               reacted={reactedReviews.has(review.id)}
               reactingId={reactingId}
+              reviewIndex={reviewIndex}
               styles={styles}
             />
           )}
@@ -759,12 +762,14 @@ function RatingStars({
 }
 
 function ReviewPhoto({
+  fallbackUri,
   path,
   rating,
   single,
   styles,
   title,
 }: {
+  fallbackUri?: string;
   path?: string | null;
   rating: number;
   single: boolean;
@@ -772,15 +777,15 @@ function ReviewPhoto({
   title: string;
 }) {
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
-  const [uri, setUri] = useState<string | null>(null);
+  const [uri, setUri] = useState<string | null>(fallbackUri ?? null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    setUri(null);
     if (!normalizedPath) {
-      setFailed(true);
+      setUri(fallbackUri ?? null);
+      setFailed(!fallbackUri);
       return () => {
         active = false;
       };
@@ -793,7 +798,8 @@ function ReviewPhoto({
         operation: 'load-place-review-photo',
         path: normalizedPath,
       });
-      setFailed(true);
+      setUri(fallbackUri ?? null);
+      setFailed(!fallbackUri);
       return () => {
         active = false;
       };
@@ -807,18 +813,27 @@ function ReviewPhoto({
           operation: 'load-place-review-photo',
           path: normalizedPath,
         });
-        if (active) setFailed(true);
+        if (active) {
+          setUri(fallbackUri ?? null);
+          setFailed(!fallbackUri);
+        }
       });
     return () => {
       active = false;
     };
-  }, [normalizedPath]);
+  }, [fallbackUri, normalizedPath]);
 
   return (
     <View style={[styles.reviewPhoto, single && styles.reviewPhotoSingle]}>
       {uri ? (
         <Image
-          onError={() => setFailed(true)}
+          onError={() => {
+            if (fallbackUri && uri !== fallbackUri) setUri(fallbackUri);
+            else {
+              setUri(null);
+              setFailed(true);
+            }
+          }}
           source={{ uri }}
           style={styles.reviewPhotoImage}
         />
@@ -842,14 +857,17 @@ function ReviewPhoto({
 }
 
 function ReviewCard({
+  fallbackPhotoUrls,
   item: review,
   onComments,
   onReact,
   onShare,
   reacted,
   reactingId,
+  reviewIndex,
   styles,
 }: {
+  fallbackPhotoUrls: string[];
   item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number];
   onComments: (reviewId: string) => void;
   onReact: (reviewId: string) => void;
@@ -858,6 +876,7 @@ function ReviewCard({
   ) => void;
   reacted: boolean;
   reactingId: string | null;
+  reviewIndex: number;
   styles: ReturnType<typeof createStyles>;
 }) {
   const { colors, isDark } = useAppTheme();
@@ -892,8 +911,13 @@ function ReviewCard({
         <ReviewMetaRow cuisine={review.cuisine} mood={review.tags?.[0]} />
         {review.dishReviews.length > 0 ? (
           <View style={styles.reviewPhotoGrid}>
-            {review.dishReviews.map((dish) => (
+            {review.dishReviews.map((dish, dishIndex) => (
               <ReviewPhoto
+                fallbackUri={fallbackReviewPhoto(
+                  fallbackPhotoUrls,
+                  reviewIndex,
+                  dishIndex,
+                )}
                 key={dish.id}
                 path={dish.photoPath}
                 rating={dish.rating}
