@@ -2,6 +2,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import NightIcon from '../../../assets/create-review/tag-night.svg';
+import RecommendationStar from '../../../assets/home/recommendation-star.svg';
+import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
+import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import type { DishReviewDraft } from '../create-review/api';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -23,8 +26,10 @@ function RatingStars({ rating, styles }: { rating: number; styles: ReturnType<ty
     {[1, 2, 3, 4, 5].map((star) => {
       const fill = Math.max(0, Math.min(1, clamped - star + 1));
       return <View key={star} style={styles.ratingStarCell}>
-        <Text style={[styles.ratingStar, styles.ratingStarEmpty]}>★</Text>
-        {fill > 0 ? <View style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}><Text style={styles.ratingStar}>★</Text></View> : null}
+        <ReviewStarOutline color="#B82F29" height={responsiveSize(17.9166)} opacity={0.3} width={responsiveSize(17.9179)} />
+        {fill > 0 ? <View style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}>
+          <ReviewStarFilled color="#B82F29" height={responsiveSize(16.6666)} width={responsiveSize(16.6671)} />
+        </View> : null}
       </View>;
     })}
   </View>;
@@ -77,7 +82,10 @@ export function ProfileDraftCard({
             <Image source={{ uri: dish.photoUri }} style={styles.dishImage} />
             <LinearGradient colors={['rgba(22,22,22,0.9)', 'rgba(22,22,22,0)']} style={styles.dishTitleShade} />
             <Text numberOfLines={1} style={styles.dishTitle}>{dish.title}</Text>
-            <View style={styles.dishRating}><Text style={styles.dishRatingText}>★ {dish.rating.toFixed(1)}</Text></View>
+            <View style={styles.dishRating}>
+              <RecommendationStar height={responsiveSize(14)} width={responsiveSize(14)} />
+              <Text style={styles.dishRatingText}>{dish.rating.toFixed(1)}</Text>
+            </View>
           </View>
         ))}
       </ScrollView> : null}
@@ -111,13 +119,11 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   date: { color: colors.text, fontSize: 14, letterSpacing: -0.24, opacity: 0.4 },
   more: { width: 24, color: colors.text, fontSize: 24, lineHeight: 24, textAlign: 'center', opacity: 0.5 },
   venueRow: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  venueCopy: { flex: 1, minWidth: 0, gap: 4 },
+  venueCopy: { flex: 1, minWidth: 0, gap: 10 },
   venue: { color: colors.text, fontSize: 16, fontWeight: '600', letterSpacing: -0.24 },
   ratingStars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ratingStarCell: { width: 20, height: 20, overflow: 'hidden' },
+  ratingStarCell: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   ratingStarFill: { position: 'absolute', top: 0, bottom: 0, left: 0, overflow: 'hidden' },
-  ratingStar: { color: colors.primary, fontSize: 20, lineHeight: 20 },
-  ratingStarEmpty: { opacity: 0.3 },
   draftTag: { paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 40, backgroundColor: colors.primary },
   draftTagText: { color: '#FFFFFF', fontSize: 12, letterSpacing: -0.23 },
   dishRow: { paddingLeft: 16, paddingRight: 1, gap: 9 },
@@ -125,7 +131,7 @@ const createStyles = (colors: ThemeColors) => responsiveStyleSheet({
   dishImage: { width: 150, height: 150 },
   dishTitleShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 48 },
   dishTitle: { position: 'absolute', top: 8, left: 10, right: 10, color: '#FFFFFF', fontSize: 13, fontWeight: '600', letterSpacing: -0.24, textAlign: 'center' },
-  dishRating: { position: 'absolute', bottom: 0, left: 0, height: 24, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 16, backgroundColor: 'rgba(22,22,22,0.72)' },
+  dishRating: { position: 'absolute', bottom: 0, left: 0, height: 24, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderTopRightRadius: 16, backgroundColor: 'rgba(22,22,22,0.72)' },
   dishRatingText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', letterSpacing: -0.23 },
   footer: { paddingHorizontal: 16, gap: 20 },
   textWrap: { position: 'relative' },
