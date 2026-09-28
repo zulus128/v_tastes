@@ -1357,6 +1357,7 @@ export function PostSignupOnboardingFlow({
             usesNarrowPlaceLayout && styles.placesCardNarrow,
             landscape && styles.placesCardLandscape,
           ]}
+          testID="onboarding-place-card"
         >
           <View style={styles.placeHeader}>
             <View style={styles.placeSearch}>
@@ -2233,7 +2234,7 @@ const createStyles = (
     },
     placesCard: {
       position: 'absolute',
-      top: 212,
+      top: 188,
       left: 0,
       right: 0,
       bottom: 0,
@@ -2244,7 +2245,7 @@ const createStyles = (
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
     },
-    placesCardNarrow: { top: 241 },
+    placesCardNarrow: { top: 217 },
     placesCardLandscape: { top: 148 },
     placeHeader: {
       height: 65,

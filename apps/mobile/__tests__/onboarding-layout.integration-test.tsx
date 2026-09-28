@@ -382,6 +382,24 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
+  it('keeps the place search container 16pt below the subtitle on iPhone 16 Pro Max', async () => {
+    resize(440, 956);
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="place"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    const placeCard = StyleSheet.flatten(
+      screen.getByTestId('onboarding-place-card').props.style,
+    );
+    expect(placeCard.top).toBeCloseTo(205.5, 1);
+  });
+
   it.each([
     ['profile', 'onboarding-profile-fields-card'],
     ['contactsPermission', 'onboarding-people-teaser'],
