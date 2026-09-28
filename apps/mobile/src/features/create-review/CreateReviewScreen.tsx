@@ -72,6 +72,7 @@ import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
   dishRatingArcGeometry,
+  isRatingArcTouch,
   ratingCurvePoint,
   ratingForCurvePoint,
   ratingForLinearPoint,
@@ -1050,15 +1051,28 @@ function RatingCurve({
     interaction.current.onChange(rating);
   };
 
+  const shouldHandleCurveGesture = (event: {
+    nativeEvent: { locationX: number; locationY: number };
+  }) => {
+    const geometry = interaction.current.arcGeometry;
+    if (!geometry) return false;
+    return isRatingArcTouch(
+      event.nativeEvent.locationX,
+      event.nativeEvent.locationY,
+      geometry,
+      responsiveSize(32),
+    );
+  };
+
   const curvePanResponder = useRef(
     PanResponder.create({
-      // Capture the whole curved rating surface immediately. This lets a drag
-      // begin anywhere on the arc and prevents the parent ScrollView from taking
-      // vertical movement while the user is adjusting the rating.
-      onStartShouldSetPanResponderCapture: () => true,
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
+      // Capture only the visible track. The same rectangular layer also covers
+      // the value label and star buttons; claiming those touches used to project
+      // the label's center to 1 star and made the value visibly reset/jitter.
+      onStartShouldSetPanResponderCapture: shouldHandleCurveGesture,
+      onStartShouldSetPanResponder: shouldHandleCurveGesture,
+      onMoveShouldSetPanResponder: shouldHandleCurveGesture,
+      onMoveShouldSetPanResponderCapture: shouldHandleCurveGesture,
       onPanResponderGrant: (event) => {
         dragging.current = true;
         interaction.current.onGestureActiveChange?.(true);
