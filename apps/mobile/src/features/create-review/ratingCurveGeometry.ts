@@ -118,28 +118,15 @@ export function ratingForCurvePoint(
   return minimumRating + progress * (maximumRating - minimumRating);
 }
 
-/**
- * Keeps the curve responder confined to the visible rating track. The curve
- * view also contains the rating label and stars, so claiming every touch in
- * its rectangular bounds makes a tap on the label project to the 1-star end.
- */
-export function isRatingArcTouch(
-  x: number,
-  y: number,
+/** Converts a handle-relative drag delta into a continuous rating. */
+export function ratingForCurveDrag(
+  startRating: number,
+  deltaX: number,
+  deltaY: number,
   geometry = defaultRatingArc,
-  tolerance = 32,
 ) {
-  const deltaX = x - geometry.centerX;
-  const deltaY = y - geometry.centerY;
-  const radialDistance = Math.hypot(deltaX, deltaY);
-  if (Math.abs(radialDistance - geometry.radius) > tolerance) return false;
-
-  const angle = Math.atan2(deltaY, deltaX);
-  const angleTolerance = tolerance / Math.max(geometry.radius, 1);
-  return (
-    angle >= geometry.rightAngle - angleTolerance &&
-    angle <= geometry.leftAngle + angleTolerance
-  );
+  const start = ratingCurvePoint(startRating, geometry);
+  return ratingForCurvePoint(start.x + deltaX, start.y + deltaY, geometry);
 }
 
 export function snapRating(rating: number) {

@@ -72,9 +72,8 @@ import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
   dishRatingArcGeometry,
-  isRatingArcTouch,
   ratingCurvePoint,
-  ratingForCurvePoint,
+  ratingForCurveDrag,
   ratingForLinearPoint,
   snapRating,
 } from './ratingCurveGeometry';
@@ -931,7 +930,7 @@ function RatingCurve({
   ).current;
   const dragging = useRef(false);
   const settling = useRef(false);
-  const dragStartPoint = useRef({ x: 0, y: 0 });
+  const dragStartRating = useRef(value);
   const currentDragRating = useRef(value);
   const settleRating = useRef(new Animated.Value(value)).current;
   const interaction = useRef({
@@ -1014,6 +1013,7 @@ function RatingCurve({
       currentDragRating.current = value;
     }
     if (!dragging.current && !settling.current) {
+      currentDragRating.current = value;
       setVisualRating(value);
     }
     if (
@@ -1051,50 +1051,29 @@ function RatingCurve({
     interaction.current.onChange(rating);
   };
 
-  const shouldHandleCurveGesture = (event: {
-    nativeEvent: { locationX: number; locationY: number };
-  }) => {
-    const geometry = interaction.current.arcGeometry;
-    if (!geometry) return false;
-    return isRatingArcTouch(
-      event.nativeEvent.locationX,
-      event.nativeEvent.locationY,
-      geometry,
-      responsiveSize(32),
-    );
-  };
-
   const curvePanResponder = useRef(
     PanResponder.create({
-      // Capture only the visible track. The same rectangular layer also covers
-      // the value label and star buttons; claiming those touches used to project
-      // the label's center to 1 star and made the value visibly reset/jitter.
-      onStartShouldSetPanResponderCapture: shouldHandleCurveGesture,
-      onStartShouldSetPanResponder: shouldHandleCurveGesture,
-      onMoveShouldSetPanResponder: shouldHandleCurveGesture,
-      onMoveShouldSetPanResponderCapture: shouldHandleCurveGesture,
-      onPanResponderGrant: (event) => {
+      onStartShouldSetPanResponderCapture: () => true,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => {
         dragging.current = true;
         interaction.current.onGestureActiveChange?.(true);
-        dragStartPoint.current = {
-          x: event.nativeEvent.locationX,
-          y: event.nativeEvent.locationY,
-        };
+        // The responder lives on the 44pt handle, so locationX/locationY are
+        // handle-local coordinates, not curve coordinates. Starting from those
+        // values projects a simple tap to the 1-star endpoint. Anchor the drag to
+        // the current rating and apply only gesture deltas from there.
+        dragStartRating.current = currentDragRating.current;
         settleRating.stopAnimation();
         settling.current = false;
-        setVisualPosition(
-          ratingForCurvePoint(
-            dragStartPoint.current.x,
-            dragStartPoint.current.y,
-            interaction.current.arcGeometry,
-          ),
-        );
       },
       onPanResponderMove: (_event, gesture) => {
         if (!dragging.current) return;
-        const continuousRating = ratingForCurvePoint(
-          dragStartPoint.current.x + gesture.dx,
-          dragStartPoint.current.y + gesture.dy,
+        const continuousRating = ratingForCurveDrag(
+          dragStartRating.current,
+          gesture.dx,
+          gesture.dy,
           interaction.current.arcGeometry,
         );
         setVisualPosition(continuousRating);
@@ -1102,15 +1081,14 @@ function RatingCurve({
       onPanResponderRelease: (_event, gesture) => {
         interaction.current.onGestureActiveChange?.(false);
         const coast = responsiveSize(18);
-        const projectedRating = ratingForCurvePoint(
-          dragStartPoint.current.x +
-            gesture.dx +
+        const projectedRating = ratingForCurveDrag(
+          dragStartRating.current,
+          gesture.dx +
             Math.max(
               -responsiveSize(30),
               Math.min(responsiveSize(30), gesture.vx * coast),
             ),
-          dragStartPoint.current.y +
-            gesture.dy +
+          gesture.dy +
             Math.max(
               -responsiveSize(30),
               Math.min(responsiveSize(30), gesture.vy * coast),
@@ -1341,7 +1319,6 @@ function RatingCurve({
               width: standaloneArc ? standaloneWidth : heroWidth,
             },
           ]}
-          {...curvePanResponder.panHandlers}
         >
           <Svg
             height={
@@ -1446,6 +1423,7 @@ function RatingCurve({
                 ratingStyles.dragPin,
                 pinPosition.getLayout(),
               ]}
+              {...curvePanResponder.panHandlers}
             >
               <RatingPin
                 color={accent}

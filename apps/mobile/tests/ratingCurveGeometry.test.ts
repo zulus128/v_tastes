@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   concentricRatingLayout,
   dishRatingArcGeometry,
-  isRatingArcTouch,
   ratingCurvePoint,
+  ratingForCurveDrag,
   ratingForCurvePoint,
   ratingForLinearPoint,
   ratingCircle,
@@ -39,6 +39,11 @@ describe('rating curve geometry', () => {
     expect(snapRating(visualRating)).toBe(2.5);
   });
 
+  it('keeps the current rating when the handle is tapped without moving', () => {
+    expect(ratingForCurveDrag(3, 0, 0)).toBeCloseTo(3, 8);
+    expect(ratingForCurveDrag(3, 20, 0)).toBeGreaterThan(3);
+  });
+
   it('maps dish slider drag positions from 0.5 to 5 stars', () => {
     expect(ratingForLinearPoint(-20, 360)).toBe(0.5);
     expect(ratingForLinearPoint(40, 360)).toBe(1);
@@ -58,15 +63,6 @@ describe('rating curve geometry', () => {
     expect(middle.y).toBeCloseTo(167, 3);
     expect(right.x).toBeCloseTo(363, 3);
     expect(right.y).toBeCloseTo(43, 3);
-  });
-
-  it('claims touches on the arc without stealing taps from the rating label', () => {
-    const geometry = dishRatingArcGeometry(402);
-    const trackPoint = ratingCurvePoint(3, geometry);
-
-    expect(isRatingArcTouch(trackPoint.x, trackPoint.y, geometry)).toBe(true);
-    expect(isRatingArcTouch(geometry.centerX, 26, geometry)).toBe(false);
-    expect(isRatingArcTouch(geometry.centerX, 72, geometry)).toBe(false);
   });
 
   it('scales the dish arc proportionally on narrower screens', () => {
