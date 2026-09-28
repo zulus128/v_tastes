@@ -314,7 +314,7 @@ describe('onboarding in resizable windows', () => {
       { wrapper: Providers },
     );
 
-    const username = screen.getByPlaceholderText('Username');
+    const username = screen.getByPlaceholderText('@yourname');
     const button = screen.getByRole('button', { name: 'Continue' });
     expect(button).toBeDisabled();
 
@@ -346,7 +346,7 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
   });
 
-  it('renders the flat profile fields from Figma', async () => {
+  it('renders the profile typography and bio controls from the client note', async () => {
     resize(402, 874);
     await render(
       <PostSignupOnboardingFlow
@@ -363,29 +363,27 @@ describe('onboarding in resizable windows', () => {
     ).toMatchObject({
       fontSize: 24,
       lineHeight: 29,
+      marginTop: 60,
     });
     expect(
       StyleSheet.flatten(
-        screen.getByText(
-          'Choose a username and add a photo so others can recognize you',
-        ).props.style,
+        screen.getByText('This is how friends find you.').props.style,
       ),
     ).toMatchObject({
       fontSize: 15,
       lineHeight: 18,
       marginTop: 7,
     });
-    const fields = StyleSheet.flatten(
-      screen.getByTestId('onboarding-profile-fields').props.style,
-    );
-    expect(fields).toMatchObject({ gap: 24, width: '100%' });
-    expect(fields).not.toHaveProperty('backgroundColor');
-    expect(fields).not.toHaveProperty('borderRadius');
-    expect(fields).not.toHaveProperty('borderWidth');
-    expect(screen.queryByText('Bio')).not.toBeOnTheScreen();
+    expect(
+      screen.getByPlaceholderText('What do you always order?').props.maxLength,
+    ).toBe(80);
+    await fireEvent.press(screen.getByText('Natural wine person'));
+    expect(screen.getByDisplayValue('Natural wine person')).toBeOnTheScreen();
+    expect(screen.getByText('19/80')).toBeOnTheScreen();
   });
 
   it.each([
+    ['profile', 'onboarding-profile-fields-card'],
     ['contactsPermission', 'onboarding-people-teaser'],
     ['notifications', 'onboarding-notification-card-now'],
   ] as const)(
