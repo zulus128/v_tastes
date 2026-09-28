@@ -1529,7 +1529,10 @@ export function PostSignupOnboardingFlow({
                           </View>
                         ) : null}
                       </View>
-                      <View style={styles.venueCopy}>
+                      <View
+                        style={styles.venueCopy}
+                        testID={`onboarding-place-copy-${item.id}`}
+                      >
                         <View style={styles.venueDetails}>
                           <Text numberOfLines={1} style={styles.venueTitle}>
                             {item.name}
@@ -1552,23 +1555,26 @@ export function PostSignupOnboardingFlow({
                             </Text>
                           </View>
                         </View>
-                      </View>
-                    </View>
-                    <View style={styles.venueTagsRow}>
-                      <View style={styles.venueTag}>
-                        <Text numberOfLines={1} style={styles.venueTagText}>
-                          {item.category}
-                        </Text>
-                      </View>
-                      <View style={styles.venueTag}>
-                        <Text numberOfLines={1} style={styles.venueTagText}>
-                          {item.price}
-                        </Text>
-                      </View>
-                      <View style={styles.venueTag}>
-                        <Text numberOfLines={1} style={styles.venueTagText}>
-                          {item.distance}
-                        </Text>
+                        <View
+                          style={styles.venueTagsRow}
+                          testID={`onboarding-place-tags-${item.id}`}
+                        >
+                          <View style={styles.venueTag}>
+                            <Text numberOfLines={1} style={styles.venueTagText}>
+                              {item.category}
+                            </Text>
+                          </View>
+                          <View style={styles.venueTag}>
+                            <Text numberOfLines={1} style={styles.venueTagText}>
+                              {item.price}
+                            </Text>
+                          </View>
+                          <View style={styles.venueTag}>
+                            <Text numberOfLines={1} style={styles.venueTagText}>
+                              {item.distance}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
                   </Pressable>
@@ -2394,9 +2400,8 @@ const createStyles = (
       gap: 12,
     },
     venue: {
-      minHeight: 167,
+      minHeight: 165,
       padding: 12,
-      gap: 12,
       borderWidth: 1,
       borderColor: isDark ? '#2A2A2A' : colors.border,
       borderRadius: 16,
@@ -2439,7 +2444,7 @@ const createStyles = (
       fontSize: 12,
       letterSpacing: -0.24,
     },
-    venueCopy: { flex: 1, minWidth: 0 },
+    venueCopy: { flex: 1, minWidth: 0, gap: 12 },
     venueDetails: { gap: 6, paddingRight: 24 },
     venueTitle: {
       color: colors.text,

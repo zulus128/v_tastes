@@ -1,7 +1,13 @@
 /// <reference types="jest" />
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -406,6 +412,11 @@ describe('onboarding in resizable windows', () => {
     expect(outline.borderTopRightRadius).toBeCloseTo(26.5, 1);
     expect(outline.borderLeftWidth).toBeGreaterThan(0);
     expect(outline.borderRightWidth).toBeGreaterThan(0);
+
+    const firstPlaceCopy = screen.getByTestId('onboarding-place-copy-gemini');
+    expect(
+      within(firstPlaceCopy).getByTestId('onboarding-place-tags-gemini'),
+    ).toBeOnTheScreen();
   });
 
   it.each([
