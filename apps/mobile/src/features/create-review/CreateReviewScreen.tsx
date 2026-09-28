@@ -73,7 +73,6 @@ import {
   concentricRatingLayout,
   dishRatingArcHeight,
   dishRatingArcGeometry,
-  isRatingArcTouch,
   ratingCurvePoint,
   ratingForCurveDrag,
   ratingForCurvePoint,
@@ -1116,22 +1115,23 @@ function RatingCurve({
   };
   const emptyCurvePanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponderCapture: (event) => {
-        const geometry = interaction.current.arcGeometry;
-        return Boolean(
-          interaction.current.value < 1 &&
-          geometry &&
-          isRatingArcTouch(
-            event.nativeEvent.locationX,
-            event.nativeEvent.locationY,
-            geometry,
-            responsiveSize(24),
-          ),
-        );
-      },
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponderCapture: () => false,
+      // Claim the whole curve canvas while the rating is empty. Requiring the
+      // initial touch to land within a narrow band around the SVG path meant a
+      // finger that started just above/below it never became the responder, so
+      // the first interaction could only be a tap. Once claimed, every point is
+      // still projected onto the arc by updateEmptyCurveRating.
+      onStartShouldSetPanResponderCapture: () =>
+        interaction.current.value < 1 &&
+        Boolean(interaction.current.arcGeometry),
+      onStartShouldSetPanResponder: () =>
+        interaction.current.value < 1 &&
+        Boolean(interaction.current.arcGeometry),
+      onMoveShouldSetPanResponder: () =>
+        interaction.current.value < 1 &&
+        Boolean(interaction.current.arcGeometry),
+      onMoveShouldSetPanResponderCapture: () =>
+        interaction.current.value < 1 &&
+        Boolean(interaction.current.arcGeometry),
       onPanResponderGrant: (event) => {
         dragging.current = true;
         settling.current = false;
