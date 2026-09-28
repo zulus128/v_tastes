@@ -127,6 +127,19 @@ export function ratingForCurvePoint(
   return minimumRating + progress * (maximumRating - minimumRating);
 }
 
+/** Converts a curve-local horizontal position into a continuous rating. */
+export function ratingForCurveX(x: number, geometry = defaultRatingArc) {
+  const normalizedX = clamp((x - geometry.centerX) / geometry.radius, -1, 1);
+  const angle = clamp(
+    Math.acos(normalizedX),
+    geometry.rightAngle,
+    geometry.leftAngle,
+  );
+  const progress =
+    (geometry.leftAngle - angle) / (geometry.leftAngle - geometry.rightAngle);
+  return minimumRating + progress * (maximumRating - minimumRating);
+}
+
 /** Returns whether a touch is close enough to the visible arc to begin dragging. */
 export function isRatingArcTouch(
   x: number,

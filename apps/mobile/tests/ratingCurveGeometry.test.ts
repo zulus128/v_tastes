@@ -7,6 +7,7 @@ import {
   ratingCurvePoint,
   ratingForCurveDrag,
   ratingForCurvePoint,
+  ratingForCurveX,
   ratingForLinearPoint,
   ratingCircle,
   snapRating,
@@ -72,6 +73,20 @@ describe('rating curve geometry', () => {
     expect(middle.y).toBeCloseTo(167, 3);
     expect(right.x).toBeCloseTo(363, 3);
     expect(right.y).toBeCloseTo(43, 3);
+  });
+
+  it('starts an empty dish drag at the rating under the finger', () => {
+    const geometry = dishRatingArcGeometry(402);
+
+    expect(
+      ratingForCurveX(ratingCurvePoint(1, geometry).x, geometry),
+    ).toBeCloseTo(1, 8);
+    expect(
+      ratingForCurveX(ratingCurvePoint(3, geometry).x, geometry),
+    ).toBeCloseTo(3, 8);
+    expect(
+      ratingForCurveX(ratingCurvePoint(5, geometry).x, geometry),
+    ).toBeCloseTo(5, 8);
   });
 
   it('scales the dish arc proportionally on narrower screens', () => {

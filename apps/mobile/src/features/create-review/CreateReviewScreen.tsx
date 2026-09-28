@@ -75,7 +75,7 @@ import {
   dishRatingArcGeometry,
   ratingCurvePoint,
   ratingForCurveDrag,
-  ratingForCurvePoint,
+  ratingForCurveX,
   ratingForLinearPoint,
   snapRating,
 } from './ratingCurveGeometry';
@@ -932,6 +932,8 @@ function RatingCurve({
     }),
   ).current;
   const dragging = useRef(false);
+  const curveRef = useRef<View>(null);
+  const curveWindowX = useRef(0);
   const settling = useRef(false);
   const dragStartRating = useRef(value);
   const currentDragRating = useRef(value);
@@ -1108,10 +1110,10 @@ function RatingCurve({
       onShouldBlockNativeResponder: () => true,
     }),
   ).current;
-  const updateEmptyCurveRating = (locationX: number, locationY: number) => {
+  const updateEmptyCurveRating = (pageX: number) => {
     const geometry = interaction.current.arcGeometry;
     if (!geometry) return;
-    setVisualPosition(ratingForCurvePoint(locationX, locationY, geometry));
+    setVisualPosition(ratingForCurveX(pageX - curveWindowX.current, geometry));
   };
   const emptyCurvePanResponder = useRef(
     PanResponder.create({
@@ -1137,17 +1139,11 @@ function RatingCurve({
         settling.current = false;
         settleRating.stopAnimation();
         interaction.current.onGestureActiveChange?.(true);
-        updateEmptyCurveRating(
-          event.nativeEvent.locationX,
-          event.nativeEvent.locationY,
-        );
+        updateEmptyCurveRating(event.nativeEvent.pageX);
       },
       onPanResponderMove: (event) => {
         if (!dragging.current) return;
-        updateEmptyCurveRating(
-          event.nativeEvent.locationX,
-          event.nativeEvent.locationY,
-        );
+        updateEmptyCurveRating(event.nativeEvent.pageX);
       },
       onPanResponderRelease: () => {
         interaction.current.onGestureActiveChange?.(false);
@@ -1369,6 +1365,12 @@ function RatingCurve({
         </View>
       ) : arcGeometry && (curvedLayout || standaloneArc) ? (
         <View
+          onLayout={() => {
+            curveRef.current?.measureInWindow((x) => {
+              curveWindowX.current = x;
+            });
+          }}
+          ref={curveRef}
           {...emptyCurvePanResponder.panHandlers}
           style={[
             ratingStyles.curve,
