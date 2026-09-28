@@ -1996,6 +1996,11 @@ export function PlaceSelector({
                     <Text numberOfLines={1} style={styles.rowName}>
                       {venue.name}
                     </Text>
+                    {venue.address || venue.city ? (
+                      <Text numberOfLines={1} style={styles.rowAddress}>
+                        {venue.address || venue.city}
+                      </Text>
+                    ) : null}
                     <View style={styles.meta}>
                       <Text style={styles.ratingPill}>
                         ★ {(venue.rating ?? 0).toFixed(1)}
@@ -2004,7 +2009,7 @@ export function PlaceSelector({
                         {venue.reviewCount ?? 0} reviews
                       </Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.rowAddress}>
+                    <View style={styles.detailPills}>
                       {[
                         venue.category,
                         venue.priceLevel ? '$'.repeat(venue.priceLevel) : null,
@@ -2012,11 +2017,16 @@ export function PlaceSelector({
                           ? null
                           : `${venue.distanceKm.toFixed(1)} km`,
                       ]
-                        .filter(Boolean)
-                        .join(' · ') ||
-                        venue.address ||
-                        venue.city}
-                    </Text>
+                        .filter((detail): detail is string => Boolean(detail))
+                        .map((detail) => (
+                          <View
+                            key={`${venue.id}-${detail}`}
+                            style={styles.detailPill}
+                          >
+                            <Text style={styles.detailPillText}>{detail}</Text>
+                          </View>
+                        ))}
+                    </View>
                   </View>
                   {submittingVenueId === venue.id ? (
                     <ActivityIndicator color={colors.primary} />
@@ -2756,6 +2766,30 @@ const createSelectorStyles = (colors: ThemeColors) =>
       color: colors.textMuted,
       fontSize: 12,
       lineHeight: 16,
+    },
+    detailPills: {
+      minWidth: 0,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 7,
+    },
+    detailPill: {
+      minHeight: 33,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    detailPillText: {
+      color: colors.text,
+      fontSize: 15,
+      lineHeight: 20,
+      letterSpacing: -0.24,
     },
     empty: { color: colors.textMuted, padding: 36, textAlign: 'center' },
     more: { height: 54, alignItems: 'center', justifyContent: 'center' },
