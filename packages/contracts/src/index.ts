@@ -64,6 +64,7 @@ export const updateProfileSettingsInputSchema = z
       .max(40)
       .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
     city: z.string().trim().min(2).max(120),
+    bio: z.string().trim().max(500),
     favoriteDish: z.string().trim().min(1).max(80),
     favoriteVenueId: z.string().trim().min(1).max(128),
   })

@@ -21,6 +21,8 @@ import {
   Animated,
   Image,
   ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -837,7 +839,12 @@ export function ProfileSettingsSheet({
                 onPress={() => setEditing(null)}
                 style={styles.modalBackdrop}
               />
-              <View pointerEvents="box-none" style={styles.editorContainer}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                pointerEvents="box-none"
+                style={styles.editorContainer}
+                testID="profile-editor-keyboard-avoider"
+              >
                 <View style={styles.editor}>
                   <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
                   <TextInput
@@ -874,7 +881,7 @@ export function ProfileSettingsSheet({
                     )}
                   </Pressable>
                 </View>
-              </View>
+              </KeyboardAvoidingView>
             </View>
           ) : null}
         </ImageBackground>

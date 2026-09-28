@@ -568,6 +568,7 @@ export const updateProfileSettings = onCall(
             }
           : {}),
         ...(input.city ? { city: input.city } : {}),
+        ...(input.bio !== undefined ? { bio: input.bio } : {}),
         ...(input.favoriteDish
           ? { 'tastePreferences.favoriteDish': input.favoriteDish }
           : {}),

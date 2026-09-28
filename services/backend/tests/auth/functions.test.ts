@@ -428,6 +428,11 @@ describe('authenticated session and paginated reads', () => {
       },
       token,
     );
+    await callFunction(
+      'updateProfileSettings',
+      { bio: 'Natural wine and handmade pasta.' },
+      token,
+    );
     expect(await callFunction('getSessionStatus', {}, token)).toMatchObject({
       profileExists: true,
       onboardingComplete: false,
@@ -454,6 +459,9 @@ describe('authenticated session and paginated reads', () => {
       .get();
     expect(profile.docs[0]?.get('email')).toBeUndefined();
     expect(profile.docs[0]?.get('phoneNumber')).toBeUndefined();
+    expect(profile.docs[0]?.get('bio')).toBe(
+      'Natural wine and handmade pasta.',
+    );
     expect(
       (
         await getFirestore()

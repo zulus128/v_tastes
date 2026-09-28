@@ -126,6 +126,7 @@ it('opens the Bio editor and accepts the full 80-character value', async () => {
   expect(input.props.maxLength).toBe(80);
   expect(input.props.textAlignVertical).toBe('top');
   expect(screen.getByText('80/80')).toBeTruthy();
+  expect(screen.getByTestId('profile-editor-keyboard-avoider')).toBeTruthy();
   expect(screen.getByLabelText('Save Bio')).toBeTruthy();
 });
 
