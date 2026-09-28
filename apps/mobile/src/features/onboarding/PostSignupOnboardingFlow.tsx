@@ -31,6 +31,15 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import Svg, {
+  Circle,
+  Defs,
+  FeGaussianBlur,
+  Filter,
+  G,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
 import addPhoto from '../../../assets/onboarding/add-photo.png';
 import tastesAppIcon from '../../../assets/icon.png';
 import chevronRight from '../../../assets/onboarding/chevron-right.png';
@@ -344,6 +353,7 @@ function PeopleYouKnowTeaser({
 }: {
   styles: ReturnType<typeof createStyles>;
 }) {
+  const { colors, isDark } = useAppTheme();
   const people = [
     { action: 'Following', detail: '4 mutual friends', name: 'Jonas Weber' },
     { action: 'Follow', detail: '2 mutual friends', name: 'Sofia Reyes' },
@@ -355,35 +365,88 @@ function PeopleYouKnowTeaser({
       <Text style={styles.peopleTeaserCount}>
         3 of your contacts are on Tastes
       </Text>
-      {people.map((person, index) => (
-        <View
-          accessibilityElementsHidden
-          key={person.name}
-          style={styles.teaserPerson}
-          testID={`onboarding-people-teaser-row-${index}`}
-        >
-          <View style={styles.teaserAvatar} />
-          <View style={styles.teaserCopy}>
-            <Text style={styles.teaserBlurred}>{person.name}</Text>
-            <Text style={styles.teaserBlurredSmall}>{person.detail}</Text>
-          </View>
-          <View
-            style={[
-              styles.teaserAction,
-              index === 0 && styles.teaserActionMuted,
-            ]}
+      <Svg
+        accessibilityElementsHidden
+        height={192}
+        testID="onboarding-people-teaser-list"
+        viewBox="0 0 338 192"
+        width="100%"
+      >
+        <Defs>
+          <Filter
+            height="140%"
+            id="people-teaser-blur"
+            width="140%"
+            x="-20%"
+            y="-20%"
           >
-            <Text
-              style={[
-                styles.teaserActionText,
-                index === 0 && styles.teaserActionMutedText,
-              ]}
-            >
-              {person.action}
-            </Text>
-          </View>
-        </View>
-      ))}
+            <FeGaussianBlur stdDeviation={3} />
+          </Filter>
+        </Defs>
+        <G filter="url(#people-teaser-blur)">
+          {people.map((person, index) => {
+            const rowTop = index * 64;
+            const muted = index === 0;
+            return (
+              <G
+                key={person.name}
+                testID={`onboarding-people-teaser-row-${index}`}
+              >
+                <Circle
+                  cx={22}
+                  cy={rowTop + 32}
+                  fill="#777777"
+                  opacity={0.58}
+                  r={22}
+                />
+                <SvgText
+                  fill={colors.text}
+                  fontSize={15}
+                  fontWeight="600"
+                  x={56}
+                  y={rowTop + 29}
+                >
+                  {person.name}
+                </SvgText>
+                <SvgText
+                  fill={colors.textSecondary}
+                  fontSize={13}
+                  x={56}
+                  y={rowTop + 48}
+                >
+                  {person.detail}
+                </SvgText>
+                <Rect
+                  fill={
+                    muted
+                      ? isDark
+                        ? '#2A2A2C'
+                        : colors.surfaceMuted
+                      : isDark
+                        ? '#FFFFFF'
+                        : colors.surfaceRaised
+                  }
+                  height={34}
+                  rx={17}
+                  width={100}
+                  x={238}
+                  y={rowTop + 15}
+                />
+                <SvgText
+                  fill={muted ? colors.text : '#0A0A0A'}
+                  fontSize={14}
+                  fontWeight="500"
+                  textAnchor="middle"
+                  x={288}
+                  y={rowTop + 37}
+                >
+                  {person.action}
+                </SvgText>
+              </G>
+            );
+          })}
+        </G>
+      </Svg>
     </View>
   );
 }
@@ -2643,67 +2706,6 @@ const createStyles = (
       fontSize: 13,
       lineHeight: 16,
     },
-    teaserPerson: {
-      height: 64,
-      flexDirection: 'row',
-      alignItems: 'center',
-      filter: [{ blur: 6 }],
-    },
-    teaserAvatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: '#777777',
-      opacity: 0.58,
-      shadowColor: '#777777',
-      shadowRadius: 6,
-      shadowOpacity: 1,
-    },
-    teaserCopy: { flex: 1, marginLeft: 12 },
-    teaserBlurred: {
-      color: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)',
-      fontSize: 15,
-      lineHeight: 19,
-      fontWeight: '600',
-      textShadowColor: colors.text,
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 6,
-    },
-    teaserBlurredSmall: {
-      marginTop: 2,
-      color: isDark ? 'rgba(170,178,197,0.14)' : 'rgba(75,80,90,0.14)',
-      fontSize: 13,
-      lineHeight: 16,
-      textShadowColor: colors.textSecondary,
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 6,
-    },
-    teaserAction: {
-      width: 100,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: isDark ? '#FFFFFF' : colors.surfaceRaised,
-      opacity: 0.78,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: isDark ? '#FFFFFF' : colors.surfaceRaised,
-      shadowRadius: 6,
-      shadowOpacity: 0.55,
-    },
-    teaserActionMuted: {
-      backgroundColor: isDark ? '#2A2A2C' : colors.surfaceMuted,
-      shadowColor: isDark ? '#2A2A2C' : colors.surfaceMuted,
-    },
-    teaserActionText: {
-      color: 'rgba(10,10,10,0.14)',
-      fontSize: 14,
-      lineHeight: 17,
-      fontWeight: '500',
-      textShadowColor: '#0A0A0A',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 6,
-    },
-    teaserActionMutedText: { textShadowColor: colors.text },
     notificationExamples: { width: '100%', marginTop: 42, gap: 12 },
     notificationCard: {
       minHeight: 78,
