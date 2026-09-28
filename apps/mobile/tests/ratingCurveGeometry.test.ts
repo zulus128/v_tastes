@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   concentricRatingLayout,
   dishRatingArcGeometry,
+  isRatingArcTouch,
   ratingCurvePoint,
   ratingForCurveDrag,
   ratingForCurvePoint,
@@ -42,6 +43,13 @@ describe('rating curve geometry', () => {
   it('keeps the current rating when the handle is tapped without moving', () => {
     expect(ratingForCurveDrag(3, 0, 0)).toBeCloseTo(3, 8);
     expect(ratingForCurveDrag(3, 20, 0)).toBeGreaterThan(3);
+  });
+
+  it('only starts an empty-rating drag close to the visible arc', () => {
+    const point = ratingCurvePoint(3);
+
+    expect(isRatingArcTouch(point.x, point.y)).toBe(true);
+    expect(isRatingArcTouch(point.x, point.y - 30)).toBe(false);
   });
 
   it('maps dish slider drag positions from 0.5 to 5 stars', () => {

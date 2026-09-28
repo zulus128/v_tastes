@@ -72,8 +72,10 @@ import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
   dishRatingArcGeometry,
+  isRatingArcTouch,
   ratingCurvePoint,
   ratingForCurveDrag,
+  ratingForCurvePoint,
   ratingForLinearPoint,
   snapRating,
 } from './ratingCurveGeometry';
@@ -1105,6 +1107,58 @@ function RatingCurve({
       onShouldBlockNativeResponder: () => true,
     }),
   ).current;
+  const updateEmptyCurveRating = (locationX: number, locationY: number) => {
+    const geometry = interaction.current.arcGeometry;
+    if (!geometry) return;
+    setVisualPosition(ratingForCurvePoint(locationX, locationY, geometry));
+  };
+  const emptyCurvePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponderCapture: (event) => {
+        const geometry = interaction.current.arcGeometry;
+        return Boolean(
+          interaction.current.value < 1 &&
+          geometry &&
+          isRatingArcTouch(
+            event.nativeEvent.locationX,
+            event.nativeEvent.locationY,
+            geometry,
+            responsiveSize(24),
+          ),
+        );
+      },
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: (event) => {
+        dragging.current = true;
+        settling.current = false;
+        settleRating.stopAnimation();
+        interaction.current.onGestureActiveChange?.(true);
+        updateEmptyCurveRating(
+          event.nativeEvent.locationX,
+          event.nativeEvent.locationY,
+        );
+      },
+      onPanResponderMove: (event) => {
+        if (!dragging.current) return;
+        updateEmptyCurveRating(
+          event.nativeEvent.locationX,
+          event.nativeEvent.locationY,
+        );
+      },
+      onPanResponderRelease: () => {
+        interaction.current.onGestureActiveChange?.(false);
+        settleToRating(snapRating(currentDragRating.current));
+      },
+      onPanResponderTerminate: () => {
+        interaction.current.onGestureActiveChange?.(false);
+        settleToRating(snapRating(currentDragRating.current));
+      },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+    }),
+  ).current;
   const updateLinearRating = (locationX: number) => {
     const width = interaction.current.scaleWidth;
     if (width <= 0) return;
@@ -1310,6 +1364,7 @@ function RatingCurve({
         </View>
       ) : arcGeometry && (curvedLayout || standaloneArc) ? (
         <View
+          {...emptyCurvePanResponder.panHandlers}
           style={[
             ratingStyles.curve,
             {

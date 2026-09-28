@@ -118,6 +118,18 @@ export function ratingForCurvePoint(
   return minimumRating + progress * (maximumRating - minimumRating);
 }
 
+/** Returns whether a touch is close enough to the visible arc to begin dragging. */
+export function isRatingArcTouch(
+  x: number,
+  y: number,
+  geometry = defaultRatingArc,
+  tolerance = 22,
+) {
+  const rating = ratingForCurvePoint(x, y, geometry);
+  const nearestPoint = ratingCurvePoint(rating, geometry);
+  return Math.hypot(x - nearestPoint.x, y - nearestPoint.y) <= tolerance;
+}
+
 /** Converts a handle-relative drag delta into a continuous rating. */
 export function ratingForCurveDrag(
   startRating: number,
