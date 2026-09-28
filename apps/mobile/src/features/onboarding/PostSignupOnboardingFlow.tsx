@@ -581,7 +581,6 @@ export function PostSignupOnboardingFlow({
   >(visualAudit ? 'available' : 'idle');
   const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
-  const [bio, setBio] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
   const photoSheetMotion = useBottomSheetMotion({
@@ -764,7 +763,6 @@ export function PostSignupOnboardingFlow({
       displayName: displayName.trim(),
       username: username.trim(),
       ...(city ? { city } : {}),
-      bio: bio.trim(),
     };
     const validation = createUserProfileInputSchema.safeParse(input);
     if (!validation.success) {
@@ -1034,12 +1032,11 @@ export function PostSignupOnboardingFlow({
               style={styles.profileScroll}
               testID="onboarding-profile-scroll"
             >
-              <StepProgress step={1} />
               <Text style={[styles.title, styles.profileTitle]}>
                 Create your profile
               </Text>
               <Text style={[styles.subtitle, styles.profileSubtitle]}>
-                This is how friends find you.
+                Choose a username and add a photo so others can recognize you
               </Text>
               <Pressable
                 accessibilityLabel="Add profile photo"
@@ -1057,27 +1054,20 @@ export function PostSignupOnboardingFlow({
                   </View>
                 ) : null}
               </Pressable>
-              <Text style={styles.profileIdentity}>
-                {displayName || 'Your name'}{' '}
-                {username ? `@${username}` : '@username'}
-              </Text>
               <View
-                style={styles.profileFieldsCard}
-                testID="onboarding-profile-fields-card"
+                style={styles.profileFields}
+                testID="onboarding-profile-fields"
               >
                 <View style={styles.profileField}>
-                  <Text style={styles.profileFieldLabel}>Name</Text>
                   <TextInput
                     value={displayName}
                     onChangeText={setDisplayName}
-                    placeholder="What your friends call you"
+                    placeholder="Your Name"
                     placeholderTextColor={colors.placeholder}
                     style={styles.profileFieldInput}
                   />
                 </View>
-                <View style={styles.profileSeparator} />
                 <View style={styles.profileField}>
-                  <Text style={styles.profileFieldLabel}>Username</Text>
                   <TextInput
                     value={username}
                     autoCapitalize="none"
@@ -1086,49 +1076,50 @@ export function PostSignupOnboardingFlow({
                       setUsername(value);
                       setUsernameTouched(true);
                     }}
-                    placeholder="@yourname"
+                    placeholder="Username"
                     placeholderTextColor={colors.placeholder}
                     style={styles.profileFieldInput}
                   />
-                  {usernameStatus === 'checking' ? (
+                  {!visualAudit && usernameStatus === 'checking' ? (
                     <Text style={styles.usernameChecking}>Checking…</Text>
                   ) : null}
-                  {usernameStatus === 'available' ? (
+                  {!visualAudit && usernameStatus === 'available' ? (
                     <Text style={styles.usernameAvailable}>
                       ✓ This name is available
                     </Text>
                   ) : null}
-                  {usernameStatus === 'taken' ? (
+                  {!visualAudit && usernameStatus === 'taken' ? (
                     <Text style={styles.usernameTaken}>
                       ✗ That name is taken
                     </Text>
                   ) : null}
-                  {usernameStatus === 'invalid' ? (
+                  {!visualAudit && usernameStatus === 'invalid' ? (
                     <Text style={styles.usernameTaken}>
                       ✗ Use letters, numbers, dots, or underscores only
                     </Text>
                   ) : null}
-                  {usernameStatus === 'error' ? (
+                  {!visualAudit && usernameStatus === 'error' ? (
                     <Text style={styles.usernameTaken}>
                       ✗ Couldn’t check this name. Try again.
                     </Text>
                   ) : null}
                 </View>
-                <View style={styles.profileSeparator} />
                 <Pressable
                   onPress={() => navigate('city')}
                   style={styles.profileField}
                 >
-                  <Text style={styles.profileFieldLabel}>Location</Text>
+                  <Text
+                    style={[
+                      styles.profileFieldInput,
+                      !city && styles.profilePlaceholder,
+                    ]}
+                  >
+                    Location
+                  </Text>
                   <View style={styles.locationSelection}>
-                    <Text
-                      style={[
-                        styles.profileFieldInput,
-                        !city && styles.profilePlaceholder,
-                      ]}
-                    >
-                      {city || 'Select your city'}
-                    </Text>
+                    {city ? (
+                      <Text style={styles.locationValue}>{city}</Text>
+                    ) : null}
                     {city ? (
                       <Image source={cityFlag} style={styles.locationFlag} />
                     ) : null}
@@ -1138,38 +1129,6 @@ export function PostSignupOnboardingFlow({
                     />
                   </View>
                 </Pressable>
-                <View style={styles.profileSeparator} />
-                <View style={[styles.profileField, styles.profileBioField]}>
-                  <View style={styles.profileLabelRow}>
-                    <Text style={styles.profileFieldLabel}>Bio</Text>
-                    <Text style={styles.bioCounter}>{bio.length}/80</Text>
-                  </View>
-                  <TextInput
-                    maxLength={80}
-                    value={bio}
-                    onChangeText={setBio}
-                    placeholder="What do you always order?"
-                    placeholderTextColor={colors.placeholder}
-                    style={styles.profileFieldInput}
-                  />
-                  <View style={styles.bioSuggestions}>
-                    {[
-                      'Ramen obsessive',
-                      'Natural wine person',
-                      'Will queue for a pastry',
-                    ].map((suggestion) => (
-                      <Pressable
-                        key={suggestion}
-                        onPress={() => setBio(suggestion)}
-                        style={styles.bioSuggestion}
-                      >
-                        <Text style={styles.bioSuggestionText}>
-                          {suggestion}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
               </View>
             </ScrollView>
             <View style={styles.profileButtonArea}>
@@ -1179,9 +1138,6 @@ export function PostSignupOnboardingFlow({
                 loading={busy}
                 onPress={saveProfile}
               />
-              <Text style={styles.changeLater}>
-                You can change all of this later.
-              </Text>
             </View>
           </View>
           <Modal
@@ -2006,18 +1962,16 @@ const createStyles = (
     profilePage: {
       flexGrow: 1,
       paddingHorizontal: 16,
-      paddingTop: landscape ? 24 : 66,
+      paddingTop: landscape ? 24 : 130,
       paddingBottom: 16,
       alignItems: 'center',
     },
     profileButtonArea: {
       paddingHorizontal: 36,
       paddingBottom: bottomGutter,
-      gap: 7,
     },
-    profileSubtitle: { marginTop: 7, width: 285, fontSize: 15, lineHeight: 18 },
+    profileSubtitle: { marginTop: 7, width: 336, fontSize: 15, lineHeight: 18 },
     profileTitle: {
-      marginTop: 60,
       fontSize: 24,
       lineHeight: 29,
       letterSpacing: 0.6,
@@ -2028,8 +1982,8 @@ const createStyles = (
       borderRadius: 60,
       borderWidth: 1,
       borderColor: colors.border,
-      marginTop: 18,
-      marginBottom: 18,
+      marginTop: 24,
+      marginBottom: 24,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surface,
@@ -2053,57 +2007,60 @@ const createStyles = (
       fontWeight: '700',
     },
     addPhotoIcon: { width: 28, height: 28 },
-    profileIdentity: {
-      color: colors.textMuted,
-      fontSize: 15,
-      marginBottom: 18,
-    },
-    profileFieldsCard: {
+    profileFields: {
       width: '100%',
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 18,
-      backgroundColor: colors.surface,
+      gap: 24,
     },
-    profileField: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
-    profileBioField: { paddingBottom: 16, gap: 12 },
-    profileFieldLabel: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      fontWeight: '500',
+    profileField: {
+      width: '100%',
+      height: 44,
+      paddingLeft: 16,
+      paddingRight: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.hairline,
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     profileFieldInput: {
       flex: 1,
-      minHeight: 22,
       padding: 0,
       color: colors.text,
-      fontSize: 16,
+      fontSize: 17,
+      lineHeight: 22,
+      letterSpacing: -0.41,
     },
     profilePlaceholder: { color: colors.placeholder },
-    profileSeparator: { height: 1, backgroundColor: colors.hairline },
-    profileLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    bioCounter: { color: colors.placeholder, fontSize: 12 },
-    usernameChecking: { color: colors.textMuted, fontSize: 12 },
-    usernameAvailable: { color: '#3DDC97', fontSize: 12 },
-    usernameTaken: { color: '#E63946', fontSize: 12 },
-    bioSuggestions: {
+    usernameChecking: {
+      position: 'absolute',
+      top: 46,
+      left: 16,
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    usernameAvailable: {
+      position: 'absolute',
+      top: 46,
+      left: 16,
+      color: '#238654',
+      fontSize: 12,
+    },
+    usernameTaken: {
+      position: 'absolute',
+      top: 46,
+      left: 16,
+      color: '#E63946',
+      fontSize: 12,
+    },
+    locationSelection: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
       gap: 8,
-      marginTop: 4,
+      alignItems: 'center',
     },
-    bioSuggestion: {
-      height: 30,
-      paddingHorizontal: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 15,
-      backgroundColor: colors.surfaceRaised,
-      justifyContent: 'center',
+    locationValue: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '500',
     },
-    bioSuggestionText: { color: colors.text, fontSize: 13 },
-    changeLater: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
     field: {
       width: '100%',
       height: 53,
@@ -2124,8 +2081,6 @@ const createStyles = (
       paddingHorizontal: 4,
     },
     locationLabel: { color: colors.placeholder, fontSize: 15 },
-    locationValue: { color: colors.textMuted, fontSize: 15 },
-    locationSelection: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     locationFlag: { width: 18, height: 18 },
     locationChevron: { width: 8, height: 16, marginLeft: 2 },
     modalBackdrop: {
