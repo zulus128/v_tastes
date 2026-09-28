@@ -19,9 +19,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import avatarCameron from '../../../assets/discover/avatar-cameron.jpg';
-import avatarKristin from '../../../assets/discover/avatar-kristin.png';
-import avatarWade from '../../../assets/discover/avatar-wade.png';
 import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
@@ -73,7 +70,6 @@ function placeImage(url: string | null | undefined): ImageSourcePropType {
   return url ? { uri: url } : restaurantImage;
 }
 
-const seededReviewAvatars = [avatarKristin, avatarCameron, avatarWade];
 export function PlaceScreen({
   onBack,
   onOpenComments,
@@ -878,7 +874,7 @@ function ReviewPhoto({
   );
 }
 
-function ReviewCard({
+export function ReviewCard({
   fallbackDishes,
   fallbackPhotoUrls,
   item: review,
@@ -906,10 +902,6 @@ function ReviewCard({
   venueName: string;
 }) {
   const { colors } = useAppTheme();
-  const seededAvatar =
-    !review.authorPhotoUrl && reviewIndex < 3
-      ? seededReviewAvatars[reviewIndex % seededReviewAvatars.length]
-      : null;
   const displayDishes = review.dishReviews.map((dish, dishIndex) => ({
     ...dish,
     fallbackUri: fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex),
@@ -942,15 +934,11 @@ function ReviewCard({
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}>
-        {seededAvatar ? (
-          <Image source={seededAvatar} style={styles.avatar} />
-        ) : (
-          <UserAvatar
-            displayName={review.authorDisplayName}
-            photoUrl={review.authorPhotoUrl}
-            style={styles.avatar}
-          />
-        )}
+        <UserAvatar
+          displayName={review.authorDisplayName}
+          photoUrl={review.authorPhotoUrl}
+          style={styles.avatar}
+        />
         <View style={styles.author}>
           <Text style={styles.authorName}>{review.authorDisplayName}</Text>
           <Text style={styles.authorHandle}>
