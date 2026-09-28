@@ -398,6 +398,14 @@ describe('onboarding in resizable windows', () => {
       screen.getByTestId('onboarding-place-card').props.style,
     );
     expect(placeCard.top).toBeCloseTo(205.5, 1);
+
+    const outline = StyleSheet.flatten(
+      screen.getByTestId('onboarding-place-card-outline').props.style,
+    );
+    expect(outline.borderTopLeftRadius).toBeCloseTo(26.5, 1);
+    expect(outline.borderTopRightRadius).toBeCloseTo(26.5, 1);
+    expect(outline.borderLeftWidth).toBeGreaterThan(0);
+    expect(outline.borderRightWidth).toBeGreaterThan(0);
   });
 
   it.each([

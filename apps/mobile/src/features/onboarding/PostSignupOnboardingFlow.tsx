@@ -1359,6 +1359,11 @@ export function PostSignupOnboardingFlow({
           ]}
           testID="onboarding-place-card"
         >
+          <View
+            pointerEvents="none"
+            style={styles.placesCardOutline}
+            testID="onboarding-place-card-outline"
+          />
           <View style={styles.placeHeader}>
             <View style={styles.placeSearch}>
               <PlaceSearchIcon
@@ -2239,9 +2244,21 @@ const createStyles = (
       right: 0,
       bottom: 0,
       overflow: 'hidden',
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
       backgroundColor: colors.canvas,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+    },
+    placesCardOutline: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 24,
+      zIndex: 1,
+      borderTopWidth: 1,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.border,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
     },
