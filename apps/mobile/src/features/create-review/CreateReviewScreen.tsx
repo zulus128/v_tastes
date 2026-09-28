@@ -71,6 +71,7 @@ import { type DishReviewDraft, useCreateReview } from './api';
 import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
+  dishRatingArcHeight,
   dishRatingArcGeometry,
   isRatingArcTouch,
   ratingCurvePoint,
@@ -604,7 +605,7 @@ export function CreateReviewScreen({
                 setDishEditor({
                   id: createIdempotencyKey('dish'),
                   photoUri: '',
-                  rating: 1,
+                  rating: 0,
                   title: '',
                 })
               }
@@ -921,6 +922,7 @@ function RatingCurve({
     standaloneArc && standaloneWidth > 0
       ? dishRatingArcGeometry(standaloneWidth)
       : curvedLayout?.ratingArc;
+  const standaloneHeight = dishRatingArcHeight(standaloneWidth);
   const selectedPoint =
     visualRating >= 1 ? ratingCurvePoint(visualRating, arcGeometry) : null;
   const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
@@ -1201,7 +1203,10 @@ function RatingCurve({
       }
       style={[
         ratingStyles.wrap,
-        standaloneArc && ratingStyles.standaloneWrap,
+        standaloneArc && [
+          ratingStyles.standaloneWrap,
+          { height: standaloneHeight },
+        ],
         curvedLayout && {
           bottom: 0,
           height: curvedLayout.arcDepth,
@@ -1368,27 +1373,23 @@ function RatingCurve({
           style={[
             ratingStyles.curve,
             {
-              height: standaloneArc
-                ? responsiveSize(198)
-                : curvedLayout?.arcDepth,
+              height: standaloneArc ? standaloneHeight : curvedLayout?.arcDepth,
               width: standaloneArc ? standaloneWidth : heroWidth,
             },
           ]}
         >
           <Svg
-            height={
-              standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth
-            }
+            height={standaloneArc ? standaloneHeight : curvedLayout?.arcDepth}
             pointerEvents="none"
             style={StyleSheet.absoluteFill}
-            viewBox={`0 0 ${standaloneArc ? standaloneWidth : heroWidth} ${standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth}`}
+            viewBox={`0 0 ${standaloneArc ? standaloneWidth : heroWidth} ${standaloneArc ? standaloneHeight : curvedLayout?.arcDepth}`}
             width={standaloneArc ? standaloneWidth : heroWidth}
           >
             <Defs>
               <ClipPath id="review-rating-progress">
                 <Rect
                   height={
-                    standaloneArc ? responsiveSize(198) : curvedLayout?.arcDepth
+                    standaloneArc ? standaloneHeight : curvedLayout?.arcDepth
                   }
                   width={selectedPoint?.x ?? 0}
                   x={0}

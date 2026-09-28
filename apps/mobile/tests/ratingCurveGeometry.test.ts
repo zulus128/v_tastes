@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   concentricRatingLayout,
+  dishRatingArcHeight,
   dishRatingArcGeometry,
   isRatingArcTouch,
   ratingCurvePoint,
@@ -80,6 +81,7 @@ describe('rating curve geometry', () => {
     expect(geometry.radius).toBeCloseTo(ratingCircle.radius / 2, 4);
     expect(middle.x).toBeCloseTo(100.5, 3);
     expect(middle.y).toBeCloseTo(83.5, 3);
+    expect(dishRatingArcHeight(201)).toBe(99);
   });
 
   it('keeps a constant radial gap on wide screens', () => {

@@ -22,6 +22,8 @@ export interface ConcentricRatingLayout {
 const minimumRating = 1;
 const maximumRating = 5;
 const ratingStep = 0.5;
+const dishRatingCanvasWidth = 402;
+const dishRatingCanvasHeight = 198;
 const defaultRatingArc: RatingArcGeometry = {
   ...ratingCircle,
   leftAngle: Math.atan2(7 - ratingCircle.centerY, 7 - ratingCircle.centerX),
@@ -34,7 +36,7 @@ const defaultRatingArc: RatingArcGeometry = {
  * actual sheet width so the endpoints and deepest point keep their proportions.
  */
 export function dishRatingArcGeometry(width: number): RatingArcGeometry {
-  const scale = width > 0 ? width / 402 : 1;
+  const scale = width > 0 ? width / dishRatingCanvasWidth : 1;
   return {
     centerX: 201 * scale,
     centerY: -0.8226 * scale,
@@ -42,6 +44,13 @@ export function dishRatingArcGeometry(width: number): RatingArcGeometry {
     radius: ratingCircle.radius * scale,
     rightAngle: defaultRatingArc.rightAngle,
   };
+}
+
+/** Keeps the standalone dish arc canvas proportional to its measured width. */
+export function dishRatingArcHeight(width: number) {
+  return width > 0
+    ? (width * dishRatingCanvasHeight) / dishRatingCanvasWidth
+    : dishRatingCanvasHeight;
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
