@@ -1169,7 +1169,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
-      backgroundColor: '#080808',
+      backgroundColor: colors.canvas,
     },
     addTitleRow: {
       height: 34,
@@ -1178,9 +1178,9 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    addBack: { width: 44, color: '#FFFFFF', fontSize: 36, lineHeight: 36 },
+    addBack: { width: 44, color: colors.text, fontSize: 36, lineHeight: 36 },
     addTitle: {
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 17,
       fontWeight: '600',
       letterSpacing: -0.4,
@@ -1203,7 +1203,7 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 28,
       flexDirection: 'row',
       gap: 10,
-      backgroundColor: '#080808',
+      backgroundColor: colors.canvas,
     },
     cancelButton: {
       flex: 1,
@@ -1214,7 +1214,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.primary,
       borderRadius: 22,
     },
-    cancelText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+    cancelText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     confirmButton: {
       flex: 1,
       height: 44,

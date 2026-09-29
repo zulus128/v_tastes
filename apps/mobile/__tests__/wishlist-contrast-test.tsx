@@ -45,7 +45,7 @@ jest.mock('../src/features/favourites/api', () => ({
   useUnsaveVenue: () => ({ mutate: jest.fn() }),
 }));
 
-it('keeps Add to Wishlist navigation visible in the light theme', async () => {
+it('uses light-theme foreground colors for Add to Wishlist navigation', async () => {
   await render(
     <SaveToFolderSheet
       onClose={jest.fn()}
@@ -56,12 +56,12 @@ it('keeps Add to Wishlist navigation visible in the light theme', async () => {
   );
 
   expect(StyleSheet.flatten(screen.getByText('‹').props.style).color).toBe(
-    '#FFFFFF',
+    '#080808',
   );
   expect(
     StyleSheet.flatten(screen.getByText('Add to Wishlist').props.style).color,
-  ).toBe('#FFFFFF');
+  ).toBe('#080808');
   expect(StyleSheet.flatten(screen.getByText('Cancel').props.style).color).toBe(
-    '#FFFFFF',
+    '#080808',
   );
 });
