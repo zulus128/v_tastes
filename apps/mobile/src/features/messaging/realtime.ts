@@ -72,19 +72,6 @@ function participantFromProfile(
   };
 }
 
-function peerId(
-  document: QueryDocumentSnapshot<DocumentData>,
-  userId: string,
-): string {
-  const participantIds = document.data().participantIds;
-  if (!Array.isArray(participantIds)) return '';
-  return (
-    participantIds.find(
-      (value): value is string => typeof value === 'string' && value !== userId,
-    ) ?? ''
-  );
-}
-
 function summaryFromDocument(
   document: QueryDocumentSnapshot<DocumentData>,
   userId: string,
@@ -211,8 +198,47 @@ export function useConversationInbox(
           snapshot.docs
             .filter((conversation) => isVisibleInInbox(conversation, userId))
             .map(async (conversation) => {
+              const participantIds: string[] = Array.isArray(
+                conversation.data().participantIds,
+              )
+                ? conversation
+                    .data()
+                    .participantIds.filter(
+                      (value: unknown): value is string =>
+                        typeof value === 'string' && value !== userId,
+                    )
+                    .slice(0, 2)
+                : [];
+              const participants = await Promise.all(
+                participantIds.map(async (participantId) => {
+                  let participant = profileCache.current.get(participantId);
+                  if (!participant) {
+                    const profile = await getDoc(
+                      doc(firestore, 'users', participantId),
+                    );
+                    participant = participantFromProfile(
+                      participantId,
+                      profile.data(),
+                    );
+                    profileCache.current.set(participantId, participant);
+                  }
+                  return participant;
+                }),
+              );
+              const participantPhotoUrls = participants
+                .map((participant) => participant.photoUrl)
+                .filter((photoUrl): photoUrl is string => Boolean(photoUrl));
+              const summary = {
+                ...summaryFromDocument(
+                  conversation,
+                  userId,
+                  conversation.data().kind === 'direct'
+                    ? (participants[0] ?? null)
+                    : null,
+                ),
+                participantPhotoUrls,
+              };
               if (conversation.data().kind === 'activity') {
-                const summary = summaryFromDocument(conversation, userId, null);
                 if (summary.activityStartsAt && summary.activityAddress)
                   return summary;
                 const activityId = summary.activityId ?? conversation.id;
@@ -242,21 +268,9 @@ export function useConversationInbox(
                 };
               }
               if (conversation.data().kind === 'group') {
-                return summaryFromDocument(conversation, userId, null);
+                return summary;
               }
-              const otherUserId = peerId(conversation, userId);
-              let participant = profileCache.current.get(otherUserId);
-              if (!participant) {
-                const profile = otherUserId
-                  ? await getDoc(doc(firestore, 'users', otherUserId))
-                  : null;
-                participant = participantFromProfile(
-                  otherUserId,
-                  profile?.data(),
-                );
-                profileCache.current.set(otherUserId, participant);
-              }
-              return summaryFromDocument(conversation, userId, participant);
+              return summary;
             }),
         )
           .then((items) => {

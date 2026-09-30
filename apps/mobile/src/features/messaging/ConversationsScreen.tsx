@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
+import { UserAvatar } from '../profile/avatar';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
@@ -27,6 +28,7 @@ import { NewDialogSheet } from './NewDialogSheet';
 import {
   activitySubtitle,
   compareConversations,
+  conversationAvatarUrls,
   reservationCountdown,
 } from './presentation';
 import { useTastesApi } from '../../session/SessionProvider';
@@ -69,6 +71,7 @@ function ConversationRow({
   const unread = conversation.unreadCount > 0;
   const activity = conversation.kind === 'activity';
   const group = conversation.kind === 'group';
+  const avatarUrls = conversationAvatarUrls(conversation);
   const countdown = activity
     ? reservationCountdown(conversation.activityStartsAt)
     : null;
@@ -156,45 +159,30 @@ function ConversationRow({
         >
           {activity || group ? (
             <View style={styles.avatarStack}>
-              {conversation.imageUrl ||
-              conversation.lastMessage?.senderPhotoUrl ? (
+              {avatarUrls[0] ? (
                 <Image
-                  source={{
-                    uri:
-                      conversation.imageUrl ??
-                      conversation.lastMessage?.senderPhotoUrl ??
-                      '',
-                  }}
-                  style={styles.avatar}
+                  source={{ uri: avatarUrls[0] }}
+                  style={styles.stackedAvatarPrimary}
                 />
               ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarInitial}>
-                    {title.slice(0, 1).toUpperCase()}
-                  </Text>
-                </View>
+                <UserAvatar
+                  displayName={title}
+                  photoUrl={null}
+                  style={styles.stackedAvatarPrimary}
+                />
               )}
-              <View style={styles.stackedAvatarFallback}>
-                <Text style={styles.stackedAvatarInitial}>
-                  {conversation.lastMessage?.senderDisplayName
-                    ?.slice(0, 1)
-                    .toUpperCase() ?? conversation.memberCount}
-                </Text>
-              </View>
+              <UserAvatar
+                displayName={conversation.lastMessage?.senderDisplayName}
+                photoUrl={avatarUrls[1] ?? null}
+                style={styles.stackedAvatarSecondary}
+              />
             </View>
-          ) : participant?.photoUrl ? (
-            <Image
-              source={{ uri: participant.photoUrl }}
+          ) : (
+            <UserAvatar
+              displayName={title}
+              photoUrl={avatarUrls[0] ?? null}
               style={styles.avatar}
             />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitial}>
-                {conversation.kind === 'activity'
-                  ? '◷'
-                  : title.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
           )}
           <View style={[styles.rowCopy, activity && styles.activityRowCopy]}>
             <View style={styles.rowHeading}>
@@ -618,17 +606,13 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 27,
       backgroundColor: colors.skeleton,
     },
-    avatarFallback: {
-      width: 54,
-      height: 54,
-      borderRadius: 27,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary,
-    },
-    avatarInitial: { color: colors.onPrimary, fontSize: 21, fontWeight: '700' },
     avatarStack: { width: 49, height: 57 },
-    stackedAvatarFallback: {
+    stackedAvatarPrimary: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+    },
+    stackedAvatarSecondary: {
       position: 'absolute',
       right: 0,
       bottom: 0,
@@ -637,14 +621,7 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 2,
       borderColor: colors.canvas,
       borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary,
-    },
-    stackedAvatarInitial: {
-      color: colors.onPrimary,
-      fontSize: 10,
-      fontWeight: '700',
+      backgroundColor: colors.surfaceRaised,
     },
     rowCopy: { flex: 1, height: 64, marginLeft: 13, justifyContent: 'center' },
     activityRowCopy: { height: 86 },

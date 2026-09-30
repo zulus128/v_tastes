@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activitySubtitle,
   compareConversations,
+  conversationAvatarUrls,
   reservationCountdown,
 } from '../src/features/messaging/presentation';
 
@@ -95,5 +96,31 @@ describe('messaging presentation', () => {
         new Date('2026-09-15T10:00:00.000Z').getTime(),
       ),
     ).toBe('in 2h');
+  });
+
+  it('uses profile photos for personal chats and participant photos for groups', () => {
+    const direct = conversation('direct', {
+      otherParticipant: {
+        userId: 'friend',
+        displayName: 'Friend',
+        username: null,
+        photoUrl: 'https://example.com/friend.jpg',
+      },
+    });
+    expect(conversationAvatarUrls(direct)).toEqual([
+      'https://example.com/friend.jpg',
+    ]);
+
+    const group = conversation('group', {
+      kind: 'group',
+      participantPhotoUrls: [
+        'https://example.com/a.jpg',
+        'https://example.com/b.jpg',
+      ],
+    });
+    expect(conversationAvatarUrls(group)).toEqual([
+      'https://example.com/a.jpg',
+      'https://example.com/b.jpg',
+    ]);
   });
 });

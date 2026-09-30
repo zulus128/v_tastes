@@ -904,6 +904,7 @@ export interface ConversationSummary {
   activityId: string | null;
   title: string | null;
   imageUrl: string | null;
+  participantPhotoUrls?: string[];
   organizerId: string | null;
   invitationStatus: 'pending' | 'accepted' | 'declined' | null;
   activityStartsAt: string | null;

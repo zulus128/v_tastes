@@ -457,6 +457,11 @@ function PlaceSelector({
   const [priceFilter, setPriceFilter] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
   const [trendingFilter, setTrendingFilter] = useState(false);
+  const { height: viewportHeight } = useWindowDimensions();
+  const sheetHeight = Math.min(
+    viewportHeight - responsiveSize(52),
+    responsiveSize(640),
+  );
   const venues = useDiscoverVenues(userId);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(
@@ -499,7 +504,10 @@ function PlaceSelector({
         <Animated.View
           style={[
             styles.sheet,
-            { transform: [{ translateY: sheet.translateY }] },
+            {
+              height: sheetHeight,
+              transform: [{ translateY: sheet.translateY }],
+            },
           ]}
         >
           <View style={styles.sheetDragArea} {...sheet.panHandlers}>

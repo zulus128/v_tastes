@@ -246,9 +246,11 @@ export const listConversations = onCall(callableOptions, async (request) => {
   });
   const profileIds = [
     ...new Set(
-      rows
-        .filter((row) => row.kind !== 'group' && Boolean(row.otherUserId))
-        .map((row) => row.otherUserId as string),
+      rows.flatMap((row) =>
+        row.participantIds
+          .filter((participantId) => participantId !== uid)
+          .slice(0, 2),
+      ),
     ),
   ];
   const profileSnapshots =
@@ -339,6 +341,14 @@ export const listConversations = onCall(callableOptions, async (request) => {
           (kind === 'activity' || kind === 'group') && document.get('imageUrl')
             ? String(document.get('imageUrl'))
             : null,
+        participantPhotoUrls: participantIds
+          .filter((participantId) => participantId !== uid)
+          .slice(0, 2)
+          .map((participantId) => profiles.get(participantId)?.get('photoUrl'))
+          .filter(
+            (photoUrl): photoUrl is string =>
+              typeof photoUrl === 'string' && photoUrl.length > 0,
+          ),
         organizerId:
           kind === 'activity'
             ? String(document.get('organizerId') ?? '')

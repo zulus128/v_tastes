@@ -65,3 +65,30 @@ export function reservationCountdown(
   if (hours < 24) return `in ${hours}h`;
   return `in ${Math.ceil(hours / 24)}d`;
 }
+
+export function conversationAvatarUrls(
+  conversation: ConversationSummary,
+): string[] {
+  const participantPhoto = conversation.otherParticipant?.photoUrl ?? null;
+  const lastMessagePhoto =
+    conversation.kind !== 'direct' ||
+    conversation.lastMessage?.senderId === conversation.otherParticipant?.userId
+      ? (conversation.lastMessage?.senderPhotoUrl ?? null)
+      : null;
+  const candidates =
+    conversation.kind === 'direct'
+      ? [
+          participantPhoto,
+          ...(conversation.participantPhotoUrls ?? []),
+          lastMessagePhoto,
+        ]
+      : [
+          conversation.imageUrl,
+          ...(conversation.participantPhotoUrls ?? []),
+          lastMessagePhoto,
+        ];
+  return candidates.filter(
+    (url, index): url is string =>
+      Boolean(url) && candidates.indexOf(url) === index,
+  );
+}
