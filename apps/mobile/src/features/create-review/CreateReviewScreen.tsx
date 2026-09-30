@@ -42,6 +42,11 @@ import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
 import CameraIcon from '../../../assets/create-review/camera.svg';
 import DeleteDishIcon from '../../../assets/create-review/delete-dish.svg';
+import placeFilterBarIcon from '../../../assets/create-review/place-filter-bar.png';
+import placeFilterCafeIcon from '../../../assets/create-review/place-filter-cafe.png';
+import placeFilterMyListIcon from '../../../assets/create-review/place-filter-my-list.png';
+import placeFilterRestaurantIcon from '../../../assets/create-review/place-filter-restaurant.png';
+import placeFilterTrendingIcon from '../../../assets/create-review/place-filter-trending.png';
 import RatingPin from '../../../assets/create-review/rating-pin.svg';
 import RatingScale from '../../../assets/create-review/rating-scale.svg';
 import RatingScaleLight from '../../../assets/create-review/rating-scale-light.svg';
@@ -114,6 +119,21 @@ const tagOptions: Array<{ emoji: string; label: string; value: ReviewTag }> = [
 const selectableReviewTags = new Set<ReviewTag>(
   tagOptions.map((tag) => tag.value),
 );
+const placeFilterOptions = [
+  {
+    icon: placeFilterTrendingIcon,
+    label: 'Trending',
+    value: 'trending',
+  },
+  {
+    icon: placeFilterRestaurantIcon,
+    label: 'Restaurant',
+    value: 'restaurant',
+  },
+  { icon: placeFilterCafeIcon, label: 'Cafe', value: 'cafe' },
+  { icon: placeFilterBarIcon, label: 'Bar', value: 'bar' },
+  { icon: placeFilterMyListIcon, label: 'My list', value: 'my-list' },
+] as const;
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
 interface StoredReviewDraft {
@@ -1912,24 +1932,17 @@ export function PlaceSelector({
             showsHorizontalScrollIndicator={false}
             style={styles.filtersScroll}
           >
-            {(
-              [
-                ['trending', '♨ Trending'],
-                ['restaurant', '⚒ Restaurant'],
-                ['cafe', '☕ Cafe'],
-                ['bar', '▽ Bar'],
-                ['my-list', '♡ My list'],
-              ] as const
-            ).map(([filter, label]) => {
-              const active = activeFilter === filter;
+            {placeFilterOptions.map((filter) => {
+              const active = activeFilter === filter.value;
               return (
                 <Pressable
-                  key={filter}
-                  onPress={() => setActiveFilter(active ? null : filter)}
+                  key={filter.value}
+                  onPress={() => setActiveFilter(active ? null : filter.value)}
                   style={[styles.filter, active && styles.filterActive]}
                 >
+                  <Image source={filter.icon} style={styles.filterIcon} />
                   <Text maxFontSizeMultiplier={1.3} style={styles.filterText}>
-                    {label}
+                    {filter.label}
                   </Text>
                 </Pressable>
               );
@@ -2713,6 +2726,8 @@ const createSelectorStyles = (colors: ThemeColors) =>
     filter: {
       height: 34,
       paddingHorizontal: 10,
+      flexDirection: 'row',
+      gap: 3,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 17,
@@ -2720,6 +2735,7 @@ const createSelectorStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       backgroundColor: colors.background,
     },
+    filterIcon: { width: 14, height: 14, tintColor: colors.text },
     filterActive: {
       borderColor: colors.primary,
       backgroundColor: colors.surfaceRaised,
