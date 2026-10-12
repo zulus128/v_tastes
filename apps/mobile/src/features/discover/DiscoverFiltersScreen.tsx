@@ -17,7 +17,6 @@ const CUISINES = [
   'Mexican 🇲🇽',
   'Chinese 🇨🇳',
 ] as const;
-const DIETARY_PREFERENCES = ['Vegetarian 🥦'] as const;
 const BUDGETS = ['$ 🍞', '$$ 🍝', '$$$ 🥂'] as const;
 const DISTANCES = ['1 km', '3 km', '5 km', 'Any'] as const;
 
@@ -82,7 +81,9 @@ export function DiscoverFiltersScreen({
     () =>
       new Set(
         initialValues.filter(
-          (value) => !/^(OpenNow|Distance|Coffee):/.test(value),
+          (value) =>
+            value !== 'Vegetarian 🥦' &&
+            !/^(OpenNow|Distance|Coffee):/.test(value),
         ),
       ),
   );
@@ -181,13 +182,6 @@ export function DiscoverFiltersScreen({
             </Pressable>
           </View>
         </View>
-        <ChipSection
-          choices={DIETARY_PREFERENCES}
-          selected={selected}
-          styles={styles}
-          title="Dietary preferences"
-          toggle={toggle}
-        />
         <ChipSection
           choices={BUDGETS}
           selected={selected}
