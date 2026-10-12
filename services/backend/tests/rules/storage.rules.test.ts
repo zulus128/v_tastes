@@ -31,53 +31,79 @@ afterAll(async () => {
 
 describe('Storage security rules', () => {
   it('allows an owner to upload a compact avatar and authenticated users to read it', async () => {
-    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
-    const readerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
+    const readerStorage = testEnvironment
+      .authenticatedContext('user-b')
+      .storage();
     const path = 'profile-images/user-a/avatar.jpg';
 
     await assertSucceeds(
-      ownerStorage.ref(path).put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+      ownerStorage
+        .ref(path)
+        .put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
     );
     await assertSucceeds(readerStorage.ref(path).getDownloadURL());
   });
 
   it('rejects oversized avatars and uploads to another user profile', async () => {
-    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
-    const attackerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
+    const attackerStorage = testEnvironment
+      .authenticatedContext('user-b')
+      .storage();
     const path = 'profile-images/user-a/avatar.jpg';
 
     await assertFails(
-      ownerStorage.ref(path).put(new Uint8Array(750 * 1024), { contentType: 'image/jpeg' }),
+      ownerStorage
+        .ref(path)
+        .put(new Uint8Array(750 * 1024), { contentType: 'image/jpeg' }),
     );
     await assertFails(
-      attackerStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+      attackerStorage
+        .ref(path)
+        .put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
     );
   });
 
   it('allows an owner to upload and authenticated users to read a dish image', async () => {
-    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
-    const readerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
+    const readerStorage = testEnvironment
+      .authenticatedContext('user-b')
+      .storage();
     const path = 'review-images/user-a/review-command/dish-one';
 
     await assertSucceeds(
-      ownerStorage.ref(path).put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+      ownerStorage
+        .ref(path)
+        .put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
     );
     await assertSucceeds(readerStorage.ref(path).getDownloadURL());
   });
 
   it('denies uploads to another user folder and anonymous reads', async () => {
-    const attackerStorage = testEnvironment.authenticatedContext('user-b').storage();
+    const attackerStorage = testEnvironment
+      .authenticatedContext('user-b')
+      .storage();
     const anonymousStorage = testEnvironment.unauthenticatedContext().storage();
     const path = 'review-images/user-a/review-command/dish-one';
 
     await assertFails(
-      attackerStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+      attackerStorage
+        .ref(path)
+        .put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
     );
     await assertFails(anonymousStorage.ref(path).getDownloadURL());
   });
 
   it('denies non-image uploads', async () => {
-    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
 
     await assertFails(
       ownerStorage
@@ -87,7 +113,9 @@ describe('Storage security rules', () => {
   });
 
   it('denies review images at or above the 1.5 MB limit', async () => {
-    const ownerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
     await assertFails(
       ownerStorage
         .ref('review-images/user-a/review-command/oversized-image')
@@ -96,27 +124,57 @@ describe('Storage security rules', () => {
   });
 
   it('allows admins to manage venue images', async () => {
-    const adminStorage = testEnvironment.authenticatedContext('admin-a', { role: 'admin' }).storage();
-    const readerStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const adminStorage = testEnvironment
+      .authenticatedContext('admin-a', { role: 'admin' })
+      .storage();
+    const readerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
     const path = 'venue-images/venue-a/hero.jpg';
 
     await assertSucceeds(
-      adminStorage.ref(path).put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+      adminStorage
+        .ref(path)
+        .put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
     );
     await assertSucceeds(readerStorage.ref(path).getDownloadURL());
     await assertSucceeds(adminStorage.ref(path).delete());
   });
 
   it('rejects venue image writes from moderators and regular users', async () => {
-    const moderatorStorage = testEnvironment.authenticatedContext('moderator-a', { role: 'moderator' }).storage();
-    const userStorage = testEnvironment.authenticatedContext('user-a').storage();
+    const moderatorStorage = testEnvironment
+      .authenticatedContext('moderator-a', { role: 'moderator' })
+      .storage();
+    const userStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
     const path = 'venue-images/venue-a/hero.jpg';
 
     await assertFails(
-      moderatorStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+      moderatorStorage
+        .ref(path)
+        .put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
     );
     await assertFails(
-      userStorage.ref(path).put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+      userStorage
+        .ref(path)
+        .put(new Uint8Array([1]), { contentType: 'image/jpeg' }),
+    );
+  });
+
+  it('rejects venue images at or above the optimized 3 MB ceiling', async () => {
+    const adminStorage = testEnvironment
+      .authenticatedContext('admin-a', {
+        role: 'admin',
+      })
+      .storage();
+
+    await assertFails(
+      adminStorage
+        .ref('venue-images/venue-a/oversized.jpg')
+        .put(new Uint8Array(3 * 1024 * 1024), {
+          contentType: 'image/jpeg',
+        }),
     );
   });
 });

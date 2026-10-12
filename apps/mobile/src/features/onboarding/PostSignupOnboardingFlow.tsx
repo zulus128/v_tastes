@@ -8,8 +8,8 @@ import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
   Alert,
   Animated,
@@ -78,7 +78,7 @@ import readyCardLightRight from '../../../assets/onboarding/ready-card-light-rig
 import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
 import readyPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
-import { auth, storage } from '../../infrastructure/firebase';
+import { auth } from '../../infrastructure/firebase';
 import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
@@ -837,17 +837,29 @@ export function PostSignupOnboardingFlow({
     setBusy(true);
     try {
       let photoPath: string | undefined;
+      let photoThumbnailPath: string | undefined;
       if (!visualAudit && photoUri && auth.currentUser) {
         photoPath = `profile-images/${auth.currentUser.uid}/avatar.jpg`;
-        const response = await fetch(photoUri);
-        const blob = await response.blob();
-        await uploadBytes(storageRef(storage, photoPath), blob, {
-          contentType: blob.type || 'image/jpeg',
-        });
+        photoThumbnailPath = `profile-images/${auth.currentUser.uid}/avatar-thumbnail.jpg`;
+        await Promise.all([
+          uploadJpegImageVariant({
+            actions: [{ resize: { width: 512, height: 512 } }],
+            compress: 0.76,
+            path: photoPath,
+            uri: photoUri,
+          }),
+          uploadJpegImageVariant({
+            actions: [{ resize: { width: 320, height: 320 } }],
+            compress: 0.68,
+            path: photoThumbnailPath,
+            uri: photoUri,
+          }),
+        ]);
       }
       await api.createUserProfile({
         ...validation.data,
         ...(photoPath ? { photoPath } : {}),
+        ...(photoThumbnailPath ? { photoThumbnailPath } : {}),
       });
       navigate('dish');
     } catch (error) {

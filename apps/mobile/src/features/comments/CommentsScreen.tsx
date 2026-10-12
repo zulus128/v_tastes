@@ -302,9 +302,9 @@ function MainReview({
                         ? seededDishPhotos[index % seededDishPhotos.length]
                         : undefined
                     }
-                    path={dish.photoPath}
+                    path={dish.thumbnailPath ?? dish.photoPath}
                     styles={styles}
-                    url={dish.photoUrl}
+                    url={dish.thumbnailUrl ?? dish.photoUrl}
                   />
                   <View style={styles.dishShade} />
                   <Text numberOfLines={1} style={styles.dishTitle}>

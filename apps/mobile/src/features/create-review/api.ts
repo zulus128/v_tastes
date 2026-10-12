@@ -1,8 +1,6 @@
 import type { ReviewTag } from '@tastes/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { ref as storageRef, uploadBytes } from 'firebase/storage';
-import { storage } from '../../infrastructure/firebase';
+import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { useTastesApi } from '../../session/SessionProvider';
 
 export interface DishReviewDraft {
@@ -27,22 +25,28 @@ async function uploadDishPhoto(
   dish: DishReviewDraft,
 ) {
   const photoPath = `review-images/${userId}/${idempotencyKey}/${dish.id}`;
+  const thumbnailPath = `${photoPath}-thumbnail`;
   // Drafts can survive app restarts and may predate the picker-side resize.
   // Recompress at the upload boundary so every Storage object obeys the same
   // 1080px / JPEG quality budget, including restored drafts.
-  const optimized = await manipulateAsync(
-    dish.photoUri,
-    [{ resize: { height: 1080, width: 1080 } }],
-    { compress: 0.75, format: SaveFormat.JPEG },
-  );
-  const response = await fetch(optimized.uri);
-  const blob = await response.blob();
-  await uploadBytes(storageRef(storage, photoPath), blob, {
-    contentType: blob.type || 'image/jpeg',
-  });
+  await Promise.all([
+    uploadJpegImageVariant({
+      actions: [{ resize: { height: 1080, width: 1080 } }],
+      compress: 0.75,
+      path: photoPath,
+      uri: dish.photoUri,
+    }),
+    uploadJpegImageVariant({
+      actions: [{ resize: { height: 360, width: 360 } }],
+      compress: 0.68,
+      path: thumbnailPath,
+      uri: dish.photoUri,
+    }),
+  ]);
   return {
     id: dish.id,
     photoPath,
+    thumbnailPath,
     rating: dish.rating,
     title: dish.title.trim(),
   };
@@ -53,9 +57,11 @@ export function useCreateReview(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (draft: CreateReviewDraft) => {
-      const dishReviews = await Promise.all(draft.dishReviews.map((dish) => (
-        uploadDishPhoto(userId, draft.idempotencyKey, dish)
-      )));
+      const dishReviews = await Promise.all(
+        draft.dishReviews.map((dish) =>
+          uploadDishPhoto(userId, draft.idempotencyKey, dish),
+        ),
+      );
       const response = await api.createReview({
         dishReviews,
         idempotencyKey: draft.idempotencyKey,

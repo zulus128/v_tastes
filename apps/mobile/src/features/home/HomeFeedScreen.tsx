@@ -315,8 +315,8 @@ function FeedCard({
                 style={styles.dish}
               >
                 <DishPhoto
-                  photoPath={dish.photoPath}
-                  photoUrl={dish.photoUrl}
+                  photoPath={dish.thumbnailPath ?? dish.photoPath}
+                  photoUrl={dish.thumbnailUrl ?? dish.photoUrl}
                 />
                 <LinearGradient
                   colors={['#161616', 'rgba(22,22,22,0)']}

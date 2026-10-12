@@ -34,6 +34,8 @@ describe('public API contracts', () => {
             rating: 4.5,
             photoPath:
               'review-images/user-1/review-command-0001/dish-command-0001',
+            thumbnailPath:
+              'review-images/user-1/review-command-0001/dish-command-0001-thumbnail',
           },
         ],
       }),
@@ -50,6 +52,8 @@ describe('public API contracts', () => {
           rating: 4.5,
           photoPath:
             'review-images/user-1/review-command-0001/dish-command-0001',
+          thumbnailPath:
+            'review-images/user-1/review-command-0001/dish-command-0001-thumbnail',
         },
       ],
     });
@@ -133,6 +137,13 @@ describe('public API contracts', () => {
       createUserProfileInputSchema.parse({ displayName: '  Demo User  ' })
         .displayName,
     ).toBe('Demo User');
+    expect(
+      createUserProfileInputSchema.parse({
+        displayName: 'Demo User',
+        photoPath: 'profile-images/user-1/avatar.jpg',
+        photoThumbnailPath: 'profile-images/user-1/avatar-thumbnail.jpg',
+      }).photoThumbnailPath,
+    ).toBe('profile-images/user-1/avatar-thumbnail.jpg');
     expect(
       reactToReviewInputSchema.parse({
         idempotencyKey: 'reaction-command-001',

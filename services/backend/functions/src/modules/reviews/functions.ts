@@ -647,6 +647,8 @@ type StoredDishReview = {
   id?: unknown;
   photoPath?: unknown;
   photoUrl?: unknown;
+  thumbnailPath?: unknown;
+  thumbnailUrl?: unknown;
   rating?: unknown;
   title?: unknown;
 };
@@ -667,29 +669,48 @@ async function attachDishPhotoUrls(
     : [];
   if (
     dishes.length === 0 ||
-    dishes.every((dish) => typeof dish.photoUrl === 'string')
+    dishes.every(
+      (dish) =>
+        typeof dish.photoUrl === 'string' &&
+        (typeof dish.thumbnailPath !== 'string' ||
+          typeof dish.thumbnailUrl === 'string'),
+    )
   )
     return;
   const bucket = getStorage().bucket();
   const enriched = await Promise.all(
     dishes.map(async (dish) => {
-      if (
-        typeof dish.photoUrl === 'string' ||
-        typeof dish.photoPath !== 'string'
-      )
-        return dish;
-      try {
-        return {
-          ...dish,
-          photoUrl: await getDownloadURL(bucket.file(dish.photoPath)),
-        };
-      } catch (error) {
-        console.warn(
-          `Unable to resolve the review photo ${dish.photoPath}.`,
-          error,
-        );
-        return dish;
-      }
+      const photoPath =
+        typeof dish.photoPath === 'string' ? dish.photoPath : undefined;
+      const thumbnailPath =
+        typeof dish.thumbnailPath === 'string' ? dish.thumbnailPath : undefined;
+      const [photoUrl, thumbnailUrl] = await Promise.all([
+        typeof dish.photoUrl === 'string' || !photoPath
+          ? Promise.resolve(undefined)
+          : getDownloadURL(bucket.file(photoPath)).catch((error) => {
+              console.warn(
+                `Unable to resolve the review photo ${photoPath}.`,
+                error,
+              );
+              return undefined;
+            }),
+        typeof dish.thumbnailUrl === 'string' || !thumbnailPath
+          ? Promise.resolve(undefined)
+          : getDownloadURL(bucket.file(thumbnailPath)).catch((error) => {
+              console.warn(
+                `Unable to resolve the review thumbnail ${thumbnailPath}.`,
+                error,
+              );
+              return undefined;
+            }),
+      ]);
+      return photoUrl || thumbnailUrl
+        ? {
+            ...dish,
+            ...(photoUrl ? { photoUrl } : {}),
+            ...(thumbnailUrl ? { thumbnailUrl } : {}),
+          }
+        : dish;
     }),
   );
   if (enriched.some((dish, index) => dish !== dishes[index])) {
@@ -697,6 +718,14 @@ async function attachDishPhotoUrls(
       enriched.flatMap((dish) =>
         typeof dish.photoPath === 'string' && typeof dish.photoUrl === 'string'
           ? [[dish.photoPath, dish.photoUrl]]
+          : [],
+      ),
+    );
+    const resolvedThumbnailUrlByPath = new Map(
+      enriched.flatMap((dish) =>
+        typeof dish.thumbnailPath === 'string' &&
+        typeof dish.thumbnailUrl === 'string'
+          ? [[dish.thumbnailPath, dish.thumbnailUrl]]
           : [],
       ),
     );
@@ -713,9 +742,24 @@ async function attachDishPhotoUrls(
           typeof dish.photoPath === 'string'
             ? resolvedUrlByPath.get(dish.photoPath)
             : undefined;
-        return photoUrl && typeof dish.photoUrl !== 'string'
-          ? { ...dish, photoUrl }
-          : dish;
+        const thumbnailUrl =
+          typeof dish.thumbnailPath === 'string'
+            ? resolvedThumbnailUrlByPath.get(dish.thumbnailPath)
+            : undefined;
+        if (
+          (!photoUrl || typeof dish.photoUrl === 'string') &&
+          (!thumbnailUrl || typeof dish.thumbnailUrl === 'string')
+        )
+          return dish;
+        return {
+          ...dish,
+          ...(photoUrl && typeof dish.photoUrl !== 'string'
+            ? { photoUrl }
+            : {}),
+          ...(thumbnailUrl && typeof dish.thumbnailUrl !== 'string'
+            ? { thumbnailUrl }
+            : {}),
+        };
       });
       if (merged.some((dish, index) => dish !== currentDishes[index])) {
         transaction.update(review.ref, {
@@ -864,7 +908,10 @@ export const createReview = onCall(callableOptions, async (request) => {
   const expectedPhotoPrefix = `review-images/${uid}/${input.idempotencyKey}/`;
   if (
     input.dishReviews.some(
-      (dish) => !dish.photoPath.startsWith(expectedPhotoPrefix),
+      (dish) =>
+        !dish.photoPath.startsWith(expectedPhotoPrefix) ||
+        (dish.thumbnailPath != null &&
+          !dish.thumbnailPath.startsWith(expectedPhotoPrefix)),
     )
   ) {
     throw new HttpsError(
@@ -940,7 +987,10 @@ export const editReview = onCall(callableOptions, async (request) => {
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   if (
     input.dishReviews.some(
-      (dish) => !dish.photoPath.startsWith(`review-images/${uid}/`),
+      (dish) =>
+        !dish.photoPath.startsWith(`review-images/${uid}/`) ||
+        (dish.thumbnailPath != null &&
+          !dish.thumbnailPath.startsWith(`review-images/${uid}/`)),
     )
   ) {
     throw new HttpsError(
@@ -980,10 +1030,21 @@ export const editReview = onCall(callableOptions, async (request) => {
           : [],
       ),
     );
+    const thumbnailUrlByPath = new Map(
+      previousDishes.flatMap((dish) =>
+        typeof dish.thumbnailPath === 'string' &&
+        typeof dish.thumbnailUrl === 'string'
+          ? [[dish.thumbnailPath, dish.thumbnailUrl]]
+          : [],
+      ),
+    );
     const dishReviews = input.dishReviews.map((dish) => ({
       ...dish,
       ...(photoUrlByPath.get(dish.photoPath)
         ? { photoUrl: photoUrlByPath.get(dish.photoPath) }
+        : {}),
+      ...(dish.thumbnailPath && thumbnailUrlByPath.get(dish.thumbnailPath)
+        ? { thumbnailUrl: thumbnailUrlByPath.get(dish.thumbnailPath) }
         : {}),
     }));
     transaction.update(reviewRef, {

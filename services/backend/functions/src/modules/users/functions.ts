@@ -30,6 +30,41 @@ const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
 // Raise this alongside an iOS release when older builds need to be nudged to update.
 const MINIMUM_SUPPORTED_IOS_BUILD = 43;
 
+async function validatedProfileImageUrl(path: string, uid: string) {
+  if (!path.startsWith(`profile-images/${uid}/`)) {
+    throw new HttpsError(
+      'permission-denied',
+      'The profile image path is not owned by this user.',
+    );
+  }
+  const file = getStorage().bucket().file(path);
+  let metadata;
+  try {
+    [metadata] = await file.getMetadata();
+  } catch (error) {
+    if ((error as { code?: number }).code === 404) {
+      throw new HttpsError(
+        'not-found',
+        'The uploaded profile photo was not found.',
+      );
+    }
+    throw error;
+  }
+  const size = Number(metadata.size ?? 0);
+  if (
+    !metadata.contentType?.startsWith('image/') ||
+    !Number.isFinite(size) ||
+    size <= 0 ||
+    size >= MAX_PROFILE_PHOTO_BYTES
+  ) {
+    throw new HttpsError(
+      'failed-precondition',
+      'The uploaded profile photo must be an image smaller than 750 KB.',
+    );
+  }
+  return getDownloadURL(file);
+}
+
 export const checkUsernameAvailability = onCall(
   callableOptions,
   async (request) => {
@@ -253,15 +288,14 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   const input = parseInput(createUserProfileInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
   const authUser = await getAuth().getUser(uid);
-  if (
-    input.photoPath &&
-    !input.photoPath.startsWith(`profile-images/${uid}/`)
-  ) {
-    throw new HttpsError(
-      'permission-denied',
-      'The profile image path is not owned by this user.',
-    );
-  }
+  const [originalPhotoUrl, thumbnailPhotoUrl] = await Promise.all([
+    input.photoPath
+      ? validatedProfileImageUrl(input.photoPath, uid)
+      : Promise.resolve(null),
+    input.photoThumbnailPath
+      ? validatedProfileImageUrl(input.photoThumbnailPath, uid)
+      : Promise.resolve(null),
+  ]);
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(userRef);
@@ -340,7 +374,14 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         city: input.city ?? existing.get('city') ?? null,
         bio: input.bio ?? '',
         photoPath: input.photoPath ?? existing.get('photoPath') ?? null,
-        photoUrl: existing.exists ? (existing.get('photoUrl') ?? null) : null,
+        photoThumbnailPath:
+          input.photoThumbnailPath ??
+          existing.get('photoThumbnailPath') ??
+          null,
+        photoUrl:
+          thumbnailPhotoUrl ??
+          originalPhotoUrl ??
+          (existing.exists ? (existing.get('photoUrl') ?? null) : null),
         status: 'active',
         xp: existing.exists ? Number(existing.get('xp') ?? 0) : 0,
         monthlyXp: existing.exists ? Number(existing.get('monthlyXp') ?? 0) : 0,
@@ -430,12 +471,6 @@ async function notifyContactInviters(
 export const updateProfilePhoto = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(updateProfilePhotoInputSchema, request.data);
-  if (!input.photoPath.startsWith(`profile-images/${uid}/`)) {
-    throw new HttpsError(
-      'permission-denied',
-      'The profile image path is not owned by this user.',
-    );
-  }
 
   const userRef = db.collection('users').doc(uid);
   const user = await userRef.get();
@@ -446,39 +481,24 @@ export const updateProfilePhoto = onCall(callableOptions, async (request) => {
     );
   }
 
-  const file = getStorage().bucket().file(input.photoPath);
-  let metadata;
-  try {
-    [metadata] = await file.getMetadata();
-  } catch (error) {
-    if ((error as { code?: number }).code === 404) {
-      throw new HttpsError(
-        'not-found',
-        'The uploaded profile photo was not found.',
-      );
-    }
-    throw error;
-  }
-  const size = Number(metadata.size ?? 0);
-  if (
-    !metadata.contentType?.startsWith('image/') ||
-    !Number.isFinite(size) ||
-    size <= 0 ||
-    size >= MAX_PROFILE_PHOTO_BYTES
-  ) {
-    throw new HttpsError(
-      'failed-precondition',
-      'The uploaded profile photo must be an image smaller than 750 KB.',
-    );
-  }
-
-  const photoUrl = await getDownloadURL(file);
+  const [originalPhotoUrl, thumbnailPhotoUrl] = await Promise.all([
+    validatedProfileImageUrl(input.photoPath, uid),
+    input.photoThumbnailPath
+      ? validatedProfileImageUrl(input.photoThumbnailPath, uid)
+      : Promise.resolve(null),
+  ]);
+  const photoUrl = thumbnailPhotoUrl ?? originalPhotoUrl;
   await userRef.update({
     photoPath: input.photoPath,
+    photoThumbnailPath: input.photoThumbnailPath ?? null,
     photoUrl,
     updatedAt: FieldValue.serverTimestamp(),
   });
-  return { photoPath: input.photoPath, photoUrl };
+  return {
+    photoPath: input.photoPath,
+    photoThumbnailPath: input.photoThumbnailPath ?? null,
+    photoUrl,
+  };
 });
 
 export const updateProfileSettings = onCall(

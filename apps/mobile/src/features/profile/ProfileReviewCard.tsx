@@ -251,8 +251,8 @@ export function ProfileReviewCard({
               >
                 <DishPhoto
                   fallbackUri={fallbackImageUrl}
-                  path={dish.photoPath}
-                  url={dish.photoUrl}
+                  path={dish.thumbnailPath ?? dish.photoPath}
+                  url={dish.thumbnailUrl ?? dish.photoUrl}
                 />
                 <LinearGradient
                   colors={['#161616', 'rgba(22,22,22,0)']}

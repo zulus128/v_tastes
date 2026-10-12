@@ -28,6 +28,7 @@ export type ProfileData = {
   followingCount: number;
   photoUrl: string | null;
   photoPath: string | null;
+  photoThumbnailPath?: string | null;
   reviewCount: number;
   username: string | null;
   xp: number;
@@ -60,6 +61,10 @@ function profileFromDocument(
     followingCount: Number(data?.followingCount ?? 0),
     photoUrl: typeof data?.photoUrl === 'string' ? data.photoUrl : null,
     photoPath: typeof data?.photoPath === 'string' ? data.photoPath : null,
+    photoThumbnailPath:
+      typeof data?.photoThumbnailPath === 'string'
+        ? data.photoThumbnailPath
+        : null,
     reviewCount: Number(data?.reviewCount ?? 0),
     username: typeof data?.username === 'string' ? data.username : null,
     xp: Number(data?.xp ?? 0),

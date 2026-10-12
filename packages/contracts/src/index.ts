@@ -19,6 +19,7 @@ export const userProfileSchema = z.object({
   displayName: z.string().min(2).max(80),
   bio: z.string().max(500).default(''),
   photoPath: z.string().max(512).nullable().default(null),
+  photoThumbnailPath: z.string().max(512).nullable().default(null),
   photoUrl: z.url().nullable().default(null),
   status: z.enum(['active', 'suspended', 'banned', 'deleted']),
 });
@@ -39,6 +40,7 @@ export const createUserProfileInputSchema = z.object({
   city: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).optional(),
   photoPath: z.string().trim().min(1).max(512).optional(),
+  photoThumbnailPath: z.string().trim().min(1).max(512).optional(),
 });
 
 export const checkUsernameAvailabilityInputSchema = z.object({
@@ -52,6 +54,7 @@ export const checkUsernameAvailabilityInputSchema = z.object({
 
 export const updateProfilePhotoInputSchema = z.object({
   photoPath: z.string().trim().min(1).max(512),
+  photoThumbnailPath: z.string().trim().min(1).max(512).optional(),
 });
 
 export const updateProfileSettingsInputSchema = z
@@ -143,6 +146,8 @@ export const reviewSchema = z.object({
         rating: z.number().min(0.5).max(5),
         photoPath: z.string().trim().min(1).max(512),
         photoUrl: z.string().url().optional(),
+        thumbnailPath: z.string().trim().min(1).max(512).optional(),
+        thumbnailUrl: z.string().url().optional(),
       }),
     )
     .max(5)
@@ -192,6 +197,15 @@ export const dishReviewInputSchema = z.object({
     .regex(
       /^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/,
     ),
+  thumbnailPath: z
+    .string()
+    .trim()
+    .min(1)
+    .max(512)
+    .regex(
+      /^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/,
+    )
+    .optional(),
 });
 
 export const createReviewInputSchema = z.object({
@@ -992,6 +1006,7 @@ export interface SaveVenueResult {
 
 export interface ProfilePhotoResult {
   photoPath: string;
+  photoThumbnailPath: string | null;
   photoUrl: string;
 }
 
@@ -1083,7 +1098,7 @@ export interface PlaceReview {
   tag: string | null;
   dishNames: string[];
   tags: ReviewTag[];
-  dishReviews: DishReviewInput[];
+  dishReviews: Review['dishReviews'];
 }
 
 export interface DiscoverPeopleResult {

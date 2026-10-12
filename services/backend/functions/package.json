@@ -13,6 +13,7 @@
     "seed": "node lib/scripts/seed.js",
     "comments:recount-seed": "node lib/scripts/recount-seed-comment-counts.js",
     "search:backfill": "node lib/scripts/backfill-user-search.js",
+    "images:backfill": "node lib/scripts/backfill-image-thumbnails.js",
     "users:migrate-private": "node lib/scripts/migrate-private-users.js",
     "staff:set-role": "node lib/scripts/set-staff-role.js"
   },
@@ -20,6 +21,7 @@
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^6.6.0",
     "google-auth-library": "^10.9.0",
+    "sharp": "^0.35.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {

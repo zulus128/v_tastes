@@ -42,6 +42,7 @@ import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
+import sharp from 'sharp';
 import { userSearchTokens } from '../modules/users/search';
 
 if (getApps().length === 0) {
@@ -99,12 +100,23 @@ async function uploadSeedMediaGroup(
   const entries = await Promise.all(
     Object.entries(assets).map(async ([key, assetPath]) => {
       const extension = extname(assetPath);
-      const file = bucket.file(`seed-media/${group}/${key}${extension}`);
-      const downloadToken = seedDownloadToken(`${group}/${key}${extension}`);
-      await file.save(await readFile(resolve(workspaceRoot, assetPath)), {
+      const outputExtension = group === 'venues' ? '.jpg' : extension;
+      const outputPath = `seed-media/${group}/${key}${outputExtension}`;
+      const file = bucket.file(outputPath);
+      const downloadToken = seedDownloadToken(outputPath);
+      const source = await readFile(resolve(workspaceRoot, assetPath));
+      const bytes =
+        group === 'venues'
+          ? await sharp(source)
+              .rotate()
+              .resize({ width: 1200, withoutEnlargement: true })
+              .jpeg({ quality: 78, mozjpeg: true })
+              .toBuffer()
+          : source;
+      await file.save(bytes, {
         resumable: false,
         metadata: {
-          contentType: extension === '.jpg' ? 'image/jpeg' : 'image/png',
+          contentType: outputExtension === '.jpg' ? 'image/jpeg' : 'image/png',
           cacheControl: 'public,max-age=31536000,immutable',
           metadata: {
             firebaseStorageDownloadTokens: downloadToken,

@@ -10,7 +10,6 @@ import {
 } from '@tastes/contracts';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Updates from 'expo-updates';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -34,11 +33,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
 import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import backIcon from '../../../assets/onboarding/back.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
+import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
@@ -252,33 +252,50 @@ export function ProfileSettingsSheet({
 
     const asset = result.assets[0];
     const cropSize = Math.min(asset.width, asset.height);
-    const photoPath = `profile-images/${userId}/avatar-${Date.now()}.jpg`;
+    const photoId = Date.now();
+    const photoPath = `profile-images/${userId}/avatar-${photoId}.jpg`;
+    const photoThumbnailPath = `profile-images/${userId}/avatar-${photoId}-thumbnail.jpg`;
     setUploadingPhoto(true);
     try {
-      const optimized = await manipulateAsync(
-        asset.uri,
-        [
-          {
-            crop: {
-              originX: Math.max(0, (asset.width - cropSize) / 2),
-              originY: Math.max(0, (asset.height - cropSize) / 2),
-              width: cropSize,
-              height: cropSize,
-            },
-          },
-          { resize: { width: 512, height: 512 } },
-        ],
-        { compress: 0.78, format: SaveFormat.JPEG },
-      );
-      const response = await fetch(optimized.uri);
-      await uploadBytes(storageRef(storage, photoPath), await response.blob(), {
-        contentType: 'image/jpeg',
-      });
-      await api.updateProfilePhoto({ photoPath });
+      const crop = {
+        crop: {
+          originX: Math.max(0, (asset.width - cropSize) / 2),
+          originY: Math.max(0, (asset.height - cropSize) / 2),
+          width: cropSize,
+          height: cropSize,
+        },
+      };
+      await Promise.all([
+        uploadJpegImageVariant({
+          actions: [crop, { resize: { width: 512, height: 512 } }],
+          compress: 0.76,
+          path: photoPath,
+          uri: asset.uri,
+        }),
+        uploadJpegImageVariant({
+          actions: [crop, { resize: { width: 320, height: 320 } }],
+          compress: 0.68,
+          path: photoThumbnailPath,
+          uri: asset.uri,
+        }),
+      ]);
+      await api.updateProfilePhoto({ photoPath, photoThumbnailPath });
       if (profile.photoPath && profile.photoPath !== photoPath) {
         void deleteObject(storageRef(storage, profile.photoPath)).catch(
           (error) =>
             captureException(error, { operation: 'delete-old-profile-photo' }),
+        );
+      }
+      if (
+        profile.photoThumbnailPath &&
+        profile.photoThumbnailPath !== photoThumbnailPath
+      ) {
+        void deleteObject(
+          storageRef(storage, profile.photoThumbnailPath),
+        ).catch((error) =>
+          captureException(error, {
+            operation: 'delete-old-profile-thumbnail',
+          }),
         );
       }
     } catch (error) {
