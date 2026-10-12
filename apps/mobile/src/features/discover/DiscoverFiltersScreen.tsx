@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 const CUISINES = [
@@ -30,7 +31,7 @@ function initialValue(values: string[], prefix: string) {
     ?.slice(prefix.length + 1);
 }
 
-function BackIcon() {
+function BackIcon({ color }: { color: string }) {
   return (
     <Svg
       fill="none"
@@ -40,7 +41,7 @@ function BackIcon() {
     >
       <Path
         d="M16 19 9 12l7-7"
-        stroke="#FFFFFF"
+        stroke={color}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
@@ -74,8 +75,9 @@ export function DiscoverFiltersScreen({
   onApply: (values: string[]) => void;
   onBack: () => void;
 }) {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [selected, setSelected] = useState(
     () =>
       new Set(
@@ -132,7 +134,7 @@ export function DiscoverFiltersScreen({
           onPress={onBack}
           style={styles.backButton}
         >
-          <BackIcon />
+          <BackIcon color={colors.text} />
         </Pressable>
         <Text style={styles.title}>Filter</Text>
         <View style={styles.headerSpacer} />
@@ -294,16 +296,15 @@ function ChipSection({
   );
 }
 
-function createStyles() {
+function createStyles(colors: ThemeColors) {
   const accent = '#E63946';
-  const border = '#45474B';
   return responsiveStyleSheet({
-    screen: { flex: 1, backgroundColor: '#161616' },
+    screen: { flex: 1, backgroundColor: colors.canvas },
     header: {
       paddingHorizontal: 6,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#080808',
+      backgroundColor: colors.background,
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
     },
@@ -316,7 +317,7 @@ function createStyles() {
     headerSpacer: { width: 44 },
     title: {
       flex: 1,
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 17,
       lineHeight: 22,
       fontWeight: '600',
@@ -328,10 +329,10 @@ function createStyles() {
       padding: 16,
       gap: 12,
       borderBottomWidth: 1,
-      borderBottomColor: border,
+      borderBottomColor: colors.border,
     },
     sectionTitle: {
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 16,
       lineHeight: 20,
       fontWeight: '500',
@@ -347,22 +348,22 @@ function createStyles() {
       paddingHorizontal: 10,
       paddingVertical: 8,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.1)',
+      borderColor: colors.hairline,
       borderRadius: 39,
-      backgroundColor: '#161616',
+      backgroundColor: colors.canvas,
     },
     choiceActive: { backgroundColor: accent },
-    choiceText: { color: '#FFFFFF', opacity: 0.5, fontSize: 14 },
-    choiceTextActive: { opacity: 1 },
+    choiceText: { color: colors.textMuted, fontSize: 14 },
+    choiceTextActive: { color: '#FFFFFF' },
     moreChoice: {
       paddingHorizontal: 10,
       paddingVertical: 8,
       borderWidth: 1,
-      borderColor: border,
+      borderColor: colors.border,
       borderRadius: 39,
-      backgroundColor: '#161616',
+      backgroundColor: colors.canvas,
     },
-    moreChoiceText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+    moreChoiceText: { color: colors.text, fontSize: 14, fontWeight: '600' },
     openNowRow: {
       minHeight: 56,
       paddingHorizontal: 16,
@@ -371,21 +372,21 @@ function createStyles() {
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    openNowLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+    openNowLabel: { color: colors.text, fontSize: 16, fontWeight: '600' },
     switchTrack: {
       width: 46,
       height: 28,
       padding: 2,
       justifyContent: 'center',
       borderRadius: 14,
-      backgroundColor: '#5A5B60',
+      backgroundColor: colors.switchTrack,
     },
     switchTrackActive: { backgroundColor: accent },
     switchThumb: {
       width: 24,
       height: 24,
       borderRadius: 12,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.switchThumb,
     },
     switchThumbActive: { alignSelf: 'flex-end' },
     distanceSection: {
@@ -399,21 +400,17 @@ function createStyles() {
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 18,
-      backgroundColor: '#262629',
+      backgroundColor: colors.surfaceRaised,
     },
     distanceChoiceActive: { backgroundColor: accent },
-    distanceText: {
-      color: 'rgba(255,255,255,0.8)',
-      fontSize: 14,
-      fontWeight: '500',
-    },
+    distanceText: { color: colors.textMuted, fontSize: 14, fontWeight: '500' },
     distanceTextActive: { color: '#FFFFFF' },
     footer: {
       paddingHorizontal: 16,
       paddingTop: 16,
       flexDirection: 'row',
       gap: 10,
-      backgroundColor: '#080808',
+      backgroundColor: colors.background,
     },
     clearButton: {
       flex: 1,
@@ -421,12 +418,12 @@ function createStyles() {
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: border,
+      borderColor: colors.border,
       borderRadius: 36,
-      backgroundColor: '#161616',
+      backgroundColor: colors.canvas,
     },
     clearText: {
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 14,
       fontWeight: '500',
       letterSpacing: 0.6,
