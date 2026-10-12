@@ -246,11 +246,14 @@ export const listConversations = onCall(callableOptions, async (request) => {
   });
   const profileIds = [
     ...new Set(
-      rows.flatMap((row) =>
-        row.participantIds
+      rows.flatMap((row) => [
+        ...row.participantIds
           .filter((participantId) => participantId !== uid)
           .slice(0, 2),
-      ),
+        ...(row.document.get('lastMessage')?.senderId
+          ? [String(row.document.get('lastMessage').senderId)]
+          : []),
+      ]),
     ),
   ];
   const profileSnapshots =
@@ -338,9 +341,12 @@ export const listConversations = onCall(callableOptions, async (request) => {
               )
             : null,
         imageUrl:
-          (kind === 'activity' || kind === 'group') && document.get('imageUrl')
-            ? String(document.get('imageUrl'))
-            : null,
+          kind === 'activity' && venue?.get('imageUrl')
+            ? String(venue.get('imageUrl'))
+            : (kind === 'activity' || kind === 'group') &&
+                document.get('imageUrl')
+              ? String(document.get('imageUrl'))
+              : null,
         participantPhotoUrls: participantIds
           .filter((participantId) => participantId !== uid)
           .slice(0, 2)
@@ -373,7 +379,20 @@ export const listConversations = onCall(callableOptions, async (request) => {
             : null,
         memberCount:
           kind === 'activity' ? acceptedCount : participantIds.length,
-        lastMessage: lastMessage(document),
+        lastMessage: (() => {
+          const message = lastMessage(document);
+          if (!message) return null;
+          const currentPhotoUrl = profiles
+            .get(message.senderId)
+            ?.get('photoUrl');
+          return {
+            ...message,
+            senderPhotoUrl:
+              typeof currentPhotoUrl === 'string'
+                ? currentPhotoUrl
+                : message.senderPhotoUrl,
+          };
+        })(),
         unreadCount: unreadCount(document, uid),
         createdAt: timestampToIso(document.get('createdAt')),
         updatedAt: timestampToIso(document.get('updatedAt')),
@@ -445,10 +464,10 @@ export const getMessages = onCall(callableOptions, async (request) => {
           : senderProfile?.get('displayName')
             ? String(senderProfile.get('displayName'))
             : null,
-        senderPhotoUrl: document.get('senderPhotoUrl')
-          ? String(document.get('senderPhotoUrl'))
-          : senderProfile?.get('photoUrl')
-            ? String(senderProfile.get('photoUrl'))
+        senderPhotoUrl: senderProfile?.get('photoUrl')
+          ? String(senderProfile.get('photoUrl'))
+          : document.get('senderPhotoUrl')
+            ? String(document.get('senderPhotoUrl'))
             : null,
         recipientId: String(document.get('recipientId')),
         recipientIds: Array.isArray(document.get('recipientIds'))

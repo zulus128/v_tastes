@@ -218,6 +218,8 @@ function isOfflineError(error: Error) {
 function FeedCard({
   item,
   onComments,
+  onOpenPlace,
+  onOpenProfile,
   onReaction,
   reactionDisabled,
   isReactionActive,
@@ -226,6 +228,8 @@ function FeedCard({
 }: {
   item: FeedItem;
   onComments: () => void;
+  onOpenPlace: () => void;
+  onOpenProfile: () => void;
   onReaction: () => void;
   reactionDisabled: boolean;
   isReactionActive: boolean;
@@ -239,6 +243,7 @@ function FeedCard({
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
     null,
   );
+  const dishSwipeStartX = useRef<number | null>(null);
   const dishReviewSheet = useBottomSheetMotion({
     onClose: () => setSelectedDishIndex(null),
     visible: selectedDishIndex !== null,
@@ -258,19 +263,24 @@ function FeedCard({
         style={styles.card}
       >
         <View style={styles.authorRow}>
-          <UserAvatar
-            displayName={item.authorDisplayName}
-            photoUrl={item.authorPhotoUrl}
-            style={styles.avatar}
-          />
-          <View style={styles.authorCopy}>
+          <Pressable
+            accessibilityLabel={`Open ${item.authorDisplayName} profile`}
+            onPress={onOpenProfile}
+          >
+            <UserAvatar
+              displayName={item.authorDisplayName}
+              photoUrl={item.authorPhotoUrl}
+              style={styles.avatar}
+            />
+          </Pressable>
+          <Pressable onPress={onOpenProfile} style={styles.authorCopy}>
             <Text numberOfLines={1} style={styles.authorName}>
               {item.authorDisplayName}
             </Text>
             <Text numberOfLines={1} style={styles.authorHandle}>
               {username}
             </Text>
-          </View>
+          </Pressable>
           <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
           <Pressable
             accessibilityLabel="Open post menu"
@@ -286,10 +296,10 @@ function FeedCard({
         </View>
 
         <View style={styles.venueSection}>
-          <View style={styles.venueTitleRow}>
+          <Pressable onPress={onOpenPlace} style={styles.venueTitleRow}>
             <Text style={styles.venue}>{item.venueName}</Text>
             <ReviewCityBadge city={item.venueCity} />
-          </View>
+          </Pressable>
           <View style={styles.ratingTagRow}>
             <RatingStars rating={item.rating} styles={styles} />
           </View>
@@ -485,7 +495,29 @@ function FeedCard({
                 showsVerticalScrollIndicator={false}
                 style={overlayStyles.dishReviewScroll}
               >
-                <View style={overlayStyles.dishReviewPhoto}>
+                <View
+                  onTouchEnd={(event) => {
+                    if (
+                      dishSwipeStartX.current == null ||
+                      dishReviews.length < 2
+                    )
+                      return;
+                    const delta =
+                      event.nativeEvent.pageX - dishSwipeStartX.current;
+                    dishSwipeStartX.current = null;
+                    if (Math.abs(delta) < 40) return;
+                    setSelectedDishIndex(
+                      delta < 0
+                        ? (selectedDishIndex + 1) % dishReviews.length
+                        : (selectedDishIndex - 1 + dishReviews.length) %
+                            dishReviews.length,
+                    );
+                  }}
+                  onTouchStart={(event) => {
+                    dishSwipeStartX.current = event.nativeEvent.pageX;
+                  }}
+                  style={overlayStyles.dishReviewPhoto}
+                >
                   <DishPhoto
                     photoPath={dishReviews[selectedDishIndex].photoPath}
                     photoUrl={dishReviews[selectedDishIndex].photoUrl}
@@ -685,12 +717,14 @@ export function HomeFeedScreen({
   onOpenLeaderboard,
   onOpenNotifications,
   onOpenPlace,
+  onOpenProfile,
 }: {
   onExplore: () => void;
   onOpenComments: (reviewId: string) => void;
   onOpenLeaderboard: () => void;
   onOpenNotifications?: () => void;
   onOpenPlace: (venueId: string) => void;
+  onOpenProfile: (userId: string) => void;
 }) {
   const { state } = useSession();
   const userId = useAuthenticatedUserId();
@@ -852,6 +886,8 @@ export function HomeFeedScreen({
       key={item.id}
       item={item}
       onComments={() => onOpenComments(item.id)}
+      onOpenPlace={() => onOpenPlace(item.venueId)}
+      onOpenProfile={() => onOpenProfile(item.authorId)}
       isReactionActive={Boolean(reactionState[item.id] ?? item.reacted)}
       reactionDisabled={Boolean(pendingReactions[item.id])}
       onReaction={() => {

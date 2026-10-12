@@ -1,18 +1,29 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+type MockAuthUser = null | {
+  email: string;
+  getIdTokenResult: () => Promise<{ claims: { role?: string } }>;
+};
 
 const mocks = vi.hoisted(() => ({
   auth: { name: 'admin-auth' },
-  authUser: null as null | {
-    email: string;
-    getIdTokenResult: () => Promise<{ claims: { role?: string } }>;
-  },
+  authUser: null as MockAuthUser,
   callAdmin: vi.fn(),
   signIn: vi.fn(),
+  authStateCallback: null as null | ((user: MockAuthUser) => void),
 }));
 
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: vi.fn((_auth, callback) => {
+    mocks.authStateCallback = callback;
     void callback(mocks.authUser);
     return () => undefined;
   }),
@@ -51,6 +62,7 @@ describe('AdminApp authentication boundary', () => {
     mocks.authUser = null;
     mocks.callAdmin.mockReset();
     mocks.signIn.mockReset();
+    mocks.authStateCallback = null;
   });
 
   afterEach(() => cleanup());
@@ -65,7 +77,9 @@ describe('AdminApp authentication boundary', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'secret-password' },
     });
-    fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Sign in' }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(mocks.signIn).toHaveBeenCalledWith(
@@ -80,9 +94,15 @@ describe('AdminApp authentication boundary', () => {
     mocks.signIn.mockRejectedValue(new Error('Firebase: Invalid credentials.'));
     render(<AdminApp />);
 
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'staff@tastes.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } });
-    fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'staff@tastes.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'wrong' },
+    });
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Sign in' }).closest('form')!,
+    );
 
     expect(await screen.findByText('Invalid credentials.')).toBeDefined();
   });
@@ -96,8 +116,41 @@ describe('AdminApp authentication boundary', () => {
 
     render(<AdminApp />);
 
-    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeDefined();
-    await waitFor(() => expect(mocks.callAdmin).toHaveBeenCalledWith('getAdminOverview', {}));
+    expect(
+      await screen.findByRole('heading', { name: 'Overview' }),
+    ).toBeDefined();
+    await waitFor(() =>
+      expect(mocks.callAdmin).toHaveBeenCalledWith('getAdminOverview', {}),
+    );
     expect(await screen.findByText('12')).toBeDefined();
+  });
+
+  it('keeps the loading screen visible while checking a newly signed-in user', async () => {
+    let resolveToken!: (result: { claims: { role: string } }) => void;
+    const tokenResult = new Promise<{ claims: { role: string } }>((resolve) => {
+      resolveToken = resolve;
+    });
+    const user = {
+      email: 'admin@tastes.com',
+      getIdTokenResult: () => tokenResult,
+    };
+    mocks.callAdmin.mockResolvedValue(overview);
+
+    render(<AdminApp />);
+    expect(
+      await screen.findByRole('button', { name: 'Sign in' }),
+    ).toBeDefined();
+
+    act(() => {
+      mocks.authStateCallback?.(user);
+    });
+
+    expect(screen.queryByText('Access restricted')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+
+    resolveToken({ claims: { role: 'admin' } });
+    expect(
+      await screen.findByRole('heading', { name: 'Overview' }),
+    ).toBeDefined();
   });
 });

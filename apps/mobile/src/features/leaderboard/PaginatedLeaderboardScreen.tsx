@@ -19,7 +19,6 @@ import backIcon from '../../../assets/leaderboard/back.png';
 import emptyFriendsIcon from '../../../assets/leaderboard/empty-friends.png';
 import infoIcon from '../../../assets/leaderboard/info.png';
 import inviteIcon from '../../../assets/leaderboard/xp-invite.png';
-import locationIcon from '../../../assets/leaderboard/xp-location.png';
 import photoIcon from '../../../assets/leaderboard/xp-photo.png';
 import reviewIcon from '../../../assets/leaderboard/xp-review.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
@@ -277,7 +276,6 @@ function HowXpSheet({
   const actions = [
     { icon: reviewIcon, label: 'Write a review', xp: '+50 XP' },
     { icon: photoIcon, label: 'Add dish photos', xp: '+15 XP' },
-    { icon: locationIcon, label: 'Check in at a place', xp: '+20 XP' },
     { icon: reviewIcon, label: 'Get a like on your review', xp: '+5 XP' },
     { icon: inviteIcon, label: 'Invite a friend', xp: '+100 XP' },
   ];

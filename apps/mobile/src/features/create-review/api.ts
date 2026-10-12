@@ -24,6 +24,13 @@ async function uploadDishPhoto(
   idempotencyKey: string,
   dish: DishReviewDraft,
 ) {
+  if (!dish.photoUri) {
+    return {
+      id: dish.id,
+      rating: dish.rating,
+      title: dish.title.trim(),
+    };
+  }
   const photoPath = `review-images/${userId}/${idempotencyKey}/${dish.id}`;
   const thumbnailPath = `${photoPath}-thumbnail`;
   // Drafts can survive app restarts and may predate the picker-side resize.

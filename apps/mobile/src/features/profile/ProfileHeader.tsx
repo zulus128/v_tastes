@@ -140,7 +140,9 @@ export function ProfileHeader({
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <View style={styles.actionLabel}>
-                    <Image source={followIcon} style={styles.followIcon} />
+                    {!following ? (
+                      <Image source={followIcon} style={styles.followIcon} />
+                    ) : null}
                     <Text style={styles.followActionText}>
                       {following ? 'Following' : 'Follow'}
                     </Text>
@@ -186,9 +188,11 @@ export function ProfileHeader({
                   >
                     {highlight.value}
                   </Text>
-                  <Text numberOfLines={1} style={styles.highlightMeta}>
-                    {highlight.meta}
-                  </Text>
+                  {highlight.meta ? (
+                    <Text numberOfLines={1} style={styles.highlightMeta}>
+                      {highlight.meta}
+                    </Text>
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -404,11 +408,11 @@ const createStyles = (colors: ThemeColors) =>
     },
     messageActionText: { fontSize: 15, fontWeight: '600', letterSpacing: 0.6 },
     highlights: {
-      minHeight: 166,
-      marginTop: 14,
+      minHeight: 142,
+      marginTop: 10,
       marginHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 18,
+      paddingTop: 12,
+      paddingBottom: 12,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 18,
@@ -422,30 +426,30 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: 'center',
     },
     highlightTiles: {
-      marginTop: 14,
+      marginTop: 10,
       paddingHorizontal: 10,
       flexDirection: 'row',
       gap: 6,
     },
     highlight: { flex: 1, minWidth: 0, alignItems: 'center' },
     highlightIcon: {
-      width: 42,
-      height: 42,
+      width: 36,
+      height: 36,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 21,
+      borderRadius: 18,
       backgroundColor: colors.surfaceRaised,
     },
-    highlightEmoji: { fontSize: 18, lineHeight: 22 },
+    highlightEmoji: { fontSize: 16, lineHeight: 20 },
     highlightLabel: {
-      marginTop: 6,
+      marginTop: 4,
       color: colors.textSecondary,
       fontSize: 9,
       lineHeight: 12,
       textAlign: 'center',
     },
     highlightValue: {
-      minHeight: 28,
+      minHeight: 24,
       marginTop: 2,
       color: colors.text,
       fontSize: 11,

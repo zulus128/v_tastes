@@ -1144,6 +1144,7 @@ export function PostSignupOnboardingFlow({
                   <Text style={styles.profileFieldLabel}>Name</Text>
                   <TextInput
                     value={displayName}
+                    maxLength={30}
                     onChangeText={setDisplayName}
                     placeholder="What your friends call you"
                     placeholderTextColor={colors.placeholder}
@@ -1156,7 +1157,7 @@ export function PostSignupOnboardingFlow({
                   <TextInput
                     value={username}
                     autoCapitalize="none"
-                    maxLength={40}
+                    maxLength={30}
                     onChangeText={(value) => {
                       setUsername(value);
                       setUsernameTouched(true);
@@ -2420,7 +2421,8 @@ const createStyles = (
       backgroundColor: isDark ? '#1A1A1A' : colors.surface,
     },
     venueSelected: {
-      borderColor: isDark ? '#2A2A2A' : colors.border,
+      borderWidth: 2,
+      borderColor: '#D33B35',
       backgroundColor: isDark ? '#222222' : colors.surfaceRaised,
     },
     venueSelection: {
@@ -2705,8 +2707,8 @@ const createStyles = (
       marginTop: 42,
       paddingTop: 15,
       paddingHorizontal: 15,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderWidth: 2,
+      borderColor: '#D33B35',
       borderRadius: 18,
       backgroundColor: colors.surface,
     },

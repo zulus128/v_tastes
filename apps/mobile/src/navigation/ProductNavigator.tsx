@@ -186,15 +186,30 @@ function MainTabs({
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [placeSelectorVisible, setPlaceSelectorVisible] = useState(false);
+  const [openingConversationFor, setOpeningConversationFor] = useState<
+    string | null
+  >(null);
 
   async function openConversation(targetUserId: string) {
+    if (openingConversationFor) return;
+    setOpeningConversationFor(targetUserId);
     try {
       const result = await api.createConversation({ targetUserId });
       rootNavigation.navigate('Conversation', {
         conversationId: result.data.id,
       });
     } catch (error) {
-      Alert.alert('Could not start conversation', apiErrorMessage(error));
+      const message = apiErrorMessage(error);
+      Alert.alert(
+        /mutual|follow each other/i.test(message)
+          ? 'Message unavailable'
+          : 'Could not start conversation',
+        /mutual|follow each other/i.test(message)
+          ? 'You can message each other after you both follow one another.'
+          : message,
+      );
+    } finally {
+      setOpeningConversationFor(null);
     }
   }
   return (
@@ -218,6 +233,9 @@ function MainTabs({
               }
               onOpenPlace={(venueId) =>
                 rootNavigation.navigate('Place', { venueId })
+              }
+              onOpenProfile={(userId) =>
+                navigation.navigate('Profile', { userId })
               }
             />
           )}

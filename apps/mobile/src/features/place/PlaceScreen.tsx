@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import CheckIcon from '../../../assets/activities/check.svg';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import BookmarkOutlineIcon from '../../../assets/activities/bookmark-body.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
 import CalendarIcon from '../../../assets/place/calendar.svg';
 import MapPinIcon from '../../../assets/discover/map-rating-pin.svg';
@@ -96,6 +97,7 @@ export function PlaceScreen({
   const contentBottom = reviewButtonBottom + responsiveSize(77);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<'overview' | 'reviews'>('overview');
+  const [dishFilter, setDishFilter] = useState<string | null>(null);
   const [sort, setSort] = useState<PlaceReviewSort>('recent');
   const [reviewScope, setReviewScope] = useState<'all' | 'friends'>('all');
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
@@ -216,9 +218,14 @@ export function PlaceScreen({
       >
         {busy ? (
           <ActivityIndicator color="#fff" size="small" />
-        ) : (
+        ) : saved ? (
           <BookmarkIcon
             color="#fff"
+            height={responsiveSize(18)}
+            width={responsiveSize(18)}
+          />
+        ) : (
+          <BookmarkOutlineIcon
             height={responsiveSize(18)}
             width={responsiveSize(18)}
           />
@@ -279,7 +286,10 @@ export function PlaceScreen({
         {(['overview', 'reviews'] as const).map((value) => (
           <Pressable
             key={value}
-            onPress={() => setTab(value)}
+            onPress={() => {
+              setTab(value);
+              if (value === 'overview') setDishFilter(null);
+            }}
             style={[styles.tab, tab === value && styles.tabActive]}
           >
             <Text
@@ -293,20 +303,32 @@ export function PlaceScreen({
       {tab === 'overview' ? (
         <Overview
           details={place}
+          openDishReviews={(dishName) => {
+            setDishFilter(dishName);
+            setReviewScope('all');
+            setTab('reviews');
+          }}
           openPhotos={() => setSheet('photos')}
           styles={styles}
         />
       ) : (
-        <ReviewsHeader
-          error={reviews.isError ? apiErrorMessage(reviews.error) : null}
-          loading={reviews.isPending}
-          openSort={() => setSheet('sort')}
-          retry={() => void reviews.refetch()}
-          scope={reviewScope}
-          setScope={setReviewScope}
-          sort={sort}
-          styles={styles}
-        />
+        <>
+          {dishFilter ? (
+            <Pressable onPress={() => setDishFilter(null)}>
+              <Text style={styles.primaryBadge}>Dish: {dishFilter} ×</Text>
+            </Pressable>
+          ) : null}
+          <ReviewsHeader
+            error={reviews.isError ? apiErrorMessage(reviews.error) : null}
+            loading={reviews.isPending}
+            openSort={() => setSheet('sort')}
+            retry={() => void reviews.refetch()}
+            scope={reviewScope}
+            setScope={setReviewScope}
+            sort={sort}
+            styles={styles}
+          />
+        </>
       )}
     </View>
   );
@@ -320,7 +342,15 @@ export function PlaceScreen({
       ) : (
         <FlatList
           contentContainerStyle={{ paddingBottom: contentBottom }}
-          data={reviews.data ?? []}
+          data={(reviews.data ?? []).filter(
+            (review) =>
+              !dishFilter ||
+              review.dishReviews.some(
+                (dish) =>
+                  dish.title.toLocaleLowerCase() ===
+                  dishFilter.toLocaleLowerCase(),
+              ),
+          )}
           initialNumToRender={8}
           keyExtractor={(review) => review.id}
           maxToRenderPerBatch={8}
@@ -332,7 +362,11 @@ export function PlaceScreen({
           }
           ListEmptyComponent={
             !reviews.isPending && !reviews.isError ? (
-              <Text style={styles.empty}>No reviews yet.</Text>
+              <Text style={styles.empty}>
+                {dishFilter
+                  ? `No reviews for ${dishFilter} yet.`
+                  : 'No reviews yet.'}
+              </Text>
             ) : null
           }
           ListFooterComponent={
@@ -431,10 +465,12 @@ export function PlaceScreen({
 
 function Overview({
   details,
+  openDishReviews,
   openPhotos,
   styles,
 }: {
   details: NonNullable<ReturnType<typeof usePlace>['data']>;
+  openDishReviews: (dishName: string) => void;
   openPhotos: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -607,12 +643,17 @@ function Overview({
         <Text style={styles.sectionTitle}>Top rated dishes</Text>
       </View>
       {details.popularDishes.map((dish, index) => (
-        <View key={dish.name} style={styles.dish}>
+        <Pressable
+          accessibilityLabel={`Show reviews for ${dish.name}`}
+          key={dish.name}
+          onPress={() => openDishReviews(dish.name)}
+          style={styles.dish}
+        >
           <Text style={styles.dishName}>
             {index + 1}. {dish.name}
           </Text>
           <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
-        </View>
+        </Pressable>
       ))}
     </View>
   );
@@ -791,6 +832,7 @@ function ReviewPhoto({
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
   const [uri, setUri] = useState<string | null>(fallbackUri ?? null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -836,7 +878,12 @@ function ReviewPhoto({
   }, [fallbackUri, normalizedPath]);
 
   return (
-    <View style={styles.reviewPhoto}>
+    <Pressable
+      accessibilityLabel={uri ? `Enlarge ${title} photo` : undefined}
+      disabled={!uri}
+      onPress={() => setExpanded(true)}
+      style={styles.reviewPhoto}
+    >
       {uri ? (
         <Image
           onError={() => {
@@ -870,7 +917,13 @@ function ReviewPhoto({
         {title}
       </Text>
       <Text style={styles.reviewPhotoRating}>★ {rating.toFixed(1)}</Text>
-    </View>
+      <FullscreenPhoto
+        close={() => setExpanded(false)}
+        styles={styles}
+        url={uri}
+        visible={expanded}
+      />
+    </Pressable>
   );
 }
 
@@ -1147,6 +1200,7 @@ function Gallery({
   styles: ReturnType<typeof createStyles>;
   visible: boolean;
 }) {
+  const [expandedPhoto, setExpandedPhoto] = useState<string | null>(null);
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={close}>
       <View style={styles.gallery}>
@@ -1162,28 +1216,41 @@ function Gallery({
             <GalleryImage
               key={key + String(index)}
               index={index}
+              onOpen={() => setExpandedPhoto(key)}
               styles={styles}
               url={key}
             />
           ))}
         </ScrollView>
+        <FullscreenPhoto
+          close={() => setExpandedPhoto(null)}
+          styles={styles}
+          url={expandedPhoto}
+          visible={expandedPhoto !== null}
+        />
       </View>
     </Modal>
   );
 }
 function GalleryImage({
   index,
+  onOpen,
   styles,
   url,
 }: {
   index: number;
+  onOpen: () => void;
   styles: ReturnType<typeof createStyles>;
   url: string;
 }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
   return (
-    <View style={styles.gridImage}>
+    <Pressable
+      accessibilityLabel={`Enlarge photo ${index + 1}`}
+      onPress={onOpen}
+      style={styles.gridImage}
+    >
       {state === 'loading' ? (
         <View style={styles.galleryLoading}>
           <ActivityIndicator color={styles.retry.color as string} />
@@ -1209,7 +1276,45 @@ function GalleryImage({
         source={placeImage(url)}
         style={[styles.galleryPhoto, state === 'error' && styles.hiddenPhoto]}
       />
-    </View>
+    </Pressable>
+  );
+}
+
+function FullscreenPhoto({
+  close,
+  styles,
+  url,
+  visible,
+}: {
+  close: () => void;
+  styles: ReturnType<typeof createStyles>;
+  url: string | null;
+  visible: boolean;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={close}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.photoViewer}>
+        <Pressable
+          accessibilityLabel="Close enlarged photo"
+          onPress={close}
+          style={styles.photoViewerClose}
+        >
+          <Text style={styles.photoViewerCloseText}>×</Text>
+        </Pressable>
+        {url ? (
+          <Image
+            resizeMode="contain"
+            source={placeImage(url)}
+            style={styles.photoViewerImage}
+          />
+        ) : null}
+      </View>
+    </Modal>
   );
 }
 function Sort({
@@ -1874,6 +1979,26 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surfaceRaised,
     },
     galleryPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
+    photoViewer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.96)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoViewerImage: { width: '100%', height: '100%' },
+    photoViewerClose: {
+      position: 'absolute',
+      top: 48,
+      right: 18,
+      zIndex: 2,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoViewerCloseText: { color: '#FFFFFF', fontSize: 32, lineHeight: 34 },
     hiddenPhoto: { opacity: 0 },
     galleryLoading: {
       position: 'absolute',

@@ -538,15 +538,22 @@ export function ChatScreen({
   async function send() {
     const value = text.trim();
     if (!value || sending) return;
+    const pendingKey = idempotencyKey;
+    setText('');
     setSending(true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingActive.current = false;
+    updateTypingStatus(false);
+    setIdempotencyKey(createIdempotencyKey('message'));
     try {
-      await api.sendMessage({ conversationId, idempotencyKey, text: value });
-      setText('');
-      if (typingTimer.current) clearTimeout(typingTimer.current);
-      typingActive.current = false;
-      updateTypingStatus(false);
-      setIdempotencyKey(createIdempotencyKey('message'));
+      await api.sendMessage({
+        conversationId,
+        idempotencyKey: pendingKey,
+        text: value,
+      });
     } catch (error) {
+      setText((current) => current || value);
+      setIdempotencyKey(pendingKey);
       Alert.alert('Could not send message', apiErrorMessage(error));
     } finally {
       setSending(false);

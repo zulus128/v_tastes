@@ -14,6 +14,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -312,7 +313,7 @@ export function DiscoverScreen({
     height: headerHeight,
     paddingTop: headerTop,
   };
-  const [tab, setTab] = useState<DiscoverTab>('trending');
+  const [tab, setTab] = useState<DiscoverTab>('places');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
@@ -417,6 +418,8 @@ export function DiscoverScreen({
             onOpenProfile={onOpenProfile}
             onToggleFollow={handleToggleFollow}
             onSeeAll={setSeeAllPlaces}
+            onRefresh={() => void feedQuery.refetch()}
+            refreshing={feedQuery.isRefetching}
             savedVenueIds={savedVenueIds}
           />
         )
@@ -546,6 +549,8 @@ function TrendingFeed({
   onOpenProfile,
   onToggleFollow,
   onSeeAll,
+  onRefresh,
+  refreshing,
   savedVenueIds,
 }: {
   feed: DiscoverFeed;
@@ -557,6 +562,8 @@ function TrendingFeed({
   onOpenProfile: (person: DiscoverPerson) => void;
   onToggleFollow: (person: DiscoverPerson) => void;
   onSeeAll: (venues: Venue[]) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
@@ -632,6 +639,14 @@ function TrendingFeed({
   return (
     <ScrollView
       contentContainerStyle={styles.feedContent}
+      refreshControl={
+        <RefreshControl
+          colors={[colors.primary]}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
+          tintColor={colors.primary}
+        />
+      }
       showsVerticalScrollIndicator={false}
     >
       {hero ? (
@@ -1232,22 +1247,6 @@ function PlacesMap({
     sheetHeight,
   ]);
 
-  function zoom(multiplier: number) {
-    const next = {
-      ...region,
-      latitudeDelta: Math.max(
-        0.008,
-        Math.min(0.5, region.latitudeDelta * multiplier),
-      ),
-      longitudeDelta: Math.max(
-        0.008,
-        Math.min(0.5, region.longitudeDelta * multiplier),
-      ),
-    };
-    setRegion(next);
-    mapRef.current?.animateToRegion(next, 250);
-  }
-
   async function goToCurrentLocation() {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (permission.status !== 'granted') {
@@ -1380,20 +1379,6 @@ function PlacesMap({
           splitLayout && styles.mapControlsLandscape,
         ]}
       >
-        <Pressable
-          accessibilityLabel="Zoom in"
-          onPress={() => zoom(0.55)}
-          style={styles.mapControlButton}
-        >
-          <Text style={styles.mapControlGlyph}>+</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Zoom out"
-          onPress={() => zoom(1.8)}
-          style={styles.mapControlButton}
-        >
-          <Text style={styles.mapControlGlyph}>−</Text>
-        </Pressable>
         <Pressable
           accessibilityLabel="My location"
           accessibilityState={{ selected: locationEnabled }}

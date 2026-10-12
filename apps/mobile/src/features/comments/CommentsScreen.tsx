@@ -743,14 +743,20 @@ export function PaginatedCommentsScreen({
   async function submit() {
     const value = text.trim();
     if (!value || mutation.isPending) return;
-    await mutation.mutateAsync({
+    const command = {
       idempotencyKey,
       parentCommentId: replyTarget?.id ?? null,
       text: value,
-    });
+    };
     setText('');
     setReplyTarget(null);
     setIdempotencyKey(createIdempotencyKey('comment'));
+    try {
+      await mutation.mutateAsync(command);
+    } catch (error) {
+      setText(value);
+      Alert.alert('Could not post comment', apiErrorMessage(error));
+    }
   }
 
   async function submitReport() {

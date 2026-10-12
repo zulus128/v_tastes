@@ -16,7 +16,7 @@ const usernameCharactersError =
 
 export const userProfileSchema = z.object({
   uid: z.string().min(1),
-  displayName: z.string().min(2).max(80),
+  displayName: z.string().min(2).max(30),
   bio: z.string().max(500).default(''),
   photoPath: z.string().max(512).nullable().default(null),
   photoThumbnailPath: z.string().max(512).nullable().default(null),
@@ -29,12 +29,12 @@ export const createUserProfileInputSchema = z.object({
     .string()
     .trim()
     .min(2, 'Your name must be at least 2 characters long.')
-    .max(80, 'Your name must be at most 80 characters long.'),
+    .max(30, 'Your name must be at most 30 characters long.'),
   username: z
     .string()
     .trim()
     .min(2, 'The username must be at least 2 characters long.')
-    .max(40, 'The username must be at most 40 characters long.')
+    .max(30, 'The username must be at most 30 characters long.')
     .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError)
     .optional(),
   city: z.string().trim().min(2).max(120).optional(),
@@ -59,12 +59,12 @@ export const updateProfilePhotoInputSchema = z.object({
 
 export const updateProfileSettingsInputSchema = z
   .object({
-    displayName: z.string().trim().min(2).max(80),
+    displayName: z.string().trim().min(2).max(30),
     username: z
       .string()
       .trim()
       .min(2)
-      .max(40)
+      .max(30)
       .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
     city: z.string().trim().min(2).max(120),
     bio: z.string().trim().max(500),
@@ -144,7 +144,7 @@ export const reviewSchema = z.object({
           .regex(/^[a-zA-Z0-9._:-]+$/),
         title: z.string().trim().min(1).max(120),
         rating: z.number().min(0.5).max(5),
-        photoPath: z.string().trim().min(1).max(512),
+        photoPath: z.string().trim().min(1).max(512).optional(),
         photoUrl: z.string().url().optional(),
         thumbnailPath: z.string().trim().min(1).max(512).optional(),
         thumbnailUrl: z.string().url().optional(),
@@ -196,7 +196,8 @@ export const dishReviewInputSchema = z.object({
     .max(512)
     .regex(
       /^review-images\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/,
-    ),
+    )
+    .optional(),
   thumbnailPath: z
     .string()
     .trim()

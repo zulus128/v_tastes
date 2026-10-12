@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ImageSourcePropType } from 'react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type ImageSourcePropType,
+} from 'react-native';
 import flagFrance from '../../../assets/onboarding/flag-france.png';
 import flagItaly from '../../../assets/onboarding/flag-italy.png';
 import flagMonaco from '../../../assets/onboarding/flag-monaco.png';
@@ -39,22 +48,40 @@ export function cityFlag(name: string): ImageSourcePropType | undefined {
   return cities.find((item) => item[1] === name)?.[0];
 }
 
-export function CityPicker({ onSelect, topPadding = 126 }: { onSelect: (name: string, flag: ImageSourcePropType) => void; topPadding?: number }) {
+export function CityPicker({
+  onSelect,
+  topPadding = 126,
+}: {
+  onSelect: (name: string, flag: ImageSourcePropType) => void;
+  topPadding?: number;
+}) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [search, setSearch] = useState('');
-  const filtered = cities.filter((item) => item[1].toLowerCase().includes(search.trim().toLowerCase()));
+  const filtered = cities.filter((item) =>
+    item[1].toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <View style={[styles.listPage, { paddingTop: responsiveSize(topPadding) }]}>
       <Text style={styles.listTitle}>Select city</Text>
-      <TextInput autoFocus onChangeText={setSearch} placeholder="Search" placeholderTextColor={colors.placeholder} style={styles.search} value={search} />
+      <TextInput
+        autoFocus
+        onChangeText={setSearch}
+        placeholder="Search"
+        placeholderTextColor={colors.placeholder}
+        style={styles.search}
+        value={search}
+      />
       <ScrollView keyboardShouldPersistTaps="handled">
-        {filtered.map(([flag, name, country]) => (
-          <Pressable key={name} onPress={() => onSelect(name, flag)} style={styles.cityRow}>
+        {filtered.map(([flag, name]) => (
+          <Pressable
+            key={name}
+            onPress={() => onSelect(name, flag)}
+            style={styles.cityRow}
+          >
             <Image source={flag} style={styles.cityFlag} />
             <Text style={styles.cityName}>{name}</Text>
-            <Text style={styles.cityCountry}>{country}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -65,9 +92,28 @@ export function CityPicker({ onSelect, topPadding = 126 }: { onSelect: (name: st
 function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     listPage: { flex: 1, paddingHorizontal: 16, paddingBottom: 90 },
-    listTitle: { marginBottom: 14, color: colors.text, fontSize: 23, lineHeight: 28, fontWeight: '700' },
-    search: { height: 44, paddingHorizontal: 14, borderRadius: 10, color: colors.text, fontSize: 14, backgroundColor: colors.surfaceRaised },
-    cityRow: { height: 49, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline, flexDirection: 'row', alignItems: 'center' },
+    listTitle: {
+      marginBottom: 14,
+      color: colors.text,
+      fontSize: 23,
+      lineHeight: 28,
+      fontWeight: '700',
+    },
+    search: {
+      height: 44,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      color: colors.text,
+      fontSize: 14,
+      backgroundColor: colors.surfaceRaised,
+    },
+    cityRow: {
+      height: 49,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.hairline,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     cityFlag: { width: 20, height: 20, marginRight: 14 },
     cityName: { flex: 1, color: colors.text, fontSize: 15 },
     cityCountry: { color: colors.textMuted, fontSize: 13 },

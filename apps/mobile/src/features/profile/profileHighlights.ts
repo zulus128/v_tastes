@@ -103,14 +103,14 @@ export function buildTasteHighlights({
       emoji: dishEmoji(dishValue),
       label: 'Favourite dish',
       value: dishValue,
-      meta: 'From onboarding',
+      meta: '',
     },
     {
       id: 'place',
       emoji: '❤️',
       label: 'Favourite place',
       value: placeValue,
-      meta: 'From onboarding',
+      meta: '',
     },
   ];
 }

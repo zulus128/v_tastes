@@ -3,7 +3,7 @@ import type { FeedItem, Venue } from '@tastes/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -262,6 +263,11 @@ export function ProfileScreen({
     Record<string, boolean>
   >({});
   const [draft, setDraft] = useState<ProfileReviewDraft | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const reviewListRef = useRef<FlatList<FeedItem>>(null);
+  const wishlistScrollRef = useRef<ScrollView>(null);
+  const reviewOffset = useRef(0);
+  const wishlistOffset = useRef(0);
   const editSheet = useBottomSheetMotion({
     onClose: () => setEditingReview(false),
     visible: editingReview,
@@ -372,6 +378,22 @@ export function ProfileScreen({
       [currentUserId, own],
     ),
   );
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (activeTab === 'reviews') {
+        reviewListRef.current?.scrollToOffset({
+          animated: false,
+          offset: reviewOffset.current,
+        });
+      } else {
+        wishlistScrollRef.current?.scrollTo({
+          animated: false,
+          y: wishlistOffset.current,
+        });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab]);
   useEffect(() => {
     const venueIds = [
       ...new Set(profileReviews.reviews.map((review) => review.venueId)),
@@ -767,6 +789,17 @@ export function ProfileScreen({
     retryProfile();
     profileReviews.retry();
   };
+  const refreshProfileScreen = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      retryProfile();
+      await profileReviews.retry();
+      setMapReload((value) => value + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
@@ -841,6 +874,7 @@ export function ProfileScreen({
         </ScrollView>
       ) : activeTab === 'reviews' ? (
         <FlatList
+          ref={reviewListRef}
           automaticallyAdjustKeyboardInsets
           contentContainerStyle={[
             styles.content,
@@ -911,6 +945,12 @@ export function ProfileScreen({
           }
           onEndReached={() => void profileReviews.loadMore()}
           onEndReachedThreshold={0.5}
+          onRefresh={() => void refreshProfileScreen()}
+          onScroll={({ nativeEvent }) => {
+            reviewOffset.current = nativeEvent.contentOffset.y;
+          }}
+          refreshing={refreshing}
+          scrollEventThrottle={32}
           windowSize={7}
           renderItem={({ item: review }) => (
             <View style={styles.reviewItem}>
@@ -942,6 +982,7 @@ export function ProfileScreen({
         />
       ) : (
         <ScrollView
+          ref={wishlistScrollRef}
           automaticallyAdjustKeyboardInsets
           contentContainerStyle={[
             styles.content,
@@ -949,6 +990,17 @@ export function ProfileScreen({
           ]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              onRefresh={() => void refreshProfileScreen()}
+              refreshing={refreshing}
+              tintColor={colors.primary}
+            />
+          }
+          onScroll={({ nativeEvent }) => {
+            wishlistOffset.current = nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
         >

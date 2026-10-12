@@ -909,7 +909,8 @@ export const createReview = onCall(callableOptions, async (request) => {
   if (
     input.dishReviews.some(
       (dish) =>
-        !dish.photoPath.startsWith(expectedPhotoPrefix) ||
+        (dish.photoPath != null &&
+          !dish.photoPath.startsWith(expectedPhotoPrefix)) ||
         (dish.thumbnailPath != null &&
           !dish.thumbnailPath.startsWith(expectedPhotoPrefix)),
     )
@@ -988,7 +989,8 @@ export const editReview = onCall(callableOptions, async (request) => {
   if (
     input.dishReviews.some(
       (dish) =>
-        !dish.photoPath.startsWith(`review-images/${uid}/`) ||
+        (dish.photoPath != null &&
+          !dish.photoPath.startsWith(`review-images/${uid}/`)) ||
         (dish.thumbnailPath != null &&
           !dish.thumbnailPath.startsWith(`review-images/${uid}/`)),
     )
@@ -1040,7 +1042,7 @@ export const editReview = onCall(callableOptions, async (request) => {
     );
     const dishReviews = input.dishReviews.map((dish) => ({
       ...dish,
-      ...(photoUrlByPath.get(dish.photoPath)
+      ...(dish.photoPath && photoUrlByPath.get(dish.photoPath)
         ? { photoUrl: photoUrlByPath.get(dish.photoPath) }
         : {}),
       ...(dish.thumbnailPath && thumbnailUrlByPath.get(dish.thumbnailPath)

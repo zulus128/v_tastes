@@ -42,11 +42,17 @@ import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
 import CameraIcon from '../../../assets/create-review/camera.svg';
 import DeleteDishIcon from '../../../assets/create-review/delete-dish.svg';
-import placeFilterBarIcon from '../../../assets/create-review/place-filter-bar.png';
-import placeFilterCafeIcon from '../../../assets/create-review/place-filter-cafe.png';
-import placeFilterMyListIcon from '../../../assets/create-review/place-filter-my-list.png';
-import placeFilterRestaurantIcon from '../../../assets/create-review/place-filter-restaurant.png';
-import placeFilterTrendingIcon from '../../../assets/create-review/place-filter-trending.png';
+import PlaceFilterBarIcon from '../../../assets/create-review/place-filter-bar.svg';
+import PlaceFilterCafeCup from '../../../assets/create-review/place-filter-cafe-cup.svg';
+import PlaceFilterCafeSteamLeft from '../../../assets/create-review/place-filter-cafe-steam-left.svg';
+import PlaceFilterCafeSteamRight from '../../../assets/create-review/place-filter-cafe-steam-right.svg';
+import PlaceFilterMyListIcon from '../../../assets/create-review/place-filter-my-list.svg';
+import PlaceFilterRestaurantIcon from '../../../assets/create-review/place-filter-restaurant.svg';
+import PlaceFilterTrendingIcon from '../../../assets/create-review/place-filter-trending.svg';
+import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
+import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
+import PlaceSelectorCloseIcon from '../../../assets/create-review/place-selector-close.svg';
+import PlaceSelectorSearchIcon from '../../../assets/create-review/place-selector-search.svg';
 import RatingPin from '../../../assets/create-review/rating-pin.svg';
 import RatingScale from '../../../assets/create-review/rating-scale.svg';
 import RatingScaleLight from '../../../assets/create-review/rating-scale-light.svg';
@@ -119,21 +125,39 @@ const tagOptions: Array<{ emoji: string; label: string; value: ReviewTag }> = [
 const selectableReviewTags = new Set<ReviewTag>(
   tagOptions.map((tag) => tag.value),
 );
+
+function PlaceFilterCafeIcon() {
+  return (
+    <View style={placeFilterIconStyles.cafe}>
+      <PlaceFilterCafeSteamLeft style={placeFilterIconStyles.cafeSteamLeft} />
+      <PlaceFilterCafeSteamRight style={placeFilterIconStyles.cafeSteamRight} />
+      <PlaceFilterCafeCup style={placeFilterIconStyles.cafeCup} />
+    </View>
+  );
+}
+
 const placeFilterOptions = [
   {
-    icon: placeFilterTrendingIcon,
+    Icon: PlaceFilterTrendingIcon,
     label: 'Trending',
     value: 'trending',
   },
   {
-    icon: placeFilterRestaurantIcon,
+    Icon: PlaceFilterRestaurantIcon,
     label: 'Restaurant',
     value: 'restaurant',
   },
-  { icon: placeFilterCafeIcon, label: 'Cafe', value: 'cafe' },
-  { icon: placeFilterBarIcon, label: 'Bar', value: 'bar' },
-  { icon: placeFilterMyListIcon, label: 'My list', value: 'my-list' },
+  { Icon: PlaceFilterCafeIcon, label: 'Cafe', value: 'cafe' },
+  { Icon: PlaceFilterBarIcon, label: 'Bar', value: 'bar' },
+  { Icon: PlaceFilterMyListIcon, label: 'My list', value: 'my-list' },
 ] as const;
+
+const placeFilterIconStyles = StyleSheet.create({
+  cafe: { height: 14, position: 'relative', width: 14 },
+  cafeSteamLeft: { left: 3.8556, position: 'absolute', top: 0 },
+  cafeSteamRight: { left: 6.6766, position: 'absolute', top: 0 },
+  cafeCup: { left: 1.4364, position: 'absolute', top: 6.0452 },
+});
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
 interface StoredReviewDraft {
@@ -211,9 +235,7 @@ export function CreateReviewScreen({
     venueId &&
     text.trim() &&
     rating >= 1 &&
-    dishes.every(
-      (dish) => dish.photoUri && dish.title.trim() && dish.rating >= 0.5,
-    ),
+    dishes.every((dish) => dish.title.trim() && dish.rating >= 0.5),
   );
   const hasDraftChanges = Boolean(
     venueId !== (initialVenueId ?? '') ||
@@ -1907,11 +1929,11 @@ export function PlaceSelector({
               hitSlop={12}
               onPress={() => dismiss()}
             >
-              <Text style={styles.close}>×</Text>
+              <PlaceSelectorCloseIcon />
             </Pressable>
           </View>
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <PlaceSelectorSearchIcon />
             <TextInput
               autoCapitalize="none"
               onChangeText={setSearch}
@@ -1922,7 +1944,7 @@ export function PlaceSelector({
             />
             {search ? (
               <Pressable onPress={() => setSearch('')}>
-                <Text style={styles.clear}>×</Text>
+                <PlaceSelectorClearIcon />
               </Pressable>
             ) : null}
           </View>
@@ -1934,13 +1956,16 @@ export function PlaceSelector({
           >
             {placeFilterOptions.map((filter) => {
               const active = activeFilter === filter.value;
+              const FilterIcon = filter.Icon;
               return (
                 <Pressable
                   key={filter.value}
                   onPress={() => setActiveFilter(active ? null : filter.value)}
                   style={[styles.filter, active && styles.filterActive]}
                 >
-                  <Image source={filter.icon} style={styles.filterIcon} />
+                  <View style={styles.filterIcon}>
+                    <FilterIcon />
+                  </View>
                   <Text maxFontSizeMultiplier={1.3} style={styles.filterText}>
                     {filter.label}
                   </Text>
@@ -2017,9 +2042,12 @@ export function PlaceSelector({
                       </Text>
                     ) : null}
                     <View style={styles.meta}>
-                      <Text style={styles.ratingPill}>
-                        ★ {(venue.rating ?? 0).toFixed(1)}
-                      </Text>
+                      <View style={styles.ratingPill}>
+                        <PlaceRatingStarIcon />
+                        <Text style={styles.ratingPillText}>
+                          {(venue.rating ?? 0).toFixed(1)}
+                        </Text>
+                      </View>
                       <Text style={styles.metaText}>
                         {venue.reviewCount ?? 0} reviews
                       </Text>
@@ -2123,9 +2151,7 @@ function DishEditor({
   }
 
   if (!draft) return null;
-  const valid = Boolean(
-    draft.photoUri && draft.title.trim() && draft.rating >= 1,
-  );
+  const valid = Boolean(draft.title.trim() && draft.rating >= 1);
   return (
     <Modal
       animationType="none"
@@ -2700,7 +2726,6 @@ const createSelectorStyles = (colors: ThemeColors) =>
       fontSize: 20,
       fontWeight: '700',
     },
-    close: { color: colors.text, fontSize: 27 },
     searchBox: {
       height: 42,
       marginHorizontal: 16,
@@ -2711,7 +2736,6 @@ const createSelectorStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
     },
-    searchIcon: { color: colors.text, marginRight: 8, fontSize: 22 },
     search: {
       flex: 1,
       height: 42,
@@ -2719,7 +2743,6 @@ const createSelectorStyles = (colors: ThemeColors) =>
       color: colors.text,
       fontSize: 16,
     },
-    clear: { color: colors.textSecondary, fontSize: 22 },
     placeList: { flex: 1 },
     filtersScroll: { flexGrow: 0, flexShrink: 0, height: 54 },
     filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
@@ -2735,7 +2758,12 @@ const createSelectorStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       backgroundColor: colors.background,
     },
-    filterIcon: { width: 14, height: 14, tintColor: colors.text },
+    filterIcon: {
+      width: 14,
+      height: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     filterActive: {
       borderColor: colors.primary,
       backgroundColor: colors.surfaceRaised,
@@ -2772,13 +2800,17 @@ const createSelectorStyles = (colors: ThemeColors) =>
     rowAddress: { color: colors.textSecondary, fontSize: 13 },
     meta: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
     ratingPill: {
-      color: '#fff',
+      height: 28,
+      flexDirection: 'row',
+      gap: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: 15,
       paddingHorizontal: 11,
       paddingVertical: 6,
       backgroundColor: '#D33B35',
-      fontWeight: '700',
     },
+    ratingPillText: { color: '#fff', fontSize: 14, fontWeight: '700' },
     metaText: {
       flexShrink: 1,
       color: colors.textMuted,
