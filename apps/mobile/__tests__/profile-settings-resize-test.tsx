@@ -130,6 +130,43 @@ it('opens the Bio editor and accepts the full 80-character value', async () => {
   expect(screen.getByLabelText('Save Bio')).toBeTruthy();
 });
 
+it('applies an appearance change after the settings pane closes', async () => {
+  const animations: Array<{
+    finish?: (result: { finished: boolean }) => void;
+  }> = [];
+  jest.spyOn(Animated, 'timing').mockImplementation(() => {
+    const animation: (typeof animations)[number] = {};
+    animations.push(animation);
+    return {
+      start: (finish) => {
+        animation.finish = finish;
+      },
+      stop: jest.fn(),
+      reset: jest.fn(),
+    };
+  });
+
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getAllByText('Appearance')[0]);
+  await fireEvent.press(screen.getByText('Light'));
+
+  expect(await AsyncStorage.getItem('@tastes/theme-preference')).toBeNull();
+
+  await act(() => animations[1].finish?.({ finished: true }));
+
+  expect(await AsyncStorage.getItem('@tastes/theme-preference')).toBe('light');
+});
+
 it.each([
   ['Appearance', 'appearance-settings-pane', 1],
   ['Notifications', 'notification-settings-pane', 0],
