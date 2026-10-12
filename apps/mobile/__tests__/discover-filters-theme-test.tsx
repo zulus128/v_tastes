@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { DiscoverFiltersScreen } from '../src/features/discover/DiscoverFiltersScreen';
 
@@ -67,4 +67,22 @@ it('uses the active theme on the filters screen', async () => {
   expect(StyleSheet.flatten(screen.getByText('Filter').props.style).color).toBe(
     '#FFFFFF',
   );
+});
+
+it('does not render or reapply the retired Vegetarian filter', async () => {
+  const onApply = jest.fn();
+
+  await render(
+    <DiscoverFiltersScreen
+      initialValues={['Vegetarian 🥦']}
+      onApply={onApply}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(screen.queryByText('Dietary preferences')).toBeNull();
+  expect(screen.queryByText('Vegetarian 🥦')).toBeNull();
+
+  fireEvent.press(screen.getByText('Apply'));
+  expect(onApply).toHaveBeenCalledWith([]);
 });
