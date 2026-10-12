@@ -441,7 +441,8 @@ describe('onboarding in resizable windows', () => {
         StyleSheet.flatten(screen.getByTestId(testID).props.style),
       ).toMatchObject({
         backgroundColor: '#FFFFFF',
-        borderColor: '#E4E4E4',
+        borderColor:
+          initialScreen === 'contactsPermission' ? '#D33B35' : '#E4E4E4',
       });
     },
   );

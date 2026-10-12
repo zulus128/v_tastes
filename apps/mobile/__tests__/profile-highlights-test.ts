@@ -73,8 +73,8 @@ describe('buildTasteHighlights', () => {
     expect(result.map(({ meta }) => meta)).toEqual([
       '2 reviews',
       '2 reviews',
-      'From onboarding',
-      'From onboarding',
+      '',
+      '',
     ]);
   });
 

@@ -96,9 +96,14 @@ describe('Discover responsive content', () => {
     Dimensions.set({ window: dimensions, screen: dimensions });
   }
 
+  async function openTrending() {
+    await fireEvent.press(screen.getByRole('tab', { name: 'Trending' }));
+  }
+
   it('fits wrapped cards inside landscape safe insets, including the final row', async () => {
     resize(667, 375);
     await render(<DiscoverScreen {...props} />);
+    await openTrending();
 
     const card = screen.getByText('Place 0').parent!.parent!;
     const row = card.parent!;
@@ -128,6 +133,7 @@ describe('Discover responsive content', () => {
       mockCarouselCount = count;
       resize(1376, 1032);
       await render(<DiscoverScreen {...props} />);
+      await openTrending();
 
       const carousels = [
         { title: 'Trending place 0', designWidth: 200, designHeight: 200 },
@@ -169,6 +175,7 @@ describe('Discover responsive content', () => {
     mockCarouselCount = 3;
     resize(1376, 1032);
     const view = await render(<DiscoverScreen {...props} />);
+    await openTrending();
 
     mockCarouselCount = 1;
     await view.rerender(<DiscoverScreen {...props} />);
@@ -204,6 +211,7 @@ describe('Discover responsive content', () => {
     ];
 
     await render(<DiscoverScreen {...props} />);
+    await openTrending();
 
     expect(screen.getByText('Legacy reviewer')).toBeOnTheScreen();
     expect(screen.getByText('Still a valid review')).toBeOnTheScreen();
@@ -232,7 +240,7 @@ describe('Discover responsive content', () => {
     );
 
     const controlsStyle = StyleSheet.flatten(
-      screen.getByLabelText('Zoom in').parent!.props.style,
+      screen.getByLabelText('My location').parent!.props.style,
     );
     const sheetStyle = StyleSheet.flatten(
       screen.getByLabelText('Expand place list').parent!.props.style,
@@ -250,7 +258,7 @@ describe('Discover responsive content', () => {
     );
     expect(controlsStyle.top + responsiveSize(48)).toBeLessThan(height - 70);
     expect(
-      4 * responsiveSize(48) + 3 * responsiveSize(6) + responsiveSize(16),
+      2 * responsiveSize(48) + responsiveSize(6) + responsiveSize(16),
     ).toBeLessThan(sheetStyle.right);
     expect(height - 70 - sheetHeight).toBeGreaterThanOrEqual(
       responsiveSize(12) + responsiveSize(52),
