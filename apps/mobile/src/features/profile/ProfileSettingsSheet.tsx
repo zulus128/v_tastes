@@ -798,8 +798,9 @@ export function ProfileSettingsSheet({
                         accessibilityState={{ checked: selected }}
                         key={option.value}
                         onPress={() => {
-                          void setPreference(option.value);
-                          closeAppearance();
+                          closeAppearance(() => {
+                            void setPreference(option.value);
+                          });
                         }}
                         style={({ pressed }) => [
                           styles.appearanceRow,
