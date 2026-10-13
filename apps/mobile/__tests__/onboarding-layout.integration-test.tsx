@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
@@ -47,8 +48,10 @@ jest.mock('firebase/storage', () => ({
 }));
 jest.mock('firebase/auth', () => ({}));
 const mockCheckUsernameAvailability = jest.fn();
+const mockGetVenues = jest.fn();
 const mockTastesApi = {
   checkUsernameAvailability: mockCheckUsernameAvailability,
+  getVenues: mockGetVenues,
 };
 jest.mock('../src/session/SessionProvider', () => ({
   useTastesApi: () => mockTastesApi,
@@ -110,6 +113,8 @@ describe('onboarding in resizable windows', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
     mockCheckUsernameAvailability.mockReset();
+    mockGetVenues.mockReset();
+    mockGetVenues.mockResolvedValue({ data: { items: [] } });
   });
 
   afterEach(async () => {
@@ -431,6 +436,21 @@ describe('onboarding in resizable windows', () => {
     });
     await fireEvent(firstImage, 'load');
     expect(StyleSheet.flatten(firstImage.props.style).opacity).not.toBe(0);
+  });
+
+  it('prefetches place data before the place step opens', async () => {
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="dish"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+      />,
+      { wrapper: Providers },
+    );
+
+    await waitFor(() =>
+      expect(mockGetVenues).toHaveBeenCalledWith({ limit: 8 }),
+    );
   });
 
   it.each([

@@ -8,7 +8,14 @@ import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
   Alert,
@@ -816,6 +823,8 @@ export function PostSignupOnboardingFlow({
   const [placeQuery, setPlaceQuery] = useState('');
   const [placeLoading, setPlaceLoading] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const placeRequestRef = useRef<Promise<void> | null>(null);
+  const placesLoadedRef = useRef(visualAudit);
   const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>(
     () =>
       visualAudit
@@ -893,6 +902,47 @@ export function PostSignupOnboardingFlow({
       : [],
   );
   const [busy, setBusy] = useState(false);
+
+  const loadPlaces = useCallback(() => {
+    if (visualAudit || placesLoadedRef.current) return Promise.resolve();
+    if (placeRequestRef.current) return placeRequestRef.current;
+
+    setPlaceLoading(true);
+    setPlaceError(null);
+    const request = api
+      .getVenues({ limit: 8 })
+      .then((response) => {
+        const mapped = response.data.items.map(
+          (venue, index): PlaceCandidate => ({
+            id: venue.id,
+            name: venue.name,
+            address: venue.address ?? venue.city,
+            image: venue.imageUrl
+              ? { uri: venue.imageUrl }
+              : [placeGeminiPopular, placeWasabi, placeGemini][index % 3]!,
+            rating: (venue.rating ?? 0).toFixed(1),
+            reviews: `${venue.reviewCount ?? 0} reviews`,
+            popular: venue.discoverTags?.includes('trending') ?? false,
+            category: venue.category ?? 'Restaurant',
+            price: '$'.repeat(venue.priceLevel ?? 2),
+            distance: `${(venue.distanceKm ?? 0).toFixed(1)} km`,
+          }),
+        );
+        setAvailablePlaces(mapped);
+        placesLoadedRef.current = true;
+      })
+      .catch((error) => setPlaceError(apiErrorMessage(error)))
+      .finally(() => {
+        setPlaceLoading(false);
+        placeRequestRef.current = null;
+      });
+    placeRequestRef.current = request;
+    return request;
+  }, [api, visualAudit]);
+
+  useEffect(() => {
+    if (screen === 'dish' || screen === 'location') void loadPlaces();
+  }, [loadPlaces, screen]);
 
   useEffect(() => {
     const value = username.trim();
@@ -1086,31 +1136,7 @@ export function PostSignupOnboardingFlow({
       setPlaceError(null);
       return;
     }
-    setPlaceLoading(true);
-    setPlaceError(null);
-    void api
-      .getVenues({ limit: 8 })
-      .then((response) => {
-        const mapped = response.data.items.map(
-          (venue, index): PlaceCandidate => ({
-            id: venue.id,
-            name: venue.name,
-            address: venue.address ?? venue.city,
-            image: venue.imageUrl
-              ? { uri: venue.imageUrl }
-              : [placeGeminiPopular, placeWasabi, placeGemini][index % 3]!,
-            rating: (venue.rating ?? 0).toFixed(1),
-            reviews: `${venue.reviewCount ?? 0} reviews`,
-            popular: venue.discoverTags?.includes('trending') ?? false,
-            category: venue.category ?? 'Restaurant',
-            price: '$'.repeat(venue.priceLevel ?? 2),
-            distance: `${(venue.distanceKm ?? 0).toFixed(1)} km`,
-          }),
-        );
-        setAvailablePlaces(mapped);
-      })
-      .catch((error) => setPlaceError(apiErrorMessage(error)))
-      .finally(() => setPlaceLoading(false));
+    void loadPlaces();
   }
 
   async function requestContacts() {
