@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -49,18 +49,31 @@ export function cityFlag(name: string): ImageSourcePropType | undefined {
 }
 
 export function CityPicker({
+  initialSearch = '',
+  onCustomSelect,
   onSelect,
   topPadding = 126,
 }: {
+  initialSearch?: string;
+  onCustomSelect?: (name: string) => void;
   onSelect: (name: string, flag: ImageSourcePropType) => void;
   topPadding?: number;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
+  const normalizedSearch = search.trim();
   const filtered = cities.filter((item) =>
-    item[1].toLowerCase().includes(search.trim().toLowerCase()),
+    item[1].toLowerCase().includes(normalizedSearch.toLowerCase()),
   );
+  const canUseCustomCity =
+    Boolean(onCustomSelect) &&
+    normalizedSearch.length >= 2 &&
+    !cities.some(
+      (item) => item[1].toLowerCase() === normalizedSearch.toLowerCase(),
+    );
+
+  useEffect(() => setSearch(initialSearch), [initialSearch]);
 
   return (
     <View style={[styles.listPage, { paddingTop: responsiveSize(topPadding) }]}>
@@ -74,6 +87,20 @@ export function CityPicker({
         value={search}
       />
       <ScrollView keyboardShouldPersistTaps="handled">
+        {canUseCustomCity ? (
+          <Pressable
+            accessibilityLabel={`Use ${normalizedSearch} as city`}
+            accessibilityRole="button"
+            onPress={() => onCustomSelect?.(normalizedSearch)}
+            style={[styles.cityRow, styles.customCityRow]}
+            testID="use-custom-city"
+          >
+            <Text style={styles.customCityAction}>Use this city</Text>
+            <Text numberOfLines={1} style={styles.cityName}>
+              {normalizedSearch}
+            </Text>
+          </Pressable>
+        ) : null}
         {filtered.map(([flag, name]) => (
           <Pressable
             key={name}
@@ -116,6 +143,12 @@ function createStyles(colors: ThemeColors) {
     },
     cityFlag: { width: 20, height: 20, marginRight: 14 },
     cityName: { flex: 1, color: colors.text, fontSize: 15 },
+    customCityRow: { gap: 10 },
+    customCityAction: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
     cityCountry: { color: colors.textMuted, fontSize: 13 },
   });
 }

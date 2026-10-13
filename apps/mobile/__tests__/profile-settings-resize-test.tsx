@@ -42,6 +42,7 @@ jest.mock('../src/features/profile/api', () => ({
   useProfile: () => ({
     profile: {
       bio: 'Initial bio',
+      city: 'London',
       displayName: 'Test User',
       username: 'tester',
     },
@@ -128,6 +129,25 @@ it('opens the Bio editor and accepts the full 80-character value', async () => {
   expect(screen.getByText('80/80')).toBeTruthy();
   expect(screen.getByTestId('profile-editor-keyboard-avoider')).toBeTruthy();
   expect(screen.getByLabelText('Save Bio')).toBeTruthy();
+});
+
+it('offers to save a city typed outside the suggested city list', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getByLabelText('Edit City'));
+  await fireEvent.changeText(screen.getByPlaceholderText('Search'), 'Istanbul');
+
+  expect(screen.getByLabelText('Use Istanbul as city')).toBeTruthy();
+  expect(screen.getByText('Use this city')).toBeTruthy();
 });
 
 it('applies an appearance change after the settings pane closes', async () => {

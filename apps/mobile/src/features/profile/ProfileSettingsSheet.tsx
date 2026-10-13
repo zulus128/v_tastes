@@ -993,6 +993,8 @@ export function ProfileSettingsSheet({
             <View style={styles.headerButton} />
           </View>
           <CityPicker
+            initialSearch={profile?.city ?? ''}
+            onCustomSelect={(name) => void save({ city: name })}
             onSelect={(name) => void save({ city: name })}
             topPadding={24}
           />
