@@ -190,6 +190,7 @@ it('applies an appearance change after the settings pane closes', async () => {
 it.each([
   ['Appearance', 'appearance-settings-pane', 1],
   ['Notifications', 'notification-settings-pane', 0],
+  ['City', 'city-settings-pane', 2],
 ] as const)(
   'keeps %s aligned while closed, open, and closing across a resize',
   async (label, paneId, backIndex) => {

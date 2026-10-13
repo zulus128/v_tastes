@@ -144,14 +144,20 @@ export function ProfileSettingsSheet({
       onRequestClose: () => setNotificationsOpen(false),
       visible: notificationsOpen,
     });
+  const { close: closeCity, translateX: cityTranslateX } =
+    useSideSlideTransition({
+      frameWidth: viewportWidth,
+      onRequestClose: () => setCityOpen(false),
+      visible: cityOpen,
+    });
   const settingsSlide = useRef<SideSlideScreenHandle>(null);
   const placeSlide = useRef<SideSlideScreenHandle>(null);
-  const citySlide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
     if (visible) return;
     setNotificationsOpen(false);
     setAppearanceOpen(false);
+    setCityOpen(false);
   }, [visible]);
 
   useEffect(() => {
@@ -461,11 +467,13 @@ export function ProfileSettingsSheet({
     <>
       <SideSlideScreen
         onRequestClose={
-          appearanceOpen
-            ? closeAppearance
-            : notificationsOpen
-              ? closeNotifications
-              : onClose
+          cityOpen
+            ? closeCity
+            : appearanceOpen
+              ? closeAppearance
+              : notificationsOpen
+                ? closeNotifications
+                : onClose
         }
         ref={settingsSlide}
         visible={visible}
@@ -850,6 +858,58 @@ export function ProfileSettingsSheet({
               </View>
             </ImageBackground>
           </Animated.View>
+          <Animated.View
+            testID="city-settings-pane"
+            pointerEvents={cityOpen ? 'auto' : 'none'}
+            style={[
+              styles.notificationsScreen,
+              { transform: [{ translateX: cityTranslateX }] },
+            ]}
+          >
+            <ImageBackground
+              imageStyle={styles.patternImage}
+              resizeMode="stretch"
+              source={isDark ? pattern : homeFeedPattern}
+              style={styles.notificationBackground}
+            >
+              {isDark ? (
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <Image
+                    resizeMode="cover"
+                    source={homeFeedPattern}
+                    style={styles.darkPatternBoost}
+                  />
+                </View>
+              ) : null}
+              <PatternBackgroundLift />
+              <View
+                style={[
+                  styles.header,
+                  {
+                    height: responsiveSize(48) + insets.top,
+                    paddingTop: insets.top,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Back to settings"
+                  hitSlop={8}
+                  onPress={() => closeCity()}
+                  style={styles.headerButton}
+                >
+                  <Image source={backIcon} style={styles.backIcon} />
+                </Pressable>
+                <Text style={styles.title}>City</Text>
+                <View style={styles.headerButton} />
+              </View>
+              <CityPicker
+                initialSearch={profile?.city ?? ''}
+                onCustomSelect={(name) => void save({ city: name })}
+                onSelect={(name) => void save({ city: name })}
+                topPadding={24}
+              />
+            </ImageBackground>
+          </Animated.View>
           {editing !== null ? (
             <View style={styles.editorOverlay}>
               <Pressable
@@ -965,39 +1025,6 @@ export function ProfileSettingsSheet({
               ))
             )}
           </View>
-        </View>
-      </SideSlideScreen>
-
-      <SideSlideScreen
-        onRequestClose={() => setCityOpen(false)}
-        ref={citySlide}
-        visible={cityOpen}
-      >
-        <View style={styles.screen}>
-          <View
-            style={[
-              styles.header,
-              {
-                height: responsiveSize(48) + insets.top,
-                paddingTop: insets.top,
-              },
-            ]}
-          >
-            <Pressable
-              onPress={() => citySlide.current?.close()}
-              style={styles.headerButton}
-            >
-              <Image source={backIcon} style={styles.backIcon} />
-            </Pressable>
-            <Text style={styles.title}>City</Text>
-            <View style={styles.headerButton} />
-          </View>
-          <CityPicker
-            initialSearch={profile?.city ?? ''}
-            onCustomSelect={(name) => void save({ city: name })}
-            onSelect={(name) => void save({ city: name })}
-            topPadding={24}
-          />
         </View>
       </SideSlideScreen>
     </>
