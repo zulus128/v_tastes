@@ -32,6 +32,7 @@ import {
   reservationCountdown,
 } from './presentation';
 import { useTastesApi } from '../../session/SessionProvider';
+import { conversationHistoryQueryKey } from '../queryKeys';
 
 function relativeTime(iso: string): string {
   const elapsed = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -289,7 +290,7 @@ export function ConversationsScreen({
   );
   const inbox = useConversationInbox(userId);
   const conversationHistory = useInfiniteQuery({
-    queryKey: ['conversations', userId, 'history'],
+    queryKey: conversationHistoryQueryKey(userId),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
       (await api.listConversations({ cursor: pageParam, limit: 50 })).data,

@@ -7,14 +7,18 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useTastesApi } from '../../session/SessionProvider';
+import {
+  discoverFeedQueryKey,
+  discoverPeopleQueryKey,
+  discoverVenuesQueryKey,
+} from '../queryKeys';
 import { normalizePlaceReviewPage } from './reviewNormalization';
 
-export const discoverFeedQueryKey = (
-  userId: string,
-  profileSignature?: string,
-) => ['discover', 'feed', userId, profileSignature] as const;
-export const discoverPeopleQueryKey = (userId: string) =>
-  ['discover', 'people', userId] as const;
+export {
+  discoverFeedQueryKey,
+  discoverPeopleQueryKey,
+  discoverVenuesQueryKey,
+} from '../queryKeys';
 export const peopleSearchQueryKey = (userId: string, query: string) =>
   ['discover', 'people-search', userId, query] as const;
 export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
@@ -29,18 +33,6 @@ export type DiscoverVenueFilter = {
   category?: string;
   tag?: DiscoverTag;
 };
-
-export const discoverVenuesQueryKey = (
-  userId: string,
-  filter: DiscoverVenueFilter,
-) =>
-  [
-    'discover',
-    'venues',
-    userId,
-    filter.category ?? null,
-    filter.tag ?? null,
-  ] as const;
 
 export function normalizeDiscoverFeed(feed: DiscoverFeed): DiscoverFeed {
   return {

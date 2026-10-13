@@ -16,10 +16,11 @@ import {
 } from '@react-navigation/native-stack';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type { DiscoverPerson } from '@tastes/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
-import { Alert, Linking, View } from 'react-native';
-import { useMemo, useState } from 'react';
+import { Alert, InteractionManager, Linking, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
@@ -54,6 +55,7 @@ import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../ui/responsive';
 import { consumePendingDeepLink } from './pendingDeepLink';
+import { prefetchPrimaryLists } from './prefetchPrimaryLists';
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
@@ -182,6 +184,7 @@ function MainTabs({
   rootNavigation: RootNavigation;
 }) {
   const { colors, isDark } = useAppTheme();
+  const queryClient = useQueryClient();
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -189,6 +192,13 @@ function MainTabs({
   const [openingConversationFor, setOpeningConversationFor] = useState<
     string | null
   >(null);
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      void prefetchPrimaryLists(queryClient, api, user.uid);
+    });
+    return () => task.cancel();
+  }, [api, queryClient, user.uid]);
 
   async function openConversation(targetUserId: string) {
     if (openingConversationFor) return;

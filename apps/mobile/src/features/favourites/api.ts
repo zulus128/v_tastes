@@ -10,9 +10,9 @@ import { useEffect, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
+import { favouritesQueryKey } from '../queryKeys';
 
-export const favouritesQueryKey = (userId: string) =>
-  ['favourites', userId] as const;
+export { favouritesQueryKey } from '../queryKeys';
 
 export function useFavourites(userId: string) {
   const api = useTastesApi();
