@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   documentId,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -100,9 +101,29 @@ export function useProfile(userId: string, fallbackName: string) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [revision, setRevision] = useState(0);
 
-  const retry = useCallback(() => setRevision((value) => value + 1), []);
+  const retry = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (__DEV__ && userId === 'visual-audit-user') {
+      setLoading(false);
+      return;
+    }
+    try {
+      const snapshot = await getDoc(doc(firestore, 'users', userId));
+      setProfile(
+        snapshot.exists()
+          ? profileFromDocument(snapshot.data(), fallbackName)
+          : null,
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause : new Error('Could not load profile.'),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [fallbackName, userId]);
 
   useEffect(() => {
     setLoading(true);
@@ -141,7 +162,7 @@ export function useProfile(userId: string, fallbackName: string) {
         setLoading(false);
       },
     );
-  }, [fallbackName, revision, userId]);
+  }, [fallbackName, userId]);
 
   return { error, loading, profile, retry };
 }
@@ -152,7 +173,6 @@ export function useProfileReviews(userId: string) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [revision, setRevision] = useState(0);
   const lastDocument = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
   const hasLoadedMore = useRef(false);
 
@@ -168,7 +188,38 @@ export function useProfileReviews(userId: string) {
       ),
     [userId],
   );
-  const retry = useCallback(() => setRevision((value) => value + 1), []);
+  const retry = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (__DEV__ && userId === 'visual-audit-user') {
+      setLoading(false);
+      setHasMore(false);
+      return;
+    }
+    try {
+      const snapshot = await getDocs(baseQuery());
+      const latest = snapshot.docs.map(reviewFromDocument);
+      setReviews((current) => {
+        const latestIds = new Set(latest.map((review) => review.id));
+        return [
+          ...latest,
+          ...current.filter((review) => !latestIds.has(review.id)),
+        ];
+      });
+      if (!hasLoadedMore.current) {
+        lastDocument.current = snapshot.docs.at(-1) ?? null;
+        setHasMore(snapshot.size === 20);
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause
+          : new Error('Could not load profile reviews.'),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [baseQuery, userId]);
 
   useEffect(() => {
     hasLoadedMore.current = false;
@@ -204,7 +255,7 @@ export function useProfileReviews(userId: string) {
         setLoading(false);
       },
     );
-  }, [baseQuery, revision]);
+  }, [baseQuery, userId]);
 
   const loadMore = useCallback(async () => {
     if (!lastDocument.current || loadingMore || !hasMore) return;

@@ -778,8 +778,7 @@ export function ProfileScreen({
     if (refreshing) return;
     setRefreshing(true);
     try {
-      retryProfile();
-      await profileReviews.retry();
+      await Promise.all([retryProfile(), profileReviews.retry()]);
       setMapReload((value) => value + 1);
     } finally {
       setRefreshing(false);
@@ -930,11 +929,19 @@ export function ProfileScreen({
           }
           onEndReached={() => void profileReviews.loadMore()}
           onEndReachedThreshold={0.5}
-          onRefresh={() => void refreshProfileScreen()}
+          refreshControl={
+            <RefreshControl
+              colors={[colors.primary]}
+              onRefresh={() => void refreshProfileScreen()}
+              progressBackgroundColor={colors.surface}
+              progressViewOffset={responsiveSize(110)}
+              refreshing={refreshing}
+              tintColor={colors.primary}
+            />
+          }
           onScroll={({ nativeEvent }) => {
             reviewOffset.current = nativeEvent.contentOffset.y;
           }}
-          refreshing={refreshing}
           scrollEventThrottle={32}
           windowSize={7}
           renderItem={({ item: review }) => (
@@ -978,7 +985,10 @@ export function ProfileScreen({
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
+              colors={[colors.primary]}
               onRefresh={() => void refreshProfileScreen()}
+              progressBackgroundColor={colors.surface}
+              progressViewOffset={responsiveSize(110)}
               refreshing={refreshing}
               tintColor={colors.primary}
             />
@@ -1025,6 +1035,16 @@ export function ProfileScreen({
         own={own}
         profile={displayedProfile}
       />
+      {refreshing ? (
+        <View
+          accessibilityLabel="Refreshing profile"
+          accessibilityLiveRegion="polite"
+          style={styles.refreshIndicator}
+          testID="profile-refresh-indicator"
+        >
+          <ActivityIndicator color={colors.primary} size="small" />
+        </View>
+      ) : null}
       <ProfileExtras
         onClose={() => setExtra(null)}
         onOpenProfile={(userId, personFollowing) => {
@@ -1215,6 +1235,25 @@ const createStyles = (colors: ThemeColors) => {
     screen: { flex: 1 },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     content: { paddingTop: 102, paddingBottom: 24 },
+    refreshIndicator: {
+      position: 'absolute',
+      zIndex: 30,
+      top: 110,
+      alignSelf: 'center',
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      elevation: 4,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.18,
+      shadowRadius: 5,
+    },
     controls: {
       paddingTop: 16,
       paddingHorizontal: 16,
