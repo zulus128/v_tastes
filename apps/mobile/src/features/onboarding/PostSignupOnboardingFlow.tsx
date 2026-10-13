@@ -63,10 +63,22 @@ import dishSushi from '../../../assets/onboarding/dish-sushi.png';
 import dishTacos from '../../../assets/onboarding/dish-tacos.png';
 import emptySearch from '../../../assets/onboarding/empty-search.png';
 import flagMonaco from '../../../assets/onboarding/flag-monaco.png';
-import inviteContacts from '../../../assets/onboarding/invite-contacts.png';
-import inviteMessage from '../../../assets/onboarding/invite-message.png';
-import invitePeople from '../../../assets/onboarding/invite-people.png';
-import inviteShare from '../../../assets/onboarding/invite-share.png';
+import InviteChevronIcon from '../../../assets/onboarding/invite-chevron.svg';
+import InviteContactsIcon from '../../../assets/onboarding/invite-contacts.svg';
+import InviteLinkIcon from '../../../assets/onboarding/invite-link.svg';
+import InviteMessageIcon from '../../../assets/onboarding/invite-message.svg';
+import InviteSparkles from '../../../assets/onboarding/invite-sparkles.svg';
+import InviteUserIcon from '../../../assets/onboarding/invite-user.svg';
+import InviteUserCenterIcon from '../../../assets/onboarding/invite-user-center.svg';
+import LocationLockIcon from '../../../assets/onboarding/location-lock.svg';
+import LocationMapPinIcon from '../../../assets/onboarding/location-map-pin.svg';
+import LocationMapStarIcon from '../../../assets/onboarding/location-map-star.svg';
+import LocationMapStreets from '../../../assets/onboarding/location-map-streets.svg';
+import LocationPinIcon from '../../../assets/onboarding/location-pin.svg';
+import locationMapAvatar from '../../../assets/onboarding/location-map-avatar.png';
+import locationMapEmma from '../../../assets/onboarding/location-map-emma.png';
+import locationMapSakura from '../../../assets/onboarding/location-map-sakura.png';
+import locationMapVelvet from '../../../assets/onboarding/location-map-velvet.png';
 import permissionContacts from '../../../assets/onboarding/permission-contacts.png';
 import permissionLocation from '../../../assets/onboarding/permission-location.png';
 import permissionNotifications from '../../../assets/onboarding/permission-notifications.png';
@@ -613,6 +625,214 @@ function PeopleYouKnowTeaser({
         </G>
       </Svg>
     </View>
+  );
+}
+
+function LocationBadge({
+  styles,
+}: {
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.locationBadge} testID="onboarding-location-badge">
+      <LocationPinIcon height={responsiveSize(72)} width={responsiveSize(64)} />
+    </View>
+  );
+}
+
+function LocationVenueCard({
+  avatar,
+  detail,
+  distance,
+  image,
+  name,
+  rating,
+  style,
+  tag,
+  tall,
+  styles,
+}: {
+  avatar?: boolean;
+  detail: string;
+  distance: string;
+  image: ImageSourcePropType;
+  name: string;
+  rating: string;
+  style: object;
+  tag?: string;
+  tall?: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={[styles.locationVenueCard, style]}>
+      <Image
+        resizeMode="cover"
+        source={image}
+        style={[
+          styles.locationVenuePhoto,
+          tall && styles.locationVenuePhotoTall,
+        ]}
+      />
+      <View style={styles.locationVenueInfo}>
+        {avatar ? (
+          <View style={styles.locationVenueFriend}>
+            <Image source={locationMapAvatar} style={styles.locationAvatar} />
+            <Text style={styles.locationVenueName}>{name}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.locationVenueTag}>
+              <Text style={styles.locationVenueTagText}>{tag}</Text>
+            </View>
+            <Text style={styles.locationVenueName}>{name}</Text>
+          </>
+        )}
+        <View style={styles.locationVenueRating}>
+          <LocationMapStarIcon
+            height={responsiveSize(10)}
+            width={responsiveSize(10)}
+          />
+          <Text style={styles.locationVenueRatingText}>{rating}</Text>
+        </View>
+        <Text numberOfLines={2} style={styles.locationVenueDetail}>
+          {detail}
+        </Text>
+        <Text style={styles.locationVenueDistance}>{distance}</Text>
+      </View>
+    </View>
+  );
+}
+
+function NearbyMapPreview({
+  styles,
+}: {
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.locationMap} testID="onboarding-location-map">
+      <LocationMapStreets style={styles.locationMapStreets} />
+      <View pointerEvents="none" style={styles.locationMapVignette} />
+      <LocationVenueCard
+        avatar
+        detail="“Best pasta I’ve had here”"
+        distance="0.3 mi away"
+        image={locationMapEmma}
+        name="Emma"
+        rating="4.5"
+        style={styles.locationVenueEmma}
+        styles={styles}
+      />
+      <LocationVenueCard
+        detail="“A local favorite right now”"
+        distance="0.6 mi away"
+        image={locationMapSakura}
+        name="Sakura"
+        rating="4.8"
+        style={styles.locationVenueSakura}
+        styles={styles}
+        tag="🔥 Trending"
+        tall
+      />
+      <LocationVenueCard
+        detail="“Great cocktails and ambiance”"
+        distance="0.4 mi away"
+        image={locationMapVelvet}
+        name="The Velvet Room"
+        rating="4.6"
+        style={styles.locationVenueVelvet}
+        styles={styles}
+        tag="Popular Nearby"
+        tall
+      />
+      {[
+        styles.locationMapPinEmma,
+        styles.locationMapPinSakura,
+        styles.locationMapPinVelvet,
+      ].map((pinStyle, index) => (
+        <LocationMapPinIcon
+          height={responsiveSize(66)}
+          key={index}
+          style={pinStyle}
+          width={responsiveSize(50)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function InviteHero({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return (
+    <View style={styles.inviteHero} testID="onboarding-invite-hero">
+      <InviteSparkles style={styles.inviteSparkles} />
+      <LinearGradient
+        colors={['#FF7380', '#ED505E', '#DB2E3D', '#9E1421']}
+        locations={[0, 0.3, 0.6, 1]}
+        style={[styles.inviteFriend, styles.inviteFriendLeft]}
+      >
+        <InviteUserIcon
+          height={responsiveSize(38)}
+          width={responsiveSize(38)}
+        />
+      </LinearGradient>
+      <LinearGradient
+        colors={['#FF7380', '#ED505E', '#DB2E3D', '#9E1421']}
+        locations={[0, 0.3, 0.6, 1]}
+        style={[styles.inviteFriend, styles.inviteFriendRight]}
+      >
+        <InviteUserIcon
+          height={responsiveSize(38)}
+          width={responsiveSize(38)}
+        />
+      </LinearGradient>
+      <LinearGradient
+        colors={['#FF7380', '#ED505E', '#DB2E3D', '#9E1421']}
+        locations={[0, 0.3, 0.6, 1]}
+        style={[styles.inviteFriend, styles.inviteFriendCenter]}
+      >
+        <InviteUserCenterIcon
+          height={responsiveSize(56)}
+          width={responsiveSize(56)}
+        />
+      </LinearGradient>
+    </View>
+  );
+}
+
+function InviteOption({
+  detail,
+  icon: Icon,
+  onPress,
+  styles,
+  title,
+}: {
+  detail: string;
+  icon: typeof InviteLinkIcon;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  title: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.actionRow}
+    >
+      <LinearGradient
+        colors={['#331F21', '#171213']}
+        style={styles.actionIconTile}
+      >
+        <Icon height={responsiveSize(32)} width={responsiveSize(32)} />
+      </LinearGradient>
+      <View style={styles.actionCopy}>
+        <Text style={styles.actionText}>{title}</Text>
+        <Text style={styles.actionSubtitle}>{detail}</Text>
+      </View>
+      <InviteChevronIcon
+        height={responsiveSize(16)}
+        width={responsiveSize(10)}
+      />
+    </Pressable>
   );
 }
 
@@ -1666,26 +1886,42 @@ export function PostSignupOnboardingFlow({
 
   if (screen === 'location')
     return (
-      <PermissionScreen
-        step={3}
-        icon={permissionLocation}
-        title="See what’s good near you"
-        subtitle="Find highly rated places nearby and recommendations from friends."
-        button="Use My Location"
-        footnote="Your precise location is never shown to other users. It’s only used to personalize nearby recommendations."
-        onBack={back}
-        onSkip={enterPlaces}
-        onPress={requestLocation}
-      >
-        <View style={styles.locationPreview}>
-          <View style={styles.locationRoadHorizontal} />
-          <View style={styles.locationRoadVertical} />
-          <View style={styles.locationPinRing}>
-            <View style={styles.locationPin} />
+      <PatternScreen>
+        <Header onBack={back} onSkip={enterPlaces} />
+        <StepProgress overlay step={3} />
+        <ScrollView
+          contentContainerStyle={styles.locationPage}
+          showsVerticalScrollIndicator={false}
+          style={styles.locationScroll}
+          testID="onboarding-location-scroll"
+        >
+          <LocationBadge styles={styles} />
+          <Text style={styles.locationTitle}>
+            See what’s <Text style={styles.locationTitleAccent}>good</Text>
+            {'\n'}near you
+          </Text>
+          <Text style={styles.locationSubtitle}>
+            Discover great spots nearby, from friend favorites to top-rated
+            local finds.
+          </Text>
+          <NearbyMapPreview styles={styles} />
+          <View style={styles.locationPrivacy}>
+            <LocationLockIcon
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+            <Text style={styles.locationPrivacyText}>
+              Your precise location is never shown to other users. It’s only
+              used to personalize nearby recommendations.
+            </Text>
           </View>
-          <Text style={styles.locationPreviewLabel}>Places near you</Text>
-        </View>
-      </PermissionScreen>
+        </ScrollView>
+        <PrimaryButton
+          label="Allow Location"
+          onPress={requestLocation}
+          style={styles.locationButton}
+        />
+      </PatternScreen>
     );
   if (screen === 'locationDenied')
     return (
@@ -2125,9 +2361,9 @@ export function PostSignupOnboardingFlow({
           style={styles.inviteScroll}
           testID="onboarding-invite-scroll"
         >
-          <Image source={invitePeople} style={styles.peopleIcon} />
-          <Text style={styles.title}>Invite your friends</Text>
-          <Text style={[styles.subtitle, styles.permissionSubtitle]}>
+          <InviteHero styles={styles} />
+          <Text style={styles.inviteTitle}>Invite your friends</Text>
+          <Text style={styles.inviteSubtitle}>
             Add 3 friends and see their ratings and recommendations
           </Text>
           {!visualAudit && invitedCount ? (
@@ -2150,36 +2386,27 @@ export function PostSignupOnboardingFlow({
             </>
           ) : null}
           <View style={styles.inviteActions}>
-            <Pressable onPress={shareInvite} style={styles.actionRow}>
-              <Image source={inviteShare} style={styles.actionIcon} />
-              <View style={styles.actionCopy}>
-                <Text style={styles.actionText}>Share your invite link</Text>
-                <Text style={styles.actionSubtitle}>
-                  Copy and share with your friends
-                </Text>
-              </View>
-              <Image source={chevronRight} style={styles.actionChevron} />
-            </Pressable>
-            <Pressable onPress={() => textInvite()} style={styles.actionRow}>
-              <Image source={inviteMessage} style={styles.actionIcon} />
-              <View style={styles.actionCopy}>
-                <Text style={styles.actionText}>Invite friend via text</Text>
-                <Text style={styles.actionSubtitle}>
-                  Send an invite directly
-                </Text>
-              </View>
-              <Image source={chevronRight} style={styles.actionChevron} />
-            </Pressable>
-            <Pressable onPress={requestContacts} style={styles.actionRow}>
-              <Image source={inviteContacts} style={styles.actionIcon} />
-              <View style={styles.actionCopy}>
-                <Text style={styles.actionText}>Invite from your contacts</Text>
-                <Text style={styles.actionSubtitle}>
-                  Find friends already on Tastes
-                </Text>
-              </View>
-              <Image source={chevronRight} style={styles.actionChevron} />
-            </Pressable>
+            <InviteOption
+              detail="Copy and share with your friends"
+              icon={InviteLinkIcon}
+              onPress={shareInvite}
+              styles={styles}
+              title="Share your invite link"
+            />
+            <InviteOption
+              detail="Send an invite directly"
+              icon={InviteMessageIcon}
+              onPress={() => textInvite()}
+              styles={styles}
+              title="Invite friend via text"
+            />
+            <InviteOption
+              detail="Find friends already on Tastes"
+              icon={InviteContactsIcon}
+              onPress={requestContacts}
+              styles={styles}
+              title="Invite from your contacts"
+            />
           </View>
         </ScrollView>
         <PrimaryButton
@@ -2508,41 +2735,190 @@ const createStyles = (
       lineHeight: 18,
       textAlign: 'center',
     },
-    locationPreview: {
+    locationScroll: {
+      position: 'absolute',
+      top: 130,
+      left: 0,
+      right: 0,
+      bottom: 94,
+    },
+    locationPage: {
+      paddingHorizontal: 16,
+      paddingBottom: 0,
+      alignItems: 'center',
+    },
+    locationBadge: {
+      width: 64,
+      height: 64,
+      overflow: 'visible',
+      borderWidth: 4,
+      borderColor: 'rgba(229,56,69,0.18)',
+      borderRadius: 44,
+      backgroundColor: '#1A1A1C',
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#E53845',
+      shadowOpacity: 0.35,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    locationTitle: {
       width: '100%',
-      height: 178,
-      marginTop: 38,
+      marginTop: 24,
+      color: '#FFFFFF',
+      fontSize: 24,
+      lineHeight: 27,
+      fontWeight: '700',
+      letterSpacing: -0.24,
+      textAlign: 'center',
+    },
+    locationTitleAccent: { color: '#E63946' },
+    locationSubtitle: {
+      width: '100%',
+      marginTop: 12,
+      color: 'rgba(255,255,255,0.72)',
+      fontSize: 15,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    locationMap: {
+      width: '100%',
+      height: 304,
+      marginTop: 36,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 18,
-      backgroundColor: isDark ? '#252626' : '#E9E7E1',
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderColor: 'rgba(255,255,255,0.08)',
+      borderRadius: 24,
+      backgroundColor: '#161618',
     },
-    locationRoadHorizontal: {
+    locationMapStreets: {
       position: 'absolute',
-      left: -20,
-      right: -20,
-      height: 24,
-      backgroundColor: isDark ? '#343737' : '#F7F5EF',
-      transform: [{ rotate: '-8deg' }],
+      left: -1,
+      top: -1,
+      width: 370,
+      height: 296,
     },
-    locationRoadVertical: {
+    locationMapVignette: {
       position: 'absolute',
-      top: -20,
-      bottom: -20,
-      width: 22,
-      backgroundColor: isDark ? '#343737' : '#F7F5EF',
-      transform: [{ rotate: '18deg' }],
+      inset: 0,
+      borderWidth: 18,
+      borderColor: 'rgba(22,22,24,0.28)',
+      borderRadius: 24,
     },
-    locationPinRing: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: 'rgba(211,59,53,0.2)',
+    locationVenueCard: {
+      position: 'absolute',
+      paddingLeft: 6,
+      paddingRight: 10,
+      paddingVertical: 6,
+      overflow: 'hidden',
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 14,
+      backgroundColor: 'rgba(28,28,30,0.94)',
+      shadowColor: '#000000',
+      shadowOpacity: 0.5,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    locationVenueEmma: { left: 11, top: 15, width: 181, height: 80 },
+    locationVenueSakura: { left: 175, top: 73, width: 184, height: 104 },
+    locationVenueVelvet: { left: 73, top: 189, width: 219, height: 104 },
+    locationVenuePhoto: {
+      width: 68,
+      height: 68,
+      borderRadius: 10,
+    },
+    locationVenuePhotoTall: { height: 92 },
+    locationVenueInfo: { flex: 1, alignItems: 'flex-start', gap: 2 },
+    locationVenueFriend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    locationAvatar: { width: 18, height: 18, borderRadius: 9 },
+    locationVenueName: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      lineHeight: 16,
+      fontWeight: '600',
+    },
+    locationVenueTag: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: 'rgba(230,57,70,0.22)',
+    },
+    locationVenueTagText: {
+      color: '#FF8C94',
+      fontSize: 9,
+      lineHeight: 11,
+      fontWeight: '600',
+    },
+    locationVenueRating: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    locationVenueRatingText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '600',
+    },
+    locationVenueDetail: {
+      width: 88,
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 9,
+      lineHeight: 11,
+    },
+    locationVenueDistance: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: 9,
+      lineHeight: 11,
+    },
+    locationMapPinEmma: {
+      position: 'absolute',
+      left: 195,
+      top: 13,
+    },
+    locationMapPinSakura: {
+      position: 'absolute',
+      left: 311,
+      top: 181,
+    },
+    locationMapPinVelvet: {
+      position: 'absolute',
+      left: 19,
+      top: 181,
+    },
+    locationPrivacy: {
+      width: 330,
+      minHeight: 72,
+      marginTop: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.08)',
+      borderRadius: 14,
+      backgroundColor: 'rgba(26,26,28,0.88)',
+    },
+    locationPrivacyText: {
+      flex: 1,
+      color: 'rgba(255,255,255,0.62)',
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    locationButton: {
+      position: 'absolute',
+      left: 36,
+      right: 36,
+      bottom: 24,
     },
     locationPin: {
       width: 18,
@@ -2551,17 +2927,6 @@ const createStyles = (
       borderWidth: 4,
       borderColor: '#FFFFFF',
       backgroundColor: '#D33B35',
-    },
-    locationPreviewLabel: {
-      marginTop: 10,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      overflow: 'hidden',
-      borderRadius: 10,
-      color: colors.text,
-      fontSize: 12,
-      fontWeight: '600',
-      backgroundColor: colors.surface,
     },
     profileKeyboardAvoiding: { flex: 1 },
     profileKeyboardLayout: { flex: 1 },
@@ -3260,7 +3625,7 @@ const createStyles = (
     inviteText: { color: colors.onPrimary, fontSize: 11 },
     inviteScroll: {
       position: 'absolute',
-      top: landscape ? 80 : 130,
+      top: landscape ? 80 : 108,
       left: 0,
       right: 0,
       bottom: Math.max(94, bottomGutter + 70),
@@ -3270,8 +3635,56 @@ const createStyles = (
       paddingBottom: 16,
       alignItems: 'center',
     },
-    peopleIcon: { width: 118, height: 46, marginBottom: 22 },
-    inviteTitle: { fontSize: 24, lineHeight: 29, letterSpacing: 0.6 },
+    inviteHero: { width: 270, height: 124 },
+    inviteSparkles: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: 270,
+      height: 124,
+    },
+    inviteFriend: {
+      position: 'absolute',
+      width: 64,
+      height: 64,
+      borderWidth: 2,
+      borderColor: 'rgba(255,153,163,0.9)',
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#E53845',
+      shadowOpacity: 0.45,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    inviteFriendLeft: { left: 38, top: 38 },
+    inviteFriendRight: { left: 168, top: 38 },
+    inviteFriendCenter: {
+      left: 93,
+      top: 24,
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+    },
+    inviteTitle: {
+      width: '100%',
+      marginTop: 22,
+      color: '#FFFFFF',
+      fontSize: 24,
+      lineHeight: 29,
+      fontWeight: '700',
+      letterSpacing: -0.24,
+      textAlign: 'center',
+    },
+    inviteSubtitle: {
+      width: '100%',
+      marginTop: 8,
+      color: 'rgba(255,255,255,0.65)',
+      fontSize: 13.5,
+      lineHeight: 18,
+      letterSpacing: -0.135,
+      textAlign: 'center',
+    },
     progressText: {
       color: '#e0453c',
       fontSize: 12,
@@ -3286,37 +3699,50 @@ const createStyles = (
       backgroundColor: colors.surfaceRaised,
     },
     progressDotActive: { backgroundColor: colors.primary },
-    inviteActions: { width: '100%', gap: 10, marginTop: 24 },
+    inviteActions: { width: '100%', gap: 14, marginTop: 22 },
     actionRow: {
-      minHeight: 64,
+      minHeight: 80,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-      backgroundColor: colors.surface,
+      borderColor: 'rgba(230,57,70,0.42)',
+      backgroundColor: '#211516',
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 16,
+      gap: 14,
+      paddingLeft: 14,
+      paddingRight: 16,
+      paddingVertical: 15,
+      shadowColor: '#E53845',
+      shadowOpacity: 0.18,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 0 },
     },
-    actionIcon: {
-      width: 18,
-      height: 18,
-      marginRight: 12,
-      tintColor: colors.text,
+    actionIconTile: {
+      width: 50,
+      height: 50,
+      flexShrink: 0,
+      borderWidth: 1,
+      borderColor: 'rgba(230,57,70,0.28)',
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000000',
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
     },
-    actionCopy: { flex: 1, gap: 2 },
+    actionCopy: { flex: 1, gap: 3 },
     actionText: {
-      color: colors.text,
-      fontSize: 15,
-      lineHeight: 20,
-      letterSpacing: -0.41,
+      color: '#FFFFFF',
+      fontSize: 16,
+      lineHeight: 19,
       fontWeight: '600',
     },
     actionSubtitle: {
-      color: colors.textMuted,
-      fontSize: 12,
+      color: 'rgba(255,255,255,0.55)',
+      fontSize: 13,
       lineHeight: 16,
     },
-    actionChevron: { width: 8, height: 16, opacity: 0.7 },
     ready: { flex: 1 },
     readyPattern: { width: '100%', height: '100%', opacity: 0.04 },
     readyContent: {

@@ -537,6 +537,67 @@ describe('onboarding in resizable windows', () => {
     ).toBe(384);
   });
 
+  it('matches the updated Figma location priming screen', async () => {
+    resize(402, 874);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="location"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(screen.getByText('Allow Location')).toBeOnTheScreen();
+    expect(screen.queryByText('Use My Location')).toBeNull();
+    expect(
+      screen.getByText(
+        'Discover great spots nearby, from friend favorites to top-rated local finds.',
+      ),
+    ).toBeOnTheScreen();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-location-map').props.style,
+      ),
+    ).toMatchObject({ height: 304, marginTop: 36, borderRadius: 24 });
+  });
+
+  it('matches the updated Figma invitation hero and option cards', async () => {
+    resize(402, 874);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="invite"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-invite-hero').props.style,
+      ),
+    ).toMatchObject({ width: 270, height: 124 });
+    expect(
+      StyleSheet.flatten(
+        screen.getByRole('button', { name: 'Share your invite link' }).props
+          .style,
+      ),
+    ).toMatchObject({
+      minHeight: 80,
+      borderColor: 'rgba(230,57,70,0.42)',
+      borderRadius: 20,
+    });
+    expect(screen.getByText('Send an invite directly')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Find friends already on Tastes'),
+    ).toBeOnTheScreen();
+  });
+
   it('uses readable completion copy in the light theme', async () => {
     resize(402, 874);
     await render(

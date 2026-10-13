@@ -1,0 +1,24 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="50" height="66" viewBox="0 0 50 66" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Pin &#226;&#128;&#148; Emma" filter="url(#filter0_d_0_46)">
+<g clip-path="url(#clip0_0_46)">
+<path id="Vector" d="M25 51C26.6569 51 28 49.6569 28 48C28 46.3431 26.6569 45 25 45C23.3431 45 22 46.3431 22 48C22 49.6569 23.3431 51 25 51Z" fill="#E63946"/>
+<path id="Vector_2" d="M25 54C28.3137 54 31 51.3137 31 48C31 44.6863 28.3137 42 25 42C21.6863 42 19 44.6863 19 48C19 51.3137 21.6863 54 25 54Z" fill="#E63946" fill-opacity="0.25"/>
+<path id="Vector_3" d="M25 8C16.7 8 10 14.5 10 22.6C10 31.5 21.6 40 23.7 41.4C24.0772 41.6763 24.5325 41.8252 25 41.8252C25.4675 41.8252 25.9228 41.6763 26.3 41.4C28.4 40 40 31.5 40 22.6C40 14.5 33.3 8 25 8Z" fill="#E63946"/>
+<path id="Vector_4" d="M20.5 16V21.2C20.508 21.6371 20.659 22.0596 20.9299 22.4027C21.2008 22.7459 21.5767 22.9908 22 23.1V29H23.4V23.1C23.8233 22.9908 24.1992 22.7459 24.4701 22.4027C24.741 22.0596 24.892 21.6371 24.9 21.2V16H23.8V20.3H23V16H22V20.3H21.2V16H20.5ZM28.7 16C27.3 16 26.5 17.9 26.5 20.2C26.5 21.7 27.1 22.8 27.9 23.1V29H29.3V16H28.7Z" fill="white"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_0_46" x="0" y="0" width="50" height="66" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2"/>
+<feGaussianBlur stdDeviation="5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.9 0 0 0 0 0.22 0 0 0 0 0.27 0 0 0 0.45 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_46"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_46" result="shape"/>
+</filter>
+<clipPath id="clip0_0_46">
+<rect width="30" height="46" fill="white" transform="translate(10 8)"/>
+</clipPath>
+</defs>
+</svg>
