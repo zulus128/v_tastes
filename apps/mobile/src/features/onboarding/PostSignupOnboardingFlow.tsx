@@ -767,7 +767,13 @@ function NearbyMapPreview({
 function InviteHero({ styles }: { styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={styles.inviteHero} testID="onboarding-invite-hero">
-      <InviteSparkles style={styles.inviteSparkles} />
+      <View
+        pointerEvents="none"
+        style={styles.inviteSparkles}
+        testID="onboarding-invite-sparkles"
+      >
+        <InviteSparkles height="100%" width="100%" />
+      </View>
       <LinearGradient
         colors={['#FF7380', '#ED505E', '#DB2E3D', '#9E1421']}
         locations={[0, 0.3, 0.6, 1]}

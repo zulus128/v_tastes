@@ -623,6 +623,26 @@ describe('onboarding in resizable windows', () => {
     ).toBeOnTheScreen();
   });
 
+  it('scales the invitation sparkles with the three friend illustrations', async () => {
+    resize(804, 1748);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="invite"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-invite-sparkles').props.style,
+      ),
+    ).toMatchObject({ width: 540, height: 248 });
+  });
+
   it('uses readable completion copy in the light theme', async () => {
     resize(402, 874);
     await render(
