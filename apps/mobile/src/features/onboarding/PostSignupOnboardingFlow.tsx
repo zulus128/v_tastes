@@ -2410,7 +2410,7 @@ const createStyles = (
       lineHeight: 26,
       fontWeight: '600',
     },
-    birthdayButton: { left: 26, right: 26 },
+    birthdayButton: { left: 26, right: 26, height: 42 },
     birthdayError: {
       marginTop: 14,
       color: colors.primary,

@@ -549,6 +549,11 @@ describe('onboarding in resizable windows', () => {
     for (const month of ['February', 'March', 'April', 'May', 'June']) {
       expect(screen.getByText(month)).toBeOnTheScreen();
     }
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-primary-button-glow').props.style,
+      ),
+    ).toMatchObject({ height: 42 });
   });
 
   it.each([
