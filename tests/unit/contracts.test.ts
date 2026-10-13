@@ -174,6 +174,28 @@ describe('public API contracts', () => {
     ).toBe(expectedMessage);
   });
 
+  it('requires profile birthdays to meet the rolling 15-year cutoff', () => {
+    const cutoff = new Date();
+    cutoff.setHours(12, 0, 0, 0);
+    cutoff.setFullYear(cutoff.getFullYear() - 15);
+    const eligible = cutoff.toISOString().slice(0, 10);
+    const tooYoung = new Date(cutoff);
+    tooYoung.setDate(tooYoung.getDate() + 1);
+
+    expect(
+      createUserProfileInputSchema.safeParse({
+        displayName: 'Demo User',
+        birthDate: eligible,
+      }).success,
+    ).toBe(true);
+    expect(
+      createUserProfileInputSchema.safeParse({
+        displayName: 'Demo User',
+        birthDate: tooYoung.toISOString().slice(0, 10),
+      }).success,
+    ).toBe(false);
+  });
+
   it('accepts an E.164 phone number and a 4-digit OTP code', () => {
     expect(
       requestPhoneOtpInputSchema.parse({ phoneNumber: ' +905551234567 ' }),

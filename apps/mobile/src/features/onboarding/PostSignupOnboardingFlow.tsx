@@ -1434,10 +1434,15 @@ export function PostSignupOnboardingFlow({
     const days = Array.from({ length: maximumDay }, (_, index) => index + 1);
     const currentYear = new Date().getFullYear();
     const years = Array.from(
-      { length: 103 },
-      (_, index) => currentYear - 13 - index,
+      { length: 101 },
+      (_, index) => currentYear - 15 - index,
     ).reverse();
     const safeDay = Math.min(birthDay, maximumDay);
+    const selectedBirthDate = new Date(birthYear, birthMonth, safeDay);
+    const ageCutoff = new Date();
+    ageCutoff.setHours(23, 59, 59, 999);
+    ageCutoff.setFullYear(ageCutoff.getFullYear() - 15);
+    const birthdayEligible = selectedBirthDate <= ageCutoff;
     return (
       <PatternScreen>
         <Header onBack={back} />
@@ -1478,8 +1483,14 @@ export function PostSignupOnboardingFlow({
               values={years}
             />
           </View>
+          {!birthdayEligible ? (
+            <Text style={styles.birthdayError}>
+              You must be at least 15 years old.
+            </Text>
+          ) : null}
         </View>
         <PrimaryButton
+          disabled={!birthdayEligible}
           label="Continue"
           loading={busy}
           onPress={() =>
@@ -2346,6 +2357,13 @@ const createStyles = (
       fontSize: 19,
       lineHeight: 24,
       fontWeight: '600',
+    },
+    birthdayError: {
+      marginTop: 14,
+      color: colors.primary,
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center',
     },
     locationPreview: {
       width: '100%',

@@ -42,6 +42,19 @@ export const createUserProfileInputSchema = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid birth date.')
+    .refine((value) => {
+      const [year, month, day] = value.split('-').map(Number);
+      const birthDate = new Date(year!, month! - 1, day!);
+      const cutoff = new Date();
+      cutoff.setHours(23, 59, 59, 999);
+      cutoff.setFullYear(cutoff.getFullYear() - 15);
+      return (
+        birthDate.getFullYear() === year &&
+        birthDate.getMonth() === month! - 1 &&
+        birthDate.getDate() === day &&
+        birthDate <= cutoff
+      );
+    }, 'You must be at least 15 years old.')
     .optional(),
   photoPath: z.string().trim().min(1).max(512).optional(),
   photoThumbnailPath: z.string().trim().min(1).max(512).optional(),
