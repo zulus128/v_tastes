@@ -1030,6 +1030,17 @@ export function PostSignupOnboardingFlow({
     contentWidth,
   );
   const landscape = orientation.width > orientation.height;
+  const locationContentScale = landscape
+    ? Math.max(
+        layoutScale,
+        Math.min(2.4, (contentWidth * 0.78) / DESIGN_VIEWPORT.width),
+      )
+    : layoutScale;
+  const locationScaleRatio = locationContentScale / layoutScale;
+  const locationContentWidth = DESIGN_VIEWPORT.width * locationContentScale;
+  const locationContentHeight = 650 * locationContentScale;
+  const locationBaseWidth = DESIGN_VIEWPORT.width * layoutScale;
+  const locationBaseHeight = 650 * layoutScale;
   const usesCompactDishLayout = viewportHeight < 840 || viewportWidth < 360;
   const usesNarrowPlaceLayout = viewportWidth < 360;
   const api = useTastesApi();
@@ -1915,31 +1926,59 @@ export function PostSignupOnboardingFlow({
           style={styles.locationScroll}
           testID="onboarding-location-scroll"
         >
-          <LocationBadge styles={styles} />
-          <Text style={styles.locationTitle}>
-            See what’s <Text style={styles.locationTitleAccent}>good</Text>
-            {'\n'}near you
-          </Text>
-          <Text style={styles.locationSubtitle}>
-            Discover great spots nearby, from friend favorites to top-rated
-            local finds.
-          </Text>
-          <NearbyMapPreview styles={styles} />
-          <View style={styles.locationPrivacy}>
-            <LocationLockIcon
-              height={responsiveSize(24)}
-              width={responsiveSize(24)}
-            />
-            <Text style={styles.locationPrivacyText}>
-              Your precise location is never shown to other users. It’s only
-              used to personalize nearby recommendations.
-            </Text>
+          <View
+            style={{
+              height: locationContentHeight,
+              width: locationContentWidth,
+            }}
+            testID="onboarding-location-scale-frame"
+          >
+            <View
+              style={[
+                styles.locationScaledContent,
+                {
+                  height: locationBaseHeight,
+                  left: (locationContentWidth - locationBaseWidth) / 2,
+                  top: (locationContentHeight - locationBaseHeight) / 2,
+                  transform: [{ scale: locationScaleRatio }],
+                  width: locationBaseWidth,
+                },
+              ]}
+              testID="onboarding-location-scaled-content"
+            >
+              <LocationBadge styles={styles} />
+              <Text style={styles.locationTitle}>
+                See what’s <Text style={styles.locationTitleAccent}>good</Text>
+                {'\n'}near you
+              </Text>
+              <Text style={styles.locationSubtitle}>
+                Discover great spots nearby, from friend favorites to top-rated
+                local finds.
+              </Text>
+              <NearbyMapPreview styles={styles} />
+              <View style={styles.locationPrivacy}>
+                <LocationLockIcon
+                  height={responsiveSize(24)}
+                  width={responsiveSize(24)}
+                />
+                <Text style={styles.locationPrivacyText}>
+                  Your precise location is never shown to other users. It’s only
+                  used to personalize nearby recommendations.
+                </Text>
+              </View>
+            </View>
           </View>
         </ScrollView>
         <PrimaryButton
           label="Allow Location"
           onPress={requestLocation}
-          style={styles.locationButton}
+          style={[
+            styles.locationButton,
+            {
+              width: 330 * locationContentScale,
+              transform: [{ translateX: -165 * locationContentScale }],
+            },
+          ]}
         />
       </PatternScreen>
     );
@@ -2765,6 +2804,10 @@ const createStyles = (
     locationPage: {
       paddingHorizontal: 16,
       paddingBottom: 0,
+      alignItems: 'center',
+    },
+    locationScaledContent: {
+      position: 'absolute',
       alignItems: 'center',
     },
     locationBadge: {
