@@ -11,6 +11,8 @@ import {
   discoverFeedQueryKey,
   discoverPeopleQueryKey,
   discoverVenuesQueryKey,
+  placeQueryKey,
+  placeReviewsQueryKey,
 } from '../queryKeys';
 import { normalizePlaceReviewPage } from './reviewNormalization';
 
@@ -18,17 +20,13 @@ export {
   discoverFeedQueryKey,
   discoverPeopleQueryKey,
   discoverVenuesQueryKey,
+  placeQueryKey,
+  placeReviewsQueryKey,
 } from '../queryKeys';
 export const peopleSearchQueryKey = (userId: string, query: string) =>
   ['discover', 'people-search', userId, query] as const;
-export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
 export const venueSearchQueryKey = (query: string) =>
   ['venues', 'search', query] as const;
-export const placeReviewsQueryKey = (
-  venueId: string,
-  sort: string,
-  scope = 'all',
-) => ['place', venueId, 'reviews', sort, scope] as const;
 export type DiscoverVenueFilter = {
   category?: string;
   tag?: DiscoverTag;
@@ -112,6 +110,7 @@ export function usePlace(venueId: string) {
     queryKey: placeQueryKey(venueId),
     queryFn: async () => (await api.getPlace({ venueId })).data,
     enabled: venueId.length > 0,
+    staleTime: 30_000,
   });
 }
 
@@ -135,6 +134,7 @@ export function usePlaceReviews(
         })
       ).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+    staleTime: 30_000,
     select: (data) => data.pages.flatMap(normalizePlaceReviewPage),
     // Switching sort/scope changes the query key; without this, the whole
     // toolbar+list would briefly get swapped for the loading spinner every

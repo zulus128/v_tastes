@@ -4,6 +4,7 @@ import type {
   TastesGroup,
 } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,20 +34,31 @@ import {
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
+import { requestsQueryKey } from '../queryKeys';
 
 export function RequestsScreen({ onBack }: { onBack: () => void }) {
   const api = useTastesApi();
+  const userId = useAuthenticatedUserId();
+  const queryClient = useQueryClient();
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [requests, setRequests] = useState<AppRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedRequests = queryClient.getQueryData<AppRequest[]>(
+    requestsQueryKey(userId),
+  );
+  const [requests, setRequests] = useState<AppRequest[]>(
+    () => cachedRequests ?? [],
+  );
+  const [loading, setLoading] = useState(() => !cachedRequests);
   useEffect(() => {
     let active = true;
     void api
       .listRequests()
       .then((r) => {
-        if (active) setRequests(r.data);
+        if (active) {
+          setRequests(r.data);
+          queryClient.setQueryData(requestsQueryKey(userId), r.data);
+        }
       })
       .catch((e) => Alert.alert('Could not load requests', apiErrorMessage(e)))
       .finally(() => {
@@ -55,7 +67,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, queryClient, userId]);
   const respond = async (
     item: AppRequest,
     response: 'accepted' | 'declined',
@@ -63,6 +75,10 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
     await api.respondToRequest({ requestId: item.id, response });
     setRequests((current) =>
       current.filter((candidate) => candidate.id !== item.id),
+    );
+    queryClient.setQueryData<AppRequest[]>(
+      requestsQueryKey(userId),
+      (current) => current?.filter((candidate) => candidate.id !== item.id),
     );
   };
   const deleteAll = async () => {
@@ -73,6 +89,7 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
       ),
     );
     setRequests([]);
+    queryClient.setQueryData(requestsQueryKey(userId), []);
   };
   return (
     <Screen style={styles.screen}>

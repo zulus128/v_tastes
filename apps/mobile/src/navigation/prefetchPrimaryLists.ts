@@ -8,6 +8,8 @@ import {
   favouritesQueryKey,
   feedQueryKey,
   leaderboardQueryKey,
+  notificationsQueryKey,
+  requestsQueryKey,
 } from '../features/queryKeys';
 
 export function prefetchPrimaryLists(
@@ -70,6 +72,17 @@ export function prefetchPrimaryLists(
           })
         ).data,
       getNextPageParam: nextCursor,
+    }),
+    queryClient.prefetchInfiniteQuery({
+      queryKey: notificationsQueryKey(userId),
+      initialPageParam: null as string | null,
+      queryFn: async ({ pageParam }) =>
+        (await api.listNotifications({ cursor: pageParam, limit: 20 })).data,
+      getNextPageParam: nextCursor,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: requestsQueryKey(userId),
+      queryFn: async () => (await api.listRequests()).data,
     }),
   ]);
 }

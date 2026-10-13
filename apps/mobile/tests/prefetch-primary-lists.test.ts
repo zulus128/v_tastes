@@ -17,6 +17,8 @@ describe('prefetchPrimaryLists', () => {
       getLeaderboard: vi.fn().mockResolvedValue({ data: page }),
       getVenues: vi.fn().mockResolvedValue({ data: page }),
       listConversations: vi.fn().mockResolvedValue({ data: page }),
+      listNotifications: vi.fn().mockResolvedValue({ data: page }),
+      listRequests: vi.fn().mockResolvedValue({ data: [] }),
     } as unknown as TastesApi;
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -29,6 +31,10 @@ describe('prefetchPrimaryLists', () => {
     expect(api.listConversations).toHaveBeenCalledWith({
       cursor: null,
       limit: 50,
+    });
+    expect(api.listNotifications).toHaveBeenCalledWith({
+      cursor: null,
+      limit: 20,
     });
     expect(
       queryClient.getQueryData(feedQueryKey('user-1', 'friends')),

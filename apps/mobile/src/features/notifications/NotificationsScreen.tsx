@@ -1,5 +1,5 @@
 import type { AppNotification, AppRequest } from '@tastes/contracts';
-import { useQueryClient } from '@tanstack/react-query';
+import { type InfiniteData, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -23,6 +23,12 @@ import {
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { unreadNotificationCountQueryKey } from './api';
+import { notificationsQueryKey, requestsQueryKey } from '../queryKeys';
+
+type NotificationPage = {
+  items: AppNotification[];
+  nextCursor: string | null;
+};
 
 type FeedEntry =
   | {
@@ -103,13 +109,27 @@ export function NotificationsScreen({
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const [items, setItems] = useState<AppNotification[]>([]);
-  const [requests, setRequests] = useState<AppRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedNotifications = queryClient.getQueryData<
+    InfiniteData<NotificationPage, string | null>
+  >(notificationsQueryKey(userId));
+  const cachedRequests = queryClient.getQueryData<AppRequest[]>(
+    requestsQueryKey(userId),
+  );
+  const [items, setItems] = useState<AppNotification[]>(
+    () => cachedNotifications?.pages.flatMap((page) => page.items) ?? [],
+  );
+  const [requests, setRequests] = useState<AppRequest[]>(
+    () => cachedRequests ?? [],
+  );
+  const [loading, setLoading] = useState(
+    () => !cachedNotifications && !cachedRequests,
+  );
   const [loadingMore, setLoadingMore] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    () => cachedNotifications?.pages.at(-1)?.nextCursor ?? null,
+  );
 
   const feed = useMemo<FeedEntry[]>(() => {
     const notifications = items.map((item): FeedEntry => ({
@@ -137,6 +157,14 @@ export function NotificationsScreen({
         setItems(notifications.data.items);
         setNextCursor(notifications.data.nextCursor);
         setRequests(pendingRequests.data);
+        queryClient.setQueryData(notificationsQueryKey(userId), {
+          pages: [notifications.data],
+          pageParams: [null],
+        });
+        queryClient.setQueryData(
+          requestsQueryKey(userId),
+          pendingRequests.data,
+        );
       })
       .catch(() =>
         Alert.alert('Could not load notifications', 'Please try again.'),
@@ -147,7 +175,7 @@ export function NotificationsScreen({
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, queryClient, userId]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -223,6 +251,10 @@ export function NotificationsScreen({
       await api.respondToRequest({ requestId: item.id, response });
       setRequests((current) =>
         current.filter((candidate) => candidate.id !== item.id),
+      );
+      queryClient.setQueryData<AppRequest[]>(
+        requestsQueryKey(userId),
+        (current) => current?.filter((candidate) => candidate.id !== item.id),
       );
     } catch {
       Alert.alert('Could not update request', 'Please try again.');

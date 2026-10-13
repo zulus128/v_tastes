@@ -55,6 +55,11 @@ import { CreateTabGlyph, TabBarGlyph } from '../ui/FigmaIcons';
 import { type ThemeColors, useAppTheme } from '../ui/ThemeProvider';
 import { responsiveStyleSheet } from '../ui/responsive';
 import { consumePendingDeepLink } from './pendingDeepLink';
+import {
+  prefetchComments,
+  prefetchConversationMessages,
+  prefetchPlace,
+} from './prefetchNextLists';
 import { prefetchPrimaryLists } from './prefetchPrimaryLists';
 
 export type RootStackParamList = {
@@ -200,14 +205,27 @@ function MainTabs({
     return () => task.cancel();
   }, [api, queryClient, user.uid]);
 
+  function openComments(reviewId: string) {
+    void prefetchComments(queryClient, api, user.uid, reviewId);
+    rootNavigation.navigate('Comments', { reviewId });
+  }
+
+  function openPlace(venueId: string) {
+    void prefetchPlace(queryClient, api, venueId);
+    rootNavigation.navigate('Place', { venueId });
+  }
+
+  function openExistingConversation(conversationId: string) {
+    void prefetchConversationMessages(queryClient, api, conversationId);
+    rootNavigation.navigate('Conversation', { conversationId });
+  }
+
   async function openConversation(targetUserId: string) {
     if (openingConversationFor) return;
     setOpeningConversationFor(targetUserId);
     try {
       const result = await api.createConversation({ targetUserId });
-      rootNavigation.navigate('Conversation', {
-        conversationId: result.data.id,
-      });
+      openExistingConversation(result.data.id);
     } catch (error) {
       const message = apiErrorMessage(error);
       Alert.alert(
@@ -234,16 +252,12 @@ function MainTabs({
           {({ navigation }) => (
             <HomeFeedScreen
               onExplore={() => navigation.navigate('Discover')}
-              onOpenComments={(reviewId) =>
-                rootNavigation.navigate('Comments', { reviewId })
-              }
+              onOpenComments={openComments}
               onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
               onOpenNotifications={() =>
                 rootNavigation.navigate('Notifications')
               }
-              onOpenPlace={(venueId) =>
-                rootNavigation.navigate('Place', { venueId })
-              }
+              onOpenPlace={openPlace}
               onOpenProfile={(userId) =>
                 navigation.navigate('Profile', { userId })
               }
@@ -256,12 +270,8 @@ function MainTabs({
               appliedFilters={discoverFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
               onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
-              onOpenComments={(reviewId) =>
-                rootNavigation.navigate('Comments', { reviewId })
-              }
-              onOpenPlace={(venueId) =>
-                rootNavigation.navigate('Place', { venueId })
-              }
+              onOpenComments={openComments}
+              onOpenPlace={openPlace}
               onOpenProfile={(person: DiscoverPerson) =>
                 navigation.navigate('Profile', {
                   initialFollowing: person.following,
@@ -314,9 +324,7 @@ function MainTabs({
             <ConversationsScreen
               onNewActivity={() => rootNavigation.navigate('NewActivity')}
               onNewGroup={() => rootNavigation.navigate('NewGroup')}
-              onOpenConversation={(conversationId) =>
-                rootNavigation.navigate('Conversation', { conversationId })
-              }
+              onOpenConversation={openExistingConversation}
               onOpenRequests={() => rootNavigation.navigate('Requests')}
               userId={user.uid}
             />
@@ -349,13 +357,9 @@ function MainTabs({
                   navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
-                onOpenComments={(reviewId) =>
-                  rootNavigation.navigate('Comments', { reviewId })
-                }
+                onOpenComments={openComments}
                 onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
-                onOpenPlace={(venueId) =>
-                  rootNavigation.navigate('Place', { venueId })
-                }
+                onOpenPlace={openPlace}
                 onOpenProfile={(profileUserId, profileFollowing) =>
                   navigation.navigate('Profile', {
                     initialFollowing: profileFollowing,
@@ -404,7 +408,15 @@ export function ProductNavigator({
   visualAuditRoute?: ProductVisualAuditRoute;
 }) {
   const { colors, isDark } = useAppTheme();
+  const queryClient = useQueryClient();
+  const { api } = useSession();
   const [discoverFilters, setDiscoverFilters] = useState<string[]>([]);
+  const warmComments = (reviewId: string) =>
+    void prefetchComments(queryClient, api, user.uid, reviewId);
+  const warmConversation = (conversationId: string) =>
+    void prefetchConversationMessages(queryClient, api, conversationId);
+  const warmPlace = (venueId: string) =>
+    void prefetchPlace(queryClient, api, venueId);
   const navigationTheme = useMemo<Theme>(() => {
     const base = isDark ? DarkTheme : DefaultTheme;
     return {
@@ -505,9 +517,10 @@ export function ProductNavigator({
                   params: { venueId: route.params.venueId },
                 })
               }
-              onOpenComments={(reviewId) =>
-                navigation.navigate('Comments', { reviewId })
-              }
+              onOpenComments={(reviewId) => {
+                warmComments(reviewId);
+                navigation.navigate('Comments', { reviewId });
+              }}
               userId={user.uid}
               venueId={route.params.venueId}
             />
@@ -575,8 +588,10 @@ export function ProductNavigator({
                 switch (item.targetType) {
                   case 'comments':
                   case 'review':
-                    if (targetId)
+                    if (targetId) {
+                      warmComments(targetId);
                       navigation.navigate('Comments', { reviewId: targetId });
+                    }
                     break;
                   case 'profile':
                     if (targetId)
@@ -592,14 +607,18 @@ export function ProductNavigator({
                       });
                     break;
                   case 'place':
-                    if (targetId)
+                    if (targetId) {
+                      warmPlace(targetId);
                       navigation.navigate('Place', { venueId: targetId });
+                    }
                     break;
                   case 'chat':
-                    if (targetId)
+                    if (targetId) {
+                      warmConversation(targetId);
                       navigation.navigate('Conversation', {
                         conversationId: targetId,
                       });
+                    }
                     break;
                   case 'recap':
                     navigation.navigate('Recap', { mode: 'ready' });
@@ -637,9 +656,10 @@ export function ProductNavigator({
           {({ navigation }) => (
             <TastesAIScreen
               onBack={navigation.goBack}
-              onOpenPlace={(venueId) =>
-                navigation.navigate('Place', { venueId })
-              }
+              onOpenPlace={(venueId) => {
+                warmPlace(venueId);
+                navigation.navigate('Place', { venueId });
+              }}
               userId={user.uid}
             />
           )}
@@ -669,9 +689,10 @@ export function ProductNavigator({
             <GroupDetailsScreen
               groupId={route.params.groupId}
               onBack={navigation.goBack}
-              onOpenConversation={(conversationId) =>
-                navigation.navigate('Conversation', { conversationId })
-              }
+              onOpenConversation={(conversationId) => {
+                warmConversation(conversationId);
+                navigation.navigate('Conversation', { conversationId });
+              }}
             />
           )}
         </RootStack.Screen>

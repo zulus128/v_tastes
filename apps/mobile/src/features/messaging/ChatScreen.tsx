@@ -32,6 +32,7 @@ import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
+import { conversationMessagesQueryKey } from '../queryKeys';
 import { useProfile } from '../profile/api';
 import {
   subscribeConversationDetails,
@@ -332,12 +333,13 @@ export function ChatScreen({
   const { profile: currentUserProfile } = useProfile(userId, 'You');
   const realtimeMessages = useConversationMessages(conversationId, userId);
   const messageHistory = useInfiniteQuery({
-    queryKey: ['messages', conversationId, 'history'],
+    queryKey: conversationMessagesQueryKey(conversationId),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
       (await api.getMessages({ conversationId, cursor: pageParam, limit: 50 }))
         .data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+    staleTime: 15_000,
   });
   const messageItems = useMemo(() => {
     const byId = new Map<string, ChatMessage>();

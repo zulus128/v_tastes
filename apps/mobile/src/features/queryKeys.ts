@@ -34,3 +34,23 @@ export const leaderboardQueryKey = (
 
 export const conversationHistoryQueryKey = (userId: string) =>
   ['conversations', userId, 'history'] as const;
+
+export const conversationMessagesQueryKey = (conversationId: string) =>
+  ['messages', conversationId, 'history'] as const;
+
+export const commentsQueryKey = (userId: string, reviewId: string) =>
+  ['comments', userId, reviewId] as const;
+
+export const notificationsQueryKey = (userId: string) =>
+  ['notifications', userId, 'list'] as const;
+
+export const requestsQueryKey = (userId: string) =>
+  ['requests', userId] as const;
+
+export const placeQueryKey = (venueId: string) => ['place', venueId] as const;
+
+export const placeReviewsQueryKey = (
+  venueId: string,
+  sort: string,
+  scope = 'all',
+) => ['place', venueId, 'reviews', sort, scope] as const;

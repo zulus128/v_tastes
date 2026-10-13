@@ -7,6 +7,7 @@ import {
   useAuthenticatedUserId,
   useTastesApi,
 } from '../../session/SessionProvider';
+import { commentsQueryKey } from '../queryKeys';
 
 export interface AddCommentCommand {
   idempotencyKey: string;
@@ -18,7 +19,7 @@ export function useComments(reviewId: string) {
   const api = useTastesApi();
   const userId = useAuthenticatedUserId();
   return useInfiniteQuery({
-    queryKey: ['comments', userId, reviewId],
+    queryKey: commentsQueryKey(userId, reviewId),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const response = await api.getComments({
@@ -54,7 +55,7 @@ export function useReactToComment(reviewId: string) {
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: ['comments', userId, reviewId],
+        queryKey: commentsQueryKey(userId, reviewId),
       }),
   });
 }
@@ -68,7 +69,7 @@ export function useDeleteComment(reviewId: string) {
       api.deleteComment({ reviewId, commentId }),
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: ['comments', userId, reviewId],
+        queryKey: commentsQueryKey(userId, reviewId),
       }),
   });
 }
@@ -83,7 +84,7 @@ export function useAddComment(reviewId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ['comments', userId, reviewId],
+          queryKey: commentsQueryKey(userId, reviewId),
         }),
         queryClient.invalidateQueries({ queryKey: ['feed', userId] }),
       ]);
