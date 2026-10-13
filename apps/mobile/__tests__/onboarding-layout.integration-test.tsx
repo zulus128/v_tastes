@@ -80,6 +80,7 @@ const onboardingPatternCases = [
   ['onboarding', 'otp', 'shared'],
   ['postSignup', 'profile', 'shared'],
   ['postSignup', 'city', 'shared'],
+  ['postSignup', 'birthday', 'shared'],
   ['postSignup', 'dish', 'shared'],
   ['postSignup', 'location', 'shared'],
   ['postSignup', 'locationDenied', 'shared'],
@@ -508,7 +509,8 @@ describe('onboarding in resizable windows', () => {
 
   it.each([
     ['city', 'Create your profile'],
-    ['dish', 'Create your profile'],
+    ['birthday', 'Create your profile'],
+    ['dish', 'When is your birthday?'],
     ['location', 'Your favourite dish!'],
     ['locationDenied', 'See what’s good near you'],
     ['place', 'See what’s good near you'],

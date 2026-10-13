@@ -403,6 +403,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         uid,
         email: authUser.email?.toLocaleLowerCase() ?? null,
         phoneNumber: authUser.phoneNumber ?? null,
+        ...(input.birthDate ? { birthDate: input.birthDate } : {}),
         updatedAt: now,
         ...(!existing.exists ? { createdAt: now } : {}),
       },

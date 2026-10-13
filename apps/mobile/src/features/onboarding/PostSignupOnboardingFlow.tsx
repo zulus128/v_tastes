@@ -97,6 +97,7 @@ import {
 export type PostSignupScreen =
   | 'profile'
   | 'city'
+  | 'birthday'
   | 'dish'
   | 'location'
   | 'locationDenied'
@@ -112,7 +113,8 @@ const previousPostSignupScreen: Partial<
   Record<PostSignupScreen, PostSignupScreen>
 > = {
   city: 'profile',
-  dish: 'profile',
+  birthday: 'profile',
+  dish: 'birthday',
   location: 'dish',
   locationDenied: 'location',
   place: 'location',
@@ -150,6 +152,90 @@ interface ContactCandidate {
   invited: boolean;
   userId?: string;
   following?: boolean;
+}
+
+const birthdayMonths = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+function daysInMonth(month: number, year: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function isoBirthDate(day: number, month: number, year: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function BirthdayColumn({
+  onChange,
+  selected,
+  values,
+}: {
+  onChange: (value: number) => void;
+  selected: number;
+  values: readonly number[];
+}) {
+  const styles = useOnboardingStyles();
+  const index = Math.max(0, values.indexOf(selected));
+  const previous = values[Math.max(0, index - 1)] ?? selected;
+  const next = values[Math.min(values.length - 1, index + 1)] ?? selected;
+  return (
+    <View style={styles.birthdayColumn}>
+      <Pressable
+        disabled={previous === selected}
+        onPress={() => onChange(previous)}
+      >
+        <Text style={styles.birthdayAdjacent}>{previous}</Text>
+      </Pressable>
+      <View style={styles.birthdaySelected}>
+        <Text style={styles.birthdaySelectedText}>{selected}</Text>
+      </View>
+      <Pressable disabled={next === selected} onPress={() => onChange(next)}>
+        <Text style={styles.birthdayAdjacent}>{next}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function BirthdayMonthColumn({
+  onChange,
+  selected,
+}: {
+  onChange: (value: number) => void;
+  selected: number;
+}) {
+  const styles = useOnboardingStyles();
+  const previous = Math.max(0, selected - 1);
+  const next = Math.min(birthdayMonths.length - 1, selected + 1);
+  return (
+    <View style={[styles.birthdayColumn, styles.birthdayMonthColumn]}>
+      <Pressable
+        disabled={previous === selected}
+        onPress={() => onChange(previous)}
+      >
+        <Text style={styles.birthdayAdjacent}>{birthdayMonths[previous]}</Text>
+      </Pressable>
+      <View style={styles.birthdaySelected}>
+        <Text style={styles.birthdaySelectedText}>
+          {birthdayMonths[selected]}
+        </Text>
+      </View>
+      <Pressable disabled={next === selected} onPress={() => onChange(next)}>
+        <Text style={styles.birthdayAdjacent}>{birthdayMonths[next]}</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 const dishes = [
@@ -645,6 +731,9 @@ export function PostSignupOnboardingFlow({
   const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
   const [bio, setBio] = useState('');
+  const [birthDay, setBirthDay] = useState(15);
+  const [birthMonth, setBirthMonth] = useState(3);
+  const [birthYear, setBirthYear] = useState(1995);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState(false);
   const photoSheetMotion = useBottomSheetMotion({
@@ -811,29 +900,40 @@ export function PostSignupOnboardingFlow({
     if (!result.canceled) setPhotoUri(result.assets[0].uri);
   }
 
-  async function saveProfile() {
+  function validatedProfileInput(birthDate?: string) {
     if (displayName.trim().length < 2) {
       Alert.alert(
         'Complete your profile',
         'Add your name and username to continue.',
       );
-      return;
+      return null;
     }
     if (usernameStatus !== 'available') {
       setUsernameTouched(true);
-      return;
+      return null;
     }
     const input = {
       displayName: displayName.trim(),
       username: username.trim(),
       ...(city ? { city } : {}),
       bio: bio.trim(),
+      ...(birthDate ? { birthDate } : {}),
     };
     const validation = createUserProfileInputSchema.safeParse(input);
     if (!validation.success) {
       Alert.alert('Check your profile', validation.error.issues[0].message);
-      return;
+      return null;
     }
+    return validation.data;
+  }
+
+  function continueFromProfile() {
+    if (validatedProfileInput()) navigate('birthday');
+  }
+
+  async function saveProfile(birthDate: string) {
+    const profileInput = validatedProfileInput(birthDate);
+    if (!profileInput) return;
     setBusy(true);
     try {
       let photoPath: string | undefined;
@@ -857,7 +957,7 @@ export function PostSignupOnboardingFlow({
         ]);
       }
       await api.createUserProfile({
-        ...validation.data,
+        ...profileInput,
         ...(photoPath ? { photoPath } : {}),
         ...(photoThumbnailPath ? { photoThumbnailPath } : {}),
       });
@@ -882,7 +982,14 @@ export function PostSignupOnboardingFlow({
     }
     const result = await Location.requestForegroundPermissionsAsync();
     if (!result.granted) {
-      navigate('locationDenied');
+      Alert.alert(
+        'Location is off',
+        'Enable location in Settings, or skip this step for now.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ],
+      );
       return;
     }
     try {
@@ -1253,7 +1360,7 @@ export function PostSignupOnboardingFlow({
                 disabled={usernameStatus !== 'available'}
                 label="Continue"
                 loading={busy}
-                onPress={saveProfile}
+                onPress={continueFromProfile}
               />
               <Text style={styles.changeLater}>
                 You can change all of this later.
@@ -1322,6 +1429,68 @@ export function PostSignupOnboardingFlow({
     );
   }
 
+  if (screen === 'birthday') {
+    const maximumDay = daysInMonth(birthMonth, birthYear);
+    const days = Array.from({ length: maximumDay }, (_, index) => index + 1);
+    const currentYear = new Date().getFullYear();
+    const years = Array.from(
+      { length: 103 },
+      (_, index) => currentYear - 13 - index,
+    ).reverse();
+    const safeDay = Math.min(birthDay, maximumDay);
+    return (
+      <PatternScreen>
+        <Header onBack={back} />
+        <StepProgress overlay step={1} />
+        <View style={styles.birthdayPage}>
+          <View style={styles.birthdayIcon}>
+            <Text style={styles.birthdayIconText}>🎂</Text>
+          </View>
+          <Text style={[styles.title, styles.birthdayTitle]}>
+            When is your birthday?
+          </Text>
+          <Text style={[styles.subtitle, styles.birthdaySubtitle]}>
+            We’ll use this to personalize your experience and confirm your age.
+          </Text>
+          <View style={styles.birthdayPicker}>
+            <BirthdayColumn
+              onChange={setBirthDay}
+              selected={safeDay}
+              values={days}
+            />
+            <BirthdayMonthColumn
+              onChange={(value) => {
+                setBirthMonth(value);
+                setBirthDay((day) =>
+                  Math.min(day, daysInMonth(value, birthYear)),
+                );
+              }}
+              selected={birthMonth}
+            />
+            <BirthdayColumn
+              onChange={(value) => {
+                setBirthYear(value);
+                setBirthDay((day) =>
+                  Math.min(day, daysInMonth(birthMonth, value)),
+                );
+              }}
+              selected={birthYear}
+              values={years}
+            />
+          </View>
+        </View>
+        <PrimaryButton
+          label="Continue"
+          loading={busy}
+          onPress={() =>
+            void saveProfile(isoBirthDate(safeDay, birthMonth, birthYear))
+          }
+          style={styles.bottomButton}
+        />
+      </PatternScreen>
+    );
+  }
+
   if (screen === 'dish') {
     return (
       <PatternScreen>
@@ -1387,12 +1556,22 @@ export function PostSignupOnboardingFlow({
         step={3}
         icon={permissionLocation}
         title="See what’s good near you"
-        subtitle="Tastes shows the spots your friends rate, within walking distance."
-        button="Allow Location"
+        subtitle="Find highly rated places nearby and recommendations from friends."
+        button="Use My Location"
+        footnote="Your precise location is never shown to other users. It’s only used to personalize nearby recommendations."
         onBack={back}
         onSkip={enterPlaces}
         onPress={requestLocation}
-      />
+      >
+        <View style={styles.locationPreview}>
+          <View style={styles.locationRoadHorizontal} />
+          <View style={styles.locationRoadVertical} />
+          <View style={styles.locationPinRing}>
+            <View style={styles.locationPin} />
+          </View>
+          <Text style={styles.locationPreviewLabel}>Places near you</Text>
+        </View>
+      </PermissionScreen>
     );
   if (screen === 'locationDenied')
     return (
@@ -1855,17 +2034,32 @@ export function PostSignupOnboardingFlow({
           <View style={styles.inviteActions}>
             <Pressable onPress={shareInvite} style={styles.actionRow}>
               <Image source={inviteShare} style={styles.actionIcon} />
-              <Text style={styles.actionText}>Share your invite link</Text>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionText}>Share your invite link</Text>
+                <Text style={styles.actionSubtitle}>
+                  Copy and share with your friends
+                </Text>
+              </View>
               <Image source={chevronRight} style={styles.actionChevron} />
             </Pressable>
             <Pressable onPress={() => textInvite()} style={styles.actionRow}>
               <Image source={inviteMessage} style={styles.actionIcon} />
-              <Text style={styles.actionText}>Invite friend via text</Text>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionText}>Invite friend via text</Text>
+                <Text style={styles.actionSubtitle}>
+                  Send an invite directly
+                </Text>
+              </View>
               <Image source={chevronRight} style={styles.actionChevron} />
             </Pressable>
             <Pressable onPress={requestContacts} style={styles.actionRow}>
               <Image source={inviteContacts} style={styles.actionIcon} />
-              <Text style={styles.actionText}>Invite from your contacts</Text>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionText}>Invite from your contacts</Text>
+                <Text style={styles.actionSubtitle}>
+                  Find friends already on Tastes
+                </Text>
+              </View>
               <Image source={chevronRight} style={styles.actionChevron} />
             </Pressable>
           </View>
@@ -2087,6 +2281,126 @@ const createStyles = (
       color: colors.textMuted,
       fontSize: 11,
       textAlign: 'center',
+    },
+    birthdayPage: {
+      flex: 1,
+      paddingTop: landscape ? 92 : 154,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+    },
+    birthdayIcon: {
+      width: 60,
+      height: 60,
+      marginBottom: 24,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#3A1716' : '#FCE5E3',
+    },
+    birthdayIconText: { fontSize: 31 },
+    birthdayTitle: { fontSize: 24, lineHeight: 29 },
+    birthdaySubtitle: {
+      maxWidth: 350,
+      marginTop: 7,
+      color: colors.textMuted,
+      fontSize: 15,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    birthdayPicker: {
+      width: '100%',
+      maxWidth: 370,
+      height: 172,
+      marginTop: 48,
+      paddingHorizontal: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    birthdayColumn: {
+      flex: 1,
+      height: 168,
+      alignItems: 'center',
+      justifyContent: 'space-around',
+    },
+    birthdayMonthColumn: { flex: 1.45 },
+    birthdayAdjacent: {
+      color: colors.textMuted,
+      fontSize: 17,
+      lineHeight: 24,
+      opacity: 0.58,
+    },
+    birthdaySelected: {
+      width: '100%',
+      minHeight: 48,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: isDark ? '#2B2B2B' : '#FFFFFF',
+    },
+    birthdaySelectedText: {
+      color: colors.text,
+      fontSize: 19,
+      lineHeight: 24,
+      fontWeight: '600',
+    },
+    locationPreview: {
+      width: '100%',
+      height: 178,
+      marginTop: 38,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      backgroundColor: isDark ? '#252626' : '#E9E7E1',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    locationRoadHorizontal: {
+      position: 'absolute',
+      left: -20,
+      right: -20,
+      height: 24,
+      backgroundColor: isDark ? '#343737' : '#F7F5EF',
+      transform: [{ rotate: '-8deg' }],
+    },
+    locationRoadVertical: {
+      position: 'absolute',
+      top: -20,
+      bottom: -20,
+      width: 22,
+      backgroundColor: isDark ? '#343737' : '#F7F5EF',
+      transform: [{ rotate: '18deg' }],
+    },
+    locationPinRing: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: 'rgba(211,59,53,0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    locationPin: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 4,
+      borderColor: '#FFFFFF',
+      backgroundColor: '#D33B35',
+    },
+    locationPreviewLabel: {
+      marginTop: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      overflow: 'hidden',
+      borderRadius: 10,
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+      backgroundColor: colors.surface,
     },
     profileKeyboardAvoiding: { flex: 1 },
     profileKeyboardLayout: { flex: 1 },
@@ -2810,8 +3124,8 @@ const createStyles = (
     progressDotActive: { backgroundColor: colors.primary },
     inviteActions: { width: '100%', gap: 10, marginTop: 24 },
     actionRow: {
-      height: 50,
-      borderRadius: 25,
+      minHeight: 64,
+      borderRadius: 20,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
       backgroundColor: colors.surface,
@@ -2825,12 +3139,18 @@ const createStyles = (
       marginRight: 12,
       tintColor: colors.text,
     },
+    actionCopy: { flex: 1, gap: 2 },
     actionText: {
       color: colors.text,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 15,
+      lineHeight: 20,
       letterSpacing: -0.41,
-      flex: 1,
+      fontWeight: '600',
+    },
+    actionSubtitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
     },
     actionChevron: { width: 8, height: 16, opacity: 0.7 },
     ready: { flex: 1 },
