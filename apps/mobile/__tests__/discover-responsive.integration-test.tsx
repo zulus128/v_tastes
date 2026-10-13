@@ -105,7 +105,7 @@ describe('Discover responsive content', () => {
     await fireEvent.press(screen.getByRole('tab', { name: 'Trending' }));
   }
 
-  it('keeps the see-all search box at input height in a tall window', async () => {
+  it('keeps the see-all search box visible and editable in a tall window', async () => {
     mockCarouselCount = 3;
     resize(974, 2286);
     await render(<DiscoverScreen {...props} />);
@@ -115,10 +115,15 @@ describe('Discover responsive content', () => {
     const searchStyle = StyleSheet.flatten(
       screen.getByTestId('see-all-places-search').props.style,
     );
+    const input = screen.getByPlaceholderText('Search in trending');
 
-    expect(searchStyle.height).toBe(responsiveSize(39));
-    expect(searchStyle.flexGrow).toBe(0);
-    expect(searchStyle.flexShrink).toBe(0);
+    expect(searchStyle.height).toBe(responsiveSize(44));
+    expect(searchStyle.alignSelf).toBe('stretch');
+
+    await act(() => fireEvent.changeText(input, 'Trending place 1'));
+    expect(screen.getByPlaceholderText('Search in trending').props.value).toBe(
+      'Trending place 1',
+    );
   });
 
   it('fits wrapped cards inside landscape safe insets, including the final row', async () => {

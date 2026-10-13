@@ -2195,11 +2195,7 @@ function SeeAllPlacesModal({
         </View>
         <View
           testID="see-all-places-search"
-          style={[
-            styles.peopleSearch,
-            styles.seeAllPlacesSearch,
-            { margin: responsiveSize(16) },
-          ]}
+          style={[styles.seeAllPlacesSearch, { margin: responsiveSize(16) }]}
         >
           <PeopleSearchIcon
             color={colors.textSecondary}
@@ -2210,7 +2206,7 @@ function SeeAllPlacesModal({
             onChangeText={setQuery}
             placeholder="Search in trending"
             placeholderTextColor={colors.placeholder}
-            style={styles.peopleSearchInput}
+            style={styles.seeAllPlacesSearchInput}
             value={query}
           />
         </View>
@@ -3761,9 +3757,24 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surfaceRaised,
     },
     seeAllPlacesSearch: {
-      flexGrow: 0,
-      flexShrink: 0,
-      flexBasis: 'auto',
+      height: 44,
+      paddingLeft: 12,
+      paddingRight: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      gap: 8,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    seeAllPlacesSearchInput: {
+      flex: 1,
+      minWidth: 0,
+      height: '100%',
+      color: colors.text,
+      fontSize: 16,
+      letterSpacing: -0.41,
+      paddingVertical: 0,
     },
     peopleSearchInput: {
       flex: 1,
