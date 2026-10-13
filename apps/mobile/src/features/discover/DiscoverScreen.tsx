@@ -9,6 +9,7 @@ import {
   Animated,
   Alert,
   Easing,
+  FlatList,
   Image,
   Keyboard,
   PanResponder,
@@ -1619,21 +1620,13 @@ function PlacesMap({
             </Text>
           </View>
         ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={styles.placesList}
-          >
-            <View style={styles.placesListContent}>
-              {orderedVenues.map((venue) => (
-                <PlaceRow
-                  key={venue.id}
-                  onOpen={() => onOpenPlace(venue.id)}
-                  onSave={() => onSave({ venueId: venue.id, name: venue.name })}
-                  place={venueToPlace(venue)}
-                  saved={savedVenueIds.has(venue.id)}
-                />
-              ))}
-              {venuesQuery.hasNextPage ? (
+          <FlatList
+            contentContainerStyle={styles.placesListContent}
+            data={orderedVenues}
+            initialNumToRender={6}
+            keyExtractor={(venue) => venue.id}
+            ListFooterComponent={
+              venuesQuery.hasNextPage ? (
                 <Pressable
                   disabled={venuesQuery.isFetchingNextPage}
                   onPress={() => void venuesQuery.fetchNextPage()}
@@ -1645,9 +1638,21 @@ function PlacesMap({
                     <Text style={styles.loadMoreText}>Load more places</Text>
                   )}
                 </Pressable>
-              ) : null}
-            </View>
-          </ScrollView>
+              ) : null
+            }
+            maxToRenderPerBatch={6}
+            renderItem={({ item: venue }) => (
+              <PlaceRow
+                onOpen={() => onOpenPlace(venue.id)}
+                onSave={() => onSave({ venueId: venue.id, name: venue.name })}
+                place={venueToPlace(venue)}
+                saved={savedVenueIds.has(venue.id)}
+              />
+            )}
+            showsVerticalScrollIndicator={false}
+            style={styles.placesList}
+            windowSize={5}
+          />
         )}
       </Animated.View>
       <Modal
@@ -2096,11 +2101,15 @@ function PeopleFeed({
             </Text>
             <View style={styles.headerAction} />
           </View>
-          <ScrollView contentContainerStyle={styles.profileList}>
-            {seeMorePeople.map((person) => (
+          <FlatList
+            contentContainerStyle={styles.profileList}
+            data={seeMorePeople}
+            initialNumToRender={8}
+            keyExtractor={(person) => person.userId}
+            maxToRenderPerBatch={8}
+            renderItem={({ item: person }) => (
               <ProfileSuggestion
                 following={person.following}
-                key={person.userId}
                 onFollow={() => handleFollow(person)}
                 onOpen={() => {
                   setSeeMore(false);
@@ -2109,8 +2118,9 @@ function PeopleFeed({
                 pending={toggleFollow.isPending || pendingId === person.userId}
                 person={person}
               />
-            ))}
-          </ScrollView>
+            )}
+            windowSize={5}
+          />
         </View>
       </Modal>
     </ScrollView>
@@ -2197,16 +2207,18 @@ function SeeAllPlacesModal({
             value={query}
           />
         </View>
-        <ScrollView
+        <FlatList
           contentContainerStyle={{
             paddingHorizontal: responsiveSize(16),
             paddingBottom: responsiveSize(30),
             gap: responsiveSize(10),
           }}
-        >
-          {visible.map((venue) => (
+          data={visible}
+          initialNumToRender={6}
+          keyExtractor={(venue) => venue.id}
+          maxToRenderPerBatch={6}
+          renderItem={({ item: venue }) => (
             <PlaceRow
-              key={venue.id}
               onOpen={() => {
                 onClose();
                 onOpenPlace(venue.id);
@@ -2218,8 +2230,9 @@ function SeeAllPlacesModal({
               place={venueToPlace(venue)}
               saved={savedVenueIds.has(venue.id)}
             />
-          ))}
-        </ScrollView>
+          )}
+          windowSize={5}
+        />
       </View>
     </Modal>
   );

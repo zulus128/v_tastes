@@ -1,4 +1,8 @@
-import type { ActivityCandidate, AppRequest, TastesGroup } from '@tastes/contracts';
+import type {
+  ActivityCandidate,
+  AppRequest,
+  TastesGroup,
+} from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -8,7 +12,6 @@ import {
   Image,
   ImageBackground,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -23,7 +26,10 @@ import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { formatDisplayDate } from '../../infrastructure/date';
-import { useAuthenticatedUserId, useTastesApi } from '../../session/SessionProvider';
+import {
+  useAuthenticatedUserId,
+  useTastesApi,
+} from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
@@ -50,20 +56,33 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
       active = false;
     };
   }, [api]);
-  const respond = async (item: AppRequest, response: 'accepted' | 'declined') => {
+  const respond = async (
+    item: AppRequest,
+    response: 'accepted' | 'declined',
+  ) => {
     await api.respondToRequest({ requestId: item.id, response });
-    setRequests((current) => current.filter((candidate) => candidate.id !== item.id));
+    setRequests((current) =>
+      current.filter((candidate) => candidate.id !== item.id),
+    );
   };
   const deleteAll = async () => {
     const pending = [...requests];
-    await Promise.all(pending.map((item) => api.respondToRequest({ requestId: item.id, response: 'declined' })));
+    await Promise.all(
+      pending.map((item) =>
+        api.respondToRequest({ requestId: item.id, response: 'declined' }),
+      ),
+    );
     setRequests([]);
   };
   return (
     <Screen style={styles.screen}>
       <Header
         action={requests.length ? 'Delete all' : undefined}
-        onAction={() => void deleteAll().catch((error) => Alert.alert('Could not delete requests', apiErrorMessage(error)))}
+        onAction={() =>
+          void deleteAll().catch((error) =>
+            Alert.alert('Could not delete requests', apiErrorMessage(error)),
+          )
+        }
         onBack={onBack}
         safeTop={insets.top}
         styles={styles}
@@ -93,7 +112,9 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
             renderItem={({ item }) => (
               <View style={styles.request}>
                 <View style={styles.requestIcon}>
-                  <Text style={styles.requestIconText}>{item.kind === 'group' ? 'G' : '◷'}</Text>
+                  <Text style={styles.requestIconText}>
+                    {item.kind === 'group' ? 'G' : '◷'}
+                  </Text>
                 </View>
                 <View style={styles.requestCopy}>
                   <Text style={styles.requestName}>{item.title}</Text>
@@ -103,10 +124,16 @@ export function RequestsScreen({ onBack }: { onBack: () => void }) {
                   </Text>
                 </View>
                 <View style={styles.requestActions}>
-                  <Pressable onPress={() => void respond(item, 'accepted')} style={styles.accept}>
+                  <Pressable
+                    onPress={() => void respond(item, 'accepted')}
+                    style={styles.accept}
+                  >
                     <Text style={styles.actionText}>Accept</Text>
                   </Pressable>
-                  <Pressable onPress={() => void respond(item, 'declined')} style={styles.decline}>
+                  <Pressable
+                    onPress={() => void respond(item, 'declined')}
+                    style={styles.decline}
+                  >
                     <Text style={styles.declineText}>×</Text>
                   </Pressable>
                 </View>
@@ -145,7 +172,9 @@ export function NewGroupScreen({
       .then((result) => {
         if (active) setPeople(result.data);
       })
-      .catch((error) => Alert.alert('Could not load friends', apiErrorMessage(error)))
+      .catch((error) =>
+        Alert.alert('Could not load friends', apiErrorMessage(error)),
+      )
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -163,12 +192,14 @@ export function NewGroupScreen({
     let active = true;
     setSearching(true);
     const timeout = setTimeout(() => {
-      void api.searchPeople({ query: normalizedQuery, limit: 50 })
+      void api
+        .searchPeople({ query: normalizedQuery, limit: 50 })
         .then((result) => {
           if (active) setSearchResults(result.data);
         })
         .catch((error) => {
-          if (active) Alert.alert('Could not search people', apiErrorMessage(error));
+          if (active)
+            Alert.alert('Could not search people', apiErrorMessage(error));
         })
         .finally(() => {
           if (active) setSearching(false);
@@ -179,13 +210,18 @@ export function NewGroupScreen({
       clearTimeout(timeout);
     };
   }, [api, normalizedQuery]);
-  const filtered = normalizedQuery.length >= 2
-    ? searchResults.filter((result) => people.some((candidate) => candidate.userId === result.userId))
-    : people.filter(
-        (person) =>
-          !normalizedQuery ||
-          `${person.displayName} ${person.username ?? ''}`.toLowerCase().includes(normalizedQuery.toLowerCase()),
-      );
+  const filtered =
+    normalizedQuery.length >= 2
+      ? searchResults.filter((result) =>
+          people.some((candidate) => candidate.userId === result.userId),
+        )
+      : people.filter(
+          (person) =>
+            !normalizedQuery ||
+            `${person.displayName} ${person.username ?? ''}`
+              .toLowerCase()
+              .includes(normalizedQuery.toLowerCase()),
+        );
   const create = async () => {
     setCreating(true);
     try {
@@ -219,7 +255,12 @@ export function NewGroupScreen({
       </View>
       <View style={styles.searchRow}>
         <View style={[styles.search, styles.newGroupSearch]}>
-          <SearchIcon color={colors.textSecondary} height={responsiveSize(24)} style={styles.searchIcon} width={responsiveSize(24)} />
+          <SearchIcon
+            color={colors.textSecondary}
+            height={responsiveSize(24)}
+            style={styles.searchIcon}
+            width={responsiveSize(24)}
+          />
           <TextInput
             onChangeText={setQuery}
             placeholder="Search people"
@@ -234,7 +275,17 @@ export function NewGroupScreen({
           onPress={() => setQuery('')}
           style={styles.contactsButton}
         >
-          {isDark ? <UserHeartIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} /> : <UserHeartLightIcon height={responsiveSize(21.5)} width={responsiveSize(21.5)} />}
+          {isDark ? (
+            <UserHeartIcon
+              height={responsiveSize(21.5)}
+              width={responsiveSize(21.5)}
+            />
+          ) : (
+            <UserHeartLightIcon
+              height={responsiveSize(21.5)}
+              width={responsiveSize(21.5)}
+            />
+          )}
         </Pressable>
       </View>
       {loading || searching ? (
@@ -258,7 +309,11 @@ export function NewGroupScreen({
                 }
                 style={styles.person}
               >
-                <Avatar name={item.displayName} photoUrl={item.photoUrl} styles={styles} />
+                <Avatar
+                  name={item.displayName}
+                  photoUrl={item.photoUrl}
+                  styles={styles}
+                />
                 <View style={styles.personCopy}>
                   <Text style={styles.personName}>{item.displayName}</Text>
                   <Text style={styles.personHandle}>
@@ -266,7 +321,9 @@ export function NewGroupScreen({
                   </Text>
                 </View>
                 <View style={styles.check}>
-                  <View style={[styles.checkCircle, active && styles.checkActive]}>
+                  <View
+                    style={[styles.checkCircle, active && styles.checkActive]}
+                  >
                     <Text style={styles.checkText}>{active ? '✓' : ''}</Text>
                   </View>
                 </View>
@@ -275,20 +332,41 @@ export function NewGroupScreen({
           }}
         />
       )}
-      <View style={[styles.createFooter, { paddingBottom: Math.max(responsiveSize(16), insets.bottom) }]}>
+      <View
+        style={[
+          styles.createFooter,
+          { paddingBottom: Math.max(responsiveSize(16), insets.bottom) },
+        ]}
+      >
         <Pressable
           disabled={creating || name.trim().length < 2 || selected.size < 1}
           onPress={() => void create()}
-          style={[styles.createGroup, (creating || name.trim().length < 2 || selected.size < 1) && styles.disabled]}
+          style={[
+            styles.createGroup,
+            (creating || name.trim().length < 2 || selected.size < 1) &&
+              styles.disabled,
+          ]}
         >
-          {creating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.createGroupText}>Create group</Text>}
+          {creating ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.createGroupText}>Create group</Text>
+          )}
         </Pressable>
       </View>
     </View>
   );
 }
 
-export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { groupId: string; onBack: () => void; onOpenConversation: (conversationId: string) => void }) {
+export function GroupDetailsScreen({
+  groupId,
+  onBack,
+  onOpenConversation,
+}: {
+  groupId: string;
+  onBack: () => void;
+  onOpenConversation: (conversationId: string) => void;
+}) {
   const api = useTastesApi();
   const currentUserId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
@@ -310,7 +388,9 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     setCandidates(people.data);
   };
   useEffect(() => {
-    void load().catch((e) => Alert.alert('Could not load group', apiErrorMessage(e)));
+    void load().catch((e) =>
+      Alert.alert('Could not load group', apiErrorMessage(e)),
+    );
   }, [api, groupId]);
   const normalizedMemberQuery = memberQuery.trim();
   useEffect(() => {
@@ -322,12 +402,14 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     let active = true;
     setSearching(true);
     const timeout = setTimeout(() => {
-      void api.searchPeople({ query: normalizedMemberQuery, limit: 50 })
+      void api
+        .searchPeople({ query: normalizedMemberQuery, limit: 50 })
         .then((result) => {
           if (active) setSearchResults(result.data);
         })
         .catch((error) => {
-          if (active) Alert.alert('Could not search people', apiErrorMessage(error));
+          if (active)
+            Alert.alert('Could not search people', apiErrorMessage(error));
         })
         .finally(() => {
           if (active) setSearching(false);
@@ -341,7 +423,12 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
   if (!group)
     return (
       <Screen style={styles.screen}>
-        <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
+        <Header
+          onBack={onBack}
+          safeTop={insets.top}
+          styles={styles}
+          title="Group details"
+        />
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       </Screen>
     );
@@ -358,148 +445,214 @@ export function GroupDetailsScreen({ groupId, onBack, onOpenConversation }: { gr
     }
   };
   const pendingMembers = group.pendingMembers ?? [];
-  const available = (normalizedMemberQuery.length >= 2
-    ? searchResults.filter((result) => candidates.some((candidate) => candidate.userId === result.userId))
-    : candidates).filter(
+  const available = (
+    normalizedMemberQuery.length >= 2
+      ? searchResults.filter((result) =>
+          candidates.some((candidate) => candidate.userId === result.userId),
+        )
+      : candidates
+  ).filter(
     (candidate) =>
-      !group.members.some((member) => member.userId === candidate.userId)
-      && !pendingMembers.some((member) => member.userId === candidate.userId),
+      !group.members.some((member) => member.userId === candidate.userId) &&
+      !pendingMembers.some((member) => member.userId === candidate.userId),
   );
+  const detailRows = [
+    ...(adding
+      ? available.map((person) => ({ kind: 'available' as const, person }))
+      : []),
+    ...pendingMembers.map((person) => ({ kind: 'pending' as const, person })),
+    ...group.members.map((person) => ({ kind: 'member' as const, person })),
+  ];
+  const firstPendingIndex = adding ? available.length : 0;
+  const firstMemberIndex = firstPendingIndex + pendingMembers.length;
   return (
     <Screen style={styles.screen}>
-      <Header onBack={onBack} safeTop={insets.top} styles={styles} title="Group details" />
-      <ScrollView contentContainerStyle={styles.details}>
-        <View style={styles.groupAvatarLarge}>
-          <Text style={styles.groupAvatarLargeText}>
-            {group.name
-              .split(' ')
-              .map((v) => v[0])
-              .join('')
-              .slice(0, 2)}
-          </Text>
-        </View>
-        <Text style={styles.detailsTitle}>{group.name}</Text>
-        <Text style={styles.detailsSubtitle}>
-          {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
-          {pendingMembers.length > 0
-            ? ` · ${pendingMembers.length} invited`
-            : ''}
-          {' · '}Created {formatDisplayDate(group.createdAt)}
-        </Text>
-        <Pressable onPress={() => onOpenConversation(groupId)} style={styles.primaryOutline}>
-          <Text style={styles.primaryOutlineText}>Open group chat</Text>
-        </Pressable>
-        {admin ? (
-          <Pressable onPress={() => {
-            setAdding((value) => !value);
-            setMemberQuery('');
-          }} style={styles.primaryOutline}>
-            <Text style={styles.primaryOutlineText}>{adding ? 'Done' : '+ Add members'}</Text>
-          </Pressable>
-        ) : null}
-        {adding ? (
-          <View style={[styles.search, styles.detailsSearch]}>
-            <Text style={styles.searchGlyph}>⌕</Text>
-            <TextInput
-              autoCorrect={false}
-              onChangeText={setMemberQuery}
-              placeholder="Search people"
-              placeholderTextColor={colors.placeholder}
-              style={styles.searchInput}
-              value={memberQuery}
-            />
-          </View>
-        ) : null}
-        {adding && searching ? <ActivityIndicator color={colors.primary} style={styles.searchLoader} /> : null}
-        {adding
-          ? available.map((person) => (
-              <View key={person.userId} style={styles.person}>
-                <Avatar name={person.displayName} photoUrl={person.photoUrl} styles={styles} />
-                <Text style={[styles.personName, { flex: 1 }]}>
-                  {person.displayName}
-                </Text>
-                <Pressable
-                  accessibilityLabel={`Add ${person.displayName}`}
-                  accessibilityRole="button"
-                  disabled={updatingUserId !== null}
-                  hitSlop={8}
-                  onPress={() =>
-                    void update(
-                      [...group.members.map((member) => member.userId), person.userId],
-                      person.userId,
-                    )
-                  }
-                  style={styles.addMember}
-                >
-                  {updatingUserId === person.userId
-                    ? <ActivityIndicator color={colors.primary} />
-                    : <Text style={styles.addMemberText}>Add</Text>}
-                </Pressable>
-              </View>
-            ))
-          : null}
-        {pendingMembers.length > 0 ? (
+      <Header
+        onBack={onBack}
+        safeTop={insets.top}
+        styles={styles}
+        title="Group details"
+      />
+      <FlatList
+        contentContainerStyle={styles.details}
+        data={detailRows}
+        initialNumToRender={8}
+        keyExtractor={(item) => `${item.kind}-${item.person.userId}`}
+        ListHeaderComponent={
           <>
-            <Text style={styles.section}>INVITED ({pendingMembers.length})</Text>
-            {pendingMembers.map((member) => (
-              <View key={member.userId} style={styles.person}>
-                <Avatar name={member.displayName} photoUrl={member.photoUrl} styles={styles} />
-                <View style={styles.personCopy}>
-                  <Text style={styles.personName}>{member.displayName}</Text>
-                  <Text style={styles.personHandle}>Invitation pending</Text>
-                </View>
-              </View>
-            ))}
-          </>
-        ) : null}
-        <Text style={styles.section}>MEMBERS ({group.members.length})</Text>
-        {group.members.map((member) => (
-          <View key={member.userId} style={styles.person}>
-            <Avatar name={member.displayName} photoUrl={member.photoUrl} styles={styles} />
-            <View style={styles.personCopy}>
-              <Text style={styles.personName}>{member.displayName}</Text>
-              <Text style={styles.personHandle}>
-                {member.username ? `@${member.username}` : ''}
+            <View style={styles.groupAvatarLarge}>
+              <Text style={styles.groupAvatarLargeText}>
+                {group.name
+                  .split(' ')
+                  .map((v) => v[0])
+                  .join('')
+                  .slice(0, 2)}
               </Text>
             </View>
-            {member.admin ? (
-              <View style={styles.admin}>
-                <Text style={styles.adminText}>Admin</Text>
-              </View>
-            ) : admin ? (
+            <Text style={styles.detailsTitle}>{group.name}</Text>
+            <Text style={styles.detailsSubtitle}>
+              {group.members.length}{' '}
+              {group.members.length === 1 ? 'member' : 'members'}
+              {pendingMembers.length > 0
+                ? ` · ${pendingMembers.length} invited`
+                : ''}
+              {' · '}Created {formatDisplayDate(group.createdAt)}
+            </Text>
+            <Pressable
+              onPress={() => onOpenConversation(groupId)}
+              style={styles.primaryOutline}
+            >
+              <Text style={styles.primaryOutlineText}>Open group chat</Text>
+            </Pressable>
+            {admin ? (
               <Pressable
-                accessibilityLabel={`Remove ${member.displayName}`}
-                onPress={() =>
-                  void update(
-                    group.members
-                      .filter((candidate) => candidate.userId !== member.userId)
-                      .map((candidate) => candidate.userId),
-                    member.userId,
-                  )
-                }
-                style={styles.remove}
+                onPress={() => {
+                  setAdding((value) => !value);
+                  setMemberQuery('');
+                }}
+                style={styles.primaryOutline}
               >
-                <Text style={styles.removeText}>⌫</Text>
+                <Text style={styles.primaryOutlineText}>
+                  {adding ? 'Done' : '+ Add members'}
+                </Text>
               </Pressable>
             ) : null}
-          </View>
-        ))}
-        <Pressable
-          onPress={() =>
-            Alert.alert(admin ? 'Delete group?' : 'Leave group?', undefined, [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: admin ? 'Delete' : 'Leave',
-                style: 'destructive',
-                onPress: () => void api.leaveGroup({ groupId }).then(onBack),
-              },
-            ])
-          }
-          style={styles.danger}
-        >
-          <Text style={styles.dangerText}>{admin ? 'Delete group' : 'Leave group'}</Text>
-        </Pressable>
-      </ScrollView>
+            {adding ? (
+              <View style={[styles.search, styles.detailsSearch]}>
+                <Text style={styles.searchGlyph}>⌕</Text>
+                <TextInput
+                  autoCorrect={false}
+                  onChangeText={setMemberQuery}
+                  placeholder="Search people"
+                  placeholderTextColor={colors.placeholder}
+                  style={styles.searchInput}
+                  value={memberQuery}
+                />
+              </View>
+            ) : null}
+            {adding && searching ? (
+              <ActivityIndicator
+                color={colors.primary}
+                style={styles.searchLoader}
+              />
+            ) : null}
+          </>
+        }
+        ListFooterComponent={
+          <Pressable
+            onPress={() =>
+              Alert.alert(admin ? 'Delete group?' : 'Leave group?', undefined, [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: admin ? 'Delete' : 'Leave',
+                  style: 'destructive',
+                  onPress: () => void api.leaveGroup({ groupId }).then(onBack),
+                },
+              ])
+            }
+            style={styles.danger}
+          >
+            <Text style={styles.dangerText}>
+              {admin ? 'Delete group' : 'Leave group'}
+            </Text>
+          </Pressable>
+        }
+        maxToRenderPerBatch={8}
+        renderItem={({ item, index }) => {
+          const { person } = item;
+          return (
+            <>
+              {item.kind === 'pending' && index === firstPendingIndex ? (
+                <Text style={styles.section}>
+                  INVITED ({pendingMembers.length})
+                </Text>
+              ) : null}
+              {item.kind === 'member' && index === firstMemberIndex ? (
+                <Text style={styles.section}>
+                  MEMBERS ({group.members.length})
+                </Text>
+              ) : null}
+              <View style={styles.person}>
+                <Avatar
+                  name={person.displayName}
+                  photoUrl={person.photoUrl}
+                  styles={styles}
+                />
+                {item.kind === 'available' ? (
+                  <>
+                    <Text style={[styles.personName, { flex: 1 }]}>
+                      {person.displayName}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel={`Add ${person.displayName}`}
+                      accessibilityRole="button"
+                      disabled={updatingUserId !== null}
+                      hitSlop={8}
+                      onPress={() =>
+                        void update(
+                          [
+                            ...group.members.map((member) => member.userId),
+                            person.userId,
+                          ],
+                          person.userId,
+                        )
+                      }
+                      style={styles.addMember}
+                    >
+                      {updatingUserId === person.userId ? (
+                        <ActivityIndicator color={colors.primary} />
+                      ) : (
+                        <Text style={styles.addMemberText}>Add</Text>
+                      )}
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.personCopy}>
+                      <Text style={styles.personName}>
+                        {person.displayName}
+                      </Text>
+                      <Text style={styles.personHandle}>
+                        {item.kind === 'pending'
+                          ? 'Invitation pending'
+                          : person.username
+                            ? `@${person.username}`
+                            : ''}
+                      </Text>
+                    </View>
+                    {item.kind === 'member' &&
+                    'admin' in person &&
+                    person.admin ? (
+                      <View style={styles.admin}>
+                        <Text style={styles.adminText}>Admin</Text>
+                      </View>
+                    ) : item.kind === 'member' && admin ? (
+                      <Pressable
+                        accessibilityLabel={`Remove ${person.displayName}`}
+                        onPress={() =>
+                          void update(
+                            group.members
+                              .filter(
+                                (candidate) =>
+                                  candidate.userId !== person.userId,
+                              )
+                              .map((candidate) => candidate.userId),
+                            person.userId,
+                          )
+                        }
+                        style={styles.remove}
+                      >
+                        <Text style={styles.removeText}>⌫</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            </>
+          );
+        }}
+        windowSize={5}
+      />
     </Screen>
   );
 }
@@ -524,13 +677,25 @@ function Header({
   title: string;
 }) {
   return (
-    <View style={[styles.header, { height: responsiveSize(62) + safeTop, paddingTop: safeTop }, style]}>
+    <View
+      style={[
+        styles.header,
+        { height: responsiveSize(62) + safeTop, paddingTop: safeTop },
+        style,
+      ]}
+    >
       <Pressable onPress={onBack} style={styles.headerButton}>
         <Text style={styles.back}>‹</Text>
       </Pressable>
       <Text style={styles.headerTitle}>{title}</Text>
-      <Pressable disabled={actionDisabled} onPress={onAction} style={styles.headerButton}>
-        <Text style={[styles.headerAction, actionDisabled && styles.disabled]}>{action}</Text>
+      <Pressable
+        disabled={actionDisabled}
+        onPress={onAction}
+        style={styles.headerButton}
+      >
+        <Text style={[styles.headerAction, actionDisabled && styles.disabled]}>
+          {action}
+        </Text>
       </Pressable>
     </View>
   );
@@ -675,7 +840,13 @@ function createStyles(colors: ThemeColors) {
       lineHeight: 20,
       textAlign: 'center',
     },
-    fieldLabel: { marginTop: 18, marginHorizontal: 16, marginBottom: 7, color: colors.textMuted, fontSize: 12 },
+    fieldLabel: {
+      marginTop: 18,
+      marginHorizontal: 16,
+      marginBottom: 7,
+      color: colors.textMuted,
+      fontSize: 12,
+    },
     groupHero: { paddingHorizontal: 16, paddingBottom: 16 },
     groupName: {
       width: '100%',
@@ -744,8 +915,17 @@ function createStyles(colors: ThemeColors) {
     },
     avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
     personCopy: { flex: 1 },
-    personName: { color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.41 },
-    personHandle: { color: colors.textSecondary, fontSize: 13, letterSpacing: -0.24 },
+    personName: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+      letterSpacing: -0.41,
+    },
+    personHandle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      letterSpacing: -0.24,
+    },
     check: {
       width: 24,
       height: 24,
@@ -767,8 +947,20 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.primary,
     },
     checkText: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '600' },
-    createFooter: { paddingTop: 12, paddingHorizontal: 31, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline, backgroundColor: colors.surface },
-    createGroup: { height: 58, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    createFooter: {
+      paddingTop: 12,
+      paddingHorizontal: 31,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.hairline,
+      backgroundColor: colors.surface,
+    },
+    createGroup: {
+      height: 58,
+      borderRadius: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
     createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     details: { paddingBottom: 40 },
     groupAvatarLarge: {

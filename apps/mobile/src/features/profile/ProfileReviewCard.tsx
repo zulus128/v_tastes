@@ -169,6 +169,7 @@ export function ProfileReviewCard({
   item,
   onComments,
   onMore,
+  onNeedFallbackImage,
   onReact,
   reacted = false,
   onShare,
@@ -178,6 +179,7 @@ export function ProfileReviewCard({
   item: FeedItem;
   onComments: () => void;
   onMore: () => void;
+  onNeedFallbackImage?: () => void;
   onReact: () => void;
   reacted?: boolean;
   onShare: () => void;
@@ -192,6 +194,21 @@ export function ProfileReviewCard({
     (typeof dishes)[number] | null
   >(null);
   const isLongText = item.text.length > 120;
+
+  useEffect(() => {
+    if (
+      !fallbackImageUrl &&
+      dishes.some(
+        (dish) =>
+          !dish.thumbnailPath &&
+          !dish.photoPath &&
+          !dish.thumbnailUrl &&
+          !dish.photoUrl,
+      )
+    ) {
+      onNeedFallbackImage?.();
+    }
+  }, [dishes, fallbackImageUrl, onNeedFallbackImage]);
 
   return (
     <View style={styles.reviewCard} testID="profile-review-card">

@@ -6,11 +6,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,7 +30,10 @@ import restaurantImage from '../../../assets/discover/restaurant.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
-import { SaveToFolderSheet, type SaveablePlace } from '../favourites/FavouritesPane';
+import {
+  SaveToFolderSheet,
+  type SaveablePlace,
+} from '../favourites/FavouritesPane';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -70,12 +73,14 @@ function parseStoredHistory(raw: string): AiConversation[] {
   return stored.flatMap((item) => {
     if ('turns' in item && Array.isArray(item.turns)) return [item];
     if ('prompt' in item && 'answer' in item) {
-      return [{
-        id: item.id,
-        turns: [item],
-        createdAt: item.createdAt,
-        updatedAt: item.createdAt,
-      }];
+      return [
+        {
+          id: item.id,
+          turns: [item],
+          createdAt: item.createdAt,
+          updatedAt: item.createdAt,
+        },
+      ];
     }
     return [];
   });
@@ -85,8 +90,17 @@ function AiMark({ color }: { color?: string } = {}) {
   const { colors } = useAppTheme();
   return (
     <View style={markStyles.container}>
-      <AiMouthPink height={responsiveSize(10)} style={markStyles.pink} width={responsiveSize(13)} />
-      <AiMouthOutline color={color ?? colors.text} height={responsiveSize(13)} style={markStyles.outline} width={responsiveSize(18)} />
+      <AiMouthPink
+        height={responsiveSize(10)}
+        style={markStyles.pink}
+        width={responsiveSize(13)}
+      />
+      <AiMouthOutline
+        color={color ?? colors.text}
+        height={responsiveSize(13)}
+        style={markStyles.outline}
+        width={responsiveSize(18)}
+      />
     </View>
   );
 }
@@ -94,7 +108,12 @@ function AiMark({ color }: { color?: string } = {}) {
 const markStyles = responsiveStyleSheet({
   container: { width: 20, height: 18 },
   pink: { position: 'absolute', top: 6, left: 4 },
-  outline: { position: 'absolute', top: 2, left: 1, transform: [{ scaleY: -1 }] },
+  outline: {
+    position: 'absolute',
+    top: 2,
+    left: 1,
+    transform: [{ scaleY: -1 }],
+  },
 });
 
 export function TastesAIScreen({
@@ -121,11 +140,16 @@ export function TastesAIScreen({
   const [savedPlace, setSavedPlace] = useState<SaveablePlace | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const chatScrollRef = useRef<ScrollView>(null);
+  const chatScrollRef = useRef<FlatList<AiTurn>>(null);
   const requestId = useRef(0);
-  const [failure, setFailure] = useState<'offline' | 'failed' | 'location' | null>(null);
+  const [failure, setFailure] = useState<
+    'offline' | 'failed' | 'location' | null
+  >(null);
   const [city, setCity] = useState<string | null>(null);
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coordinates, setCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [lastPrompt, setLastPrompt] = useState('');
 
   useEffect(() => {
@@ -140,7 +164,8 @@ export function TastesAIScreen({
       })
       .finally(() => setLoadingHistory(false));
     void Location.getForegroundPermissionsAsync().then((permission) => {
-      if (permission.status === 'denied' && !permission.canAskAgain) setFailure('location');
+      if (permission.status === 'denied' && !permission.canAskAgain)
+        setFailure('location');
     });
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -167,14 +192,19 @@ export function TastesAIScreen({
       const answer = await api
         .askTastesAi({
           prompt,
-          context: activeConversation?.turns.slice(-10).map((turn) => turn.prompt) ?? [],
+          context:
+            activeConversation?.turns.slice(-10).map((turn) => turn.prompt) ??
+            [],
           ...(city ? { location: city } : {}),
           ...(coordinates ?? {}),
         })
         .then((response) => response.data);
-      const remainingPreviewDelay = THINKING_PREVIEW_DELAY_MS - (Date.now() - thinkingStartedAt);
+      const remainingPreviewDelay =
+        THINKING_PREVIEW_DELAY_MS - (Date.now() - thinkingStartedAt);
       if (remainingPreviewDelay > 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, remainingPreviewDelay));
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, remainingPreviewDelay),
+        );
       }
       if (currentRequest !== requestId.current) return;
       const nextTurn = {
@@ -205,7 +235,9 @@ export function TastesAIScreen({
     } catch (error) {
       if (currentRequest !== requestId.current) return;
       const code = (error as { code?: string }).code ?? '';
-      setFailure(/unavailable|network|deadline/.test(code) ? 'offline' : 'failed');
+      setFailure(
+        /unavailable|network|deadline/.test(code) ? 'offline' : 'failed',
+      );
     } finally {
       if (currentRequest === requestId.current) setAsking(false);
     }
@@ -227,7 +259,10 @@ export function TastesAIScreen({
     if (permission.status === 'granted') {
       const position = await Location.getCurrentPositionAsync();
       const result = await Location.reverseGeocodeAsync(position.coords);
-      setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setCoordinates({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
       setCity(result[0]?.city ?? 'Nearby');
       setFailure(null);
     }
@@ -248,7 +283,8 @@ export function TastesAIScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.screen}
       >
-          <View style={[
+        <View
+          style={[
             styles.header,
             {
               height: responsiveSize(66) + insets.top,
@@ -256,15 +292,22 @@ export function TastesAIScreen({
               paddingRight: responsiveSize(6) + insets.right,
               paddingLeft: responsiveSize(6) + insets.left,
             },
-          ]}>
-          <Pressable accessibilityLabel="Back" onPress={onBack} style={styles.headerAction}>
+          ]}
+        >
+          <Pressable
+            accessibilityLabel="Back"
+            onPress={onBack}
+            style={styles.headerAction}
+          >
             <Text style={styles.back}>‹</Text>
           </Pressable>
           <View style={styles.brand}>
             <AiMark color="#FFFFFF" />
             <Text style={styles.title}>Tastes AI</Text>
           </View>
-          {failure || asking || conversation ? <View style={styles.headerAction} /> : (
+          {failure || asking || conversation ? (
+            <View style={styles.headerAction} />
+          ) : (
             <Pressable
               accessibilityLabel="Open AI history"
               onPress={() => setHistoryOpen(true)}
@@ -279,9 +322,17 @@ export function TastesAIScreen({
           <View style={styles.errorPanel}>
             <View style={styles.errorContent}>
               {failure === 'location' ? (
-                <LocationOffIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(52)} />
+                <LocationOffIcon
+                  color={colors.text}
+                  height={responsiveSize(62)}
+                  width={responsiveSize(52)}
+                />
               ) : (
-                <OfflineIcon color={colors.text} height={responsiveSize(62)} width={responsiveSize(62)} />
+                <OfflineIcon
+                  color={colors.text}
+                  height={responsiveSize(62)}
+                  width={responsiveSize(62)}
+                />
               )}
               <Text style={styles.errorTitle}>
                 {failure === 'location' ? 'Location is off' : "You're offline"}
@@ -314,7 +365,9 @@ export function TastesAIScreen({
                   }}
                   style={styles.errorSecondary}
                 >
-                  <Text style={styles.errorSecondaryText}>Choose city manually</Text>
+                  <Text style={styles.errorSecondaryText}>
+                    Choose city manually
+                  </Text>
                 </Pressable>
               ) : null}
             </View>
@@ -323,45 +376,63 @@ export function TastesAIScreen({
           <View style={styles.empty}>
             <Text style={styles.heroTitle}>Discover where to eat...</Text>
             <View style={styles.assistantCrop}>
-              <Image resizeMode="contain" source={assistantImage} style={styles.assistant} />
+              <Image
+                resizeMode="contain"
+                source={assistantImage}
+                style={styles.assistant}
+              />
             </View>
             <Text style={styles.heroCopy}>
-              {'Find the best restaurants near you\nwith AI recommendations based on\n'}
+              {
+                'Find the best restaurants near you\nwith AI recommendations based on\n'
+              }
               <Text style={styles.accent}>your taste</Text>
             </Text>
           </View>
         ) : asking && !conversation ? (
           <Thinking prompt={lastPrompt} styles={styles} />
         ) : (
-          <ScrollView
+          <FlatList
             contentContainerStyle={styles.chatContent}
+            data={conversation?.turns ?? []}
+            initialNumToRender={4}
+            keyExtractor={(turn) => turn.id}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+            ListFooterComponent={
+              asking && conversation ? (
+                <View style={styles.conversationTurn}>
+                  <UserBubble text={lastPrompt} styles={styles} />
+                  <InlineThinking styles={styles} />
+                </View>
+              ) : null
+            }
+            maxToRenderPerBatch={4}
+            onContentSizeChange={() =>
+              chatScrollRef.current?.scrollToEnd({ animated: true })
+            }
             ref={chatScrollRef}
-            showsVerticalScrollIndicator={false}
-            style={styles.chatViewport}
-          >
-            {conversation?.turns.map((turn) => (
+            renderItem={({ item: turn }) => (
               <ChatTurn
-                key={turn.id}
                 onAsk={(prompt) => void ask(prompt)}
                 onOpenPlace={onOpenPlace}
                 onSavePlace={setSavedPlace}
                 styles={styles}
                 turn={turn}
               />
-            ))}
-            {asking && conversation ? (
-              <View style={styles.conversationTurn}>
-                <UserBubble text={lastPrompt} styles={styles} />
-                <InlineThinking styles={styles} />
-              </View>
-            ) : null}
-          </ScrollView>
+            )}
+            showsVerticalScrollIndicator={false}
+            style={styles.chatViewport}
+            windowSize={5}
+          />
         )}
 
         {toast ? (
-          <View style={[styles.toast, { bottom: responsiveSize(82) + insets.bottom }]}>
+          <View
+            style={[
+              styles.toast,
+              { bottom: responsiveSize(82) + insets.bottom },
+            ]}
+          >
             <Text style={styles.toastText}>✓ {toast}</Text>
           </View>
         ) : null}
@@ -373,23 +444,33 @@ export function TastesAIScreen({
               <View style={styles.quickPromptsDivider} />
             </View>
             <View style={styles.quickPromptRows}>
-              {[QUICK_PROMPTS.slice(0, 3), QUICK_PROMPTS.slice(3)].map((row, index) => (
-                <View key={index} style={styles.quickPromptRow}>
-                  {row.map(({ label, prompt }) => (
-                    <Pressable
-                      key={label}
-                      onPress={() => void ask(prompt)}
-                      style={styles.quickPrompt}
-                    >
-                      <Text style={styles.quickPromptText}>{label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ))}
+              {[QUICK_PROMPTS.slice(0, 3), QUICK_PROMPTS.slice(3)].map(
+                (row, index) => (
+                  <View key={index} style={styles.quickPromptRow}>
+                    {row.map(({ label, prompt }) => (
+                      <Pressable
+                        key={label}
+                        onPress={() => void ask(prompt)}
+                        style={styles.quickPrompt}
+                      >
+                        <Text style={styles.quickPromptText}>{label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ),
+              )}
             </View>
           </View>
         ) : null}
-        <View style={[styles.composer, { minHeight: responsiveSize(isDark ? 64 : 55) + insets.bottom, paddingBottom: Math.max(responsiveSize(10), insets.bottom) }]}>
+        <View
+          style={[
+            styles.composer,
+            {
+              minHeight: responsiveSize(isDark ? 64 : 55) + insets.bottom,
+              paddingBottom: Math.max(responsiveSize(10), insets.bottom),
+            },
+          ]}
+        >
           <TextInput
             editable={!asking}
             maxLength={500}
@@ -412,9 +493,19 @@ export function TastesAIScreen({
                   })()
                 : void ask()
             }
-            style={[styles.send, !asking && !text.trim() && styles.sendDisabled]}
+            style={[
+              styles.send,
+              !asking && !text.trim() && styles.sendDisabled,
+            ]}
           >
-            {asking ? <Text style={styles.sendText}>■</Text> : <SendIcon height={responsiveSize(16.667)} width={responsiveSize(16.667)} />}
+            {asking ? (
+              <Text style={styles.sendText}>■</Text>
+            ) : (
+              <SendIcon
+                height={responsiveSize(16.667)}
+                width={responsiveSize(16.667)}
+              />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -468,7 +559,9 @@ function ChatTurn({
       <UserBubble text={turn.prompt} styles={styles} />
       <View style={styles.answer}>
         <View style={styles.assistantMessageRow}>
-          <View style={styles.aiAvatar}><AiMark color="#FFFFFF" /></View>
+          <View style={styles.aiAvatar}>
+            <AiMark color="#FFFFFF" />
+          </View>
           <View style={styles.assistantBubble}>
             <Text style={styles.answerText}>{turn.answer.text}</Text>
           </View>
@@ -477,12 +570,16 @@ function ChatTurn({
           <View style={styles.noResults}>
             <Text style={styles.noResultsIcon}>⌕</Text>
             <Text style={styles.noResultsTitle}>No confident matches</Text>
-            <Text style={styles.noResultsBody}>Try another area, cuisine or occasion.</Text>
+            <Text style={styles.noResultsBody}>
+              Try another area, cuisine or occasion.
+            </Text>
           </View>
         ) : (
           <>
             <View style={styles.bestResultsRow}>
-              <View style={styles.aiAvatar}><AiMark color="#FFFFFF" /></View>
+              <View style={styles.aiAvatar}>
+                <AiMark color="#FFFFFF" />
+              </View>
               <View style={styles.bestResultsBubble}>
                 <Text style={styles.bestResultsText}>Best results</Text>
               </View>
@@ -493,7 +590,9 @@ function ChatTurn({
                   key={place.id}
                   index={index}
                   onOpen={() => onOpenPlace(place.id)}
-                  onSave={() => onSavePlace({ venueId: place.id, name: place.name })}
+                  onSave={() =>
+                    onSavePlace({ venueId: place.id, name: place.name })
+                  }
                   place={place}
                   styles={styles}
                 />
@@ -503,7 +602,11 @@ function ChatTurn({
         )}
         <View style={styles.followUps}>
           {turn.answer.followUps.map((followUp) => (
-            <Pressable key={followUp} onPress={() => onAsk(followUp)} style={styles.followUp}>
+            <Pressable
+              key={followUp}
+              onPress={() => onAsk(followUp)}
+              style={styles.followUp}
+            >
               <Text style={styles.followUpText}>{followUp}</Text>
             </Pressable>
           ))}
@@ -513,7 +616,13 @@ function ChatTurn({
   );
 }
 
-function UserBubble({ text, styles }: { text: string; styles: ReturnType<typeof createStyles> }) {
+function UserBubble({
+  text,
+  styles,
+}: {
+  text: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.userBubble}>
       <Text style={styles.userText}>{text}</Text>
@@ -521,10 +630,16 @@ function UserBubble({ text, styles }: { text: string; styles: ReturnType<typeof 
   );
 }
 
-function InlineThinking({ styles }: { styles: ReturnType<typeof createStyles> }) {
+function InlineThinking({
+  styles,
+}: {
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.inlineThinkingRow}>
-      <View style={styles.aiAvatar}><AiMark color="#FFFFFF" /></View>
+      <View style={styles.aiAvatar}>
+        <AiMark color="#FFFFFF" />
+      </View>
       <View style={styles.inlineThinkingBubble}>
         <Text style={styles.inlineThinkingText}>Thinking…</Text>
       </View>
@@ -532,12 +647,22 @@ function InlineThinking({ styles }: { styles: ReturnType<typeof createStyles> })
   );
 }
 
-function Thinking({ prompt, styles }: { prompt: string; styles: ReturnType<typeof createStyles> }) {
+function Thinking({
+  prompt,
+  styles,
+}: {
+  prompt: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.thinkingScreen}>
       <View style={styles.thinkingHero}>
         <View style={styles.thinkingAssistantCrop}>
-          <Image resizeMode="contain" source={assistantImage} style={styles.thinkingAssistant} />
+          <Image
+            resizeMode="contain"
+            source={assistantImage}
+            style={styles.thinkingAssistant}
+          />
         </View>
         <Text style={styles.thinkingTitle}>Thinking...</Text>
       </View>
@@ -567,34 +692,53 @@ function PlaceCard({
   const reviewCount = 35 + index * 18;
   return (
     <Pressable onPress={onOpen} style={styles.placeCard}>
-      <Image source={PLACE_IMAGES[index % PLACE_IMAGES.length]} style={styles.placeImage} />
+      <Image
+        source={PLACE_IMAGES[index % PLACE_IMAGES.length]}
+        style={styles.placeImage}
+      />
       <View style={styles.placeCopy}>
-        <Text numberOfLines={1} style={styles.placeName}>{place.name}</Text>
-        <Text numberOfLines={1} style={styles.placeDescription}>{place.description}</Text>
+        <Text numberOfLines={1} style={styles.placeName}>
+          {place.name}
+        </Text>
+        <Text numberOfLines={1} style={styles.placeDescription}>
+          {place.description}
+        </Text>
         <View style={styles.placeRatingRow}>
           <View style={styles.ratingPill}>
-            <Text style={styles.ratingPillText}>★ {place.rating.toFixed(1)}</Text>
+            <Text style={styles.ratingPillText}>
+              ★ {place.rating.toFixed(1)}
+            </Text>
           </View>
           <Text style={styles.reviewCount}>{reviewCount} reviews</Text>
         </View>
       </View>
-        <Pressable
-          accessibilityLabel={`Save ${place.name}`}
-          onPress={(event) => {
-            event.stopPropagation();
-            onSave();
-          }}
-          style={styles.bookmark}
-        >
-          {isDark ? (
-            <BookmarkIcon height={responsiveSize(20)} width={responsiveSize(18)} />
-          ) : (
-            <View style={styles.bookmarkOutline}>
-              <BookmarkOutline height={responsiveSize(17)} width={responsiveSize(15)} />
-              <BookmarkOutlineLine height={responsiveSize(1.2)} style={styles.bookmarkOutlineLine} width={responsiveSize(6)} />
-            </View>
-          )}
-        </Pressable>
+      <Pressable
+        accessibilityLabel={`Save ${place.name}`}
+        onPress={(event) => {
+          event.stopPropagation();
+          onSave();
+        }}
+        style={styles.bookmark}
+      >
+        {isDark ? (
+          <BookmarkIcon
+            height={responsiveSize(20)}
+            width={responsiveSize(18)}
+          />
+        ) : (
+          <View style={styles.bookmarkOutline}>
+            <BookmarkOutline
+              height={responsiveSize(17)}
+              width={responsiveSize(15)}
+            />
+            <BookmarkOutlineLine
+              height={responsiveSize(1.2)}
+              style={styles.bookmarkOutlineLine}
+              width={responsiveSize(6)}
+            />
+          </View>
+        )}
+      </Pressable>
     </Pressable>
   );
 }
@@ -602,8 +746,16 @@ function PlaceCard({
 function formatHistoryDate(value: string) {
   const date = new Date(value);
   const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  ).getTime();
+  const startOfDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime();
   const daysAgo = Math.round((startOfToday - startOfDate) / 86_400_000);
   if (daysAgo === 0) return 'Today';
   if (daysAgo === 1) return 'Yesterday';
@@ -653,17 +805,29 @@ function HistoryModal({
         <View pointerEvents="none" style={styles.historyGlow}>
           <Image source={bottomGlow} style={styles.historyGlowImage} />
         </View>
-        <View pointerEvents="none" style={[styles.historyPanel, { top: responsiveSize(66) + insets.top }]} />
-        <View style={[
-          styles.historyHeader,
-          {
-            height: responsiveSize(66) + insets.top,
-            paddingTop: responsiveSize(6) + insets.top,
-            paddingRight: responsiveSize(6) + insets.right,
-            paddingLeft: responsiveSize(6) + insets.left,
-          },
-        ]}>
-          <Pressable accessibilityLabel="Back" onPress={onClose} style={styles.historyButton}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.historyPanel,
+            { top: responsiveSize(66) + insets.top },
+          ]}
+        />
+        <View
+          style={[
+            styles.historyHeader,
+            {
+              height: responsiveSize(66) + insets.top,
+              paddingTop: responsiveSize(6) + insets.top,
+              paddingRight: responsiveSize(6) + insets.right,
+              paddingLeft: responsiveSize(6) + insets.left,
+            },
+          ]}
+        >
+          <Pressable
+            accessibilityLabel="Back"
+            onPress={onClose}
+            style={styles.historyButton}
+          >
             <Text style={styles.back}>‹</Text>
           </Pressable>
           <View style={styles.historyBrand}>
@@ -673,10 +837,15 @@ function HistoryModal({
             <Text style={styles.historyTitle}>Tastes AI</Text>
           </View>
           {!loading && history.length > 0 ? (
-            <Pressable onPress={() => setClearConfirm(true)} style={styles.historyButton}>
+            <Pressable
+              onPress={() => setClearConfirm(true)}
+              style={styles.historyButton}
+            >
               <Text style={styles.clearHistory}>Clear all</Text>
             </Pressable>
-          ) : <View style={styles.historyButton} />}
+          ) : (
+            <View style={styles.historyButton} />
+          )}
         </View>
         {loading ? (
           <ActivityIndicator color={color} style={styles.historyLoader} />
@@ -705,14 +874,21 @@ function HistoryModal({
               <Text style={styles.newChatText}>New chat</Text>
             </Pressable>
             <Text style={styles.historySectionTitle}>RECENT</Text>
-            <ScrollView contentContainerStyle={[styles.historyList, { paddingBottom: responsiveSize(24) + insets.bottom }]}>
-              {history.map((item, index) => {
+            <FlatList
+              contentContainerStyle={[
+                styles.historyList,
+                { paddingBottom: responsiveSize(24) + insets.bottom },
+              ]}
+              data={history}
+              initialNumToRender={8}
+              keyExtractor={(item) => item.id}
+              maxToRenderPerBatch={8}
+              renderItem={({ item, index }) => {
                 const firstTurn = item.turns[0];
                 const latestTurn = item.turns[item.turns.length - 1];
                 if (!firstTurn || !latestTurn) return null;
                 return (
                   <Pressable
-                    key={item.id}
                     onLongPress={() => setMenuId(item.id)}
                     onPress={() => onOpen(item)}
                     style={styles.historyRow}
@@ -730,13 +906,18 @@ function HistoryModal({
                     </View>
                   </Pressable>
                 );
-              })}
-            </ScrollView>
+              }}
+              style={styles.historyListViewport}
+              windowSize={5}
+            />
           </>
         )}
         {menuId ? (
           <View style={styles.historyScrim}>
-            <Pressable onPress={() => setMenuId(null)} style={StyleSheet.absoluteFill} />
+            <Pressable
+              onPress={() => setMenuId(null)}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={styles.historySheet}>
               <Text style={styles.historySheetTitle}>Chat options</Text>
               <Pressable
@@ -749,7 +930,10 @@ function HistoryModal({
               >
                 <Text style={styles.historyDestructiveText}>Delete chat</Text>
               </Pressable>
-              <Pressable onPress={() => setMenuId(null)} style={styles.historyCancel}>
+              <Pressable
+                onPress={() => setMenuId(null)}
+                style={styles.historyCancel}
+              >
                 <Text style={styles.historyCancelText}>Cancel</Text>
               </Pressable>
             </View>
@@ -771,7 +955,10 @@ function HistoryModal({
               >
                 <Text style={styles.historyDestructiveText}>Clear all</Text>
               </Pressable>
-              <Pressable onPress={() => setClearConfirm(false)} style={styles.historyCancel}>
+              <Pressable
+                onPress={() => setClearConfirm(false)}
+                style={styles.historyCancel}
+              >
                 <Text style={styles.historyCancelText}>Cancel</Text>
               </Pressable>
             </View>
@@ -875,7 +1062,11 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.primary,
     },
     errorPrimaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-    errorSecondary: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 10 },
+    errorSecondary: {
+      marginTop: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+    },
     errorSecondaryText: { color: colors.textSecondary, fontSize: 15 },
     empty: { flex: 1, paddingHorizontal: 16, alignItems: 'center' },
     heroTitle: {
@@ -923,12 +1114,29 @@ function createStyles(colors: ThemeColors) {
       textAlign: 'center',
     },
     quickPrompts: { width: '100%', paddingHorizontal: 16, paddingBottom: 4 },
-    quickPromptsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    quickPromptsDivider: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-    quickPromptsTitle: { color: colors.textMuted, fontSize: 13, letterSpacing: 0.6 },
+    quickPromptsTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    quickPromptsDivider: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+    },
+    quickPromptsTitle: {
+      color: colors.textMuted,
+      fontSize: 13,
+      letterSpacing: 0.6,
+    },
     quickPromptRows: { marginTop: 12, gap: 8 },
     quickPromptRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-    quickPrompt: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 39, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF' },
+    quickPrompt: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 39,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
+    },
     quickPromptText: { color: isDark ? colors.text : '#000000', fontSize: 14 },
     chatViewport: {
       flex: 1,
@@ -955,7 +1163,11 @@ function createStyles(colors: ThemeColors) {
       borderBottomRightRadius: isDark ? 4 : 12,
       backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF',
     },
-    userText: { color: colors.text, fontSize: 14, lineHeight: isDark ? 20 : 17 },
+    userText: {
+      color: colors.text,
+      fontSize: 14,
+      lineHeight: isDark ? 20 : 17,
+    },
     answer: {
       marginTop: isDark ? 18 : 12,
       paddingTop: isDark ? 14 : 0,
@@ -1020,7 +1232,11 @@ function createStyles(colors: ThemeColors) {
       borderBottomLeftRadius: 4,
       backgroundColor: 'rgba(255,255,255,0.10)',
     },
-    inlineThinkingText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+    inlineThinkingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
     thinkingScreen: { flex: 1, paddingHorizontal: 16 },
     thinkingHero: {
       height: 120,
@@ -1232,7 +1448,11 @@ function createStyles(colors: ThemeColors) {
       height: 454.4,
       transform: [{ translateX: -227.2 }],
     },
-    historyGlowImage: { width: '100%', height: '100%', opacity: isDark ? 1 : 0 },
+    historyGlowImage: {
+      width: '100%',
+      height: '100%',
+      opacity: isDark ? 1 : 0,
+    },
     historyPanel: {
       position: 'absolute',
       top: 66,
@@ -1289,7 +1509,12 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 25,
       backgroundColor: colors.primary,
     },
-    newChatPlus: { color: '#FFFFFF', fontSize: 19, lineHeight: 23, fontWeight: '400' },
+    newChatPlus: {
+      color: '#FFFFFF',
+      fontSize: 19,
+      lineHeight: 23,
+      fontWeight: '400',
+    },
     newChatText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     historySectionTitle: {
       marginTop: 38,
@@ -1335,6 +1560,7 @@ function createStyles(colors: ThemeColors) {
       marginLeft: 0,
     },
     historyList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+    historyListViewport: { flex: 1 },
     historyRow: {
       minHeight: 66,
       paddingVertical: 14,

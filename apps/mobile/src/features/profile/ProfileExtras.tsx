@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   Pressable,
   ScrollView,
@@ -231,82 +232,85 @@ export function ProfileExtras({
         </View>
 
         {screen === 'followers' || screen === 'following' ? (
-          <ScrollView
+          <FlatList
             contentContainerStyle={[
               styles.peopleList,
               { paddingBottom: Math.max(responsiveSize(30), insets.bottom) },
             ]}
+            data={data ? visibleConnections : []}
+            initialNumToRender={8}
+            keyExtractor={(person) => person.userId}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {!data ? (
-              <ActivityIndicator
-                color={colors.primary}
-                style={styles.peopleLoading}
-              />
-            ) : (
-              visibleConnections.map((person) => (
-                <View key={person.userId} style={styles.person}>
-                  <Pressable
-                    accessibilityLabel={`Open ${person.displayName}'s profile`}
-                    accessibilityRole="button"
-                    onPress={() =>
-                      onOpenProfile(person.userId, person.following)
-                    }
-                    style={({ pressed }) => [
-                      styles.personLink,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    {person.photoUrl ? (
-                      <Image
-                        source={{ uri: person.photoUrl }}
-                        style={styles.avatarImage}
-                      />
-                    ) : (
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                          {person.displayName
-                            .split(' ')
-                            .map((part) => part[0])
-                            .join('')
-                            .slice(0, 2)}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.personCopy}>
-                      <Text numberOfLines={1} style={styles.personName}>
-                        {person.displayName}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.handle}>
-                        {person.username ? `@${person.username}` : ''}
+            ListEmptyComponent={
+              !data ? (
+                <ActivityIndicator
+                  color={colors.primary}
+                  style={styles.peopleLoading}
+                />
+              ) : null
+            }
+            maxToRenderPerBatch={8}
+            renderItem={({ item: person }) => (
+              <View style={styles.person}>
+                <Pressable
+                  accessibilityLabel={`Open ${person.displayName}'s profile`}
+                  accessibilityRole="button"
+                  onPress={() => onOpenProfile(person.userId, person.following)}
+                  style={({ pressed }) => [
+                    styles.personLink,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {person.photoUrl ? (
+                    <Image
+                      source={{ uri: person.photoUrl }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {person.displayName
+                          .split(' ')
+                          .map((part) => part[0])
+                          .join('')
+                          .slice(0, 2)}
                       </Text>
                     </View>
+                  )}
+                  <View style={styles.personCopy}>
+                    <Text numberOfLines={1} style={styles.personName}>
+                      {person.displayName}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.handle}>
+                      {person.username ? `@${person.username}` : ''}
+                    </Text>
+                  </View>
+                </Pressable>
+                {screen === 'followers' && own ? (
+                  <Pressable
+                    accessibilityLabel={`Remove ${person.displayName}`}
+                    disabled={removingFollowerId === person.userId}
+                    onPress={() =>
+                      confirmRemoveFollower(person.userId, person.displayName)
+                    }
+                    style={styles.removeFollower}
+                  >
+                    {removingFollowerId === person.userId ? (
+                      <ActivityIndicator color={colors.text} size="small" />
+                    ) : (
+                      <TrashIcon
+                        color={colors.text}
+                        height={responsiveSize(25)}
+                        width={responsiveSize(24)}
+                      />
+                    )}
                   </Pressable>
-                  {screen === 'followers' && own ? (
-                    <Pressable
-                      accessibilityLabel={`Remove ${person.displayName}`}
-                      disabled={removingFollowerId === person.userId}
-                      onPress={() =>
-                        confirmRemoveFollower(person.userId, person.displayName)
-                      }
-                      style={styles.removeFollower}
-                    >
-                      {removingFollowerId === person.userId ? (
-                        <ActivityIndicator color={colors.text} size="small" />
-                      ) : (
-                        <TrashIcon
-                          color={colors.text}
-                          height={responsiveSize(25)}
-                          width={responsiveSize(24)}
-                        />
-                      )}
-                    </Pressable>
-                  ) : null}
-                </View>
-              ))
+                ) : null}
+              </View>
             )}
-          </ScrollView>
+            showsVerticalScrollIndicator={false}
+            windowSize={5}
+          />
         ) : screen === 'notifications' ? (
           <ScrollView contentContainerStyle={styles.settings}>
             <Setting

@@ -20,7 +20,7 @@ export function useFavourites(userId: string) {
     queryKey: favouritesQueryKey(userId),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
-      (await api.getFavourites({ cursor: pageParam, limit: 20 })).data,
+      (await api.getFavourites({ cursor: pageParam, limit: 10 })).data,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     select: (data) => ({
       folders: data.pages[0]?.folders ?? [],

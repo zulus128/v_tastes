@@ -1211,17 +1211,24 @@ function Gallery({
           <Text style={styles.galleryTitle}>Photos</Text>
           <View style={styles.spacer} />
         </View>
-        <ScrollView contentContainerStyle={styles.grid}>
-          {photos.map((key, index) => (
+        <FlatList
+          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={styles.grid}
+          data={photos}
+          initialNumToRender={9}
+          keyExtractor={(key, index) => key + String(index)}
+          maxToRenderPerBatch={9}
+          numColumns={3}
+          renderItem={({ item: key, index }) => (
             <GalleryImage
-              key={key + String(index)}
               index={index}
               onOpen={() => setExpandedPhoto(key)}
               styles={styles}
               url={key}
             />
-          ))}
-        </ScrollView>
+          )}
+          windowSize={5}
+        />
         <FullscreenPhoto
           close={() => setExpandedPhoto(null)}
           styles={styles}
@@ -1970,7 +1977,8 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: 'center',
     },
     spacer: { width: 24 },
-    grid: { padding: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+    grid: { padding: 8, gap: 4 },
+    gridRow: { gap: 4 },
     gridImage: {
       width: '32.4%',
       aspectRatio: 1,

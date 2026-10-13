@@ -3,7 +3,7 @@ import type { FeedItem, Venue } from '@tastes/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
@@ -395,6 +395,7 @@ export function ProfileScreen({
     return () => cancelAnimationFrame(frame);
   }, [activeTab]);
   useEffect(() => {
+    if (!mapOpen) return;
     const venueIds = [
       ...new Set(profileReviews.reviews.map((review) => review.venueId)),
     ];
@@ -414,7 +415,7 @@ export function ProfileScreen({
     return () => {
       active = false;
     };
-  }, [api, mapReload, profileReviews.reviews]);
+  }, [api, mapOpen, mapReload, profileReviews.reviews]);
   useEffect(() => {
     if (!profile?.favoriteVenueId) {
       setFavoritePlaceName(null);
@@ -434,38 +435,22 @@ export function ProfileScreen({
     };
   }, [api, profile?.favoriteVenueId]);
 
-  useEffect(() => {
-    const venueIds = [
-      ...new Set(
-        profileReviews.reviews
-          .filter((review) =>
-            review.dishReviews?.some((dish) => !dish.photoPath),
-          )
-          .map((review) => review.venueId),
-      ),
-    ].filter((venueId) => venueId && !(venueId in venueImages));
-    if (venueIds.length === 0) return;
-    let active = true;
-    void Promise.all(
-      venueIds.map(async (venueId) => {
-        try {
-          const response = await api.getPlace({ venueId });
-          return [venueId, response.data.venue.imageUrl ?? ''] as const;
-        } catch {
-          return [venueId, ''] as const;
-        }
-      }),
-    ).then((entries) => {
-      if (!active) return;
-      setVenueImages((current) => ({
-        ...current,
-        ...Object.fromEntries(entries),
-      }));
-    });
-    return () => {
-      active = false;
-    };
-  }, [api, profileReviews.reviews, venueImages]);
+  const loadVenueImage = useCallback(
+    (venueId: string) => {
+      if (!venueId || venueId in venueImages) return;
+      setVenueImages((current) => ({ ...current, [venueId]: '' }));
+      void api
+        .getPlace({ venueId })
+        .then((response) => {
+          setVenueImages((current) => ({
+            ...current,
+            [venueId]: response.data.venue.imageUrl ?? '',
+          }));
+        })
+        .catch(() => undefined);
+    },
+    [api, venueImages],
+  );
 
   async function toggleFollow() {
     if (followPending) return;
@@ -957,6 +942,7 @@ export function ProfileScreen({
               <ProfileReviewCard
                 fallbackImageUrl={venueImages[review.venueId]}
                 item={review}
+                onNeedFallbackImage={() => loadVenueImage(review.venueId)}
                 onComments={() => onOpenComments(review.id)}
                 onMore={() =>
                   own
