@@ -491,6 +491,30 @@ describe('onboarding in resizable windows', () => {
     }
   });
 
+  it('renders the birthday reference layout with labelled five-row columns', async () => {
+    resize(402, 874);
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="birthday"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(screen.queryByText('🎂')).toBeNull();
+    for (const label of ['DAY', 'MONTH', 'YEAR']) {
+      expect(screen.getByText(label)).toBeOnTheScreen();
+    }
+    for (const value of ['13', '14', '15', '16', '17']) {
+      expect(screen.getByText(value)).toBeOnTheScreen();
+    }
+    for (const month of ['February', 'March', 'April', 'May', 'June']) {
+      expect(screen.getByText(month)).toBeOnTheScreen();
+    }
+  });
+
   it.each([
     ['country', 'Your phone number'],
     ['phone', 'Discover the best places!'],

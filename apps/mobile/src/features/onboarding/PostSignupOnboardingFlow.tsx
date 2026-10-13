@@ -178,62 +178,86 @@ function isoBirthDate(day: number, month: number, year: number) {
 }
 
 function BirthdayColumn({
+  label,
   onChange,
   selected,
   values,
 }: {
+  label: string;
   onChange: (value: number) => void;
   selected: number;
   values: readonly number[];
 }) {
   const styles = useOnboardingStyles();
   const index = Math.max(0, values.indexOf(selected));
-  const previous = values[Math.max(0, index - 1)] ?? selected;
-  const next = values[Math.min(values.length - 1, index + 1)] ?? selected;
+  const visibleValues = [-2, -1, 0, 1, 2].map((offset) => ({
+    offset,
+    value:
+      values[Math.min(values.length - 1, Math.max(0, index + offset))] ??
+      selected,
+  }));
   return (
     <View style={styles.birthdayColumn}>
-      <Pressable
-        disabled={previous === selected}
-        onPress={() => onChange(previous)}
-      >
-        <Text style={styles.birthdayAdjacent}>{previous}</Text>
-      </Pressable>
-      <View style={styles.birthdaySelected}>
-        <Text style={styles.birthdaySelectedText}>{selected}</Text>
-      </View>
-      <Pressable disabled={next === selected} onPress={() => onChange(next)}>
-        <Text style={styles.birthdayAdjacent}>{next}</Text>
-      </Pressable>
+      <Text style={styles.birthdayColumnLabel}>{label}</Text>
+      {visibleValues.map(({ offset, value }) => (
+        <Pressable
+          disabled={offset === 0 || value === selected}
+          key={offset}
+          onPress={() => onChange(value)}
+          style={styles.birthdayValue}
+        >
+          <Text
+            style={[
+              offset === 0
+                ? styles.birthdaySelectedText
+                : styles.birthdayAdjacent,
+              Math.abs(offset) === 2 && styles.birthdayFar,
+            ]}
+          >
+            {value}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
 
 function BirthdayMonthColumn({
+  label,
   onChange,
   selected,
 }: {
+  label: string;
   onChange: (value: number) => void;
   selected: number;
 }) {
   const styles = useOnboardingStyles();
-  const previous = Math.max(0, selected - 1);
-  const next = Math.min(birthdayMonths.length - 1, selected + 1);
+  const visibleValues = [-2, -1, 0, 1, 2].map((offset) => ({
+    offset,
+    value: Math.min(birthdayMonths.length - 1, Math.max(0, selected + offset)),
+  }));
   return (
     <View style={[styles.birthdayColumn, styles.birthdayMonthColumn]}>
-      <Pressable
-        disabled={previous === selected}
-        onPress={() => onChange(previous)}
-      >
-        <Text style={styles.birthdayAdjacent}>{birthdayMonths[previous]}</Text>
-      </Pressable>
-      <View style={styles.birthdaySelected}>
-        <Text style={styles.birthdaySelectedText}>
-          {birthdayMonths[selected]}
-        </Text>
-      </View>
-      <Pressable disabled={next === selected} onPress={() => onChange(next)}>
-        <Text style={styles.birthdayAdjacent}>{birthdayMonths[next]}</Text>
-      </Pressable>
+      <Text style={styles.birthdayColumnLabel}>{label}</Text>
+      {visibleValues.map(({ offset, value }) => (
+        <Pressable
+          disabled={offset === 0 || value === selected}
+          key={offset}
+          onPress={() => onChange(value)}
+          style={styles.birthdayValue}
+        >
+          <Text
+            style={[
+              offset === 0
+                ? styles.birthdaySelectedText
+                : styles.birthdayAdjacent,
+              Math.abs(offset) === 2 && styles.birthdayFar,
+            ]}
+          >
+            {birthdayMonths[value]}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -1448,9 +1472,6 @@ export function PostSignupOnboardingFlow({
         <Header onBack={back} />
         <StepProgress overlay step={1} />
         <View style={styles.birthdayPage}>
-          <View style={styles.birthdayIcon}>
-            <Text style={styles.birthdayIconText}>🎂</Text>
-          </View>
           <Text style={[styles.title, styles.birthdayTitle]}>
             When is your birthday?
           </Text>
@@ -1458,12 +1479,15 @@ export function PostSignupOnboardingFlow({
             We’ll use this to personalize your experience and confirm your age.
           </Text>
           <View style={styles.birthdayPicker}>
+            <View pointerEvents="none" style={styles.birthdaySelectionBand} />
             <BirthdayColumn
+              label="DAY"
               onChange={setBirthDay}
               selected={safeDay}
               values={days}
             />
             <BirthdayMonthColumn
+              label="MONTH"
               onChange={(value) => {
                 setBirthMonth(value);
                 setBirthDay((day) =>
@@ -1473,6 +1497,7 @@ export function PostSignupOnboardingFlow({
               selected={birthMonth}
             />
             <BirthdayColumn
+              label="YEAR"
               onChange={(value) => {
                 setBirthYear(value);
                 setBirthDay((day) =>
@@ -1496,7 +1521,7 @@ export function PostSignupOnboardingFlow({
           onPress={() =>
             void saveProfile(isoBirthDate(safeDay, birthMonth, birthYear))
           }
-          style={styles.bottomButton}
+          style={[styles.bottomButton, styles.birthdayButton]}
         />
       </PatternScreen>
     );
@@ -2295,69 +2320,95 @@ const createStyles = (
     },
     birthdayPage: {
       flex: 1,
-      paddingTop: landscape ? 92 : 154,
+      paddingTop: landscape ? 92 : 204,
       paddingHorizontal: 16,
       alignItems: 'center',
     },
-    birthdayIcon: {
-      width: 60,
-      height: 60,
-      marginBottom: 24,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: isDark ? '#3A1716' : '#FCE5E3',
+    birthdayTitle: {
+      fontSize: landscape ? 27 : 32,
+      lineHeight: landscape ? 33 : 39,
+      fontWeight: '700',
+      letterSpacing: -0.7,
     },
-    birthdayIconText: { fontSize: 31 },
-    birthdayTitle: { fontSize: 24, lineHeight: 29 },
     birthdaySubtitle: {
-      maxWidth: 350,
-      marginTop: 7,
-      color: colors.textMuted,
-      fontSize: 15,
-      lineHeight: 20,
+      maxWidth: 330,
+      marginTop: 15,
+      color: isDark ? '#B9B9BE' : colors.textSecondary,
+      fontSize: 17,
+      lineHeight: 24,
+      letterSpacing: -0.25,
       textAlign: 'center',
     },
     birthdayPicker: {
       width: '100%',
       maxWidth: 370,
-      height: 172,
-      marginTop: 48,
-      paddingHorizontal: 8,
+      height: landscape ? 220 : 250,
+      marginTop: landscape ? 22 : 36,
+      overflow: 'hidden',
       flexDirection: 'row',
-      alignItems: 'center',
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
+      borderWidth: 1,
+      borderColor: isDark ? '#292B2C' : colors.border,
+      borderRadius: 22,
+      backgroundColor: isDark ? 'rgba(8,9,9,0.88)' : 'rgba(255,255,255,0.92)',
+    },
+    birthdaySelectionBand: {
+      position: 'absolute',
+      zIndex: 0,
+      top: landscape ? 96 : 111,
+      left: 10,
+      right: 10,
+      height: 48,
+      borderWidth: 1,
+      borderColor: isDark ? '#7D2B30' : '#EC8990',
+      borderRadius: 22,
+      backgroundColor: isDark ? 'rgba(116,40,44,0.42)' : '#FCE5E7',
+      shadowColor: '#FF4757',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: isDark ? 0.2 : 0.08,
+      shadowRadius: 8,
     },
     birthdayColumn: {
+      zIndex: 1,
       flex: 1,
-      height: 168,
+      height: '100%',
+      paddingTop: landscape ? 10 : 17,
+      paddingBottom: landscape ? 4 : 5,
       alignItems: 'center',
-      justifyContent: 'space-around',
     },
-    birthdayMonthColumn: { flex: 1.45 },
-    birthdayAdjacent: {
-      color: colors.textMuted,
-      fontSize: 17,
-      lineHeight: 24,
-      opacity: 0.58,
+    birthdayMonthColumn: {
+      flex: 1.35,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderRightWidth: StyleSheet.hairlineWidth,
+      borderColor: isDark ? 'rgba(255,255,255,0.08)' : colors.hairline,
     },
-    birthdaySelected: {
+    birthdayColumnLabel: {
+      height: 28,
+      color: isDark ? '#D5D5DA' : colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '700',
+      letterSpacing: 2.4,
+    },
+    birthdayValue: {
       width: '100%',
-      minHeight: 48,
-      paddingHorizontal: 6,
+      height: landscape ? 34 : 39,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 12,
-      backgroundColor: isDark ? '#2B2B2B' : '#FFFFFF',
     },
+    birthdayAdjacent: {
+      color: isDark ? '#8B8B90' : colors.textMuted,
+      fontSize: 17,
+      lineHeight: 24,
+      fontWeight: '500',
+    },
+    birthdayFar: { opacity: 0.35 },
     birthdaySelectedText: {
       color: colors.text,
-      fontSize: 19,
-      lineHeight: 24,
+      fontSize: 20,
+      lineHeight: 26,
       fontWeight: '600',
     },
+    birthdayButton: { left: 26, right: 26 },
     birthdayError: {
       marginTop: 14,
       color: colors.primary,
