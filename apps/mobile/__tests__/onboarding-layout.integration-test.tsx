@@ -442,11 +442,47 @@ describe('onboarding in resizable windows', () => {
         StyleSheet.flatten(screen.getByTestId(testID).props.style),
       ).toMatchObject({
         backgroundColor: '#FFFFFF',
-        borderColor:
-          initialScreen === 'contactsPermission' ? '#D33B35' : '#E4E4E4',
+        borderColor: '#E4E4E4',
       });
     },
   );
+
+  it('matches the dark Figma contacts-permission card', async () => {
+    resize(402, 874);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="contactsPermission"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-people-teaser').props.style,
+      ),
+    ).toMatchObject({
+      backgroundColor: '#1A1A1A',
+      borderColor: '#2A2A2A',
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 272,
+      marginTop: 42,
+    });
+    expect(
+      StyleSheet.flatten(
+        screen.getByText('Your feed is only as good as who you follow.').props
+          .style,
+      ),
+    ).toMatchObject({
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: 15,
+      lineHeight: 18,
+    });
+  });
 
   it('uses readable completion copy in the light theme', async () => {
     resize(402, 874);

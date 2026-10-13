@@ -2308,7 +2308,9 @@ const createStyles = (
       lineHeight: 18,
       textAlign: 'center',
     },
-    permissionBodyText: { color: colors.textMuted },
+    permissionBodyText: {
+      color: isDark ? 'rgba(255,255,255,0.5)' : colors.textMuted,
+    },
     permissionFootnote: {
       position: 'absolute',
       left: 36,
@@ -3090,10 +3092,10 @@ const createStyles = (
       marginTop: 42,
       paddingTop: 15,
       paddingHorizontal: 15,
-      borderWidth: 2,
-      borderColor: '#D33B35',
+      borderWidth: 1,
+      borderColor: isDark ? '#2A2A2A' : colors.border,
       borderRadius: 18,
-      backgroundColor: colors.surface,
+      backgroundColor: isDark ? '#1A1A1A' : colors.surface,
     },
     peopleTeaserTitle: {
       color: colors.text,
