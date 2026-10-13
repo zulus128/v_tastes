@@ -8,7 +8,7 @@ import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
   Alert,
@@ -179,46 +179,87 @@ function isoBirthDate(day: number, month: number, year: number) {
 }
 
 function BirthdayColumn({
+  formatValue = String,
   label,
+  month = false,
   onChange,
   selected,
   values,
 }: {
+  formatValue?: (value: number) => string;
   label: string;
+  month?: boolean;
   onChange: (value: number) => void;
   selected: number;
   values: readonly number[];
 }) {
   const styles = useOnboardingStyles();
+  const { width, height } = useOrientationDimensions();
+  const rowHeight = width > height ? 34 : 39;
+  const wheelRef = useRef<ScrollView>(null);
   const index = Math.max(0, values.indexOf(selected));
-  const visibleValues = [-2, -1, 0, 1, 2].map((offset) => ({
-    offset,
-    value:
-      values[Math.min(values.length - 1, Math.max(0, index + offset))] ??
-      selected,
-  }));
+
+  const alignSelectedRow = () =>
+    wheelRef.current?.scrollTo({
+      animated: false,
+      y: index * rowHeight,
+    });
+
+  useEffect(alignSelectedRow, [index, rowHeight]);
+
+  const selectVisibleRow = (offset: number) => {
+    const nextIndex = Math.max(
+      0,
+      Math.min(values.length - 1, Math.round(offset / rowHeight)),
+    );
+    const nextValue = values[nextIndex];
+    if (nextValue !== undefined && nextValue !== selected) onChange(nextValue);
+  };
+
   return (
-    <View style={styles.birthdayColumn}>
+    <View style={[styles.birthdayColumn, month && styles.birthdayMonthColumn]}>
       <Text style={styles.birthdayColumnLabel}>{label}</Text>
-      {visibleValues.map(({ offset, value }) => (
-        <Pressable
-          disabled={offset === 0 || value === selected}
-          key={offset}
-          onPress={() => onChange(value)}
-          style={styles.birthdayValue}
-        >
-          <Text
-            style={[
-              offset === 0
-                ? styles.birthdaySelectedText
-                : styles.birthdayAdjacent,
-              Math.abs(offset) === 2 && styles.birthdayFar,
-            ]}
-          >
-            {value}
-          </Text>
-        </Pressable>
-      ))}
+      <ScrollView
+        contentContainerStyle={styles.birthdayWheelContent}
+        decelerationRate="fast"
+        nestedScrollEnabled
+        onContentSizeChange={alignSelectedRow}
+        onMomentumScrollEnd={({ nativeEvent }) =>
+          selectVisibleRow(nativeEvent.contentOffset.y)
+        }
+        onScrollEndDrag={({ nativeEvent }) =>
+          selectVisibleRow(nativeEvent.contentOffset.y)
+        }
+        ref={wheelRef}
+        showsVerticalScrollIndicator={false}
+        snapToAlignment="start"
+        snapToInterval={rowHeight}
+        style={styles.birthdayWheel}
+        testID={`onboarding-birthday-wheel-${label.toLowerCase()}`}
+      >
+        {values.map((item, itemIndex) => {
+          const offset = itemIndex - index;
+          return (
+            <Pressable
+              disabled={offset === 0}
+              key={item}
+              onPress={() => onChange(item)}
+              style={styles.birthdayValue}
+            >
+              <Text
+                style={[
+                  offset === 0
+                    ? styles.birthdaySelectedText
+                    : styles.birthdayAdjacent,
+                  Math.abs(offset) >= 2 && styles.birthdayFar,
+                ]}
+              >
+                {formatValue(item)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -232,34 +273,15 @@ function BirthdayMonthColumn({
   onChange: (value: number) => void;
   selected: number;
 }) {
-  const styles = useOnboardingStyles();
-  const visibleValues = [-2, -1, 0, 1, 2].map((offset) => ({
-    offset,
-    value: Math.min(birthdayMonths.length - 1, Math.max(0, selected + offset)),
-  }));
   return (
-    <View style={[styles.birthdayColumn, styles.birthdayMonthColumn]}>
-      <Text style={styles.birthdayColumnLabel}>{label}</Text>
-      {visibleValues.map(({ offset, value }) => (
-        <Pressable
-          disabled={offset === 0 || value === selected}
-          key={offset}
-          onPress={() => onChange(value)}
-          style={styles.birthdayValue}
-        >
-          <Text
-            style={[
-              offset === 0
-                ? styles.birthdaySelectedText
-                : styles.birthdayAdjacent,
-              Math.abs(offset) === 2 && styles.birthdayFar,
-            ]}
-          >
-            {birthdayMonths[value]}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <BirthdayColumn
+      formatValue={(value) => birthdayMonths[value] ?? ''}
+      label={label}
+      month
+      onChange={onChange}
+      selected={selected}
+      values={birthdayMonths.map((_month, index) => index)}
+    />
   );
 }
 
@@ -1504,7 +1526,11 @@ export function PostSignupOnboardingFlow({
             We’ll use this to personalize your experience and confirm your age.
           </Text>
           <View style={styles.birthdayPicker}>
-            <View pointerEvents="none" style={styles.birthdaySelectionBand} />
+            <View
+              pointerEvents="none"
+              style={styles.birthdaySelectionBand}
+              testID="onboarding-birthday-selection-band"
+            />
             <BirthdayColumn
               label="DAY"
               onChange={setBirthDay}
@@ -2385,13 +2411,13 @@ const createStyles = (
     birthdaySelectionBand: {
       position: 'absolute',
       zIndex: 0,
-      top: landscape ? 96 : 111,
+      top: landscape ? 106 : 123,
       left: 10,
       right: 10,
-      height: 48,
+      height: landscape ? 34 : 39,
       borderWidth: 1,
       borderColor: isDark ? '#7D2B30' : '#EC8990',
-      borderRadius: 22,
+      borderRadius: 12,
       backgroundColor: isDark ? 'rgba(116,40,44,0.42)' : '#FCE5E7',
       shadowColor: '#FF4757',
       shadowOffset: { width: 0, height: 0 },
@@ -2419,6 +2445,14 @@ const createStyles = (
       lineHeight: 18,
       fontWeight: '700',
       letterSpacing: 2.4,
+    },
+    birthdayWheel: {
+      width: '100%',
+      height: landscape ? 170 : 195,
+      flexGrow: 0,
+    },
+    birthdayWheelContent: {
+      paddingVertical: landscape ? 68 : 78,
     },
     birthdayValue: {
       width: '100%',
