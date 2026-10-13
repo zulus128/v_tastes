@@ -215,7 +215,11 @@ function BirthdayColumn({
 }) {
   const styles = useOnboardingStyles();
   const { width, height } = useOrientationDimensions();
-  const rowHeight = width > height ? 34 : 39;
+  // The row itself is created by responsiveStyleSheet, so every scroll
+  // calculation must use the same scaled height. Using the design-space value
+  // here made large macOS/iPad windows scroll to the wrong item while the
+  // selection band stayed correctly centered.
+  const rowHeight = responsiveSize(width > height ? 34 : 39);
   const wheelRef = useRef<ScrollView>(null);
   const index = Math.max(0, values.indexOf(selected));
 
@@ -2727,7 +2731,7 @@ const createStyles = (
       lineHeight: 26,
       fontWeight: '600',
     },
-    birthdayButton: { left: 26, right: 26, height: 42 },
+    birthdayButton: { left: 26, right: 26 },
     birthdayError: {
       marginTop: 14,
       color: colors.primary,

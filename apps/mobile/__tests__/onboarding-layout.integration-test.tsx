@@ -667,7 +667,7 @@ describe('onboarding in resizable windows', () => {
       StyleSheet.flatten(
         screen.getByTestId('onboarding-primary-button-glow').props.style,
       ),
-    ).toMatchObject({ height: 42 });
+    ).toMatchObject({ height: 54 });
     expect(
       StyleSheet.flatten(
         screen.getByTestId('onboarding-birthday-selection-band').props.style,
@@ -682,6 +682,28 @@ describe('onboarding in resizable windows', () => {
     expect(
       StyleSheet.flatten(screen.getByText('16').props.style),
     ).toMatchObject({ fontSize: 20, fontWeight: '600' });
+  });
+
+  it('keeps the birthday wheel aligned with its selection band at large scale', async () => {
+    resize(990, 2130);
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="birthday"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    await fireEvent(
+      screen.getByTestId('onboarding-birthday-wheel-month'),
+      'momentumScrollEnd',
+      { nativeEvent: { contentOffset: { y: 4 * 78 } } },
+    );
+    expect(
+      StyleSheet.flatten(screen.getByText('May').props.style),
+    ).toMatchObject({ fontSize: 40, fontWeight: '600' });
   });
 
   it.each([
