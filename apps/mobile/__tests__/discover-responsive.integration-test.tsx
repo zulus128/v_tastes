@@ -13,9 +13,14 @@ const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
 let mockCarouselCount = 0;
 let mockPopularReviews: Array<Record<string, unknown>> = [];
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => mockInsets,
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = jest.requireActual('react-native');
+  return {
+    SafeAreaProvider: View,
+    SafeAreaView: View,
+    useSafeAreaInsets: () => mockInsets,
+  };
+});
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: String }));
 jest.mock('../src/ui/ThemeProvider', () => ({
   useAppTheme: () => ({ colors: {}, isDark: true }),
@@ -99,6 +104,22 @@ describe('Discover responsive content', () => {
   async function openTrending() {
     await fireEvent.press(screen.getByRole('tab', { name: 'Trending' }));
   }
+
+  it('keeps the see-all search box at input height in a tall window', async () => {
+    mockCarouselCount = 3;
+    resize(974, 2286);
+    await render(<DiscoverScreen {...props} />);
+    await openTrending();
+    await fireEvent.press(screen.getByText(/See all/));
+
+    const searchStyle = StyleSheet.flatten(
+      screen.getByTestId('see-all-places-search').props.style,
+    );
+
+    expect(searchStyle.height).toBe(responsiveSize(39));
+    expect(searchStyle.flexGrow).toBe(0);
+    expect(searchStyle.flexShrink).toBe(0);
+  });
 
   it('fits wrapped cards inside landscape safe insets, including the final row', async () => {
     resize(667, 375);

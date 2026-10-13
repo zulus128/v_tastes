@@ -2193,7 +2193,14 @@ function SeeAllPlacesModal({
           </Text>
           <View style={styles.headerAction} />
         </View>
-        <View style={[styles.peopleSearch, { margin: responsiveSize(16) }]}>
+        <View
+          testID="see-all-places-search"
+          style={[
+            styles.peopleSearch,
+            styles.seeAllPlacesSearch,
+            { margin: responsiveSize(16) },
+          ]}
+        >
           <PeopleSearchIcon
             color={colors.textSecondary}
             height={responsiveSize(24)}
@@ -3752,6 +3759,11 @@ const createStyles = (colors: ThemeColors) =>
       gap: 8,
       borderRadius: 22,
       backgroundColor: colors.surfaceRaised,
+    },
+    seeAllPlacesSearch: {
+      flexGrow: 0,
+      flexShrink: 0,
+      flexBasis: 'auto',
     },
     peopleSearchInput: {
       flex: 1,
