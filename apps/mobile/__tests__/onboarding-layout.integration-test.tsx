@@ -517,6 +517,26 @@ describe('onboarding in resizable windows', () => {
     });
   });
 
+  it('scales the blurred contacts teaser rows with a large app window', async () => {
+    resize(804, 1748);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="contactsPermission"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      screen.getByTestId('onboarding-people-teaser-list', {
+        includeHiddenElements: true,
+      }).props.height,
+    ).toBe(384);
+  });
+
   it('uses readable completion copy in the light theme', async () => {
     resize(402, 874);
     await render(

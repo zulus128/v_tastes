@@ -97,6 +97,7 @@ import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import {
   DESIGN_VIEWPORT,
+  responsiveSize,
   responsiveStyleSheet,
   useOrientationDimensions,
   useResponsiveMetrics,
@@ -531,7 +532,7 @@ function PeopleYouKnowTeaser({
       </Text>
       <Svg
         accessibilityElementsHidden
-        height={192}
+        height={responsiveSize(192)}
         testID="onboarding-people-teaser-list"
         viewBox="0 0 338 192"
         width="100%"
