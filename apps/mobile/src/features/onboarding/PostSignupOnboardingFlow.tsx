@@ -13,6 +13,7 @@ import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import {
   Alert,
   Animated,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -258,6 +259,30 @@ function BirthdayMonthColumn({
           </Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+function LazyVenueImage({
+  source,
+  testID,
+}: {
+  source: ImageSourcePropType;
+  testID: string;
+}) {
+  const styles = useOnboardingStyles();
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <View style={styles.venueImagePlaceholder}>
+      <Image
+        fadeDuration={180}
+        onLoad={() => setLoaded(true)}
+        resizeMode="cover"
+        source={source}
+        style={[styles.venueImage, !loaded && styles.venueImageLoading]}
+        testID={testID}
+      />
     </View>
   );
 }
@@ -1042,7 +1067,7 @@ export function PostSignupOnboardingFlow({
     setPlaceLoading(true);
     setPlaceError(null);
     void api
-      .getVenues({ limit: 20 })
+      .getVenues({ limit: 8 })
       .then((response) => {
         const mapped = response.data.items.map(
           (venue, index): PlaceCandidate => ({
@@ -1727,16 +1752,17 @@ export function PostSignupOnboardingFlow({
               </Text>
             </ScrollView>
           ) : (
-            <ScrollView
+            <FlatList
               contentContainerStyle={styles.placeListContent}
-              style={styles.placeList}
-              showsVerticalScrollIndicator={false}
-            >
-              {filteredPlaces.map((item) => {
+              data={filteredPlaces}
+              initialNumToRender={4}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.id}
+              maxToRenderPerBatch={4}
+              renderItem={({ item }) => {
                 const selected = place === item.id;
                 return (
                   <Pressable
-                    key={item.id}
                     onPress={() => setPlace(item.id)}
                     style={[styles.venue, selected && styles.venueSelected]}
                   >
@@ -1746,10 +1772,9 @@ export function PostSignupOnboardingFlow({
                     />
                     <View style={styles.venueMainRow}>
                       <View style={styles.venueImageWrap}>
-                        <Image
+                        <LazyVenueImage
                           source={item.image}
-                          resizeMode="cover"
-                          style={styles.venueImage}
+                          testID={`onboarding-place-image-${item.id}`}
                         />
                         {item.popular ? (
                           <View style={styles.popularBadge}>
@@ -1807,8 +1832,12 @@ export function PostSignupOnboardingFlow({
                     </View>
                   </Pressable>
                 );
-              })}
-            </ScrollView>
+              }}
+              showsVerticalScrollIndicator={false}
+              style={styles.placeList}
+              testID="onboarding-place-list"
+              windowSize={3}
+            />
           )}
         </View>
         <LinearGradient
@@ -2825,8 +2854,11 @@ const createStyles = (
       height: 86,
       borderRadius: 12,
       overflow: 'hidden',
+      backgroundColor: colors.skeletonMuted,
     },
+    venueImagePlaceholder: { width: 86, height: 86 },
     venueImage: { width: 86, height: 86, borderRadius: 12 },
+    venueImageLoading: { opacity: 0 },
     popularBadge: {
       position: 'absolute',
       top: 6,

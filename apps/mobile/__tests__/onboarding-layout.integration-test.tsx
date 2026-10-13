@@ -418,6 +418,19 @@ describe('onboarding in resizable windows', () => {
     expect(
       within(firstPlaceCopy).getByTestId('onboarding-place-tags-gemini'),
     ).toBeOnTheScreen();
+
+    const placeList = screen.getByTestId('onboarding-place-list');
+    expect(placeList.props).toMatchObject({
+      initialNumToRender: 4,
+      maxToRenderPerBatch: 4,
+      windowSize: 3,
+    });
+    const firstImage = screen.getByTestId('onboarding-place-image-gemini');
+    expect(StyleSheet.flatten(firstImage.props.style)).toMatchObject({
+      opacity: 0,
+    });
+    await fireEvent(firstImage, 'load');
+    expect(StyleSheet.flatten(firstImage.props.style).opacity).not.toBe(0);
   });
 
   it.each([
