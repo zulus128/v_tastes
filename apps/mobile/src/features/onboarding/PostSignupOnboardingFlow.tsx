@@ -714,7 +714,17 @@ function NearbyMapPreview({
 }) {
   return (
     <View style={styles.locationMap} testID="onboarding-location-map">
-      <LocationMapStreets style={styles.locationMapStreets} />
+      <View
+        pointerEvents="none"
+        style={styles.locationMapStreets}
+        testID="onboarding-location-map-streets"
+      >
+        <LocationMapStreets
+          height="100%"
+          preserveAspectRatio="none"
+          width="100%"
+        />
+      </View>
       <View pointerEvents="none" style={styles.locationMapVignette} />
       <LocationVenueCard
         avatar
@@ -2803,10 +2813,10 @@ const createStyles = (
     },
     locationMapStreets: {
       position: 'absolute',
-      left: -1,
-      top: -1,
-      width: 370,
-      height: 296,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
     },
     locationMapVignette: {
       position: 'absolute',
