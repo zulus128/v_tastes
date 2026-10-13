@@ -2786,7 +2786,7 @@ const createStyles = (
       textAlign: 'center',
     },
     locationMap: {
-      width: '100%',
+      width: 370,
       height: 304,
       marginTop: 36,
       overflow: 'hidden',
@@ -2920,9 +2920,10 @@ const createStyles = (
     },
     locationButton: {
       position: 'absolute',
-      left: 36,
-      right: 36,
+      left: '50%',
+      width: 330,
       bottom: 24,
+      transform: [{ translateX: -165 }],
     },
     locationPin: {
       width: 18,

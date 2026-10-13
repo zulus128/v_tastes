@@ -564,6 +564,31 @@ describe('onboarding in resizable windows', () => {
     ).toMatchObject({ height: 304, marginTop: 36, borderRadius: 24 });
   });
 
+  it('keeps the location composition proportional in a wide window', async () => {
+    resize(2048, 1547);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="location"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-location-map').props.style,
+      ),
+    ).toMatchObject({ width: 655, height: 538 });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('onboarding-primary-button-glow').props.style,
+      ),
+    ).toMatchObject({ width: 584, left: '50%' });
+  });
+
   it('matches the updated Figma invitation hero and option cards', async () => {
     resize(402, 874);
     await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
