@@ -743,6 +743,92 @@ async function main() {
     }),
   );
 
+  // Some demo venues are added outside the core fixture above. Keep every
+  // active venue's Top rated dishes usable by ensuring each dish has at least
+  // one published review in the seeded database.
+  const [activeVenueSnapshots, publishedReviewSnapshots] = await Promise.all([
+    db.collection('venues').where('status', '==', 'active').get(),
+    db.collection('reviews').where('status', '==', 'published').get(),
+  ]);
+  const normalizeDishName = (value: string) => value.trim().toLocaleLowerCase();
+  const reviewedDishesByVenue = new Map<string, Set<string>>();
+  publishedReviewSnapshots.docs.forEach((reviewSnapshot) => {
+    const venueId = reviewSnapshot.get('venueId');
+    if (typeof venueId !== 'string') return;
+    const reviewedDishes =
+      reviewedDishesByVenue.get(venueId) ?? new Set<string>();
+    const dishReviews = reviewSnapshot.get('dishReviews');
+    if (Array.isArray(dishReviews)) {
+      dishReviews.forEach((dish: unknown) => {
+        if (typeof dish !== 'object' || dish === null || !('title' in dish))
+          return;
+        if (typeof dish.title === 'string') {
+          reviewedDishes.add(normalizeDishName(dish.title));
+        }
+      });
+    }
+    reviewedDishesByVenue.set(venueId, reviewedDishes);
+  });
+
+  await Promise.all(
+    activeVenueSnapshots.docs.map((venueSnapshot) => {
+      const popularDishes = venueSnapshot.get('popularDishes');
+      if (!Array.isArray(popularDishes)) return Promise.resolve();
+      const dishes = popularDishes.flatMap((dish: unknown) => {
+        if (
+          typeof dish !== 'object' ||
+          dish === null ||
+          !('name' in dish) ||
+          typeof dish.name !== 'string'
+        ) {
+          return [];
+        }
+        const rating =
+          'rating' in dish && typeof dish.rating === 'number'
+            ? dish.rating
+            : Number(venueSnapshot.get('rating') ?? 4.5);
+        return [{ name: dish.name, rating }];
+      });
+      if (dishes.length === 0) return Promise.resolve();
+
+      const reviewedDishes = reviewedDishesByVenue.get(venueSnapshot.id);
+      const hasCompleteCoverage = dishes.every((dish) =>
+        reviewedDishes?.has(normalizeDishName(dish.name)),
+      );
+      if (hasCompleteCoverage) return Promise.resolve();
+
+      const dishReviews = dishes.map((dish, index) => ({
+        id: `seed-${stableSeedKey(`${venueSnapshot.id}:${dish.name}`)}-${index + 1}`,
+        title: dish.name,
+        rating: dish.rating,
+        photoPath: null,
+      }));
+      return db
+        .collection('reviews')
+        .doc(`dish-coverage-${stableSeedKey(venueSnapshot.id)}`)
+        .set(
+          {
+            authorId: 'discover-kristin',
+            authorDisplayName: 'Kristin Watson',
+            venueId: venueSnapshot.id,
+            venueName: String(venueSnapshot.get('name') ?? 'Venue'),
+            venueCity: String(venueSnapshot.get('city') ?? ''),
+            rating: Number(venueSnapshot.get('rating') ?? 4.5),
+            text: `The ${dishes.map((dish) => dish.name).join(' and ')} are well worth ordering.`,
+            dishReviews,
+            dishNames: dishReviews.map((dish) => dish.title),
+            status: 'published',
+            reactionCount: 0,
+            commentCount: 0,
+            source: 'seed',
+            createdAt: Timestamp.fromMillis(Date.now() - 48 * 60 * 60 * 1_000),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+    }),
+  );
+
   if (stressImageCount > 0 || stressImageCleanup) {
     const stressReviews = await db
       .collection('reviews')
