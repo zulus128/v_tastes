@@ -1612,7 +1612,7 @@ function PlacesMap({
                 style={[styles.filterChip, active && styles.filterChipActive]}
               >
                 <Icon
-                  color={active ? '#FFFFFF' : colors.textSecondary}
+                  color={active ? colors.primary : colors.textSecondary}
                   height={responsiveSize(14)}
                   width={responsiveSize(14)}
                 />
