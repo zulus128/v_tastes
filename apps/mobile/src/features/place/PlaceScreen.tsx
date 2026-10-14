@@ -116,6 +116,8 @@ export function PlaceScreen({
   const [toast, setToast] = useState(false);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
+  const reviewsListRef = useRef<FlatList<PlaceReview>>(null);
+  const scrollToDishReviewsRef = useRef(false);
   const details = usePlace(venueId);
   const reviews = usePlaceReviews(venueId, sort, reviewScope);
   const savedVenue = useSavedVenue(userId, venueId);
@@ -322,6 +324,7 @@ export function PlaceScreen({
         <Overview
           details={place}
           openDishReviews={(dishName) => {
+            scrollToDishReviewsRef.current = true;
             setDishFilter(dishName);
             setReviewScope('all');
             setTab('reviews');
@@ -359,6 +362,7 @@ export function PlaceScreen({
         </ScrollView>
       ) : (
         <FlatList
+          ref={reviewsListRef}
           contentContainerStyle={{ paddingBottom: contentBottom }}
           data={(reviews.data ?? []).filter(
             (review) =>
@@ -373,10 +377,25 @@ export function PlaceScreen({
           keyExtractor={(review) => review.id}
           maxToRenderPerBatch={8}
           ListHeaderComponent={
-            <>
+            <View
+              onLayout={(event) => {
+                if (!scrollToDishReviewsRef.current) return;
+                scrollToDishReviewsRef.current = false;
+                const reviewsOffset = Math.max(
+                  0,
+                  event.nativeEvent.layout.height - responsiveSize(12),
+                );
+                requestAnimationFrame(() =>
+                  reviewsListRef.current?.scrollToOffset({
+                    animated: false,
+                    offset: reviewsOffset,
+                  }),
+                );
+              }}
+            >
               {hero}
               {intro}
-            </>
+            </View>
           }
           ListEmptyComponent={
             !reviews.isPending && !reviews.isError ? (
