@@ -57,11 +57,11 @@ import mapTrendingIcon from '../../../assets/profile/map-trending.png';
 import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
-import filterBarIcon from '../../../assets/onboarding/filter-bar.png';
-import filterCafeIcon from '../../../assets/onboarding/filter-cafe.png';
-import filterRestaurantIcon from '../../../assets/onboarding/filter-restaurant.png';
-import filterReviewsIcon from '../../../assets/onboarding/filter-reviews.png';
-import filterTrendingIcon from '../../../assets/onboarding/filter-trending.png';
+import FilterBarIcon from '../../../assets/discover/filter-bar.svg';
+import FilterCafeIcon from '../../../assets/discover/filter-cafe.svg';
+import FilterRestaurantIcon from '../../../assets/discover/filter-restaurant.svg';
+import FilterReviewsIcon from '../../../assets/discover/filter-reviews.svg';
+import FilterTrendingIcon from '../../../assets/discover/filter-trending.svg';
 import {
   type DiscoverVenueFilter,
   useDiscoverFeed,
@@ -993,22 +993,22 @@ function PlacesMap({
         ]
       : venues;
 
-  const filters: Array<MapFilter & { icon: ImageSourcePropType }> = [
+  const filters: Array<MapFilter & { Icon: typeof FilterTrendingIcon }> = [
     {
       key: 'trending',
       label: 'Trending',
       tag: 'trending',
-      icon: filterTrendingIcon,
+      Icon: FilterTrendingIcon,
     },
     {
       key: 'restaurant',
       label: 'Restaurant',
       category: 'Restaurant',
-      icon: filterRestaurantIcon,
+      Icon: FilterRestaurantIcon,
     },
-    { key: 'cafe', label: 'Cafe', category: 'Cafe', icon: filterCafeIcon },
-    { key: 'bar', label: 'Bar', category: 'Bar', icon: filterBarIcon },
-    { key: 'my-reviews', label: 'My Reviews', icon: filterReviewsIcon },
+    { key: 'cafe', label: 'Cafe', category: 'Cafe', Icon: FilterCafeIcon },
+    { key: 'bar', label: 'Bar', category: 'Bar', Icon: FilterBarIcon },
+    { key: 'my-reviews', label: 'My Reviews', Icon: FilterReviewsIcon },
   ];
 
   const filtered = searchableVenues.filter((venue) => {
@@ -1604,13 +1604,18 @@ function PlacesMap({
           ) : null}
           {filters.map((filter) => {
             const active = activeFilter?.key === filter.key;
+            const Icon = filter.Icon;
             return (
               <Pressable
                 key={filter.key}
                 onPress={() => setActiveFilter(active ? null : filter)}
                 style={[styles.filterChip, active && styles.filterChipActive]}
               >
-                <Image source={filter.icon} style={styles.filterIcon} />
+                <Icon
+                  color={active ? '#FFFFFF' : colors.textSecondary}
+                  height={responsiveSize(14)}
+                  width={responsiveSize(14)}
+                />
                 <Text
                   style={[styles.filterText, active && styles.filterTextActive]}
                 >
@@ -3671,7 +3676,6 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: colors.primary,
       backgroundColor: 'rgba(184,47,41,0.12)',
     },
-    filterIcon: { width: 14, height: 14, resizeMode: 'contain' },
     filterText: { color: colors.textSecondary, fontSize: 12 },
     filterTextActive: { color: colors.primary, fontWeight: '700' },
     mapResultsMeta: {
