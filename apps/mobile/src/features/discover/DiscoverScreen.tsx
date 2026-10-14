@@ -11,6 +11,7 @@ import {
   Easing,
   FlatList,
   Image,
+  InteractionManager,
   Keyboard,
   PanResponder,
   Platform,
@@ -2231,7 +2232,7 @@ function SeeAllPlacesModal({
   );
   return (
     <Modal
-      animationType="slide"
+      animationType="none"
       visible={venues !== null}
       onRequestClose={onClose}
     >
@@ -2282,7 +2283,9 @@ function SeeAllPlacesModal({
             <PlaceRow
               onOpen={() => {
                 onOpenPlace(venue.id);
-                onClose();
+                requestAnimationFrame(() => {
+                  InteractionManager.runAfterInteractions(onClose);
+                });
               }}
               onSave={() => {
                 onClose();
