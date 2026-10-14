@@ -1,5 +1,5 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
   View,
+  type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
@@ -718,6 +719,7 @@ export function HomeFeedScreen({
   onOpenNotifications,
   onOpenPlace,
   onOpenProfile,
+  onPrefetchComments,
 }: {
   onExplore: () => void;
   onOpenComments: (reviewId: string) => void;
@@ -725,6 +727,7 @@ export function HomeFeedScreen({
   onOpenNotifications?: () => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (userId: string) => void;
+  onPrefetchComments?: (reviewIds: string[]) => void;
 }) {
   const { state } = useSession();
   const userId = useAuthenticatedUserId();
@@ -786,6 +789,24 @@ export function HomeFeedScreen({
     latestFeedQuery.data?.id &&
     items[0].id !== latestFeedQuery.data.id,
   );
+  const leadReviewSignature = visibleItems
+    .slice(0, 2)
+    .map((item) => item.id)
+    .join('|');
+  const handleVisibleReviewsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<FeedItem>> }) => {
+      const reviewIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.id] : [],
+      );
+      if (reviewIds.length > 0) onPrefetchComments?.(reviewIds);
+    },
+    [onPrefetchComments],
+  );
+
+  useEffect(() => {
+    if (!leadReviewSignature) return;
+    onPrefetchComments?.(leadReviewSignature.split('|'));
+  }, [leadReviewSignature, onPrefetchComments]);
 
   useEffect(
     () => () => {
@@ -1140,6 +1161,7 @@ export function HomeFeedScreen({
               void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.45}
+          onViewableItemsChanged={handleVisibleReviewsChanged}
           windowSize={7}
           refreshControl={
             <RefreshControl

@@ -9,6 +9,7 @@ import {
 } from '../src/features/queryKeys';
 import {
   prefetchComments,
+  prefetchCommentsForReviews,
   prefetchConversationMessages,
   prefetchPlace,
 } from '../src/navigation/prefetchNextLists';
@@ -41,6 +42,40 @@ describe('next-screen list prefetching', () => {
     expect(queryClient.getQueryData(placeQueryKey('v1'))).toBeDefined();
     expect(
       queryClient.getQueryData(placeReviewsQueryKey('v1', 'recent', 'all')),
+    ).toBeDefined();
+  });
+
+  it('prefetches visible review comments concurrently and deduplicates ids', async () => {
+    const releases: Array<() => void> = [];
+    const api = {
+      getComments: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            releases.push(() =>
+              resolve({ data: { items: [], nextCursor: null } }),
+            );
+          }),
+      ),
+    } as unknown as TastesApi;
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const pending = prefetchCommentsForReviews(queryClient, api, 'u1', [
+      'r1',
+      'r2',
+      'r1',
+    ]);
+
+    await vi.waitFor(() => expect(api.getComments).toHaveBeenCalledTimes(2));
+    releases.forEach((release) => release());
+    await pending;
+
+    expect(
+      queryClient.getQueryData(commentsQueryKey('u1', 'r1')),
+    ).toBeDefined();
+    expect(
+      queryClient.getQueryData(commentsQueryKey('u1', 'r2')),
     ).toBeDefined();
   });
 });

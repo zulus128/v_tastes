@@ -20,7 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
 import { Alert, InteractionManager, Linking, View } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
 import { ActivityDetailsScreen } from '../features/activities/ActivityDetailsScreen';
@@ -57,6 +57,7 @@ import { responsiveStyleSheet } from '../ui/responsive';
 import { consumePendingDeepLink } from './pendingDeepLink';
 import {
   prefetchComments,
+  prefetchCommentsForReviews,
   prefetchConversationMessages,
   prefetchPlace,
 } from './prefetchNextLists';
@@ -210,6 +211,15 @@ function MainTabs({
     rootNavigation.navigate('Comments', { reviewId });
   }
 
+  const prefetchVisibleComments = useCallback(
+    (reviewIds: string[]) => {
+      InteractionManager.runAfterInteractions(() => {
+        void prefetchCommentsForReviews(queryClient, api, user.uid, reviewIds);
+      });
+    },
+    [api, queryClient, user.uid],
+  );
+
   function openPlace(venueId: string) {
     void prefetchPlace(queryClient, api, venueId);
     rootNavigation.navigate('Place', { venueId });
@@ -261,6 +271,7 @@ function MainTabs({
               onOpenProfile={(userId) =>
                 navigation.navigate('Profile', { userId })
               }
+              onPrefetchComments={prefetchVisibleComments}
             />
           )}
         </Tabs.Screen>
@@ -278,6 +289,7 @@ function MainTabs({
                   userId: person.userId,
                 })
               }
+              onPrefetchComments={prefetchVisibleComments}
               userId={user.uid}
             />
           )}
@@ -366,6 +378,7 @@ function MainTabs({
                     userId: profileUserId,
                   })
                 }
+                onPrefetchComments={prefetchVisibleComments}
                 onContinueDraft={() => navigation.navigate('Create')}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}
@@ -413,6 +426,14 @@ export function ProductNavigator({
   const [discoverFilters, setDiscoverFilters] = useState<string[]>([]);
   const warmComments = (reviewId: string) =>
     void prefetchComments(queryClient, api, user.uid, reviewId);
+  const prefetchVisibleComments = useCallback(
+    (reviewIds: string[]) => {
+      InteractionManager.runAfterInteractions(() => {
+        void prefetchCommentsForReviews(queryClient, api, user.uid, reviewIds);
+      });
+    },
+    [api, queryClient, user.uid],
+  );
   const warmConversation = (conversationId: string) =>
     void prefetchConversationMessages(queryClient, api, conversationId);
   const warmPlace = (venueId: string) =>
@@ -521,6 +542,7 @@ export function ProductNavigator({
                 warmComments(reviewId);
                 navigation.navigate('Comments', { reviewId });
               }}
+              onPrefetchComments={prefetchVisibleComments}
               userId={user.uid}
               venueId={route.params.venueId}
             />

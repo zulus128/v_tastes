@@ -287,6 +287,7 @@ export function DiscoverScreen({
   onOpenComments,
   onOpenPlace,
   onOpenProfile,
+  onPrefetchComments,
   userId,
 }: {
   appliedFilters: string[];
@@ -295,6 +296,7 @@ export function DiscoverScreen({
   onOpenComments: (reviewId: string) => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (person: DiscoverPerson) => void;
+  onPrefetchComments?: (reviewIds: string[]) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -326,6 +328,15 @@ export function DiscoverScreen({
   const [followPendingId, setFollowPendingId] = useState<string | null>(null);
   const [seeAllPlaces, setSeeAllPlaces] = useState<Venue[] | null>(null);
   const mapMode = tab === 'places' && !favouritesOpen;
+  const popularReviewSignature = (feedQuery.data?.popularReviews ?? [])
+    .slice(0, 6)
+    .map((review) => review.id)
+    .join('|');
+
+  useEffect(() => {
+    if (tab !== 'trending' || !popularReviewSignature) return;
+    onPrefetchComments?.(popularReviewSignature.split('|'));
+  }, [onPrefetchComments, popularReviewSignature, tab]);
 
   function selectTab(value: DiscoverTab) {
     setTab(value);

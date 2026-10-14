@@ -21,6 +21,7 @@ import {
   Text,
   TextInput,
   View,
+  type ViewToken,
 } from 'react-native';
 import SearchIcon from '../../../assets/profile/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
@@ -204,6 +205,7 @@ export function ProfileScreen({
   onOpenFilters,
   onOpenPlace,
   onOpenProfile,
+  onPrefetchComments,
   onContinueDraft,
   onSettings,
   targetUserId,
@@ -218,6 +220,7 @@ export function ProfileScreen({
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (userId: string, following: boolean) => void;
+  onPrefetchComments?: (reviewIds: string[]) => void;
   onContinueDraft: () => void;
   onSettings: () => void;
   targetUserId: string;
@@ -657,6 +660,15 @@ export function ProfileScreen({
     (left, right) =>
       Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)),
   );
+  const handleVisibleReviewsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<FeedItem>> }) => {
+      const reviewIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.id] : [],
+      );
+      if (reviewIds.length > 0) onPrefetchComments?.(reviewIds);
+    },
+    [onPrefetchComments],
+  );
   const venuesById = new Map(mapVenues.map((venue) => [venue.id, venue]));
   const tasteHighlights = buildTasteHighlights({
     favoritePlaceName,
@@ -929,6 +941,7 @@ export function ProfileScreen({
           }
           onEndReached={() => void profileReviews.loadMore()}
           onEndReachedThreshold={0.5}
+          onViewableItemsChanged={handleVisibleReviewsChanged}
           refreshControl={
             <RefreshControl
               colors={[colors.primary]}

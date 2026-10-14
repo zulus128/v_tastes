@@ -32,6 +32,19 @@ export function prefetchComments(
   });
 }
 
+export function prefetchCommentsForReviews(
+  queryClient: QueryClient,
+  api: TastesApi,
+  userId: string,
+  reviewIds: string[],
+) {
+  return Promise.allSettled(
+    [...new Set(reviewIds)]
+      .filter(Boolean)
+      .map((reviewId) => prefetchComments(queryClient, api, userId, reviewId)),
+  );
+}
+
 export function prefetchPlace(
   queryClient: QueryClient,
   api: TastesApi,

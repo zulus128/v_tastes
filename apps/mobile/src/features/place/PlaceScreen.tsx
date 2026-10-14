@@ -1,6 +1,13 @@
-import type { PlaceReviewSort } from '@tastes/contracts';
+import type { PlaceReview, PlaceReviewSort } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -15,6 +22,7 @@ import {
   useWindowDimensions,
   View,
   type ImageSourcePropType,
+  type ViewToken,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,12 +82,14 @@ function placeImage(url: string | null | undefined): ImageSourcePropType {
 export function PlaceScreen({
   onBack,
   onOpenComments,
+  onPrefetchComments,
   onWriteReview,
   userId,
   venueId,
 }: {
   onBack: () => void;
   onOpenComments: (reviewId: string) => void;
+  onPrefetchComments?: (reviewIds: string[]) => void;
   onWriteReview: () => void;
   userId: string;
   venueId: string;
@@ -112,6 +122,15 @@ export function PlaceScreen({
   const unsave = useUnsaveVenue(userId);
   const saved = savedVenue.saved;
   const busy = unsave.isPending;
+  const handleVisibleReviewsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<PlaceReview>> }) => {
+      const reviewIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.id] : [],
+      );
+      if (reviewIds.length > 0) onPrefetchComments?.(reviewIds);
+    },
+    [onPrefetchComments],
+  );
   async function reactToReview(reviewId: string) {
     if (reactingId) return;
     setReactingId(reviewId);
@@ -382,6 +401,7 @@ export function PlaceScreen({
               void reviews.fetchNextPage();
           }}
           onEndReachedThreshold={0.5}
+          onViewableItemsChanged={handleVisibleReviewsChanged}
           windowSize={7}
           renderItem={({ item: review, index: reviewIndex }) => (
             <ReviewCard
