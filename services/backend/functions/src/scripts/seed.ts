@@ -673,9 +673,31 @@ async function main() {
       commentCount: 0,
       hoursAgo: 30,
     },
+    {
+      id: 'discover-review-le-jardin',
+      authorId: 'discover-kristin',
+      venueId: 'le-jardin-salad-bar',
+      rating: 4.7,
+      text: 'Fresh, balanced salads with crisp greens and generous portions.',
+      reactionCount: 44,
+      commentCount: 0,
+      hoursAgo: 36,
+    },
   ];
   const usersById = new Map(users.map((user) => [user.id, user]));
   const venuesById = new Map(venues.map((venue) => [venue.id, venue]));
+  const reviewedVenueIds = new Set(reviewSeeds.map((review) => review.venueId));
+  const venuesMissingDishReviews = venues.filter(
+    (venue) =>
+      'popularDishes' in venue &&
+      venue.popularDishes.length > 0 &&
+      !reviewedVenueIds.has(venue.id),
+  );
+  if (venuesMissingDishReviews.length > 0) {
+    throw new Error(
+      `Top-rated dishes require a seeded review for: ${venuesMissingDishReviews.map((venue) => venue.id).join(', ')}.`,
+    );
+  }
 
   await Promise.all(
     reviewSeeds.map((review) => {
@@ -686,24 +708,38 @@ async function main() {
       const createdAt = Timestamp.fromMillis(
         Date.now() - review.hoursAgo * 60 * 60 * 1_000,
       );
-      return db.collection('reviews').doc(review.id).set(
-        {
-          authorId: review.authorId,
-          authorDisplayName: author.displayName,
-          venueId: review.venueId,
-          venueName: venue.name,
-          venueCity: venue.city,
-          rating: review.rating,
-          text: review.text,
-          status: 'published',
-          reactionCount: review.reactionCount,
-          commentCount: review.commentCount,
-          source: 'seed',
-          createdAt,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
+      const dishReviews =
+        'popularDishes' in venue
+          ? venue.popularDishes.map((dish, index) => ({
+              id: `seed-${stableSeedKey(`${venue.id}:${dish.name}`)}-${index + 1}`,
+              title: dish.name,
+              rating: dish.rating,
+              photoPath: null,
+            }))
+          : [];
+      return db
+        .collection('reviews')
+        .doc(review.id)
+        .set(
+          {
+            authorId: review.authorId,
+            authorDisplayName: author.displayName,
+            venueId: review.venueId,
+            venueName: venue.name,
+            venueCity: venue.city,
+            rating: review.rating,
+            text: review.text,
+            dishReviews,
+            dishNames: dishReviews.map((dish) => dish.title),
+            status: 'published',
+            reactionCount: review.reactionCount,
+            commentCount: review.commentCount,
+            source: 'seed',
+            createdAt,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
     }),
   );
 
