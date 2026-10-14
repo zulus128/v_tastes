@@ -2281,8 +2281,8 @@ function SeeAllPlacesModal({
           renderItem={({ item: venue }) => (
             <PlaceRow
               onOpen={() => {
-                onClose();
                 onOpenPlace(venue.id);
+                onClose();
               }}
               onSave={() => {
                 onClose();
