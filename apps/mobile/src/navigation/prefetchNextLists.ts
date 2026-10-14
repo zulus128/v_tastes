@@ -75,6 +75,18 @@ export function prefetchPlace(
   ]);
 }
 
+export function prefetchPlaces(
+  queryClient: QueryClient,
+  api: TastesApi,
+  venueIds: string[],
+) {
+  return Promise.allSettled(
+    [...new Set(venueIds)]
+      .filter(Boolean)
+      .map((venueId) => prefetchPlace(queryClient, api, venueId)),
+  );
+}
+
 export function prefetchConversationMessages(
   queryClient: QueryClient,
   api: TastesApi,

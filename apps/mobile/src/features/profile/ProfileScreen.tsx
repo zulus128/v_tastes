@@ -206,6 +206,7 @@ export function ProfileScreen({
   onOpenPlace,
   onOpenProfile,
   onPrefetchComments,
+  onPrefetchPlaces,
   onContinueDraft,
   onSettings,
   targetUserId,
@@ -221,6 +222,7 @@ export function ProfileScreen({
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (userId: string, following: boolean) => void;
   onPrefetchComments?: (reviewIds: string[]) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   onContinueDraft: () => void;
   onSettings: () => void;
   targetUserId: string;
@@ -666,8 +668,12 @@ export function ProfileScreen({
         token.isViewable && token.item ? [token.item.id] : [],
       );
       if (reviewIds.length > 0) onPrefetchComments?.(reviewIds);
+      const venueIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.venueId] : [],
+      );
+      if (venueIds.length > 0) onPrefetchPlaces?.(venueIds);
     },
-    [onPrefetchComments],
+    [onPrefetchComments, onPrefetchPlaces],
   );
   const venuesById = new Map(mapVenues.map((venue) => [venue.id, venue]));
   const tasteHighlights = buildTasteHighlights({
@@ -1021,6 +1027,7 @@ export function ProfileScreen({
                 appliedFilters={appliedFilters}
                 onOpenFilters={onOpenFilters}
                 onOpenPlace={onOpenPlace}
+                onPrefetchPlaces={onPrefetchPlaces}
                 userId={currentUserId}
               />
             </View>

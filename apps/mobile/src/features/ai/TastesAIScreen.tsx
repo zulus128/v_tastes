@@ -119,10 +119,12 @@ const markStyles = responsiveStyleSheet({
 export function TastesAIScreen({
   onBack,
   onOpenPlace,
+  onPrefetchPlaces,
   userId,
 }: {
   onBack: () => void;
   onOpenPlace: (venueId: string) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   userId: string;
 }) {
   const api = useTastesApi();
@@ -151,6 +153,17 @@ export function TastesAIScreen({
     longitude: number;
   } | null>(null);
   const [lastPrompt, setLastPrompt] = useState('');
+  const latestPlaceSignature =
+    conversation?.turns
+      .slice(-1)[0]
+      ?.answer.places.slice(0, 4)
+      .map((place) => place.id)
+      .join('|') ?? '';
+
+  useEffect(() => {
+    if (!latestPlaceSignature) return;
+    onPrefetchPlaces?.(latestPlaceSignature.split('|'));
+  }, [latestPlaceSignature, onPrefetchPlaces]);
 
   useEffect(() => {
     void AsyncStorage.getItem(historyKey)

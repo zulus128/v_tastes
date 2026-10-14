@@ -720,6 +720,7 @@ export function HomeFeedScreen({
   onOpenPlace,
   onOpenProfile,
   onPrefetchComments,
+  onPrefetchPlaces,
 }: {
   onExplore: () => void;
   onOpenComments: (reviewId: string) => void;
@@ -728,6 +729,7 @@ export function HomeFeedScreen({
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (userId: string) => void;
   onPrefetchComments?: (reviewIds: string[]) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
 }) {
   const { state } = useSession();
   const userId = useAuthenticatedUserId();
@@ -793,20 +795,35 @@ export function HomeFeedScreen({
     .slice(0, 2)
     .map((item) => item.id)
     .join('|');
+  const leadVenueSignature = [
+    ...visibleItems.slice(0, 2).map((item) => item.venueId),
+    recommendationQuery.data?.forYou[0]?.id,
+  ]
+    .filter((venueId): venueId is string => Boolean(venueId))
+    .join('|');
   const handleVisibleReviewsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken<FeedItem>> }) => {
       const reviewIds = viewableItems.flatMap((token) =>
         token.isViewable && token.item ? [token.item.id] : [],
       );
       if (reviewIds.length > 0) onPrefetchComments?.(reviewIds);
+      const venueIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.venueId] : [],
+      );
+      if (venueIds.length > 0) onPrefetchPlaces?.(venueIds);
     },
-    [onPrefetchComments],
+    [onPrefetchComments, onPrefetchPlaces],
   );
 
   useEffect(() => {
     if (!leadReviewSignature) return;
     onPrefetchComments?.(leadReviewSignature.split('|'));
   }, [leadReviewSignature, onPrefetchComments]);
+
+  useEffect(() => {
+    if (!leadVenueSignature) return;
+    onPrefetchPlaces?.(leadVenueSignature.split('|'));
+  }, [leadVenueSignature, onPrefetchPlaces]);
 
   useEffect(
     () => () => {

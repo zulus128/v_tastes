@@ -55,12 +55,14 @@ export function FavouritesPane({
   onBack,
   onOpenFilters,
   onOpenPlace,
+  onPrefetchPlaces,
   userId,
 }: {
   appliedFilters?: string[];
   onBack?: () => void;
   onOpenFilters?: () => void;
   onOpenPlace: (venueId: string) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -89,6 +91,15 @@ export function FavouritesPane({
   const selectedFolder = folders.find(
     (folder) => folder.id === selectedFolderId,
   );
+  const leadVenueSignature = places
+    .slice(0, 6)
+    .map((place) => place.venueId)
+    .join('|');
+
+  useEffect(() => {
+    if (!leadVenueSignature) return;
+    onPrefetchPlaces?.(leadVenueSignature.split('|'));
+  }, [leadVenueSignature, onPrefetchPlaces]);
 
   function confirmDelete(folder: FavouriteFolder) {
     setFolderMenu(null);

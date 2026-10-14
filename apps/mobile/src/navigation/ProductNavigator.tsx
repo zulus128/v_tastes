@@ -60,6 +60,7 @@ import {
   prefetchCommentsForReviews,
   prefetchConversationMessages,
   prefetchPlace,
+  prefetchPlaces,
 } from './prefetchNextLists';
 import { prefetchPrimaryLists } from './prefetchPrimaryLists';
 
@@ -220,6 +221,15 @@ function MainTabs({
     [api, queryClient, user.uid],
   );
 
+  const prefetchVisiblePlaces = useCallback(
+    (venueIds: string[]) => {
+      InteractionManager.runAfterInteractions(() => {
+        void prefetchPlaces(queryClient, api, venueIds);
+      });
+    },
+    [api, queryClient],
+  );
+
   function openPlace(venueId: string) {
     void prefetchPlace(queryClient, api, venueId);
     rootNavigation.navigate('Place', { venueId });
@@ -272,6 +282,7 @@ function MainTabs({
                 navigation.navigate('Profile', { userId })
               }
               onPrefetchComments={prefetchVisibleComments}
+              onPrefetchPlaces={prefetchVisiblePlaces}
             />
           )}
         </Tabs.Screen>
@@ -290,6 +301,7 @@ function MainTabs({
                 })
               }
               onPrefetchComments={prefetchVisibleComments}
+              onPrefetchPlaces={prefetchVisiblePlaces}
               userId={user.uid}
             />
           )}
@@ -379,6 +391,7 @@ function MainTabs({
                   })
                 }
                 onPrefetchComments={prefetchVisibleComments}
+                onPrefetchPlaces={prefetchVisiblePlaces}
                 onContinueDraft={() => navigation.navigate('Create')}
                 onSettings={() => setSettingsVisible(true)}
                 targetUserId={targetUserId}
@@ -438,6 +451,14 @@ export function ProductNavigator({
     void prefetchConversationMessages(queryClient, api, conversationId);
   const warmPlace = (venueId: string) =>
     void prefetchPlace(queryClient, api, venueId);
+  const prefetchVisiblePlaces = useCallback(
+    (venueIds: string[]) => {
+      InteractionManager.runAfterInteractions(() => {
+        void prefetchPlaces(queryClient, api, venueIds);
+      });
+    },
+    [api, queryClient],
+  );
   const navigationTheme = useMemo<Theme>(() => {
     const base = isDark ? DarkTheme : DefaultTheme;
     return {
@@ -682,6 +703,7 @@ export function ProductNavigator({
                 warmPlace(venueId);
                 navigation.navigate('Place', { venueId });
               }}
+              onPrefetchPlaces={prefetchVisiblePlaces}
               userId={user.uid}
             />
           )}

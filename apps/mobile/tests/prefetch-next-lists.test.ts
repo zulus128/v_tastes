@@ -12,6 +12,7 @@ import {
   prefetchCommentsForReviews,
   prefetchConversationMessages,
   prefetchPlace,
+  prefetchPlaces,
 } from '../src/navigation/prefetchNextLists';
 
 describe('next-screen list prefetching', () => {
@@ -77,5 +78,35 @@ describe('next-screen list prefetching', () => {
     expect(
       queryClient.getQueryData(commentsQueryKey('u1', 'r2')),
     ).toBeDefined();
+  });
+
+  it('prefetches visible place data concurrently without loading images', async () => {
+    const placeReleases: Array<() => void> = [];
+    const api = {
+      getPlace: vi.fn().mockImplementation(
+        ({ venueId }: { venueId: string }) =>
+          new Promise((resolve) => {
+            placeReleases.push(() =>
+              resolve({ data: { venue: { id: venueId } } }),
+            );
+          }),
+      ),
+      getPlaceReviews: vi
+        .fn()
+        .mockResolvedValue({ data: { items: [], nextCursor: null } }),
+    } as unknown as TastesApi;
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const pending = prefetchPlaces(queryClient, api, ['v1', 'v2', 'v1']);
+
+    await vi.waitFor(() => expect(api.getPlace).toHaveBeenCalledTimes(2));
+    expect(api.getPlaceReviews).toHaveBeenCalledTimes(2);
+    placeReleases.forEach((release) => release());
+    await pending;
+
+    expect(queryClient.getQueryData(placeQueryKey('v1'))).toBeDefined();
+    expect(queryClient.getQueryData(placeQueryKey('v2'))).toBeDefined();
   });
 });

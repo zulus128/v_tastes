@@ -160,8 +160,7 @@ export function PlaceScreen({
     }
   };
 
-  if (details.isPending || (__DEV__ && details.isFetching))
-    return <Loading onBack={onBack} />;
+  if (details.isPending) return <Loading onBack={onBack} />;
   if (details.isError || !details.data)
     return (
       <ErrorPage

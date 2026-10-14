@@ -2,7 +2,7 @@ import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -24,6 +24,7 @@ import {
   useWindowDimensions,
   View,
   type ImageSourcePropType,
+  type ViewToken,
 } from 'react-native';
 import MapView, {
   Marker,
@@ -288,6 +289,7 @@ export function DiscoverScreen({
   onOpenPlace,
   onOpenProfile,
   onPrefetchComments,
+  onPrefetchPlaces,
   userId,
 }: {
   appliedFilters: string[];
@@ -297,6 +299,7 @@ export function DiscoverScreen({
   onOpenPlace: (venueId: string) => void;
   onOpenProfile: (person: DiscoverPerson) => void;
   onPrefetchComments?: (reviewIds: string[]) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   userId: string;
 }) {
   const { colors } = useAppTheme();
@@ -332,11 +335,23 @@ export function DiscoverScreen({
     .slice(0, 6)
     .map((review) => review.id)
     .join('|');
+  const visibleTrendingVenueSignature = [
+    feedQuery.data?.hero?.id,
+    ...(feedQuery.data?.trending ?? []).slice(0, 2).map((venue) => venue.id),
+    ...(feedQuery.data?.forYou ?? []).slice(0, 2).map((venue) => venue.id),
+  ]
+    .filter((venueId): venueId is string => Boolean(venueId))
+    .join('|');
 
   useEffect(() => {
     if (tab !== 'trending' || !popularReviewSignature) return;
     onPrefetchComments?.(popularReviewSignature.split('|'));
   }, [onPrefetchComments, popularReviewSignature, tab]);
+
+  useEffect(() => {
+    if (tab !== 'trending' || !visibleTrendingVenueSignature) return;
+    onPrefetchPlaces?.(visibleTrendingVenueSignature.split('|'));
+  }, [onPrefetchPlaces, tab, visibleTrendingVenueSignature]);
 
   function selectTab(value: DiscoverTab) {
     setTab(value);
@@ -442,6 +457,7 @@ export function DiscoverScreen({
           onBack={() => setFavouritesOpen(false)}
           onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
+          onPrefetchPlaces={onPrefetchPlaces}
           userId={userId}
         />
       ) : null}
@@ -452,6 +468,7 @@ export function DiscoverScreen({
           onOpenFavourites={() => setFavouritesOpen(true)}
           onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
+          onPrefetchPlaces={onPrefetchPlaces}
           onSave={setSaveTarget}
           savedVenueIds={savedVenueIds}
           userId={userId}
@@ -488,6 +505,7 @@ export function DiscoverScreen({
       <SeeAllPlacesModal
         onClose={() => setSeeAllPlaces(null)}
         onOpenPlace={onOpenPlace}
+        onPrefetchPlaces={onPrefetchPlaces}
         onSave={setSaveTarget}
         savedVenueIds={savedVenueIds}
         venues={seeAllPlaces}
@@ -884,6 +902,7 @@ function PlacesMap({
   onOpenFavourites,
   onOpenFilters,
   onOpenPlace,
+  onPrefetchPlaces,
   onSave,
   savedVenueIds,
   userId,
@@ -893,6 +912,7 @@ function PlacesMap({
   onOpenFavourites: () => void;
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   onSave: (place: SaveablePlace) => void;
   savedVenueIds: Set<string>;
   userId: string;
@@ -1023,6 +1043,15 @@ function PlacesMap({
     }
     return (right.rating ?? 0) - (left.rating ?? 0);
   });
+  const handleVisiblePlacesChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<Venue>> }) => {
+      const venueIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.id] : [],
+      );
+      if (venueIds.length > 0) onPrefetchPlaces?.(venueIds);
+    },
+    [onPrefetchPlaces],
+  );
   const sortLabel =
     placeSortOptions.find((option) => option.value === sort)?.label ??
     'Best match';
@@ -1652,6 +1681,7 @@ function PlacesMap({
               ) : null
             }
             maxToRenderPerBatch={6}
+            onViewableItemsChanged={handleVisiblePlacesChanged}
             renderItem={({ item: venue }) => (
               <PlaceRow
                 onOpen={() => onOpenPlace(venue.id)}
@@ -2167,12 +2197,14 @@ function SectionLabel({
 function SeeAllPlacesModal({
   onClose,
   onOpenPlace,
+  onPrefetchPlaces,
   onSave,
   savedVenueIds,
   venues,
 }: {
   onClose: () => void;
   onOpenPlace: (id: string) => void;
+  onPrefetchPlaces?: (venueIds: string[]) => void;
   onSave: (place: SaveablePlace) => void;
   savedVenueIds: Set<string>;
   venues: Venue[] | null;
@@ -2182,6 +2214,15 @@ function SeeAllPlacesModal({
   const [query, setQuery] = useState('');
   const visible = (venues ?? []).filter((venue) =>
     venue.name.toLowerCase().includes(query.toLowerCase()),
+  );
+  const handleVisiblePlacesChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<Venue>> }) => {
+      const venueIds = viewableItems.flatMap((token) =>
+        token.isViewable && token.item ? [token.item.id] : [],
+      );
+      if (venueIds.length > 0) onPrefetchPlaces?.(venueIds);
+    },
+    [onPrefetchPlaces],
   );
   return (
     <Modal
@@ -2231,6 +2272,7 @@ function SeeAllPlacesModal({
           initialNumToRender={6}
           keyExtractor={(venue) => venue.id}
           maxToRenderPerBatch={6}
+          onViewableItemsChanged={handleVisiblePlacesChanged}
           renderItem={({ item: venue }) => (
             <PlaceRow
               onOpen={() => {
