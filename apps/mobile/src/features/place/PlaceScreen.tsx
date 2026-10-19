@@ -175,8 +175,10 @@ export function PlaceScreen({
     );
 
   const place = details.data;
-  const photos =
-    place.photoUrls.length > 0 ? place.photoUrls : [place.venue.imageUrl ?? ''];
+  const photos = [
+    ...new Set([place.venue.imageUrl, ...place.photoUrls]),
+  ].filter((url): url is string => Boolean(url?.trim()));
+  if (photos.length === 0) photos.push('');
   const galleryPhotos = buildGalleryPhotos(photos, place.photoCount);
   const photoCount = galleryPhotos.length;
   const categoryChip = place.venue.category;
@@ -1239,6 +1241,7 @@ function Gallery({
   visible: boolean;
 }) {
   const [expandedPhoto, setExpandedPhoto] = useState<string | null>(null);
+  const fallbackUrl = photos[0];
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={close}>
       <View style={styles.gallery}>
@@ -1259,6 +1262,7 @@ function Gallery({
           numColumns={3}
           renderItem={({ item: key, index }) => (
             <GalleryImage
+              fallbackUrl={fallbackUrl}
               index={index}
               onOpen={() => setExpandedPhoto(key)}
               styles={styles}
@@ -1278,11 +1282,13 @@ function Gallery({
   );
 }
 function GalleryImage({
+  fallbackUrl,
   index,
   onOpen,
   styles,
   url,
 }: {
+  fallbackUrl?: string;
   index: number;
   onOpen: () => void;
   styles: ReturnType<typeof createStyles>;
@@ -1290,6 +1296,12 @@ function GalleryImage({
 }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
+  const [sourceUrl, setSourceUrl] = useState(url);
+
+  useEffect(() => {
+    setSourceUrl(url);
+    setState('loading');
+  }, [url]);
   return (
     <Pressable
       accessibilityLabel={`Enlarge photo ${index + 1}`}
@@ -1306,6 +1318,7 @@ function GalleryImage({
           accessibilityLabel={`Retry photo ${index + 1}`}
           onPress={() => {
             setAttempt((value) => value + 1);
+            setSourceUrl(url);
             setState('loading');
           }}
           style={styles.galleryError}
@@ -1316,9 +1329,16 @@ function GalleryImage({
       ) : null}
       <Image
         key={attempt}
-        onError={() => setState('error')}
+        onError={() => {
+          if (fallbackUrl && sourceUrl !== fallbackUrl) {
+            setSourceUrl(fallbackUrl);
+            setState('loading');
+            return;
+          }
+          setState('error');
+        }}
         onLoad={() => setState('ready')}
-        source={placeImage(url)}
+        source={placeImage(sourceUrl)}
         style={[styles.galleryPhoto, state === 'error' && styles.hiddenPhoto]}
       />
     </Pressable>

@@ -65,7 +65,7 @@ export const checkUsernameAvailabilityInputSchema = z.object({
     .string()
     .trim()
     .min(2)
-    .max(40)
+    .max(30)
     .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
 });
 

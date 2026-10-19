@@ -2828,7 +2828,7 @@ const createStyles = (
     locationTitle: {
       width: '100%',
       marginTop: 24,
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 24,
       lineHeight: 27,
       fontWeight: '700',
@@ -2839,7 +2839,7 @@ const createStyles = (
     locationSubtitle: {
       width: '100%',
       marginTop: 12,
-      color: 'rgba(255,255,255,0.72)',
+      color: colors.textSecondary,
       fontSize: 15,
       lineHeight: 20,
       textAlign: 'center',
@@ -3733,7 +3733,7 @@ const createStyles = (
     inviteTitle: {
       width: '100%',
       marginTop: 22,
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 24,
       lineHeight: 29,
       fontWeight: '700',
@@ -3743,7 +3743,7 @@ const createStyles = (
     inviteSubtitle: {
       width: '100%',
       marginTop: 8,
-      color: 'rgba(255,255,255,0.65)',
+      color: colors.textSecondary,
       fontSize: 13.5,
       lineHeight: 18,
       letterSpacing: -0.135,

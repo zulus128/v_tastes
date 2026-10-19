@@ -63,6 +63,7 @@ import FilterCafeIcon from '../../../assets/discover/filter-cafe.svg';
 import FilterRestaurantIcon from '../../../assets/discover/filter-restaurant.svg';
 import FilterReviewsIcon from '../../../assets/discover/filter-reviews.svg';
 import FilterTrendingIcon from '../../../assets/discover/filter-trending.svg';
+import FollowingCheckIcon from '../../../assets/discover/following-check.svg';
 import {
   type DiscoverVenueFilter,
   useDiscoverFeed,
@@ -2863,7 +2864,7 @@ function FollowButton({
   onPress: () => void;
   pending: boolean;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable
@@ -2872,13 +2873,21 @@ function FollowButton({
       style={[
         styles.followButton,
         following && styles.followingButton,
+        following && !isDark && styles.followingButtonLight,
         pending && styles.pressed,
       ]}
     >
+      {following ? (
+        <FollowingCheckIcon
+          height={responsiveSize(16)}
+          width={responsiveSize(16)}
+        />
+      ) : null}
       <Text
         style={[
           styles.followButtonText,
           following && styles.followingButtonText,
+          following && !isDark && styles.followingButtonTextLight,
         ]}
       >
         {following ? 'Following' : 'Follow'}
@@ -4036,17 +4045,37 @@ const createStyles = (colors: ThemeColors) =>
       height: 30,
       paddingHorizontal: 14,
       borderRadius: 15,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
     },
-    followButtonText: { color: '#161616', fontSize: 13, fontWeight: '600' },
-    followingButton: {
-      borderWidth: 1,
-      borderColor: colors.primary,
-      backgroundColor: 'transparent',
+    followButtonText: {
+      color: colors.onPrimary,
+      fontSize: 13,
+      fontWeight: '600',
     },
-    followingButtonText: { color: colors.primary },
+    followingButton: {
+      minWidth: 0,
+      height: 34,
+      paddingLeft: 12,
+      paddingRight: 14,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: '#B82E29',
+      borderRadius: 999,
+      backgroundColor: '#2A1513',
+    },
+    followingButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '500',
+      letterSpacing: 0.6,
+    },
+    followingButtonLight: {
+      backgroundColor: 'rgba(184,47,41,0.08)',
+    },
+    followingButtonTextLight: { color: colors.primary },
     profileList: { gap: 10 },
     profileSuggestion: {
       minHeight: 172,

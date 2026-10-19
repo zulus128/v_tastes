@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "node lib/scripts/seed.js",
     "comments:recount-seed": "node lib/scripts/recount-seed-comment-counts.js",
+    "seed:backfill-dish-photos": "node lib/scripts/backfill-seed-dish-photos.js",
     "search:backfill": "node lib/scripts/backfill-user-search.js",
     "images:backfill": "node lib/scripts/backfill-image-thumbnails.js",
     "users:migrate-private": "node lib/scripts/migrate-private-users.js",

@@ -131,6 +131,23 @@ it('opens the Bio editor and accepts the full 80-character value', async () => {
   expect(screen.getByLabelText('Save Bio')).toBeTruthy();
 });
 
+it('enforces the 30-character username limit before saving', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getByLabelText('Edit Username'));
+
+  expect(screen.getByLabelText('Username').props.maxLength).toBe(30);
+});
+
 it('offers to save a city typed outside the suggested city list', async () => {
   await render(
     <ProfileSettingsSheet

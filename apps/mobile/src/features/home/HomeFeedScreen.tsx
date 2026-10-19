@@ -144,13 +144,23 @@ function DishPhoto({
   photoPath?: string;
   photoUrl?: string;
 }) {
-  const [uri, setUri] = useState<string | undefined>(photoUrl);
-  const normalizedPath = photoPath?.trim().replace(/^\/+|\/+$/g, '');
+  const directUrl = photoUrl?.trim();
+  const canLoadDirectly = Boolean(
+    directUrl && /^(?:https?:|file:|data:|blob:)/i.test(directUrl),
+  );
+  const normalizedPath = (
+    photoPath ?? (canLoadDirectly ? undefined : directUrl)
+  )
+    ?.trim()
+    .replace(/^\/+|\/+$/g, '');
+  const [uri, setUri] = useState<string | undefined>(
+    canLoadDirectly ? directUrl : undefined,
+  );
 
   useEffect(() => {
     let active = true;
-    if (photoUrl) {
-      setUri(photoUrl);
+    if (canLoadDirectly && directUrl) {
+      setUri(directUrl);
       return () => {
         active = false;
       };
@@ -199,13 +209,26 @@ function DishPhoto({
     return () => {
       active = false;
     };
-  }, [normalizedPath, photoUrl]);
+  }, [canLoadDirectly, directUrl, normalizedPath]);
 
   // Keep the full dish visible inside the fixed Figma tile. The default
   // `cover` mode trims the photo edges when its aspect ratio differs from the
   // tile, which is the slight side-cropping visible in the review carousel.
   return uri ? (
-    <Image resizeMode="cover" source={{ uri }} style={stylesStatic.dishPhoto} />
+    <Image
+      onError={() => {
+        if (!normalizedPath || uri !== directUrl) {
+          setUri(undefined);
+          return;
+        }
+        void resolveStorageImageUrl(normalizedPath)
+          .then(setUri)
+          .catch(() => setUri(undefined));
+      }}
+      resizeMode="cover"
+      source={{ uri }}
+      style={stylesStatic.dishPhoto}
+    />
   ) : (
     <View style={stylesStatic.dishPhotoPlaceholder} />
   );
@@ -282,24 +305,19 @@ function FeedCard({
               {username}
             </Text>
           </Pressable>
-          <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
-          <Pressable
-            accessibilityLabel="Open post menu"
-            hitSlop={10}
-            onPress={(event) => {
-              event.stopPropagation();
-              onOpenMenu();
-            }}
-            style={styles.moreButton}
-          >
-            <Text style={styles.moreButtonText}>•••</Text>
-          </Pressable>
+          <Text numberOfLines={1} style={styles.date}>
+            {formatDisplayDate(item.createdAt)}
+          </Text>
         </View>
 
         <View style={styles.venueSection}>
           <Pressable onPress={onOpenPlace} style={styles.venueTitleRow}>
-            <Text style={styles.venue}>{item.venueName}</Text>
-            <ReviewCityBadge city={item.venueCity} />
+            <Text numberOfLines={1} style={styles.venue}>
+              {item.venueName}
+            </Text>
+            <View style={styles.venueCityBadge}>
+              <ReviewCityBadge city={item.venueCity} />
+            </View>
           </Pressable>
           <View style={styles.ratingTagRow}>
             <RatingStars rating={item.rating} styles={styles} />
@@ -1548,24 +1566,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       letterSpacing: -0.24,
     },
     date: {
+      flexShrink: 0,
+      marginLeft: 8,
       color: colors.text,
       fontSize: 14,
       letterSpacing: -0.24,
       opacity: 0.4,
-    },
-    moreButton: {
-      width: 32,
-      height: 32,
-      marginRight: -8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    moreButtonText: {
-      marginTop: -7,
-      color: colors.text,
-      fontSize: 18,
-      fontWeight: '700',
-      letterSpacing: 1,
     },
     venueSection: { paddingHorizontal: 16, gap: 10 },
     venueTitleRow: {
@@ -1575,12 +1581,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: 8,
     },
     venue: {
+      flex: 1,
+      minWidth: 0,
       color: colors.text,
       fontSize: 16,
       fontWeight: '600',
       lineHeight: 20,
       letterSpacing: -0.24,
     },
+    venueCityBadge: { flexShrink: 0 },
     ratingTagRow: {
       flexDirection: 'row',
       alignItems: 'center',

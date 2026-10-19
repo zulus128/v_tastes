@@ -333,6 +333,16 @@ export function ProfileSettingsSheet({
       );
       return;
     }
+    if (
+      (editing === 'username' || editing === 'displayName') &&
+      value.length > 30
+    ) {
+      Alert.alert(
+        `${labels[editing]} is too long`,
+        `${labels[editing]} must be at most 30 characters long.`,
+      );
+      return;
+    }
     await save({ [editing]: value });
   }
 
@@ -933,7 +943,13 @@ export function ProfileSettingsSheet({
                       editing === 'username' ? 'none' : 'sentences'
                     }
                     autoFocus
-                    maxLength={editing === 'bio' ? 80 : undefined}
+                    maxLength={
+                      editing === 'bio'
+                        ? 80
+                        : editing === 'username' || editing === 'displayName'
+                          ? 30
+                          : undefined
+                    }
                     multiline={editing === 'bio'}
                     onChangeText={setDraft}
                     placeholderTextColor={colors.textMuted}
