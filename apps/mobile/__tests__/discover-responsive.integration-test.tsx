@@ -352,14 +352,18 @@ describe('Discover responsive content', () => {
         : sheetStyle.height.__getValue();
 
     expect(sheetStyle.right).toBeCloseTo(contentWidth * 0.48);
-    expect(controlsStyle.flexDirection).toBe('row');
+    expect(controlsStyle.flexDirection).toBe('column');
+    expect(controlsStyle.gap).toBe(responsiveSize(10));
+    expect(controlsStyle.right).toBe(responsiveSize(16));
     expect(controlsStyle.top).toBeCloseTo(
       responsiveSize(12) + responsiveSize(52) + responsiveSize(18),
     );
-    expect(controlsStyle.top + responsiveSize(48)).toBeLessThan(height - 70);
     expect(
-      2 * responsiveSize(48) + responsiveSize(6) + responsiveSize(16),
-    ).toBeLessThan(sheetStyle.right);
+      controlsStyle.top + 4 * responsiveSize(40) + 3 * responsiveSize(10),
+    ).toBeLessThan(height - 70);
+    expect(responsiveSize(40) + responsiveSize(16)).toBeLessThan(
+      sheetStyle.right,
+    );
     expect(height - 70 - sheetHeight).toBeGreaterThanOrEqual(
       responsiveSize(12) + responsiveSize(52),
     );

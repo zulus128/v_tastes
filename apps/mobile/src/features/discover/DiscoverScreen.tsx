@@ -1442,12 +1442,22 @@ function PlacesMap({
         ]}
       />
       <View
-        style={[
-          styles.mapControls,
-          { top: headerHeight + responsiveSize(18) },
-          splitLayout && styles.mapControlsLandscape,
-        ]}
+        style={[styles.mapControls, { top: headerHeight + responsiveSize(18) }]}
       >
+        <Pressable
+          accessibilityLabel="Zoom in"
+          onPress={() => void zoomMap(1)}
+          style={styles.mapControlButton}
+        >
+          <Text style={styles.mapZoomGlyph}>+</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Zoom out"
+          onPress={() => void zoomMap(-1)}
+          style={styles.mapControlButton}
+        >
+          <Text style={styles.mapZoomGlyph}>−</Text>
+        </Pressable>
         <Pressable
           accessibilityLabel="My location"
           accessibilityState={{ selected: locationEnabled }}
@@ -1479,35 +1489,11 @@ function PlacesMap({
           />
         </Pressable>
       </View>
-      <View
-        style={[
-          styles.mapZoomControls,
-          { top: headerHeight + responsiveSize(150) },
-          splitLayout && styles.mapZoomControlsLandscape,
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="Zoom in"
-          onPress={() => void zoomMap(1)}
-          style={styles.mapZoomButton}
-        >
-          <Text style={styles.mapZoomGlyph}>+</Text>
-        </Pressable>
-        <View style={styles.mapZoomDivider} />
-        <Pressable
-          accessibilityLabel="Zoom out"
-          onPress={() => void zoomMap(-1)}
-          style={styles.mapZoomButton}
-        >
-          <Text style={styles.mapZoomGlyph}>−</Text>
-        </Pressable>
-      </View>
       {layersOpen ? (
         <View
           style={[
             styles.layersMenu,
-            { top: headerHeight + responsiveSize(splitLayout ? 76 : 18) },
-            splitLayout && { right: responsiveSize(16) },
+            { top: headerHeight + responsiveSize(18) },
           ]}
         >
           <Text style={styles.layersTitle}>Show on map</Text>
@@ -3638,55 +3624,37 @@ const createStyles = (colors: ThemeColors) =>
     mapLayerMarkerCopy: { width: 96, marginLeft: 6, paddingTop: 3 },
     mapLayerMarkerName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
     mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
-    mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
-    mapControlsLandscape: { flexDirection: 'row', gap: 6 },
-    mapZoomControls: {
+    mapControls: {
       position: 'absolute',
       zIndex: 5,
       right: 16,
-      width: 44,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      backgroundColor: colors.background,
+      flexDirection: 'column',
+      gap: 10,
     },
-    mapZoomControlsLandscape: { right: '50%' },
-    mapZoomButton: {
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    mapZoomDivider: { height: 1, backgroundColor: colors.border },
-    mapZoomGlyph: { color: colors.text, fontSize: 25, lineHeight: 28 },
-    mapControlButton: {
-      width: 48,
-      height: 48,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000000',
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
-    },
-    mapControlButtonActive: {
-      borderColor: colors.primary,
-      backgroundColor: 'rgba(184,47,41,0.9)',
-    },
-    mapControlGlyph: {
-      color: colors.text,
+    mapZoomGlyph: {
+      color: '#FFFFFF',
       fontSize: 22,
       lineHeight: 26,
       fontWeight: '700',
+      textAlign: 'center',
+    },
+    mapControlButton: {
+      width: 40,
+      height: 40,
+      borderWidth: 1,
+      borderColor: '#2A2A2A',
+      borderRadius: 12,
+      backgroundColor: 'rgba(22,22,22,0.85)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mapControlButtonActive: {
+      borderColor: colors.primary,
     },
     layersMenu: {
       position: 'absolute',
       zIndex: 6,
-      right: 72,
+      right: 66,
       width: 190,
       paddingHorizontal: 15,
       paddingTop: 12,
