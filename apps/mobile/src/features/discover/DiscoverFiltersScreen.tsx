@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +83,7 @@ export function DiscoverFiltersScreen({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const venuesQuery = useDiscoverVenues(userId);
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = venuesQuery;
   const [selected, setSelected] = useState(
     () =>
       new Set(
@@ -111,6 +112,10 @@ export function DiscoverFiltersScreen({
       CUISINES.slice(5).includes(value as (typeof CUISINES)[number]),
     ),
   );
+
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   function toggle(value: string) {
     setSelected((current) => {

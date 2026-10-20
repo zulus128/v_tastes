@@ -13,6 +13,7 @@ import {
   MonthlyRecapFlow,
   type RecapStep,
 } from '../features/recap/MonthlyRecapFlow';
+import { SaveToFolderSheet } from '../features/favourites/FavouritesPane';
 import {
   ProductNavigator,
   type MainTabParamList,
@@ -98,6 +99,7 @@ export const visualAuditCases = [
   'recap/close',
   ...Object.keys(productTabs).map((screen) => `product/${screen}`),
   ...Object.keys(productRoots).map((screen) => `product/${screen}`),
+  'product/save-to',
 ];
 
 // The recurring device pass intentionally stays focused on the screens that drive
@@ -234,6 +236,25 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
   }
 
   if (group === 'product') {
+    if (name === 'save-to') {
+      return (
+        <SessionStateOverrideProvider user={visualAuditUser} visualAudit>
+          <View
+            style={[styles.saveToBackdrop, { backgroundColor: colors.canvas }]}
+          >
+            <SaveToFolderSheet
+              onClose={() => undefined}
+              place={{
+                name: 'Gemini750 Restaurant',
+                venueId: 'visual-audit-venue',
+              }}
+              userId={visualAuditUser.uid}
+              visible
+            />
+          </View>
+        </SessionStateOverrideProvider>
+      );
+    }
     const tab = productTabs[name];
     const root = productRoots[name];
     const visualAuditRoute: ProductVisualAuditRoute | undefined = tab
@@ -274,4 +295,5 @@ const styles = responsiveStyleSheet({
   },
   missingTitle: { fontSize: 20, fontWeight: '700' },
   missingCase: { fontSize: 14, marginTop: 8 },
+  saveToBackdrop: { flex: 1 },
 });

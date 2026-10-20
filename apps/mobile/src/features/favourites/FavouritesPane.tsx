@@ -8,7 +8,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  PanResponder,
   Pressable,
   ScrollView,
   Text,
@@ -25,7 +24,6 @@ import AddFolderCircle from '../../../assets/create-review/select-place-circle.s
 import AddFolderPlus from '../../../assets/create-review/select-place-plus.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import closeFolderIcon from '../../../assets/favourites/close-folder.png';
-import trashIcon from '../../../assets/favourites/trash.png';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
@@ -304,11 +302,14 @@ export function SaveToFolderSheet({
   const savedVenue = useSavedVenue(userId, place?.venueId);
   const saveVenue = useSaveVenue(userId);
   const createFolder = useCreateFolder(userId);
-  const deleteFolder = useDeleteFolder(userId);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
   const [folderName, setFolderName] = useState('');
-  const [query, setQuery] = useState('');
+  const saveSheet = useBottomSheetMotion({
+    closedOffset: 600,
+    onClose,
+    visible,
+  });
   const closeCreateFolder = useCallback(() => setCreating(false), []);
   const createFolderSheet = useBottomSheetMotion({
     closedOffset: 600,
@@ -321,7 +322,6 @@ export function SaveToFolderSheet({
       setSelected(new Set(savedVenue.folderIds));
       setCreating(false);
       setFolderName('');
-      setQuery('');
     }
   }, [savedVenue.folderIds, visible]);
 
@@ -363,114 +363,104 @@ export function SaveToFolderSheet({
 
   return (
     <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
+      animationType="none"
+      onRequestClose={saveSheet.close}
       transparent
       visible={visible}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.addScreen}
+        style={styles.modalRoot}
       >
-        <View style={styles.addHeader}>
-          <View style={styles.addTitleRow}>
-            <Pressable
-              accessibilityLabel="Cancel"
-              hitSlop={12}
-              onPress={onClose}
-            >
-              <Text style={styles.addBack}>‹</Text>
-            </Pressable>
-            <Text style={styles.addTitle}>Add to Wishlist</Text>
-            <View style={styles.addTitleSpacer} />
-          </View>
-          <View style={styles.addSearch}>
-            <SearchIcon
-              color={colors.textMuted}
-              height={responsiveSize(22)}
-              width={responsiveSize(22)}
-            />
-            <TextInput
-              onChangeText={setQuery}
-              placeholder="Search"
-              placeholderTextColor={colors.placeholder}
-              style={styles.searchInput}
-              value={query}
-            />
-            <SearchTuneIcon
-              color={colors.textMuted}
-              height={responsiveSize(24)}
-              width={responsiveSize(24)}
-            />
-          </View>
-        </View>
-        <ScrollView
-          contentContainerStyle={styles.selectionList}
-          keyboardShouldPersistTaps="handled"
+        <AnimatedPressable
+          onPress={saveSheet.close}
+          style={[styles.scrim, { opacity: saveSheet.backdropOpacity }]}
+        />
+        <Animated.View
+          style={[
+            styles.saveSheet,
+            { transform: [{ translateY: saveSheet.translateY }] },
+          ]}
         >
-          <FolderSelectionRow
-            checked={selected.size === 0}
-            label="All"
-            onPress={() => setSelected(new Set())}
-            styles={styles}
-          />
-          {(favourites.data?.folders ?? [])
-            .filter((folder) =>
-              folder.name
-                .toLocaleLowerCase('en-US')
-                .includes(query.trim().toLocaleLowerCase('en-US')),
-            )
-            .map((folder) => (
-              <FolderSelectionRow
-                key={folder.id}
-                checked={selected.has(folder.id)}
-                onDelete={() => deleteFolder.mutate(folder.id)}
-                label={folder.name}
-                onPress={() => toggleFolder(folder.id)}
-                styles={styles}
-              />
-            ))}
-          <Pressable
-            onPress={() => setCreating(true)}
-            style={styles.newFolderButton}
+          <View style={styles.sheetDragArea} {...saveSheet.panHandlers}>
+            <View style={styles.sheetHandle} />
+          </View>
+          <View style={styles.saveTitleRow}>
+            <Text style={styles.sheetTitle}>Save to…</Text>
+            <Pressable
+              accessibilityLabel="Close save sheet"
+              hitSlop={10}
+              onPress={saveSheet.close}
+              style={styles.saveCloseButton}
+            >
+              <Text style={styles.saveCloseText}>×</Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            style={styles.saveFolderList}
           >
-            <View style={styles.addFolderIcon}>
-              <AddFolderCircle
-                color={colors.text}
-                height={responsiveSize(20)}
-                style={styles.addFolderIconPart}
-                width={responsiveSize(20)}
-              />
-              <AddFolderPlus
-                color={colors.text}
-                height={responsiveSize(7)}
-                style={styles.addFolderIconPart}
-                width={responsiveSize(7)}
-              />
-            </View>
-            <Text style={styles.newFolderText}>Create Folder</Text>
-          </Pressable>
-        </ScrollView>
-        <View style={styles.addFooter}>
-          <Pressable onPress={onClose} style={styles.cancelButton}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
+            <Pressable
+              onPress={() => setSelected(new Set())}
+              style={styles.saveFolderRow}
+            >
+              <Text style={styles.saveFolderLabel}>All places</Text>
+              <View
+                style={[
+                  styles.radioCircle,
+                  selected.size === 0 && styles.radioCircleChecked,
+                ]}
+              >
+                {selected.size === 0 ? (
+                  <Text style={styles.checkmark}>✓</Text>
+                ) : null}
+              </View>
+            </Pressable>
+            {(favourites.data?.folders ?? []).map((folder) => {
+              const checked = selected.has(folder.id);
+              return (
+                <Pressable
+                  key={folder.id}
+                  onPress={() => toggleFolder(folder.id)}
+                  style={styles.saveFolderRow}
+                >
+                  <Text style={styles.saveFolderLabel}>{folder.name}</Text>
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      checked && styles.radioCircleChecked,
+                    ]}
+                  >
+                    {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={() => setCreating(true)}
+              style={styles.saveFolderRow}
+            >
+              <Text style={styles.saveNewFolderText}>+ New folder</Text>
+              <View style={styles.radioCircle} />
+            </Pressable>
+          </ScrollView>
           <Pressable
             disabled={!place || saveVenue.isPending}
             onPress={() => void save()}
             style={({ pressed }) => [
-              styles.confirmButton,
+              styles.doneButton,
+              (!place || saveVenue.isPending) && styles.saveButtonDisabled,
               pressed && styles.pressed,
             ]}
           >
             {saveVenue.isPending ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.confirmText}>✓ Confirm</Text>
+              <Text style={styles.doneText}>Done</Text>
             )}
           </Pressable>
-        </View>
+        </Animated.View>
         <Modal
           animationType="none"
           onRequestClose={createFolderSheet.close}
@@ -719,99 +709,6 @@ function FavouriteCard({
           {place.distanceKm.toFixed(1).replace('.', ',')} km
         </Text>
       </View>
-    </View>
-  );
-}
-
-function FolderSelectionRow({
-  checked,
-  label,
-  onDelete,
-  onPress,
-  styles,
-}: {
-  checked: boolean;
-  label: string;
-  onDelete?: () => void;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  const deleteActionWidth = responsiveSize(60);
-  const deleteThreshold = responsiveSize(36);
-  const swipeStartThreshold = responsiveSize(8);
-  const translateX = useMemo(() => new Animated.Value(0), []);
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Boolean(onDelete) &&
-          gesture.dx < -swipeStartThreshold &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
-        onPanResponderMove: (_, gesture) =>
-          translateX.setValue(
-            Math.max(-deleteActionWidth, Math.min(0, gesture.dx)),
-          ),
-        onPanResponderRelease: (_, gesture) => {
-          Animated.spring(translateX, {
-            toValue: gesture.dx < -deleteThreshold ? -deleteActionWidth : 0,
-            useNativeDriver: true,
-          }).start();
-        },
-        onPanResponderTerminate: () =>
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start(),
-      }),
-    [
-      deleteActionWidth,
-      deleteThreshold,
-      onDelete,
-      swipeStartThreshold,
-      translateX,
-    ],
-  );
-  return (
-    <View style={styles.selectionSwipe}>
-      {onDelete ? (
-        <Pressable
-          accessibilityLabel={`Delete ${label}`}
-          onPress={onDelete}
-          style={styles.selectionDeleteAction}
-        >
-          <Image source={trashIcon} style={styles.selectionDelete} />
-        </Pressable>
-      ) : null}
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={{ transform: [{ translateX }] }}
-      >
-        <Pressable
-          onPress={() => {
-            if ((translateX as unknown as { _value: number })._value < 0)
-              Animated.spring(translateX, {
-                toValue: 0,
-                useNativeDriver: true,
-              }).start();
-            else onPress();
-          }}
-          style={styles.selectionRow}
-        >
-          <View style={styles.selectionName}>
-            <FolderIcon
-              color={styles.selectionLabel.color}
-              height={responsiveSize(20)}
-              width={responsiveSize(20)}
-            />
-            <Text style={styles.selectionLabel}>{label}</Text>
-          </View>
-          <View
-            style={[styles.radioCircle, checked && styles.radioCircleChecked]}
-          >
-            {checked ? <Text style={styles.checkmark}>✓</Text> : null}
-          </View>
-        </Pressable>
-      </Animated.View>
     </View>
   );
 }
@@ -1340,11 +1237,45 @@ function createStyles(colors: ThemeColors) {
     saveSheet: {
       margin: 16,
       marginBottom: 24,
-      padding: 24,
-      paddingTop: 20,
+      paddingHorizontal: 24,
+      paddingBottom: 24,
       borderRadius: 22,
       backgroundColor: colors.surfaceRaised,
     },
+    saveTitleRow: {
+      height: 44,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    saveCloseButton: {
+      width: 24,
+      height: 24,
+      borderWidth: 1.5,
+      borderColor: colors.text,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveCloseText: {
+      marginTop: -2,
+      color: colors.text,
+      fontSize: 20,
+      lineHeight: 22,
+      fontWeight: '400',
+    },
+    saveFolderList: { maxHeight: 280 },
+    saveFolderRow: {
+      height: 52,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    saveFolderLabel: { color: colors.text, fontSize: 16 },
+    saveNewFolderText: { color: colors.primary, fontSize: 16 },
+    saveButtonDisabled: { opacity: 0.5 },
     nameSheet: {
       margin: 16,
       marginBottom: 24,
@@ -1381,39 +1312,6 @@ function createStyles(colors: ThemeColors) {
     },
     sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
     sheetCancelText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-    selectionSwipe: {
-      height: 76,
-      overflow: 'hidden',
-      backgroundColor: colors.canvas,
-    },
-    selectionRow: {
-      height: 76,
-      paddingHorizontal: 18,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      backgroundColor: colors.canvas,
-    },
-    selectionName: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    selectionLabel: { color: colors.text, fontSize: 16 },
-    selectionDelete: { width: 24, height: 24 },
-    selectionDeleteAction: {
-      position: 'absolute',
-      right: 0,
-      top: 0,
-      width: 60,
-      height: 76,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surfaceRaised,
-    },
     radioCircle: {
       width: 20,
       height: 20,

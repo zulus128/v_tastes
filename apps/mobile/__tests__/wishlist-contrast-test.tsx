@@ -69,7 +69,7 @@ jest.mock('../src/features/favourites/api', () => ({
   useUnsaveVenue: () => ({ mutate: jest.fn() }),
 }));
 
-it('uses light-theme foreground colors for Add to Wishlist navigation', async () => {
+it('uses light-theme foreground colors for the Save to sheet', async () => {
   mockResolvedTheme = 'light';
   await render(
     <SaveToFolderSheet
@@ -80,22 +80,19 @@ it('uses light-theme foreground colors for Add to Wishlist navigation', async ()
     />,
   );
 
-  expect(StyleSheet.flatten(screen.getByText('‹').props.style).color).toBe(
+  expect(
+    StyleSheet.flatten(screen.getByText('Save to…').props.style).color,
+  ).toBe('#080808');
+  expect(StyleSheet.flatten(screen.getByText('×').props.style).color).toBe(
     '#080808',
   );
   expect(
-    StyleSheet.flatten(screen.getByText('Add to Wishlist').props.style).color,
+    StyleSheet.flatten(screen.getByText('All places').props.style).color,
   ).toBe('#080808');
-  expect(StyleSheet.flatten(screen.getByText('Cancel').props.style).color).toBe(
-    '#080808',
-  );
-  expect(screen.getByTestId('wishlist-modal').props.presentationStyle).toBe(
-    'overFullScreen',
-  );
   expect(screen.getByTestId('wishlist-modal').props.transparent).toBe(true);
 });
 
-it('updates Add to Wishlist colors while the modal stays open', async () => {
+it('updates Save to sheet colors while the modal stays open', async () => {
   mockResolvedTheme = 'light';
   const sheet = await render(
     <SaveToFolderSheet
@@ -107,7 +104,7 @@ it('updates Add to Wishlist colors while the modal stays open', async () => {
   );
 
   expect(
-    StyleSheet.flatten(screen.getByText('Add to Wishlist').props.style).color,
+    StyleSheet.flatten(screen.getByText('Save to…').props.style).color,
   ).toBe('#080808');
 
   mockResolvedTheme = 'dark';
@@ -121,9 +118,9 @@ it('updates Add to Wishlist colors while the modal stays open', async () => {
   );
 
   expect(
-    StyleSheet.flatten(screen.getByText('Add to Wishlist').props.style).color,
+    StyleSheet.flatten(screen.getByText('Save to…').props.style).color,
   ).toBe('#FFFFFF');
-  expect(StyleSheet.flatten(screen.getByText('Cancel').props.style).color).toBe(
+  expect(StyleSheet.flatten(screen.getByText('×').props.style).color).toBe(
     '#FFFFFF',
   );
 });
