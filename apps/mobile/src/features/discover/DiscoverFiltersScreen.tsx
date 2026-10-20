@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -7,6 +7,13 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { useDiscoverVenues } from './api';
 import { matchesPlaceFilters } from './placeFilters';
+import {
+  moveRatingThumb,
+  nearestRatingThumb,
+  ratingPosition,
+  RATING_RANGE_THUMB_SIZE,
+  type RatingRangeThumb,
+} from './ratingRangeGeometry';
 
 const CUISINES = [
   'Italian 🇮🇹',
@@ -311,24 +318,71 @@ function RatingRange({
   value: [number, number];
 }) {
   const [width, setWidth] = useState(0);
-  const update = (locationX: number) => {
-    if (!width) return;
-    const next = Math.max(0, Math.min(5, Math.round((locationX / width) * 5)));
-    const distanceToMin = Math.abs(next - value[0]);
-    const distanceToMax = Math.abs(next - value[1]);
-    if (distanceToMin <= distanceToMax)
-      onChange([Math.min(next, value[1]), value[1]]);
-    else onChange([value[0], Math.max(next, value[0])]);
+  const widthRef = useRef(width);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  const activeThumb = useRef<RatingRangeThumb | null>(null);
+  const dragStartX = useRef(0);
+  widthRef.current = width;
+  valueRef.current = value;
+  onChangeRef.current = onChange;
+
+  const update = (locationX: number, thumb: RatingRangeThumb) => {
+    if (!widthRef.current) return;
+    const next = moveRatingThumb(
+      valueRef.current,
+      thumb,
+      locationX,
+      widthRef.current,
+    );
+    valueRef.current = next;
+    onChangeRef.current(next);
   };
-  const left = width ? (value[0] / 5) * width : 0;
-  const right = width ? (value[1] / 5) * width : 0;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 2 &&
+        Math.abs(gesture.dx) >= Math.abs(gesture.dy),
+      onPanResponderGrant: (event) => {
+        const locationX = event.nativeEvent.locationX;
+        const thumb = nearestRatingThumb(
+          locationX,
+          widthRef.current,
+          valueRef.current,
+        );
+        activeThumb.current = thumb;
+        dragStartX.current = locationX;
+        update(locationX, thumb);
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (!activeThumb.current) return;
+        update(dragStartX.current + gesture.dx, activeThumb.current);
+      },
+      onPanResponderRelease: () => {
+        activeThumb.current = null;
+      },
+      onPanResponderTerminate: () => {
+        activeThumb.current = null;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+    }),
+  ).current;
+  const left = width ? ratingPosition(value[0], width) : 0;
+  const right = width ? ratingPosition(value[1], width) : 0;
   return (
     <View>
-      <Pressable
+      <View
         accessibilityLabel={`Rating range ${value[0]} to ${value[1]}`}
-        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-        onPress={(event) => update(event.nativeEvent.locationX)}
+        accessibilityRole="adjustable"
+        onLayout={(event) => {
+          const nextWidth = event.nativeEvent.layout.width;
+          widthRef.current = nextWidth;
+          setWidth(nextWidth);
+        }}
         style={styles.ratingTrackTouch}
+        {...panResponder.panHandlers}
       >
         <View style={styles.ratingTrack} />
         <View
@@ -337,9 +391,19 @@ function RatingRange({
             { left, width: Math.max(0, right - left) },
           ]}
         />
-        <View style={[styles.ratingThumb, { left: left - 8 }]} />
-        <View style={[styles.ratingThumb, { left: right - 8 }]} />
-      </Pressable>
+        <View
+          style={[
+            styles.ratingThumb,
+            { left: left - RATING_RANGE_THUMB_SIZE / 2 },
+          ]}
+        />
+        <View
+          style={[
+            styles.ratingThumb,
+            { left: right - RATING_RANGE_THUMB_SIZE / 2 },
+          ]}
+        />
+      </View>
       <View style={styles.ratingTicks}>
         {RATING_STEPS.map((step) => (
           <Text key={step} style={styles.ratingTick}>
@@ -433,27 +497,28 @@ function createStyles(colors: ThemeColors) {
     ratingValue: { color: colors.text, fontSize: 13, fontWeight: '600' },
     ratingTrackTouch: {
       height: 34,
-      marginHorizontal: 8,
       justifyContent: 'center',
     },
     ratingTrack: {
-      height: 3,
+      height: 4,
       borderRadius: 2,
       backgroundColor: colors.border,
     },
     ratingTrackActive: {
       position: 'absolute',
-      height: 3,
+      top: 15,
+      height: 4,
       borderRadius: 2,
       backgroundColor: accent,
     },
     ratingThumb: {
       position: 'absolute',
-      width: 16,
-      height: 16,
+      top: 6,
+      width: RATING_RANGE_THUMB_SIZE,
+      height: RATING_RANGE_THUMB_SIZE,
       borderWidth: 2,
       borderColor: accent,
-      borderRadius: 8,
+      borderRadius: RATING_RANGE_THUMB_SIZE / 2,
       backgroundColor: '#FFFFFF',
     },
     ratingTicks: {
@@ -461,7 +526,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       justifyContent: 'space-between',
     },
-    ratingTick: { color: colors.textSecondary, fontSize: 10 },
+    ratingTick: { color: colors.textSecondary, fontSize: 12 },
     section: {
       padding: 16,
       gap: 12,
