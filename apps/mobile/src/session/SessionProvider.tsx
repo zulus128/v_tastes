@@ -289,7 +289,26 @@ function visualAuditData(operation: string): unknown {
     case 'getUnreadNotificationCount':
       return { count: 0 };
     case 'getFavourites':
-      return { folders: [], places: [], nextCursor: null };
+      return {
+        folders: [],
+        places: [
+          {
+            venueId: 'visual-audit-venue',
+            folderIds: [],
+            savedAt: '2026-10-20T12:00:00.000Z',
+            name: 'Gemini750 Restaurant',
+            city: 'Istanbul',
+            address: '38 Beauchamp Place',
+            category: 'Restaurant',
+            imageUrl: null,
+            priceLevel: 2,
+            distanceKm: 1.2,
+            rating: 4.8,
+            reviewCount: 24,
+          },
+        ],
+        nextCursor: null,
+      };
     case 'getMonthlyRecap':
       return { ready: false };
     case 'askTastesAi':

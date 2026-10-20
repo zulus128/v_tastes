@@ -11,6 +11,7 @@ import { responsiveSize } from '../src/ui/responsive';
 
 const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
 let mockCarouselCount = 0;
+let mockFavouritePlaces: Array<Record<string, unknown>> = [];
 let mockPopularReviews: Array<Record<string, unknown>> = [];
 let mockVenues: Array<Record<string, unknown>> = [];
 
@@ -23,8 +24,18 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: String }));
+jest.mock('../assets/discover/bookmark-saved.svg', () => {
+  const { View } = jest.requireActual('react-native');
+  return {
+    __esModule: true,
+    default: (props: Record<string, unknown>) => <View {...props} />,
+  };
+});
 jest.mock('../src/ui/ThemeProvider', () => ({
-  useAppTheme: () => ({ colors: {}, isDark: true }),
+  useAppTheme: () => ({
+    colors: { primary: '#B82F29', text: '#FFFFFF' },
+    isDark: true,
+  }),
 }));
 jest.mock('../src/session/SessionProvider', () => ({
   useTastesApi: () => ({}),
@@ -34,7 +45,7 @@ jest.mock('../src/features/favourites/FavouritesPane', () => ({
   SaveToFolderSheet: () => null,
 }));
 jest.mock('../src/features/favourites/api', () => ({
-  useFavourites: () => ({ data: { places: [] } }),
+  useFavourites: () => ({ data: { places: mockFavouritePlaces } }),
 }));
 jest.mock('react-native-maps', () => {
   const { View } = jest.requireActual('react-native');
@@ -95,6 +106,7 @@ describe('Discover responsive content', () => {
     );
     mockInsets.top = 0;
     mockCarouselCount = 0;
+    mockFavouritePlaces = [];
     mockPopularReviews = [];
     mockVenues = [];
     jest.restoreAllMocks();
@@ -189,6 +201,30 @@ describe('Discover responsive content', () => {
         letterSpacing: -0.24,
       });
     });
+  });
+
+  it('uses the neutral Figma icon for a saved place', async () => {
+    mockVenues = [
+      {
+        id: 'saved-place',
+        name: 'Saved place',
+        address: '1 Test Street',
+        category: 'Restaurant',
+        rating: 4.4,
+        reviewCount: 100,
+      },
+    ];
+    mockFavouritePlaces = [{ venueId: 'saved-place' }];
+    resize(402, 874);
+    await render(<DiscoverScreen {...props} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
+
+    expect(screen.getByTestId('saved-place-list-icon').props.color).toBe(
+      '#FFFFFF',
+    );
+    expect(screen.getByTestId('saved-place-list-icon').props.color).not.toBe(
+      '#B82F29',
+    );
   });
 
   it.each([2, 3])(

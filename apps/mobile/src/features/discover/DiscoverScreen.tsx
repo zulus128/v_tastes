@@ -34,7 +34,7 @@ import MapView, {
 } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import BookmarkIcon from '../../../assets/discover/bookmark-filled.svg';
+import BookmarkIcon from '../../../assets/discover/bookmark-saved.svg';
 import BookmarkOutlineIcon from '../../../assets/discover/bookmark-outline.svg';
 import MapFavouriteIcon from '../../../assets/discover/map-favourite.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
@@ -2432,8 +2432,9 @@ function TrendingTile({
       >
         {saved ? (
           <BookmarkIcon
-            color={colors.primary}
+            color="#FFFFFF"
             height={responsiveSize(22)}
+            testID="saved-place-tile-icon"
             width={responsiveSize(22)}
           />
         ) : (
@@ -2474,7 +2475,9 @@ function PlaceRow({
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
         <View style={styles.newChip}>
-          <Text style={[styles.newChipText, { letterSpacing: -0.24 }]}>Popular</Text>
+          <Text style={[styles.newChipText, { letterSpacing: -0.24 }]}>
+            Popular
+          </Text>
         </View>
       </Pressable>
       <Pressable onPress={onOpen} style={styles.placeInfo}>
@@ -2504,8 +2507,9 @@ function PlaceRow({
       >
         {saved ? (
           <BookmarkIcon
-            color={colors.primary}
+            color={colors.text}
             height={responsiveSize(20)}
+            testID="saved-place-list-icon"
             width={responsiveSize(20)}
           />
         ) : (
