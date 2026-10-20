@@ -173,19 +173,32 @@ it('rounds the comments panel instead of each comment row', async () => {
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderTopLeftRadius: responsiveSize(32),
-    borderTopRightRadius: responsiveSize(32),
+    borderTopLeftRadius: responsiveSize(48),
+    borderTopRightRadius: responsiveSize(48),
   });
   expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderBottomLeftRadius: responsiveSize(32),
-    borderBottomRightRadius: responsiveSize(32),
+    borderBottomLeftRadius: responsiveSize(48),
+    borderBottomRightRadius: responsiveSize(48),
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
     expect(style.borderRadius).toBeUndefined();
     expect(style.marginHorizontal).toBeUndefined();
     expect(style.marginBottom).toBeUndefined();
+  });
+});
+
+it('keeps the comments top bar corners clearly visible', async () => {
+  await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  const header = screen.getByText('Comments').parent!;
+  expect(StyleSheet.flatten(header.props.style)).toMatchObject({
+    overflow: 'hidden',
+    borderBottomLeftRadius: responsiveSize(48),
+    borderBottomRightRadius: responsiveSize(48),
   });
 });
 

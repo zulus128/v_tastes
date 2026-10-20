@@ -1228,8 +1228,8 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       overflow: 'hidden',
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
+      borderBottomLeftRadius: 48,
+      borderBottomRightRadius: 48,
       backgroundColor: colors.background,
     },
     back: {
@@ -1480,13 +1480,13 @@ const createStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
-      borderTopLeftRadius: 32,
-      borderTopRightRadius: 32,
+      borderTopLeftRadius: 48,
+      borderTopRightRadius: 48,
     },
     commentsPanelEnd: {
       overflow: 'hidden',
-      borderBottomLeftRadius: 32,
-      borderBottomRightRadius: 32,
+      borderBottomLeftRadius: 48,
+      borderBottomRightRadius: 48,
     },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.
