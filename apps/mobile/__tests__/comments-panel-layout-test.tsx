@@ -174,11 +174,7 @@ it('rounds the comments panel instead of each comment row', async () => {
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
     borderTopWidth: responsiveSize(1),
-    borderLeftWidth: responsiveSize(1),
-    borderRightWidth: responsiveSize(1),
     borderTopColor: colors.border,
-    borderLeftColor: colors.border,
-    borderRightColor: colors.border,
     borderTopLeftRadius: responsiveSize(24),
     borderTopRightRadius: responsiveSize(24),
     backgroundColor: 'transparent',
@@ -186,12 +182,15 @@ it('rounds the comments panel instead of each comment row', async () => {
   expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
     overflow: 'hidden',
     borderBottomWidth: responsiveSize(1),
-    borderLeftWidth: responsiveSize(1),
-    borderRightWidth: responsiveSize(1),
     borderBottomColor: colors.border,
     borderBottomLeftRadius: responsiveSize(24),
     borderBottomRightRadius: responsiveSize(24),
     backgroundColor: 'transparent',
+  });
+  [panelStart, panelEnd].forEach((panelEdge) => {
+    const style = StyleSheet.flatten(panelEdge.props.style);
+    expect(style.borderLeftWidth).toBeUndefined();
+    expect(style.borderRightWidth).toBeUndefined();
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);

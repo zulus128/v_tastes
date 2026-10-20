@@ -1485,10 +1485,6 @@ const createStyles = (colors: ThemeColors) =>
       position: 'relative',
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
-      borderLeftWidth: 1,
-      borderRightWidth: 1,
-      borderLeftColor: colors.border,
-      borderRightColor: colors.border,
       backgroundColor: colors.background,
     },
     commentsPanelStart: {
