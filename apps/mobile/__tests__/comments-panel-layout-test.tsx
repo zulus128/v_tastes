@@ -234,11 +234,49 @@ it('keeps the reply target and input in one gapless composer field', async () =>
   expect(StyleSheet.flatten(field.props.style)).toMatchObject({
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   });
   expect(input.parent).toBe(field);
   expect(StyleSheet.flatten(banner.props.style).marginBottom).toBeUndefined();
   expect(StyleSheet.flatten(input.props.style).backgroundColor).toBe(
     'transparent',
   );
+});
+
+it('matches the Figma composer dimensions and colors', async () => {
+  await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  const input = screen.getByPlaceholderText('Add comment');
+  const field = input.parent!;
+  const composer = field.parent!;
+  const send = screen.getByLabelText('Send comment');
+
+  expect(input.props.placeholderTextColor).toBe('rgba(217,221,229,0.4)');
+  expect(StyleSheet.flatten(composer.props.style)).toMatchObject({
+    paddingHorizontal: responsiveSize(16),
+    paddingTop: responsiveSize(8),
+    gap: responsiveSize(12),
+    backgroundColor: colors.background,
+  });
+  expect(StyleSheet.flatten(field.props.style)).toMatchObject({
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  });
+  expect(StyleSheet.flatten(input.props.style)).toMatchObject({
+    height: responsiveSize(40),
+    paddingLeft: responsiveSize(14),
+    paddingRight: responsiveSize(4),
+    paddingVertical: 0,
+    fontSize: responsiveSize(16),
+    lineHeight: responsiveSize(22),
+    letterSpacing: responsiveSize(-0.41),
+  });
+  expect(StyleSheet.flatten(send.props.style)).toMatchObject({
+    width: responsiveSize(40),
+    height: responsiveSize(40),
+    borderColor: colors.primary,
+    borderRadius: responsiveSize(36),
+    backgroundColor: colors.primary,
+  });
 });

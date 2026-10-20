@@ -34,7 +34,7 @@ import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
-import SendIcon from '../../../assets/ai/send.svg';
+import SendIcon from '../../../assets/comments/send.svg';
 import avatarKristin from '../../../assets/discover/avatar-kristin.png';
 import loungePhoto from '../../../assets/discover/lounge.png';
 import restaurantPhoto from '../../../assets/discover/restaurant.png';
@@ -1108,7 +1108,7 @@ export function PaginatedCommentsScreen({
                   ? `Reply to ${replyTarget.authorDisplayName}`
                   : 'Add comment'
               }
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="rgba(217,221,229,0.4)"
               style={styles.input}
               value={text}
             />
@@ -1560,13 +1560,13 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 12,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.background,
     },
     composerField: {
       flex: 1,
       overflow: 'hidden',
       borderRadius: theme.radius.pill,
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: 'rgba(255,255,255,0.08)',
     },
     replyBanner: {
       height: 28,
@@ -1580,8 +1580,13 @@ const createStyles = (colors: ThemeColors) =>
     input: {
       flex: 1,
       height: 40,
-      paddingHorizontal: 14,
+      paddingLeft: 14,
+      paddingRight: 4,
+      paddingVertical: 0,
       color: colors.text,
+      fontSize: 16,
+      lineHeight: 22,
+      letterSpacing: -0.41,
       backgroundColor: 'transparent',
     },
     send: {
@@ -1589,7 +1594,7 @@ const createStyles = (colors: ThemeColors) =>
       height: 40,
       borderWidth: 1,
       borderColor: colors.primary,
-      borderRadius: 20,
+      borderRadius: 36,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
