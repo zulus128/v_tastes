@@ -173,13 +173,13 @@ it('rounds the comments panel instead of each comment row', async () => {
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderTopLeftRadius: responsiveSize(48),
-    borderTopRightRadius: responsiveSize(48),
+    borderTopLeftRadius: responsiveSize(24),
+    borderTopRightRadius: responsiveSize(24),
   });
   expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderBottomLeftRadius: responsiveSize(48),
-    borderBottomRightRadius: responsiveSize(48),
+    borderBottomLeftRadius: responsiveSize(24),
+    borderBottomRightRadius: responsiveSize(24),
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
@@ -189,7 +189,7 @@ it('rounds the comments panel instead of each comment row', async () => {
   });
 });
 
-it('keeps the comments top bar corners clearly visible', async () => {
+it('shows the Figma top bar radius over the gray screen backdrop', async () => {
   await render(
     <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
   );
@@ -197,8 +197,11 @@ it('keeps the comments top bar corners clearly visible', async () => {
   const header = screen.getByText('Comments').parent!;
   expect(StyleSheet.flatten(header.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderBottomLeftRadius: responsiveSize(48),
-    borderBottomRightRadius: responsiveSize(48),
+    borderBottomLeftRadius: responsiveSize(24),
+    borderBottomRightRadius: responsiveSize(24),
+  });
+  expect(StyleSheet.flatten(header.parent!.props.style)).toMatchObject({
+    backgroundColor: colors.canvas,
   });
 });
 

@@ -1226,7 +1226,7 @@ export function PaginatedCommentsScreen({
 
 const createStyles = (colors: ThemeColors) =>
   responsiveStyleSheet({
-    keyboardAvoiding: { flex: 1 },
+    keyboardAvoiding: { flex: 1, backgroundColor: colors.canvas },
     header: {
       height: 102,
       paddingTop: 54,
@@ -1234,8 +1234,8 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       overflow: 'hidden',
-      borderBottomLeftRadius: 48,
-      borderBottomRightRadius: 48,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
       backgroundColor: colors.background,
     },
     back: {
@@ -1486,13 +1486,13 @@ const createStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
-      borderTopLeftRadius: 48,
-      borderTopRightRadius: 48,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
     },
     commentsPanelEnd: {
       overflow: 'hidden',
-      borderBottomLeftRadius: 48,
-      borderBottomRightRadius: 48,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
     },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.
