@@ -145,10 +145,16 @@ function visualAuditData(operation: string): unknown {
           rating: 4.5,
           text: "The hand-cut tagliolini is unreal — go on a Tuesday for the chef's special.",
           tags: ['quick-bites'],
-          dishReviews: [
-            { id: 'dish-1', title: 'Tagliolini', rating: 4.9 },
-            { id: 'dish-2', title: 'Tiramisu', rating: 4.7 },
-          ],
+          dishReviews: Array.from({ length: 15 }, (_, index) => ({
+            id: `dish-${index + 1}`,
+            title:
+              index === 0
+                ? 'Tagliolini'
+                : index === 1
+                  ? 'Tiramisu'
+                  : `Dish ${index + 1}`,
+            rating: index === 0 ? 4.9 : index === 1 ? 4.7 : 4.5,
+          })),
           status: 'published',
           commentCount: 3,
           reactionCount: 94,

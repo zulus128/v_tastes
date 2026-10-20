@@ -33,6 +33,7 @@ import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
 import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
+import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import SendIcon from '../../../assets/ai/send.svg';
 import avatarKristin from '../../../assets/discover/avatar-kristin.png';
 import loungePhoto from '../../../assets/discover/lounge.png';
@@ -240,7 +241,8 @@ function MainReview({
     onClose: () => setSelectedDish(null),
     visible: selectedDish !== null,
   });
-  const seededReview = review.id.startsWith('seed-own-');
+  const seededReview =
+    review.id.startsWith('seed-own-') || review.id === 'visual-audit-review';
   const selectedDishIndex = selectedDish
     ? review.dishReviews.findIndex((dish) => dish.id === selectedDish.id)
     : -1;
@@ -357,6 +359,22 @@ function MainReview({
               width={responsiveSize(20)}
             />
           </Pressable>
+          {review.dishReviews.length > 0 ? (
+            <Pressable
+              accessibilityLabel="Open dish reviews"
+              onPress={() => setSelectedDish(review.dishReviews[0] ?? null)}
+              style={styles.dishesButton}
+            >
+              <TopRatedDishesIcon
+                color={colors.primary}
+                height={responsiveSize(14)}
+                width={responsiveSize(14)}
+              />
+              <Text style={styles.dishesButtonText}>
+                Dishes ({review.dishReviews.length})
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
       <Modal
@@ -914,6 +932,7 @@ export function PaginatedCommentsScreen({
                   style={[
                     styles.thread,
                     index === 0 && styles.commentsPanelStart,
+                    index === rootItems.length - 1 && styles.commentsPanelEnd,
                   ]}
                 >
                   <CommentRow
@@ -1208,6 +1227,9 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      overflow: 'hidden',
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
       backgroundColor: colors.background,
     },
     back: {
@@ -1225,19 +1247,14 @@ const createStyles = (colors: ThemeColors) =>
     title: { color: colors.text, fontSize: 17, fontWeight: '700' },
     list: { flex: 1 },
     content: {
-      paddingTop: 8,
+      paddingTop: 0,
       paddingBottom: 16,
       backgroundColor: colors.canvas,
     },
     empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
     mainReview: {
-      marginHorizontal: 8,
       marginBottom: 8,
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-      borderRadius: 20,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     reviewAuthorRow: {
       minHeight: 72,
@@ -1434,6 +1451,18 @@ const createStyles = (colors: ThemeColors) =>
       gap: 2,
     },
     reviewActionCount: { color: colors.text, fontSize: 14 },
+    dishesButton: {
+      minHeight: 24,
+      marginLeft: 'auto',
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      borderWidth: 1,
+      borderColor: 'rgba(184,47,41,0.4)',
+      borderRadius: 40,
+    },
+    dishesButtonText: { color: colors.text, fontSize: 12 },
     commentsHeading: {
       paddingHorizontal: 16,
       paddingBottom: 10,
@@ -1453,6 +1482,11 @@ const createStyles = (colors: ThemeColors) =>
       borderTopColor: colors.border,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
+    },
+    commentsPanelEnd: {
+      overflow: 'hidden',
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
     },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.

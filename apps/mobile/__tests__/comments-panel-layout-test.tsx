@@ -76,6 +76,28 @@ jest.mock('../src/features/comments/api', () => {
     data: {
       pages: [
         {
+          review: {
+            id: 'review-1',
+            authorId: 'author-0',
+            authorDisplayName: 'Cameron Williamson',
+            authorUsername: 'cameronw',
+            authorPhotoUrl: null,
+            venueId: 'venue-1',
+            venueName: 'Gemini750 Restaurant',
+            rating: 4.5,
+            text: 'Main review text',
+            tags: ['quick-bites'],
+            dishReviews: Array.from({ length: 15 }, (_, index) => ({
+              id: `dish-${index + 1}`,
+              title: `Dish ${index + 1}`,
+              rating: 4.5,
+            })),
+            status: 'published',
+            commentCount: 2,
+            reactionCount: 94,
+            reacted: true,
+            createdAt: '2026-10-14T12:00:00.000Z',
+          },
           items: [
             {
               id: 'comment-1',
@@ -147,11 +169,17 @@ it('rounds the comments panel instead of each comment row', async () => {
   const firstRow = screen.getByText('Wade Warren').parent!.parent!.parent!;
   const secondRow = screen.getByText('Jane Cooper').parent!.parent!.parent!;
   const panelStart = firstRow.parent!;
+  const panelEnd = secondRow.parent!;
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
     borderTopLeftRadius: responsiveSize(24),
     borderTopRightRadius: responsiveSize(24),
+  });
+  expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
+    overflow: 'hidden',
+    borderBottomLeftRadius: responsiveSize(24),
+    borderBottomRightRadius: responsiveSize(24),
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
@@ -159,4 +187,18 @@ it('rounds the comments panel instead of each comment row', async () => {
     expect(style.marginHorizontal).toBeUndefined();
     expect(style.marginBottom).toBeUndefined();
   });
+});
+
+it('matches the full-width review panel and shows the dish count tag', async () => {
+  await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  expect(screen.getByText('Dishes (15)')).toBeTruthy();
+  const mainReview = screen.getByText('Gemini750 Restaurant').parent!.parent!
+    .parent!;
+  const style = StyleSheet.flatten(mainReview.props.style);
+  expect(style.marginHorizontal).toBeUndefined();
+  expect(style.borderRadius).toBeUndefined();
+  expect(style.borderWidth).toBeUndefined();
 });
