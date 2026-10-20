@@ -189,6 +189,7 @@ export function CreateReviewScreen({
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const feedbackRef = useRef<TextInput>(null);
   // Measured so the hero's SVG background (HeroBackground) can be shaped to the card's real
@@ -201,11 +202,6 @@ export function CreateReviewScreen({
   const [rating, setRating] = useState(0);
   const [ratingGestureActive, setRatingGestureActive] = useState(false);
   const [text, setText] = useState('');
-  const feedbackMinHeight = responsiveSize(50);
-  const feedbackMaxHeight = responsiveSize(140);
-  const [feedbackHeight, setFeedbackHeight] = useState(() =>
-    responsiveSize(50),
-  );
   const [feedbackFocused, setFeedbackFocused] = useState(false);
   const [tags, setTags] = useState<ReviewTag[]>([]);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -326,7 +322,6 @@ export function CreateReviewScreen({
     setSelectedVenue(null);
     setRating(0);
     setText('');
-    setFeedbackHeight(50);
     setTags([]);
     setDishes([]);
     setIdempotencyKey(createIdempotencyKey('review'));
@@ -565,25 +560,26 @@ export function CreateReviewScreen({
                 : undefined
             }
           />
-          <View style={styles.feedbackField}>
+          <View
+            style={[
+              styles.feedbackField,
+              { width: Math.max(0, windowWidth - responsiveSize(32)) },
+            ]}
+          >
+            <Text
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              pointerEvents="none"
+              style={styles.feedbackSizer}
+            >
+              {text || 'Enter text'}
+            </Text>
             <TextInput
               blurOnSubmit
               maxLength={500}
               multiline
-              numberOfLines={4}
               onBlur={() => setFeedbackFocused(false)}
-              onChangeText={setText}
-              onContentSizeChange={({ nativeEvent }) =>
-                setFeedbackHeight(
-                  Math.min(
-                    feedbackMaxHeight,
-                    Math.max(
-                      feedbackMinHeight,
-                      Math.ceil(nativeEvent.contentSize.height),
-                    ),
-                  ),
-                )
-              }
+              onChangeText={(value) => setText(value.slice(0, 500))}
               onFocus={() => setFeedbackFocused(true)}
               onSubmitEditing={() => {
                 feedbackRef.current?.blur();
@@ -593,8 +589,8 @@ export function CreateReviewScreen({
               placeholderTextColor={colors.placeholder}
               ref={feedbackRef}
               returnKeyType="done"
-              scrollEnabled={feedbackHeight >= feedbackMaxHeight}
-              style={[styles.feedback, { height: feedbackHeight }]}
+              scrollEnabled
+              style={styles.feedback}
               testID="review-text-input"
               textAlignVertical="top"
               value={text}
@@ -2562,20 +2558,32 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
     },
     feedbackField: {
-      alignSelf: 'stretch',
-      marginHorizontal: 16,
-      minWidth: 0,
-    },
-    feedback: {
-      alignSelf: 'stretch',
-      width: '100%',
+      alignSelf: 'center',
       minHeight: 50,
       maxHeight: 140,
-      borderRadius: 12,
-      padding: 12,
+      minWidth: 0,
       overflow: 'hidden',
-      color: colors.text,
+      position: 'relative',
+      borderRadius: 12,
       backgroundColor: colors.surface,
+    },
+    feedbackSizer: {
+      width: '100%',
+      minHeight: 50,
+      padding: 12,
+      color: 'transparent',
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    feedback: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: '100%',
+      height: '100%',
+      padding: 12,
+      color: colors.text,
+      backgroundColor: 'transparent',
       fontSize: 16,
       lineHeight: 22,
     },
