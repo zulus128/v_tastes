@@ -189,7 +189,7 @@ it('rounds the comments panel instead of each comment row', async () => {
   });
 });
 
-it('shows the Figma top bar radius over the gray screen backdrop', async () => {
+it('shows the Figma top bar radius over the raised review backdrop', async () => {
   await render(
     <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
   );
@@ -201,7 +201,7 @@ it('shows the Figma top bar radius over the gray screen backdrop', async () => {
     borderBottomRightRadius: responsiveSize(24),
   });
   expect(StyleSheet.flatten(header.parent!.props.style)).toMatchObject({
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.surfaceRaised,
   });
 });
 

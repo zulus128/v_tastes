@@ -1226,7 +1226,7 @@ export function PaginatedCommentsScreen({
 
 const createStyles = (colors: ThemeColors) =>
   responsiveStyleSheet({
-    keyboardAvoiding: { flex: 1, backgroundColor: colors.canvas },
+    keyboardAvoiding: { flex: 1, backgroundColor: colors.surfaceRaised },
     header: {
       height: 102,
       paddingTop: 54,
