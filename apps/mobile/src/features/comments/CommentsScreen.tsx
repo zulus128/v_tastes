@@ -634,6 +634,7 @@ export function PaginatedCommentsScreen({
   );
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const listRef = useRef<FlatList<Comment> | null>(null);
   const query = useComments(reviewId);
   const mutation = useAddComment(reviewId);
@@ -719,6 +720,16 @@ export function PaginatedCommentsScreen({
         next.delete(parentCommentId);
         return next;
       });
+    }
+  }
+
+  async function refreshComments() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await query.refetch();
+    } finally {
+      setRefreshing(false);
     }
   }
   const targetRootIndex = commentId
@@ -870,8 +881,8 @@ export function PaginatedCommentsScreen({
             windowSize={7}
             refreshControl={
               <RefreshControl
-                refreshing={query.isRefetching && !query.isFetchingNextPage}
-                onRefresh={() => void query.refetch()}
+                refreshing={refreshing}
+                onRefresh={() => void refreshComments()}
                 tintColor={colors.primary}
               />
             }

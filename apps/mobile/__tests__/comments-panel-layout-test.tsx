@@ -19,6 +19,30 @@ const colors = {
   textSecondary: '#AAB2C5',
 };
 
+let mockCommentsRefetching = false;
+
+function findRefreshControl(
+  node: unknown,
+): { props: { refreshing?: boolean } } | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const match = findRefreshControl(child);
+      if (match) return match;
+    }
+    return null;
+  }
+  if (!node || typeof node !== 'object') return null;
+  const candidate = node as {
+    type?: string;
+    props?: { refreshing?: boolean };
+    children?: unknown;
+  };
+  if (candidate.type === 'RCTRefreshControl' && candidate.props) {
+    return { props: candidate.props };
+  }
+  return findRefreshControl(candidate.children);
+}
+
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: String }));
 jest.mock('../src/infrastructure/observability', () => ({
   captureException: jest.fn(),
@@ -96,10 +120,23 @@ jest.mock('../src/features/comments/api', () => {
   };
   return {
     useAddComment: () => ({ isPending: false, mutateAsync: jest.fn() }),
-    useComments: () => query,
+    useComments: () => ({
+      ...query,
+      isRefetching: mockCommentsRefetching,
+    }),
     useDeleteComment: () => ({ mutate: jest.fn() }),
     useReactToComment: () => ({ mutate: jest.fn() }),
   };
+});
+
+it('does not show pull-to-refresh during a background reaction refetch', async () => {
+  mockCommentsRefetching = true;
+  const view = await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  expect(findRefreshControl(view.toJSON())?.props.refreshing).not.toBe(true);
+  mockCommentsRefetching = false;
 });
 
 it('rounds the comments panel instead of each comment row', async () => {
