@@ -565,34 +565,41 @@ export function CreateReviewScreen({
                 : undefined
             }
           />
-          <TextInput
-            blurOnSubmit
-            maxLength={500}
-            multiline
-            onBlur={() => setFeedbackFocused(false)}
-            onChangeText={setText}
-            onContentSizeChange={({ nativeEvent }) =>
-              setFeedbackHeight(
-                Math.min(
-                  feedbackMaxHeight,
-                  Math.max(feedbackMinHeight, nativeEvent.contentSize.height),
-                ),
-              )
-            }
-            onFocus={() => setFeedbackFocused(true)}
-            onSubmitEditing={() => {
-              feedbackRef.current?.blur();
-              Keyboard.dismiss();
-            }}
-            placeholder="Enter text"
-            placeholderTextColor={colors.placeholder}
-            ref={feedbackRef}
-            returnKeyType="done"
-            scrollEnabled={feedbackHeight >= feedbackMaxHeight}
-            style={[styles.feedback, { height: feedbackHeight }]}
-            textAlignVertical="top"
-            value={text}
-          />
+          <View style={styles.feedbackField}>
+            <TextInput
+              blurOnSubmit
+              maxLength={500}
+              multiline
+              numberOfLines={4}
+              onBlur={() => setFeedbackFocused(false)}
+              onChangeText={setText}
+              onContentSizeChange={({ nativeEvent }) =>
+                setFeedbackHeight(
+                  Math.min(
+                    feedbackMaxHeight,
+                    Math.max(
+                      feedbackMinHeight,
+                      Math.ceil(nativeEvent.contentSize.height),
+                    ),
+                  ),
+                )
+              }
+              onFocus={() => setFeedbackFocused(true)}
+              onSubmitEditing={() => {
+                feedbackRef.current?.blur();
+                Keyboard.dismiss();
+              }}
+              placeholder="Enter text"
+              placeholderTextColor={colors.placeholder}
+              ref={feedbackRef}
+              returnKeyType="done"
+              scrollEnabled={feedbackHeight >= feedbackMaxHeight}
+              style={[styles.feedback, { height: feedbackHeight }]}
+              testID="review-text-input"
+              textAlignVertical="top"
+              value={text}
+            />
+          </View>
           <Text style={styles.reviewCounter}>{text.length}/500</Text>
           {submitError ? (
             <View accessibilityRole="alert" style={styles.errorBanner}>
@@ -2554,11 +2561,19 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    feedback: {
-      minHeight: 50,
+    feedbackField: {
+      alignSelf: 'stretch',
       marginHorizontal: 16,
+      minWidth: 0,
+    },
+    feedback: {
+      alignSelf: 'stretch',
+      width: '100%',
+      minHeight: 50,
+      maxHeight: 140,
       borderRadius: 12,
       padding: 12,
+      overflow: 'hidden',
       color: colors.text,
       backgroundColor: colors.surface,
       fontSize: 16,
