@@ -61,7 +61,21 @@ function visualAuditData(operation: string): unknown {
       return {
         hero: null,
         topReviewer: null,
-        trending: [],
+        trending: [
+          {
+            id: 'visual-audit-venue',
+            name: 'Gemini750 Restaurant',
+            city: 'Istanbul',
+            address: '38 Beauchamp Place',
+            category: 'Restaurant',
+            status: 'active',
+            priceLevel: 2,
+            rating: 4.8,
+            reviewCount: 24,
+            distanceKm: 1.2,
+            discoverTags: ['trending'],
+          },
+        ],
         newSpots: [],
         mostReviewed: [],
         forYou: [],
@@ -76,14 +90,139 @@ function visualAuditData(operation: string): unknown {
       return { items: [], externalResultsAvailable: false };
     case 'getFeed':
     case 'getFriendFeed':
-    case 'getVenues':
     case 'getPlaceReviews':
     case 'listConversations':
     case 'getMessages':
-    case 'getComments':
     case 'getLeaderboard':
-    case 'listNotifications':
       return { items: [], nextCursor: null };
+    case 'getVenues':
+      return {
+        items: [
+          {
+            id: 'visual-audit-venue',
+            name: 'Gemini750 Restaurant',
+            city: 'Istanbul',
+            address: '38 Beauchamp Place',
+            category: 'Restaurant',
+            status: 'active',
+            priceLevel: 2,
+            rating: 4.8,
+            reviewCount: 24,
+            distanceKm: 1.2,
+            latitude: 41.0422,
+            longitude: 29.0083,
+            discoverTags: ['trending'],
+          },
+          {
+            id: 'visual-audit-cafe',
+            name: 'Bosphorus Coffee House',
+            city: 'Istanbul',
+            address: '12 Bebek Caddesi',
+            category: 'Cafe',
+            status: 'active',
+            priceLevel: 1,
+            rating: 4.6,
+            reviewCount: 18,
+            distanceKm: 2.4,
+            latitude: 41.0764,
+            longitude: 29.0436,
+            discoverTags: ['new'],
+          },
+        ],
+        nextCursor: null,
+      };
+    case 'getComments':
+      return {
+        review: {
+          id: 'visual-audit-review',
+          authorId: 'visual-audit-author',
+          authorDisplayName: 'Cameron Williamson',
+          authorUsername: 'cameronw',
+          authorPhotoUrl: null,
+          venueId: 'visual-audit-venue',
+          venueName: 'Gemini750 Restaurant',
+          venueCity: 'Istanbul',
+          rating: 4.5,
+          text: "The hand-cut tagliolini is unreal — go on a Tuesday for the chef's special.",
+          tags: ['quick-bites'],
+          dishReviews: [
+            { id: 'dish-1', title: 'Tagliolini', rating: 4.9 },
+            { id: 'dish-2', title: 'Tiramisu', rating: 4.7 },
+          ],
+          status: 'published',
+          commentCount: 3,
+          reactionCount: 94,
+          reacted: true,
+          createdAt: '2026-10-14T12:00:00.000Z',
+        },
+        items: [
+          {
+            id: 'comment-1',
+            reviewId: 'visual-audit-review',
+            authorId: 'comment-author-1',
+            authorDisplayName: 'Wade Warren',
+            authorPhotoUrl: null,
+            parentCommentId: null,
+            reactionCount: 8,
+            replyCount: 1,
+            reacted: true,
+            text: 'That pasta really is worth the trip.',
+            createdAt: '2026-10-15T10:30:00.000Z',
+          },
+          {
+            id: 'comment-2',
+            reviewId: 'visual-audit-review',
+            authorId: 'comment-author-2',
+            authorDisplayName: 'Jane Cooper',
+            authorPhotoUrl: null,
+            parentCommentId: null,
+            reactionCount: 0,
+            replyCount: 0,
+            reacted: false,
+            text: 'Adding this to my list!',
+            createdAt: '2026-10-15T09:00:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      };
+    case 'listNotifications':
+      return {
+        items: [
+          {
+            id: 'notification-1',
+            type: null,
+            kind: 'comment',
+            group: 'likesComments',
+            category: null,
+            title: 'Wade Warren commented on your review',
+            body: 'commented on your review',
+            actorId: 'comment-author-1',
+            actorName: 'Wade Warren',
+            actorPhotoUrl: null,
+            targetType: 'comments',
+            targetId: 'visual-audit-review',
+            unread: true,
+            createdAt: '2026-10-20T10:30:00.000Z',
+          },
+          {
+            id: 'notification-2',
+            type: null,
+            kind: 'follow',
+            group: 'follows',
+            category: null,
+            title: 'Jane Cooper followed you',
+            body: 'started following you',
+            actorId: 'comment-author-2',
+            actorName: 'Jane Cooper',
+            actorPhotoUrl: null,
+            targetType: 'profile',
+            targetId: 'comment-author-2',
+            unread: false,
+            createdAt: '2026-10-19T08:00:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      };
     case 'getPlace':
     case 'getVenue':
       return {

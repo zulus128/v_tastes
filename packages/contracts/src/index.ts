@@ -791,6 +791,7 @@ export interface AppNotification {
   body: string;
   actorId: string | null;
   actorName: string | null;
+  actorPhotoUrl: string | null;
   targetType: NotificationTargetType | null;
   targetId: string | null;
   unread: boolean;

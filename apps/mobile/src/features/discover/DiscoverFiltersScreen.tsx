@@ -4,6 +4,9 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useAuthenticatedUserId } from '../../session/SessionProvider';
+import { useDiscoverVenues } from './api';
+import { matchesPlaceFilters } from './placeFilters';
 
 const CUISINES = [
   'Italian 🇮🇹',
@@ -19,6 +22,7 @@ const CUISINES = [
 ] as const;
 const BUDGETS = ['$ 🍞', '$$ 🍝', '$$$ 🥂'] as const;
 const DISTANCES = ['1 km', '3 km', '5 km', 'Any'] as const;
+const RATING_STEPS = [0, 1, 2, 3, 4, 5] as const;
 
 function encoded(prefix: string, value: string) {
   return `${prefix}:${value}`;
@@ -75,8 +79,10 @@ export function DiscoverFiltersScreen({
   onBack: () => void;
 }) {
   const { colors } = useAppTheme();
+  const userId = useAuthenticatedUserId();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const venuesQuery = useDiscoverVenues(userId);
   const [selected, setSelected] = useState(
     () =>
       new Set(
@@ -93,6 +99,13 @@ export function DiscoverFiltersScreen({
   const [maxDistance, setMaxDistance] = useState(
     initialValue(initialValues, 'Distance') ?? 'Any',
   );
+  const initialRating = initialValue(initialValues, 'Rating')
+    ?.split('-')
+    .map(Number);
+  const [ratingRange, setRatingRange] = useState<[number, number]>([
+    Number.isFinite(initialRating?.[0]) ? initialRating![0]! : 0,
+    Number.isFinite(initialRating?.[1]) ? initialRating![1]! : 5,
+  ]);
   const [cuisinesExpanded, setCuisinesExpanded] = useState(() =>
     initialValues.some((value) =>
       CUISINES.slice(5).includes(value as (typeof CUISINES)[number]),
@@ -112,14 +125,28 @@ export function DiscoverFiltersScreen({
     setSelected(new Set());
     setOpenNow(false);
     setMaxDistance('Any');
+    setRatingRange([0, 5]);
   }
 
-  function apply() {
+  function valuesForSelection() {
     const values = [...selected];
     if (openNow) values.push(encoded('OpenNow', 'true'));
     if (maxDistance !== 'Any') values.push(encoded('Distance', maxDistance));
+    if (ratingRange[0] > 0 || ratingRange[1] < 5)
+      values.push(encoded('Rating', `${ratingRange[0]}-${ratingRange[1]}`));
+    return values;
+  }
+
+  function apply() {
+    const values = valuesForSelection();
     onApply(values);
   }
+
+  const previewValues = valuesForSelection();
+  const resultCount =
+    venuesQuery.data?.pages
+      .flatMap((page) => page.items)
+      .filter((venue) => matchesPlaceFilters(venue, previewValues)).length ?? 0;
 
   return (
     <View style={styles.screen}>
@@ -145,6 +172,19 @@ export function DiscoverFiltersScreen({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.ratingSection}>
+          <View style={styles.ratingHeader}>
+            <Text style={styles.sectionTitle}>Rating range</Text>
+            <Text style={styles.ratingValue}>
+              ★ {ratingRange[0].toFixed(1)} – {ratingRange[1].toFixed(1)}
+            </Text>
+          </View>
+          <RatingRange
+            onChange={setRatingRange}
+            styles={styles}
+            value={ratingRange}
+          />
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kind of food</Text>
           <View style={styles.choices}>
@@ -245,8 +285,62 @@ export function DiscoverFiltersScreen({
         </Pressable>
         <Pressable onPress={apply} style={styles.applyButton}>
           <CheckIcon />
-          <Text style={styles.applyText}>Apply</Text>
+          <Text style={styles.applyText}>
+            {venuesQuery.isPending
+              ? 'Show places'
+              : `Show ${resultCount} places`}
+          </Text>
         </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function RatingRange({
+  onChange,
+  styles,
+  value,
+}: {
+  onChange: (value: [number, number]) => void;
+  styles: ReturnType<typeof createStyles>;
+  value: [number, number];
+}) {
+  const [width, setWidth] = useState(0);
+  const update = (locationX: number) => {
+    if (!width) return;
+    const next = Math.max(0, Math.min(5, Math.round((locationX / width) * 5)));
+    const distanceToMin = Math.abs(next - value[0]);
+    const distanceToMax = Math.abs(next - value[1]);
+    if (distanceToMin <= distanceToMax)
+      onChange([Math.min(next, value[1]), value[1]]);
+    else onChange([value[0], Math.max(next, value[0])]);
+  };
+  const left = width ? (value[0] / 5) * width : 0;
+  const right = width ? (value[1] / 5) * width : 0;
+  return (
+    <View>
+      <Pressable
+        accessibilityLabel={`Rating range ${value[0]} to ${value[1]}`}
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+        onPress={(event) => update(event.nativeEvent.locationX)}
+        style={styles.ratingTrackTouch}
+      >
+        <View style={styles.ratingTrack} />
+        <View
+          style={[
+            styles.ratingTrackActive,
+            { left, width: Math.max(0, right - left) },
+          ]}
+        />
+        <View style={[styles.ratingThumb, { left: left - 8 }]} />
+        <View style={[styles.ratingThumb, { left: right - 8 }]} />
+      </Pressable>
+      <View style={styles.ratingTicks}>
+        {RATING_STEPS.map((step) => (
+          <Text key={step} style={styles.ratingTick}>
+            {step}★
+          </Text>
+        ))}
       </View>
     </View>
   );
@@ -319,6 +413,50 @@ function createStyles(colors: ThemeColors) {
       textAlign: 'center',
     },
     scrollContent: { paddingBottom: 16 },
+    ratingSection: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    ratingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    ratingValue: { color: colors.text, fontSize: 13, fontWeight: '600' },
+    ratingTrackTouch: {
+      height: 34,
+      marginHorizontal: 8,
+      justifyContent: 'center',
+    },
+    ratingTrack: {
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+    },
+    ratingTrackActive: {
+      position: 'absolute',
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: accent,
+    },
+    ratingThumb: {
+      position: 'absolute',
+      width: 16,
+      height: 16,
+      borderWidth: 2,
+      borderColor: accent,
+      borderRadius: 8,
+      backgroundColor: '#FFFFFF',
+    },
+    ratingTicks: {
+      marginTop: -2,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    ratingTick: { color: colors.textSecondary, fontSize: 10 },
     section: {
       padding: 16,
       gap: 12,

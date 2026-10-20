@@ -144,6 +144,7 @@ function DishPhoto({
   photoPath?: string;
   photoUrl?: string;
 }) {
+  const { colors } = useAppTheme();
   const directUrl = photoUrl?.trim();
   const canLoadDirectly = Boolean(
     directUrl && /^(?:https?:|file:|data:|blob:)/i.test(directUrl),
@@ -227,10 +228,18 @@ function DishPhoto({
       }}
       resizeMode="cover"
       source={{ uri }}
-      style={stylesStatic.dishPhoto}
+      style={[
+        stylesStatic.dishPhoto,
+        { backgroundColor: colors.surfaceRaised },
+      ]}
     />
   ) : (
-    <View style={stylesStatic.dishPhotoPlaceholder} />
+    <View
+      style={[
+        stylesStatic.dishPhotoPlaceholder,
+        { backgroundColor: colors.surfaceRaised },
+      ]}
+    />
   );
 }
 
@@ -485,6 +494,8 @@ function FeedCard({
             style={[
               overlayStyles.dishReviewSheet,
               {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
                 paddingBottom: Math.max(30, insets.bottom),
                 transform: [{ translateY: dishReviewSheet.translateY }],
               },
@@ -494,17 +505,33 @@ function FeedCard({
               style={overlayStyles.dragArea}
               {...dishReviewSheet.panHandlers}
             >
-              <View style={overlayStyles.sheetHandle} />
+              <View
+                style={[
+                  overlayStyles.sheetHandle,
+                  { backgroundColor: colors.border },
+                ]}
+              />
             </View>
             <View style={overlayStyles.dishReviewHeader}>
-              <Text style={overlayStyles.dishReviewTitle}>Dish Review</Text>
+              <Text
+                style={[overlayStyles.dishReviewTitle, { color: colors.text }]}
+              >
+                Dish Review
+              </Text>
               <Pressable
                 accessibilityLabel="Close dish review"
                 hitSlop={10}
                 onPress={dishReviewSheet.close}
                 style={overlayStyles.dishReviewClose}
               >
-                <Text style={overlayStyles.dishReviewCloseText}>×</Text>
+                <Text
+                  style={[
+                    overlayStyles.dishReviewCloseText,
+                    { color: colors.text },
+                  ]}
+                >
+                  ×
+                </Text>
               </Pressable>
             </View>
             {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
@@ -579,7 +606,12 @@ function FeedCard({
                       {dishReviews[selectedDishIndex].rating.toFixed(1)}
                     </Text>
                   </View>
-                  <Text style={overlayStyles.dishReviewName}>
+                  <Text
+                    style={[
+                      overlayStyles.dishReviewName,
+                      { color: colors.text },
+                    ]}
+                  >
                     {dishReviews[selectedDishIndex].title}
                   </Text>
                 </View>
@@ -792,6 +824,9 @@ export function HomeFeedScreen({
     new Set(),
   );
   const [recommendationMenu, setRecommendationMenu] = useState(false);
+  const [dismissedRecommendationIds, setDismissedRecommendationIds] = useState<
+    Set<string>
+  >(new Set());
   const [reportReviewId, setReportReviewId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<ReportReason>(
     reportReasons[0] as ReportReason,
@@ -1054,7 +1089,10 @@ export function HomeFeedScreen({
             <View style={styles.feedLead}>
               {visibleItems.slice(0, 2).map(renderFeedCard)}
               {typeof recommendationQuery.data?.forYou[0]?.matchPercent ===
-              'number'
+                'number' &&
+              !dismissedRecommendationIds.has(
+                recommendationQuery.data?.forYou[0]?.id ?? '',
+              )
                 ? (() => {
                     const rec = recommendationQuery.data!.forYou[0]!;
                     const priceDots = rec.priceLevel
@@ -1238,6 +1276,21 @@ export function HomeFeedScreen({
       {recommendationMenu ? (
         <ActionSheet
           actions={[
+            {
+              label: 'Not interested',
+              destructive: true,
+              onPress: () => {
+                const recommendationId =
+                  recommendationQuery.data?.forYou[0]?.id;
+                if (recommendationId) {
+                  setDismissedRecommendationIds((current) =>
+                    new Set(current).add(recommendationId),
+                  );
+                }
+                setRecommendationMenu(false);
+                showToast('Recommendation hidden');
+              },
+            },
             {
               label: 'Why am I seeing this?',
               onPress: () => {

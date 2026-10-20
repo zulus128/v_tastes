@@ -567,7 +567,7 @@ export function CreateReviewScreen({
           />
           <TextInput
             blurOnSubmit
-            maxLength={2_000}
+            maxLength={500}
             multiline
             onBlur={() => setFeedbackFocused(false)}
             onChangeText={setText}
@@ -593,6 +593,7 @@ export function CreateReviewScreen({
             textAlignVertical="top"
             value={text}
           />
+          <Text style={styles.reviewCounter}>{text.length}/500</Text>
           {submitError ? (
             <View accessibilityRole="alert" style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>
@@ -616,10 +617,16 @@ export function CreateReviewScreen({
                   onPress={() => setDishEditor(dish)}
                   style={styles.dishCard}
                 >
-                  <Image
-                    source={{ uri: dish.photoUri }}
-                    style={styles.dishImage}
-                  />
+                  {dish.photoUri ? (
+                    <Image
+                      source={{ uri: dish.photoUri }}
+                      style={styles.dishImage}
+                    />
+                  ) : (
+                    <View style={[styles.dishImage, styles.emptyDishPhoto]}>
+                      <Text style={styles.addPhotoText}>+ Add photo</Text>
+                    </View>
+                  )}
                   <Pressable
                     accessibilityLabel={`Remove ${dish.title}`}
                     onPress={() => setDishToRemove(dish)}
@@ -2557,6 +2564,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       fontSize: 16,
       lineHeight: 22,
     },
+    reviewCounter: {
+      marginTop: 4,
+      marginHorizontal: 20,
+      color: colors.textMuted,
+      fontSize: 12,
+      textAlign: 'right',
+    },
     errorBanner: {
       minHeight: 52,
       marginTop: 10,
@@ -2578,6 +2592,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       backgroundColor: colors.surface,
     },
     dishImage: { width: 150, height: 150, borderRadius: 14 },
+    emptyDishPhoto: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceRaised,
+    },
+    addPhotoText: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
     deleteDish: {
       position: 'absolute',
       right: 17,

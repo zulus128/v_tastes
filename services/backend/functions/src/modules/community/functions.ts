@@ -58,11 +58,34 @@ export const listNotifications = onCall(
     }
     const snapshot = await notificationsQuery.limit(input.limit + 1).get();
     const pageDocs = snapshot.docs.slice(0, input.limit);
+    const actorIds = [
+      ...new Set(
+        pageDocs.flatMap((doc) => {
+          const actorId = doc.get('actorId');
+          return typeof actorId === 'string' && actorId ? [actorId] : [];
+        }),
+      ),
+    ];
+    const actors =
+      actorIds.length > 0
+        ? await db.getAll(
+            ...actorIds.map((actorId) => db.collection('users').doc(actorId)),
+          )
+        : [];
+    const actorPhotoById = new Map(
+      actors.map((actor) => [
+        actor.id,
+        actor.exists && actor.get('photoUrl')
+          ? String(actor.get('photoUrl'))
+          : null,
+      ]),
+    );
     const items = pageDocs.map((doc) => {
       const type = doc.get('type');
       const definition = isNotificationType(type)
         ? notificationCatalog[type]
         : null;
+      const actorId = doc.get('actorId') ?? null;
       return {
         id: doc.id,
         type: definition?.type ?? null,
@@ -71,8 +94,10 @@ export const listNotifications = onCall(
         category: definition?.category ?? null,
         title: doc.get('title'),
         body: doc.get('body'),
-        actorId: doc.get('actorId') ?? null,
+        actorId,
         actorName: doc.get('actorName') ?? null,
+        actorPhotoUrl:
+          (actorId ? actorPhotoById.get(String(actorId)) : null) ?? null,
         targetType: doc.get('targetType') ?? definition?.targetType ?? null,
         targetId: doc.get('targetId') ?? null,
         unread: doc.get('unread') !== false,

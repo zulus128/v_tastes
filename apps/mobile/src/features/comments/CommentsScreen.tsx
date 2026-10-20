@@ -30,6 +30,7 @@ import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
 import CaretDownIcon from '../../../assets/comments/caret-down.svg';
 import ChatIcon from '../../../assets/comments/chat-round-outline.svg';
+import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import SendIcon from '../../../assets/ai/send.svg';
@@ -326,21 +327,21 @@ function MainReview({
             onPress={onReact}
             style={styles.reviewActionIconRow}
           >
-            <HeartIcon
-              color={review.reacted ? colors.primary : colors.text}
-              height={responsiveSize(20)}
-              width={responsiveSize(20)}
-            />
+            {review.reacted ? (
+              <HeartBoldIcon
+                color={colors.primary}
+                height={responsiveSize(20)}
+                width={responsiveSize(20)}
+              />
+            ) : (
+              <HeartIcon
+                color={colors.text}
+                height={responsiveSize(20)}
+                width={responsiveSize(20)}
+              />
+            )}
             <Text style={styles.reviewActionCount}>{review.reactionCount}</Text>
           </Pressable>
-          <View style={styles.reviewActionIconRow}>
-            <ChatIcon
-              color={colors.text}
-              height={responsiveSize(20)}
-              width={responsiveSize(20)}
-            />
-            <Text style={styles.reviewActionCount}>{review.commentCount}</Text>
-          </View>
           <Pressable
             accessibilityLabel="Share review"
             onPress={() =>
@@ -511,11 +512,19 @@ function CommentRow({
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>
           <Pressable onPress={onReact} style={styles.reactionAction}>
-            <HeartIcon
-              color={item.reacted ? colors.primary : colors.text}
-              height={responsiveSize(20)}
-              width={responsiveSize(20)}
-            />
+            {item.reacted ? (
+              <HeartBoldIcon
+                color={colors.primary}
+                height={responsiveSize(20)}
+                width={responsiveSize(20)}
+              />
+            ) : (
+              <HeartIcon
+                color={colors.text}
+                height={responsiveSize(20)}
+                width={responsiveSize(20)}
+              />
+            )}
             {item.reactionCount ? (
               <Text style={styles.reactionCount}>{item.reactionCount}</Text>
             ) : null}
@@ -592,10 +601,6 @@ export function PaginatedCommentsScreen({
     paddingTop: headerTop,
   };
   const composerBottom = Math.max(insets.bottom, responsiveSize(16));
-  const composerSafeStyle = {
-    height: responsiveSize(56) + composerBottom,
-    paddingBottom: composerBottom,
-  };
   const connectorColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
   const connectorX = responsiveSize(36);
   const connectorArmX = responsiveSize(63);
@@ -836,7 +841,6 @@ export function PaginatedCommentsScreen({
                     reacting={reviewReacting}
                     review={review}
                   />
-                  <Text style={styles.commentsHeading}>Comments</Text>
                 </View>
               ) : null
             }
@@ -1031,7 +1035,15 @@ export function PaginatedCommentsScreen({
             }}
           />
         )}
-        <View style={[styles.composer, composerSafeStyle]}>
+        <View
+          style={[
+            styles.composer,
+            {
+              height: responsiveSize(replyTarget ? 88 : 56) + composerBottom,
+              paddingBottom: composerBottom,
+            },
+          ]}
+        >
           {replyTarget ? (
             <View style={styles.replyBanner}>
               <Text numberOfLines={1} style={styles.replyBannerText}>
@@ -1196,9 +1208,21 @@ const createStyles = (colors: ThemeColors) =>
     },
     title: { color: colors.text, fontSize: 17, fontWeight: '700' },
     list: { flex: 1 },
-    content: { paddingBottom: 16, backgroundColor: colors.canvas },
+    content: {
+      paddingTop: 8,
+      paddingBottom: 16,
+      backgroundColor: colors.canvas,
+    },
     empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
-    mainReview: { marginBottom: 16, backgroundColor: colors.background },
+    mainReview: {
+      marginHorizontal: 8,
+      marginBottom: 8,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+    },
     reviewAuthorRow: {
       minHeight: 72,
       paddingHorizontal: 16,
@@ -1244,10 +1268,12 @@ const createStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
       paddingHorizontal: 11,
       paddingVertical: 5,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       borderRadius: 20,
       color: colors.text,
       fontSize: 12,
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: colors.canvas,
     },
     dishes: { gap: 9, paddingHorizontal: 16 },
     dishCard: {
@@ -1410,12 +1436,15 @@ const createStyles = (colors: ThemeColors) =>
       left: 0,
     },
     row: {
+      marginHorizontal: 8,
+      marginBottom: 8,
       paddingHorizontal: 16,
       paddingVertical: 12,
       flexDirection: 'row',
       gap: 7,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      borderRadius: 16,
       backgroundColor: colors.canvas,
     },
     nestedRow: { paddingLeft: 63 },
@@ -1441,6 +1470,7 @@ const createStyles = (colors: ThemeColors) =>
     text: { color: colors.text, opacity: 0.82, lineHeight: 19 },
     actions: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
       gap: 12,
       marginTop: 3,
@@ -1462,28 +1492,23 @@ const createStyles = (colors: ThemeColors) =>
     },
     caretFlipped: { transform: [{ rotate: '180deg' }] },
     composer: {
-      height: 89,
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 33,
+      paddingTop: 8,
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
       gap: 12,
       backgroundColor: colors.surface,
     },
     replyBanner: {
-      position: 'absolute',
-      left: 16,
-      right: 16,
-      top: -30,
-      height: 30,
+      flexBasis: '100%',
+      height: 28,
       paddingHorizontal: 12,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: colors.surfaceRaised,
-      borderTopLeftRadius: 10,
-      borderTopRightRadius: 10,
+      borderRadius: 10,
     },
     replyBannerText: { flex: 1, color: colors.textMuted, fontSize: 12 },
     replyClose: { color: colors.text, fontSize: 20 },

@@ -34,6 +34,12 @@ jest.mock('../src/ui/ThemeProvider', () => ({
     colors: mockResolvedTheme === 'light' ? mockLightColors : mockDarkColors,
   }),
 }));
+jest.mock('../src/session/SessionProvider', () => ({
+  useAuthenticatedUserId: () => 'test-user',
+}));
+jest.mock('../src/features/discover/api', () => ({
+  useDiscoverVenues: () => ({ data: { pages: [{ items: [] }] } }),
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
@@ -83,6 +89,6 @@ it('does not render or reapply the retired Vegetarian filter', async () => {
   expect(screen.queryByText('Dietary preferences')).toBeNull();
   expect(screen.queryByText('Vegetarian 🥦')).toBeNull();
 
-  fireEvent.press(screen.getByText('Apply'));
+  fireEvent.press(screen.getByText(/Show/));
   expect(onApply).toHaveBeenCalledWith([]);
 });

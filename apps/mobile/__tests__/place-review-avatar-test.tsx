@@ -55,7 +55,6 @@ const review: PlaceReview = {
 it('shows the default profile avatar when a venue review author has no photo', async () => {
   await render(
     <ReviewCard
-      fallbackDishes={[]}
       fallbackPhotoUrls={[]}
       item={review}
       onComments={jest.fn()}

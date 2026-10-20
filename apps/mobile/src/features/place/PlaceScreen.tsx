@@ -425,7 +425,6 @@ export function PlaceScreen({
           windowSize={7}
           renderItem={({ item: review, index: reviewIndex }) => (
             <ReviewCard
-              fallbackDishes={place.popularDishes}
               fallbackPhotoUrls={photos}
               item={review}
               onComments={onOpenComments}
@@ -674,27 +673,22 @@ function Overview({
         ))}
         <Text style={styles.seePhotos}>See all photos ›</Text>
       </Pressable>
-      <View style={styles.sectionTitleRow}>
-        <TopRatedDishesIcon
-          color={styles.sectionTitleIcon.color}
-          height={responsiveSize(22)}
-          width={responsiveSize(24)}
-        />
-        <Text style={styles.sectionTitle}>Top rated dishes</Text>
-      </View>
-      {details.popularDishes.map((dish, index) => (
-        <Pressable
-          accessibilityLabel={`Show reviews for ${dish.name}`}
-          key={dish.name}
-          onPress={() => openDishReviews(dish.name)}
-          style={styles.dish}
-        >
-          <Text style={styles.dishName}>
-            {index + 1}. {dish.name}
-          </Text>
-          <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
-        </Pressable>
-      ))}
+      {details.popularDishes.length > 0 ? (
+        <View style={styles.topDishesCard}>
+          <Text style={styles.sectionTitle}>Top rated dishes</Text>
+          {details.popularDishes.map((dish) => (
+            <Pressable
+              accessibilityLabel={`Show reviews for ${dish.name}`}
+              key={dish.name}
+              onPress={() => openDishReviews(dish.name)}
+              style={styles.dish}
+            >
+              <Text style={styles.dishName}>{dish.name}</Text>
+              <Text style={styles.dishRating}>★ {dish.rating.toFixed(1)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -968,7 +962,6 @@ function ReviewPhoto({
 }
 
 export function ReviewCard({
-  fallbackDishes,
   fallbackPhotoUrls,
   item: review,
   onComments,
@@ -980,7 +973,6 @@ export function ReviewCard({
   styles,
   venueName,
 }: {
-  fallbackDishes: Array<{ name: string; rating: number }>;
   fallbackPhotoUrls: string[];
   item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number];
   onComments: (reviewId: string) => void;
@@ -999,31 +991,6 @@ export function ReviewCard({
     ...dish,
     fallbackUri: fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex),
   }));
-  if (reviewIndex < 3 && fallbackPhotoUrls.length > 0) {
-    const suggestedDishes =
-      fallbackDishes.length > 0
-        ? fallbackDishes
-        : [
-            { name: 'Chef recommendation', rating: review.rating },
-            { name: 'House favourite', rating: review.rating },
-            { name: 'Signature dish', rating: review.rating },
-            { name: 'Seasonal special', rating: review.rating },
-          ];
-    for (let dishIndex = displayDishes.length; dishIndex < 4; dishIndex += 1) {
-      const suggestion = suggestedDishes[dishIndex % suggestedDishes.length]!;
-      displayDishes.push({
-        id: `preview-${review.id}-${dishIndex}`,
-        title: suggestion.name,
-        rating: suggestion.rating,
-        photoPath: '',
-        fallbackUri: fallbackReviewPhoto(
-          fallbackPhotoUrls,
-          reviewIndex,
-          dishIndex,
-        ),
-      });
-    }
-  }
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <View style={styles.reviewer}>
@@ -1658,14 +1625,21 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 10,
       fontSize: 10,
     },
-    sectionTitleRow: {
+    topDishesCard: {
       marginTop: 18,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
     },
-    sectionTitleIcon: { color: colors.text },
-    sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+    sectionTitle: {
+      marginBottom: 4,
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+    },
     dish: {
       minHeight: 60,
       flexDirection: 'row',

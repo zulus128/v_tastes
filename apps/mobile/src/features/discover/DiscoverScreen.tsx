@@ -34,7 +34,8 @@ import MapView, {
 } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
-import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
+import BookmarkIcon from '../../../assets/discover/bookmark-filled.svg';
+import BookmarkOutlineIcon from '../../../assets/discover/bookmark-outline.svg';
 import MapFavouriteIcon from '../../../assets/discover/map-favourite.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
 import VoiceIcon from '../../../assets/profile/followers-voice.svg';
@@ -722,11 +723,13 @@ function TrendingFeed({
             {feed.trending.map((venue) => (
               <TrendingTile
                 key={venue.id}
+                onSave={() => onSave({ venueId: venue.id, name: venue.name })}
                 onOpen={() => onOpenPlace(venue.id)}
                 image={venueImage(venue.imageUrl)}
                 meta={`${venue.category ?? ''} · ${'$'.repeat(venue.priceLevel ?? 1)}`}
                 name={venue.name}
                 rating={(venue.rating ?? 0).toFixed(1)}
+                saved={savedVenueIds.has(venue.id)}
                 width={trendingCardWidth}
               />
             ))}
@@ -1020,6 +1023,13 @@ function PlacesMap({
       .join(' ')
       .toLowerCase();
     if (query && !searchable.includes(query)) return false;
+    if (
+      activeFilter?.category &&
+      venue.category?.toLowerCase() !== activeFilter.category.toLowerCase()
+    )
+      return false;
+    if (activeFilter?.tag && !venue.discoverTags?.includes(activeFilter.tag))
+      return false;
     return matchesPlaceFilters(venue, appliedFilters);
   });
 
@@ -1057,6 +1067,9 @@ function PlacesMap({
   const sortLabel =
     placeSortOptions.find((option) => option.value === sort)?.label ??
     'Best match';
+  const visibleVenues = mapLayers.saved
+    ? orderedVenues.filter((venue) => savedVenueIds.has(venue.id))
+    : orderedVenues;
   const mappableVenues = orderedVenues.filter(
     (venue) =>
       venue.latitude != null &&
@@ -1312,6 +1325,18 @@ function PlacesMap({
     mapRef.current?.animateToRegion(next, 450);
   }
 
+  async function zoomMap(delta: number) {
+    const camera = await mapRef.current?.getCamera();
+    if (!camera) return;
+    mapRef.current?.animateCamera(
+      {
+        ...camera,
+        zoom: Math.max(2, Math.min(20, (camera.zoom ?? 12) + delta)),
+      },
+      { duration: 220 },
+    );
+  }
+
   function focusFirstSearchResult() {
     const venue = filtered.find(
       (item) => item.latitude != null && item.longitude != null,
@@ -1354,7 +1379,7 @@ function PlacesMap({
       >
         {mappableVenues.map((venue) => {
           const saved = savedVenueIds.has(venue.id);
-          if (layerMode && !(mapLayers.saved && saved)) return null;
+          if (mapLayers.friends && !mapLayers.saved) return null;
           return (
             <Marker
               anchor={{ x: 0.5, y: 1 }}
@@ -1366,6 +1391,7 @@ function PlacesMap({
               onPress={() => onOpenPlace(venue.id)}
             >
               <MapVenueMarker
+                highlighted={!mapLayers.saved || saved}
                 layered={layerMode}
                 styles={styles}
                 venue={venue}
@@ -1451,6 +1477,29 @@ function PlacesMap({
             height={responsiveSize(20)}
             width={responsiveSize(20)}
           />
+        </Pressable>
+      </View>
+      <View
+        style={[
+          styles.mapZoomControls,
+          { top: headerHeight + responsiveSize(150) },
+          splitLayout && styles.mapZoomControlsLandscape,
+        ]}
+      >
+        <Pressable
+          accessibilityLabel="Zoom in"
+          onPress={() => void zoomMap(1)}
+          style={styles.mapZoomButton}
+        >
+          <Text style={styles.mapZoomGlyph}>+</Text>
+        </Pressable>
+        <View style={styles.mapZoomDivider} />
+        <Pressable
+          accessibilityLabel="Zoom out"
+          onPress={() => void zoomMap(-1)}
+          style={styles.mapZoomButton}
+        >
+          <Text style={styles.mapZoomGlyph}>−</Text>
         </Pressable>
       </View>
       {layersOpen ? (
@@ -1614,7 +1663,7 @@ function PlacesMap({
                 style={[styles.filterChip, active && styles.filterChipActive]}
               >
                 <Icon
-                  color={active ? colors.primary : colors.textSecondary}
+                  color={active ? colors.background : colors.textSecondary}
                   height={responsiveSize(14)}
                   width={responsiveSize(14)}
                 />
@@ -1629,7 +1678,9 @@ function PlacesMap({
         </ScrollView>
         {sheetDetent !== 'peek' || sidePanelLayout ? (
           <View style={styles.mapResultsMeta}>
-            <Text style={styles.mapResultsCount}>{filtered.length} places</Text>
+            <Text style={styles.mapResultsCount}>
+              {visibleVenues.length} places
+            </Text>
             <Pressable
               accessibilityLabel="Sort places"
               accessibilityState={{ expanded: sortOpen }}
@@ -1660,16 +1711,22 @@ function PlacesMap({
               <Text style={styles.inlineRetryText}>Try again</Text>
             </Pressable>
           </View>
-        ) : filtered.length === 0 ? (
+        ) : visibleVenues.length === 0 ? (
           <View style={styles.placesStatus}>
+            <SearchIcon
+              color={colors.text}
+              height={responsiveSize(48)}
+              width={responsiveSize(48)}
+            />
+            <Text style={styles.placesEmptyTitle}>No places found</Text>
             <Text style={styles.placesStatusText}>
-              No places match your search.
+              Try a different search or adjust your filters.
             </Text>
           </View>
         ) : (
           <FlatList
             contentContainerStyle={styles.placesListContent}
-            data={orderedVenues}
+            data={visibleVenues}
             initialNumToRender={6}
             keyExtractor={(venue) => venue.id}
             ListFooterComponent={
@@ -1778,10 +1835,12 @@ function PlacesMap({
 }
 
 function MapVenueMarker({
+  highlighted,
   layered,
   styles,
   venue,
 }: {
+  highlighted: boolean;
   layered: boolean;
   styles: ReturnType<typeof createStyles>;
   venue: Venue;
@@ -1796,10 +1855,28 @@ function MapVenueMarker({
           : mapTrendingIcon;
     return (
       <View style={styles.mapLayerMarker}>
-        <View style={styles.mapLayerMarkerIcon}>
-          <Image source={icon} style={styles.mapLayerMarkerImage} />
+        <View
+          style={[
+            styles.mapLayerMarkerIcon,
+            highlighted
+              ? styles.mapLayerMarkerIconHighlighted
+              : styles.mapLayerMarkerIconDimmed,
+          ]}
+        >
+          <Image
+            source={icon}
+            style={[
+              styles.mapLayerMarkerImage,
+              { tintColor: highlighted ? '#FFFFFF' : '#161616' },
+            ]}
+          />
         </View>
-        <View style={styles.mapLayerMarkerDot} />
+        <View
+          style={[
+            styles.mapLayerMarkerDot,
+            { backgroundColor: highlighted ? '#B82F29' : '#FFFFFF' },
+          ]}
+        />
         <View style={styles.mapLayerMarkerCopy}>
           <Text numberOfLines={1} style={styles.mapLayerMarkerName}>
             {venue.name}
@@ -1948,7 +2025,7 @@ function PeopleFeed({
             >
               <Image
                 source={searchCloseIcon}
-                style={styles.peopleSearchClear}
+                style={[styles.peopleSearchClear, { tintColor: colors.text }]}
               />
             </Pressable>
           ) : null}
@@ -2318,14 +2395,18 @@ function TrendingTile({
   meta,
   name,
   onOpen,
+  onSave,
   rating,
+  saved,
   width,
 }: {
   image: ImageSourcePropType;
   meta: string;
   name: string;
   onOpen: () => void;
+  onSave: () => void;
   rating: string;
+  saved: boolean;
   width: number;
 }) {
   const { colors } = useAppTheme();
@@ -2340,6 +2421,29 @@ function TrendingTile({
       <View style={styles.tileRating}>
         <RatingPill value={rating} />
       </View>
+      <Pressable
+        accessibilityLabel={saved ? 'Remove from saved' : 'Save place'}
+        hitSlop={8}
+        onPress={(event) => {
+          event.stopPropagation();
+          onSave();
+        }}
+        style={styles.tileSave}
+      >
+        {saved ? (
+          <BookmarkIcon
+            color={colors.primary}
+            height={responsiveSize(22)}
+            width={responsiveSize(22)}
+          />
+        ) : (
+          <BookmarkOutlineIcon
+            color="#FFFFFF"
+            height={responsiveSize(22)}
+            width={responsiveSize(22)}
+          />
+        )}
+      </Pressable>
       <View style={styles.tileCopy}>
         <Text numberOfLines={1} style={styles.tileTitle}>
           {name}
@@ -2398,11 +2502,19 @@ function PlaceRow({
         onPress={onSave}
         style={styles.placeSave}
       >
-        <BookmarkIcon
-          color={saved ? colors.primary : colors.text}
-          height={responsiveSize(20)}
-          width={responsiveSize(20)}
-        />
+        {saved ? (
+          <BookmarkIcon
+            color={colors.primary}
+            height={responsiveSize(20)}
+            width={responsiveSize(20)}
+          />
+        ) : (
+          <BookmarkOutlineIcon
+            color={colors.text}
+            height={responsiveSize(20)}
+            width={responsiveSize(20)}
+          />
+        )}
       </Pressable>
     </View>
   );
@@ -3211,7 +3323,18 @@ const createStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
       backgroundColor: colors.surface,
     },
-    tileRating: { position: 'absolute', top: 8, right: 8 },
+    tileRating: { position: 'absolute', top: 8, left: 8 },
+    tileSave: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.44)',
+    },
     tileCopy: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 3 },
     tileTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     tileMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 12 },
@@ -3473,10 +3596,11 @@ const createStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: '#FFFFFF',
       borderRadius: 18,
-      backgroundColor: '#161616',
       alignItems: 'center',
       justifyContent: 'center',
     },
+    mapLayerMarkerIconHighlighted: { backgroundColor: '#B82F29' },
+    mapLayerMarkerIconDimmed: { backgroundColor: '#FFFFFF' },
     mapLayerMarkerImage: { width: 20, height: 20, resizeMode: 'contain' },
     mapFriendMarker: {
       width: 142,
@@ -3508,6 +3632,25 @@ const createStyles = (colors: ThemeColors) =>
     mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
     mapControls: { position: 'absolute', zIndex: 5, right: 16, gap: 10 },
     mapControlsLandscape: { flexDirection: 'row', gap: 6 },
+    mapZoomControls: {
+      position: 'absolute',
+      zIndex: 5,
+      right: 16,
+      width: 44,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.background,
+    },
+    mapZoomControlsLandscape: { right: '50%' },
+    mapZoomButton: {
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mapZoomDivider: { height: 1, backgroundColor: colors.border },
+    mapZoomGlyph: { color: colors.text, fontSize: 25, lineHeight: 28 },
     mapControlButton: {
       width: 48,
       height: 48,
@@ -3686,10 +3829,10 @@ const createStyles = (colors: ThemeColors) =>
     },
     filterChipActive: {
       borderColor: colors.primary,
-      backgroundColor: 'rgba(184,47,41,0.12)',
+      backgroundColor: colors.text,
     },
     filterText: { color: colors.textSecondary, fontSize: 12 },
-    filterTextActive: { color: colors.primary, fontWeight: '700' },
+    filterTextActive: { color: colors.background, fontWeight: '700' },
     mapResultsMeta: {
       zIndex: 3,
       minHeight: 32,
@@ -3785,8 +3928,20 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: colors.primary,
       backgroundColor: colors.primary,
     },
-    placesStatus: { paddingVertical: 20, alignItems: 'center', gap: 10 },
-    placesStatusText: { color: colors.textSecondary, fontSize: 13 },
+    placesStatus: {
+      flex: 1,
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    placesEmptyTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+    placesStatusText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+    },
     inlineRetry: {
       paddingHorizontal: 14,
       paddingVertical: 8,

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import backIcon from '../../../assets/onboarding/back.png';
 import notificationIcon from '../../../assets/onboarding/permission-notifications.png';
 import patternDark from '../../../assets/onboarding/pattern-screen.png';
+import patternLight from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import {
   useAuthenticatedUserId,
   useTastesApi,
@@ -127,6 +128,7 @@ export function NotificationsScreen({
   const [loadingMore, setLoadingMore] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'activity' | 'badges'>('activity');
   const [nextCursor, setNextCursor] = useState<string | null>(
     () => cachedNotifications?.pages.at(-1)?.nextCursor ?? null,
   );
@@ -148,6 +150,17 @@ export function NotificationsScreen({
       (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
     );
   }, [items, requests]);
+  const visibleFeed = useMemo(
+    () =>
+      feed.filter((entry) =>
+        tab === 'badges'
+          ? entry.type === 'notification' &&
+            (entry.item.kind === 'reward' || entry.item.group === 'recap')
+          : entry.type === 'request' ||
+            (entry.item.kind !== 'reward' && entry.item.group !== 'recap'),
+      ),
+    [feed, tab],
+  );
 
   useEffect(() => {
     let active = true;
@@ -326,29 +339,36 @@ export function NotificationsScreen({
           pressed && styles.pressed,
         ]}
       >
-        <View
-          style={[
-            styles.avatar,
-            promotional && styles.promotionAvatar,
-            item.unread && !promotional && styles.avatarUnread,
-          ]}
-        >
-          <Text
-            style={[styles.avatarGlyph, promotional && styles.promotionGlyph]}
+        {item.actorPhotoUrl ? (
+          <Image source={{ uri: item.actorPhotoUrl }} style={styles.avatar} />
+        ) : (
+          <View
+            style={[
+              styles.avatar,
+              promotional && styles.promotionAvatar,
+              item.unread && !promotional && styles.avatarUnread,
+            ]}
           >
-            {emblem}
-          </Text>
-        </View>
+            <Text
+              style={[styles.avatarGlyph, promotional && styles.promotionGlyph]}
+            >
+              {emblem}
+            </Text>
+          </View>
+        )}
         <View style={styles.copy}>
           <Text
             numberOfLines={1}
             style={[styles.rowTitle, item.unread && styles.rowTitleUnread]}
           >
-            {item.title}
+            {item.actorName ?? item.title}
           </Text>
-          <Text numberOfLines={promotional ? 2 : 1} style={styles.body}>
-            {item.body}
-          </Text>
+          <View style={styles.actionLine}>
+            <Text style={styles.actionGlyph}>{glyphFor(item)}</Text>
+            <Text numberOfLines={promotional ? 2 : 1} style={styles.body}>
+              {item.body || item.title}
+            </Text>
+          </View>
         </View>
         {!promotional ? (
           <Text style={styles.time}>{dateLabel(item.createdAt)}</Text>
@@ -382,15 +402,35 @@ export function NotificationsScreen({
             </Text>
           </Pressable>
         </View>
+        <View style={styles.tabs}>
+          {(['activity', 'badges'] as const).map((value) => (
+            <Pressable
+              key={value}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === value }}
+              onPress={() => setTab(value)}
+              style={[styles.tab, tab === value && styles.tabSelected]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === value && styles.tabTextSelected,
+                ]}
+              >
+                {value === 'activity' ? 'Activity' : 'Badges'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={styles.loading} />
-      ) : feed.length === 0 ? (
+      ) : visibleFeed.length === 0 ? (
         <ImageBackground
           imageStyle={styles.emptyPatternImage}
           resizeMode="cover"
-          source={patternDark}
+          source={isDark ? patternDark : patternLight}
           style={styles.emptyBackground}
         >
           <View style={styles.empty}>
@@ -404,7 +444,7 @@ export function NotificationsScreen({
       ) : (
         <FlatList
           contentContainerStyle={styles.content}
-          data={feed}
+          data={visibleFeed}
           initialNumToRender={12}
           keyExtractor={(entry) => entry.id}
           ListFooterComponent={
@@ -443,6 +483,22 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       borderBottomRightRadius: 24,
       backgroundColor: colors.background,
     },
+    tabs: {
+      height: 44,
+      padding: 4,
+      flexDirection: 'row',
+      borderRadius: 22,
+      backgroundColor: colors.surfaceRaised,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 18,
+    },
+    tabSelected: { backgroundColor: colors.text },
+    tabText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+    tabTextSelected: { color: colors.background },
     titleRow: {
       height: 54,
       flexDirection: 'row',
@@ -534,12 +590,19 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     rowTitleUnread: { fontWeight: '700' },
     body: {
-      marginTop: 2,
+      flex: 1,
       color: colors.textSecondary,
       fontSize: 14,
       lineHeight: 18,
       letterSpacing: -0.41,
     },
+    actionLine: {
+      marginTop: 3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    actionGlyph: { color: colors.primary, fontSize: 12, fontWeight: '700' },
     time: {
       marginLeft: 16,
       color: colors.textSecondary,
