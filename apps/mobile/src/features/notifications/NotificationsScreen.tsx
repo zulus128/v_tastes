@@ -86,14 +86,10 @@ function initials(value: string) {
 function dateLabel(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  }
-  return date.toLocaleDateString([], {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+    year: 'numeric',
   });
 }
 
@@ -605,9 +601,11 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     actionGlyph: { color: colors.primary, fontSize: 12, fontWeight: '700' },
     time: {
       marginLeft: 16,
+      flexShrink: 0,
       color: colors.textSecondary,
       opacity: 0.4,
       fontSize: 14,
+      lineHeight: 18,
       letterSpacing: -0.24,
     },
     requestActions: { marginLeft: 8, flexDirection: 'row', gap: 8 },
