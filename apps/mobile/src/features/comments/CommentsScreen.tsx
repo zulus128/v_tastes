@@ -875,7 +875,7 @@ export function PaginatedCommentsScreen({
                 tintColor={colors.primary}
               />
             }
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const previewReplies = repliesByParent.get(item.id) ?? [];
               const additionalReplies = extraReplies[item.id]?.items ?? [];
               const replies = [
@@ -899,7 +899,12 @@ export function PaginatedCommentsScreen({
                   return next;
                 });
               return (
-                <View style={styles.thread}>
+                <View
+                  style={[
+                    styles.thread,
+                    index === 0 && styles.commentsPanelStart,
+                  ]}
+                >
                   <CommentRow
                     highlighted={commentId === item.id}
                     item={item}
@@ -1425,7 +1430,19 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: 18,
       fontWeight: '700',
     },
-    thread: { position: 'relative' },
+    thread: {
+      position: 'relative',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    commentsPanelStart: {
+      overflow: 'hidden',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+    },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.
     threadConnector: {
@@ -1436,16 +1453,11 @@ const createStyles = (colors: ThemeColors) =>
       left: 0,
     },
     row: {
-      marginHorizontal: 8,
-      marginBottom: 8,
       paddingHorizontal: 16,
       paddingVertical: 12,
       flexDirection: 'row',
       gap: 7,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-      borderRadius: 16,
-      backgroundColor: colors.canvas,
+      backgroundColor: colors.background,
     },
     nestedRow: { paddingLeft: 63 },
     highlightedRow: {
