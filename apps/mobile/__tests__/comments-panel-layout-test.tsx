@@ -241,7 +241,7 @@ it('keeps the reply target and input in one gapless composer field', async () =>
 
   const banner = screen.getByText('Replying to Wade Warren').parent!;
   const field = banner.parent!;
-  const input = screen.getByPlaceholderText('Reply to Wade Warren');
+  const input = screen.getByPlaceholderText('Add comment');
 
   expect(StyleSheet.flatten(field.props.style)).toMatchObject({
     flex: 1,
@@ -253,6 +253,13 @@ it('keeps the reply target and input in one gapless composer field', async () =>
   expect(StyleSheet.flatten(input.props.style).backgroundColor).toBe(
     'transparent',
   );
+  expect(input.props.accessibilityLabel).toBe('Reply to Wade Warren');
+
+  await user.press(screen.getByLabelText('Cancel reply'));
+  expect(screen.queryByText('Replying to Wade Warren')).toBeNull();
+  expect(
+    screen.getByPlaceholderText('Add comment').props.accessibilityLabel,
+  ).toBe('Add comment');
 });
 
 it('matches the Figma composer dimensions and colors', async () => {

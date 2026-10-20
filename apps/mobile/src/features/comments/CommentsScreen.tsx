@@ -1089,12 +1089,21 @@ export function PaginatedCommentsScreen({
                 <Text numberOfLines={1} style={styles.replyBannerText}>
                   Replying to {replyTarget.authorDisplayName}
                 </Text>
-                <Pressable onPress={() => setReplyTarget(null)}>
+                <Pressable
+                  accessibilityLabel="Cancel reply"
+                  accessibilityRole="button"
+                  onPress={() => setReplyTarget(null)}
+                >
                   <Text style={styles.replyClose}>×</Text>
                 </Pressable>
               </View>
             ) : null}
             <TextInput
+              accessibilityLabel={
+                replyTarget
+                  ? `Reply to ${replyTarget.authorDisplayName}`
+                  : 'Add comment'
+              }
               editable={!mutation.isPending}
               maxLength={1_000}
               onChangeText={(value) => {
@@ -1103,11 +1112,7 @@ export function PaginatedCommentsScreen({
                 setText(value);
               }}
               onSubmitEditing={() => void submit()}
-              placeholder={
-                replyTarget
-                  ? `Reply to ${replyTarget.authorDisplayName}`
-                  : 'Add comment'
-              }
+              placeholder="Add comment"
               placeholderTextColor="rgba(217,221,229,0.4)"
               style={styles.input}
               value={text}
