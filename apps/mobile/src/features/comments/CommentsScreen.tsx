@@ -883,6 +883,7 @@ export function PaginatedCommentsScreen({
             ListFooterComponent={
               <ListFooter loading={query.isFetchingNextPage} />
             }
+            ListFooterComponentStyle={styles.commentsFooter}
             onEndReached={() => {
               if (query.hasNextPage && !query.isFetchingNextPage)
                 void query.fetchNextPage();
@@ -900,6 +901,7 @@ export function PaginatedCommentsScreen({
               );
             }}
             style={styles.list}
+            testID="comments-list"
             windowSize={7}
             refreshControl={
               <RefreshControl
@@ -936,7 +938,6 @@ export function PaginatedCommentsScreen({
                   style={[
                     styles.thread,
                     index === 0 && styles.commentsPanelStart,
-                    index === rootItems.length - 1 && styles.commentsPanelEnd,
                   ]}
                 >
                   <CommentRow
@@ -1084,24 +1085,6 @@ export function PaginatedCommentsScreen({
                           styles.commentsPanelBorderShapeTop,
                         ]}
                         testID="comments-panel-top-border-shape"
-                      />
-                    </View>
-                  ) : null}
-                  {index === rootItems.length - 1 ? (
-                    <View
-                      pointerEvents="none"
-                      style={[
-                        styles.commentsPanelBorderClip,
-                        styles.commentsPanelBottomBorder,
-                      ]}
-                      testID="comments-panel-bottom-border"
-                    >
-                      <View
-                        style={[
-                          styles.commentsPanelBorderShape,
-                          styles.commentsPanelBorderShapeBottom,
-                        ]}
-                        testID="comments-panel-bottom-border-shape"
                       />
                     </View>
                   ) : null}
@@ -1292,11 +1275,16 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '300',
     },
     title: { color: colors.text, fontSize: 17, fontWeight: '700' },
-    list: { flex: 1 },
+    list: { flex: 1, backgroundColor: colors.background },
     content: {
+      flexGrow: 1,
       paddingTop: 0,
-      paddingBottom: 16,
+      paddingBottom: 0,
       backgroundColor: colors.canvas,
+    },
+    commentsFooter: {
+      flexGrow: 1,
+      backgroundColor: colors.background,
     },
     empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
     mainReview: {
@@ -1529,13 +1517,6 @@ const createStyles = (colors: ThemeColors) =>
       borderTopRightRadius: 24,
       backgroundColor: 'transparent',
     },
-    commentsPanelEnd: {
-      overflow: 'hidden',
-      borderBottomWidth: 0,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
-      backgroundColor: 'transparent',
-    },
     commentsPanelBorderClip: {
       position: 'absolute',
       right: 0,
@@ -1545,7 +1526,6 @@ const createStyles = (colors: ThemeColors) =>
       zIndex: 2,
     },
     commentsPanelTopBorder: { top: 0 },
-    commentsPanelBottomBorder: { bottom: 0 },
     commentsPanelBorderShape: {
       position: 'absolute',
       right: 0,
@@ -1556,7 +1536,6 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 24,
     },
     commentsPanelBorderShapeTop: { top: 0 },
-    commentsPanelBorderShapeBottom: { bottom: 0 },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.
     threadConnector: {

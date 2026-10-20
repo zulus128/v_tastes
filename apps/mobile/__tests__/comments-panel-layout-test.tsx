@@ -161,7 +161,7 @@ it('does not show pull-to-refresh during a background reaction refetch', async (
   mockCommentsRefetching = false;
 });
 
-it('rounds the comments panel instead of each comment row', async () => {
+it('rounds only the top of the comments panel', async () => {
   await render(
     <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
   );
@@ -169,7 +169,7 @@ it('rounds the comments panel instead of each comment row', async () => {
   const firstRow = screen.getByText('Wade Warren').parent!.parent!.parent!;
   const secondRow = screen.getByText('Jane Cooper').parent!.parent!.parent!;
   const panelStart = firstRow.parent!;
-  const panelEnd = secondRow.parent!;
+  const lastThread = secondRow.parent!;
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
@@ -177,47 +177,39 @@ it('rounds the comments panel instead of each comment row', async () => {
     borderTopRightRadius: responsiveSize(24),
     backgroundColor: 'transparent',
   });
-  expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
-    overflow: 'hidden',
-    borderBottomWidth: responsiveSize(0),
-    borderBottomLeftRadius: responsiveSize(24),
-    borderBottomRightRadius: responsiveSize(24),
-    backgroundColor: 'transparent',
-  });
-  [panelStart, panelEnd].forEach((panelEdge) => {
+  [panelStart, lastThread].forEach((panelEdge) => {
     const style = StyleSheet.flatten(panelEdge.props.style);
     expect(style.borderLeftWidth).toBeUndefined();
     expect(style.borderRightWidth).toBeUndefined();
   });
   const topBorder = screen.getByTestId('comments-panel-top-border');
   const topBorderShape = screen.getByTestId('comments-panel-top-border-shape');
-  const bottomBorder = screen.getByTestId('comments-panel-bottom-border');
-  const bottomBorderShape = screen.getByTestId(
-    'comments-panel-bottom-border-shape',
-  );
   expect(StyleSheet.flatten(topBorder.props.style)).toMatchObject({
     top: responsiveSize(0),
     height: responsiveSize(24),
     overflow: 'hidden',
   });
-  expect(StyleSheet.flatten(bottomBorder.props.style)).toMatchObject({
-    bottom: responsiveSize(0),
-    height: responsiveSize(24),
-    overflow: 'hidden',
-  });
-  [topBorderShape, bottomBorderShape].forEach((borderShape) => {
-    expect(StyleSheet.flatten(borderShape.props.style)).toMatchObject({
-      height: responsiveSize(48),
-      borderWidth: responsiveSize(1),
-      borderColor: colors.border,
-      borderRadius: responsiveSize(24),
-    });
-  });
   expect(StyleSheet.flatten(topBorderShape.props.style)).toMatchObject({
+    height: responsiveSize(48),
+    borderWidth: responsiveSize(1),
+    borderColor: colors.border,
+    borderRadius: responsiveSize(24),
     top: responsiveSize(0),
   });
-  expect(StyleSheet.flatten(bottomBorderShape.props.style)).toMatchObject({
-    bottom: responsiveSize(0),
+  expect(screen.queryByTestId('comments-panel-bottom-border')).toBeNull();
+  expect(screen.queryByTestId('comments-panel-bottom-border-shape')).toBeNull();
+  const commentsList = screen.getByTestId('comments-list');
+  expect(StyleSheet.flatten(commentsList.props.style)).toMatchObject({
+    backgroundColor: colors.background,
+  });
+  expect(
+    StyleSheet.flatten(commentsList.props.contentContainerStyle),
+  ).toMatchObject({ flexGrow: 1, paddingBottom: 0 });
+  expect(
+    StyleSheet.flatten(commentsList.props.ListFooterComponentStyle),
+  ).toMatchObject({
+    flexGrow: 1,
+    backgroundColor: colors.background,
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
