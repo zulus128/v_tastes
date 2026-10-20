@@ -1468,8 +1468,9 @@ function PlacesMap({
           ]}
         >
           <MapLocateIcon
-            color={locationEnabled ? '#FFFFFF' : colors.text}
+            color="#FFFFFF"
             height={responsiveSize(18)}
+            testID="map-location-control-icon"
             width={responsiveSize(18)}
           />
         </Pressable>
@@ -1483,8 +1484,9 @@ function PlacesMap({
           ]}
         >
           <MapLayersControlIcon
-            color={layersOpen ? '#FFFFFF' : colors.text}
+            color="#FFFFFF"
             height={responsiveSize(20)}
+            testID="map-layers-control-icon"
             width={responsiveSize(20)}
           />
         </Pressable>
