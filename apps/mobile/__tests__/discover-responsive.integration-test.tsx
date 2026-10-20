@@ -14,6 +14,7 @@ let mockCarouselCount = 0;
 let mockFavouritePlaces: Array<Record<string, unknown>> = [];
 let mockPopularReviews: Array<Record<string, unknown>> = [];
 let mockVenues: Array<Record<string, unknown>> = [];
+let mockIsDark = true;
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
@@ -33,8 +34,8 @@ jest.mock('../assets/discover/bookmark-saved.svg', () => {
 });
 jest.mock('../src/ui/ThemeProvider', () => ({
   useAppTheme: () => ({
-    colors: { primary: '#B82F29', text: '#FFFFFF' },
-    isDark: true,
+    colors: { primary: '#B82F29', text: mockIsDark ? '#FFFFFF' : '#000000' },
+    isDark: mockIsDark,
   }),
 }));
 jest.mock('../src/session/SessionProvider', () => ({
@@ -109,6 +110,7 @@ describe('Discover responsive content', () => {
     mockFavouritePlaces = [];
     mockPopularReviews = [];
     mockVenues = [];
+    mockIsDark = true;
     jest.restoreAllMocks();
   });
 
@@ -224,6 +226,20 @@ describe('Discover responsive content', () => {
     );
     expect(screen.getByTestId('saved-place-list-icon').props.color).not.toBe(
       '#B82F29',
+    );
+  });
+
+  it('keeps map control icons visible on dark buttons in light mode', async () => {
+    mockIsDark = false;
+    resize(402, 874);
+    await render(<DiscoverScreen {...props} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
+
+    expect(screen.getByTestId('map-location-control-icon').props.color).toBe(
+      '#FFFFFF',
+    );
+    expect(screen.getByTestId('map-layers-control-icon').props.color).toBe(
+      '#FFFFFF',
     );
   });
 
