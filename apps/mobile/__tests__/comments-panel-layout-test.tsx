@@ -173,13 +173,13 @@ it('rounds the comments panel instead of each comment row', async () => {
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderTopLeftRadius: responsiveSize(24),
-    borderTopRightRadius: responsiveSize(24),
+    borderTopLeftRadius: responsiveSize(32),
+    borderTopRightRadius: responsiveSize(32),
   });
   expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderBottomLeftRadius: responsiveSize(24),
-    borderBottomRightRadius: responsiveSize(24),
+    borderBottomLeftRadius: responsiveSize(32),
+    borderBottomRightRadius: responsiveSize(32),
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
