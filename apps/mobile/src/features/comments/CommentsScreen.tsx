@@ -859,7 +859,10 @@ export function PaginatedCommentsScreen({
         ) : (
           <FlatList
             ref={listRef}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[
+              styles.content,
+              rootItems.length === 0 && styles.emptyContent,
+            ]}
             data={rootItems}
             initialNumToRender={10}
             keyboardDismissMode="interactive"
@@ -1282,6 +1285,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingBottom: 0,
       backgroundColor: colors.canvas,
     },
+    emptyContent: { backgroundColor: colors.background },
     commentsFooter: {
       flexGrow: 1,
       backgroundColor: colors.background,

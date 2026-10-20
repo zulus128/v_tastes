@@ -20,6 +20,7 @@ const colors = {
 };
 
 let mockCommentsRefetching = false;
+let mockCommentsEmpty = false;
 
 function findRefreshControl(
   node: unknown,
@@ -144,6 +145,12 @@ jest.mock('../src/features/comments/api', () => {
     useAddComment: () => ({ isPending: false, mutateAsync: jest.fn() }),
     useComments: () => ({
       ...query,
+      data: {
+        pages: query.data.pages.map((page) => ({
+          ...page,
+          items: mockCommentsEmpty ? [] : page.items,
+        })),
+      },
       isRefetching: mockCommentsRefetching,
     }),
     useDeleteComment: () => ({ mutate: jest.fn() }),
@@ -316,4 +323,22 @@ it('matches the Figma composer dimensions and colors', async () => {
     borderRadius: responsiveSize(36),
     backgroundColor: colors.primary,
   });
+});
+
+it('uses a black comments area when there are no comments', async () => {
+  mockCommentsEmpty = true;
+  try {
+    await render(
+      <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+    );
+
+    expect(screen.getByText('No comments yet. Be the first.')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('comments-list').props.contentContainerStyle,
+      ),
+    ).toMatchObject({ backgroundColor: colors.background });
+  } finally {
+    mockCommentsEmpty = false;
+  }
 });
