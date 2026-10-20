@@ -1632,8 +1632,8 @@ function PlacesMap({
           >
             <MapFavouriteIcon
               color={colors.text}
-              height={responsiveSize(22)}
-              width={responsiveSize(20)}
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
             />
           </Pressable>
         </View>
