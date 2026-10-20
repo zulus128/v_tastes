@@ -455,6 +455,7 @@ function CommentRow({
   onReport,
   repliesToggle,
   onLayout,
+  reacting = false,
 }: {
   item: Comment;
   nested?: boolean;
@@ -472,6 +473,7 @@ function CommentRow({
     onToggle: () => void;
   };
   onLayout?: (event: LayoutChangeEvent) => void;
+  reacting?: boolean;
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -529,7 +531,12 @@ function CommentRow({
         </View>
         <Text style={styles.text}>{item.text}</Text>
         <View style={styles.actions}>
-          <Pressable onPress={onReact} style={styles.reactionAction}>
+          <Pressable
+            accessibilityLabel={`${item.reacted ? 'Unlike' : 'Like'} comment by ${item.authorDisplayName}`}
+            disabled={reacting}
+            onPress={onReact}
+            style={styles.reactionAction}
+          >
             {item.reacted ? (
               <HeartBoldIcon
                 color={colors.primary}
@@ -544,7 +551,12 @@ function CommentRow({
               />
             )}
             {item.reactionCount ? (
-              <Text style={styles.reactionCount}>{item.reactionCount}</Text>
+              <Text
+                style={styles.reactionCount}
+                testID={`comment-reaction-count-${item.id}`}
+              >
+                {item.reactionCount}
+              </Text>
             ) : null}
           </Pressable>
           <Pressable
@@ -657,6 +669,12 @@ export function PaginatedCommentsScreen({
   const [replyOffsets, setReplyOffsets] = useState<Record<string, number>>({});
   const [reviewReacting, setReviewReacting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [commentReactionOverrides, setCommentReactionOverrides] = useState<
+    Record<string, Pick<Comment, 'reacted' | 'reactionCount'>>
+  >({});
+  const [pendingReactionIds, setPendingReactionIds] = useState<Set<string>>(
+    new Set(),
+  );
   const listRef = useRef<FlatList<Comment> | null>(null);
   const query = useComments(reviewId);
   const mutation = useAddComment(reviewId);
@@ -707,6 +725,59 @@ export function PaginatedCommentsScreen({
   function refreshDeepLinkContext() {
     setExtraReplies({});
     setDeepLinkRevision((revision) => revision + 1);
+  }
+
+  function commentWithReaction(item: Comment): Comment {
+    const override = commentReactionOverrides[item.id];
+    return override ? { ...item, ...override } : item;
+  }
+
+  function reactToComment(item: Comment) {
+    if (pendingReactionIds.has(item.id)) return;
+    const previous = {
+      reacted: item.reacted,
+      reactionCount: item.reactionCount,
+    };
+    const optimistic = {
+      reacted: !item.reacted,
+      reactionCount: Math.max(0, item.reactionCount + (item.reacted ? -1 : 1)),
+    };
+    setCommentReactionOverrides((current) => ({
+      ...current,
+      [item.id]: optimistic,
+    }));
+    setPendingReactionIds((current) => new Set(current).add(item.id));
+    reaction.mutate(
+      {
+        commentId: item.id,
+        idempotencyKey: createIdempotencyKey('comment-reaction'),
+      },
+      {
+        onError: (error) => {
+          setCommentReactionOverrides((current) => ({
+            ...current,
+            [item.id]: previous,
+          }));
+          Alert.alert('Could not update comment', apiErrorMessage(error));
+        },
+        onSuccess: (result) => {
+          setCommentReactionOverrides((current) => ({
+            ...current,
+            [item.id]: {
+              reacted: result.active,
+              reactionCount: result.reactionCount,
+            },
+          }));
+        },
+        onSettled: () => {
+          setPendingReactionIds((current) => {
+            const next = new Set(current);
+            next.delete(item.id);
+            return next;
+          });
+        },
+      },
+    );
   }
 
   async function loadMoreReplies(parentCommentId: string) {
@@ -914,6 +985,7 @@ export function PaginatedCommentsScreen({
               />
             }
             renderItem={({ item, index }) => {
+              const displayedItem = commentWithReaction(item);
               const previewReplies = repliesByParent.get(item.id) ?? [];
               const additionalReplies = extraReplies[item.id]?.items ?? [];
               const replies = [
@@ -945,7 +1017,7 @@ export function PaginatedCommentsScreen({
                 >
                   <CommentRow
                     highlighted={commentId === item.id}
-                    item={item}
+                    item={displayedItem}
                     onDelete={
                       item.authorId === currentUserId
                         ? () =>
@@ -955,21 +1027,10 @@ export function PaginatedCommentsScreen({
                             })
                         : undefined
                     }
-                    onReact={() =>
-                      reaction.mutate(
-                        {
-                          commentId: item.id,
-                          idempotencyKey:
-                            createIdempotencyKey('comment-reaction'),
-                        },
-                        {
-                          onError: showError,
-                          onSuccess: refreshDeepLinkContext,
-                        },
-                      )
-                    }
+                    onReact={() => reactToComment(displayedItem)}
                     onReply={() => setReplyTarget(item)}
                     onReport={() => setReportCommentId(item.id)}
+                    reacting={pendingReactionIds.has(item.id)}
                     repliesToggle={
                       item.replyCount > 0
                         ? {
@@ -988,46 +1049,38 @@ export function PaginatedCommentsScreen({
                     }
                   />
                   {!hidden
-                    ? replies.map((reply) => (
-                        <CommentRow
-                          highlighted={commentId === reply.id}
-                          key={reply.id}
-                          item={reply}
-                          nested
-                          onDelete={
-                            reply.authorId === currentUserId
-                              ? () =>
-                                  deletion.mutate(reply.id, {
-                                    onError: showError,
-                                    onSuccess: refreshDeepLinkContext,
-                                  })
-                              : undefined
-                          }
-                          onReact={() =>
-                            reaction.mutate(
-                              {
-                                commentId: reply.id,
-                                idempotencyKey:
-                                  createIdempotencyKey('comment-reaction'),
-                              },
-                              {
-                                onError: showError,
-                                onSuccess: refreshDeepLinkContext,
-                              },
-                            )
-                          }
-                          onReply={() => setReplyTarget(item)}
-                          onReport={() => setReportCommentId(reply.id)}
-                          onLayout={(event) => {
-                            const nextOffset = event.nativeEvent.layout.y;
-                            setReplyOffsets((current) =>
-                              current[reply.id] === nextOffset
-                                ? current
-                                : { ...current, [reply.id]: nextOffset },
-                            );
-                          }}
-                        />
-                      ))
+                    ? replies.map((reply) => {
+                        const displayedReply = commentWithReaction(reply);
+                        return (
+                          <CommentRow
+                            highlighted={commentId === reply.id}
+                            key={reply.id}
+                            item={displayedReply}
+                            nested
+                            onDelete={
+                              reply.authorId === currentUserId
+                                ? () =>
+                                    deletion.mutate(reply.id, {
+                                      onError: showError,
+                                      onSuccess: refreshDeepLinkContext,
+                                    })
+                                : undefined
+                            }
+                            onReact={() => reactToComment(displayedReply)}
+                            onReply={() => setReplyTarget(item)}
+                            onReport={() => setReportCommentId(reply.id)}
+                            reacting={pendingReactionIds.has(reply.id)}
+                            onLayout={(event) => {
+                              const nextOffset = event.nativeEvent.layout.y;
+                              setReplyOffsets((current) =>
+                                current[reply.id] === nextOffset
+                                  ? current
+                                  : { ...current, [reply.id]: nextOffset },
+                              );
+                            }}
+                          />
+                        );
+                      })
                     : null}
                   {!hidden && replies.length > 0 ? (
                     <Svg

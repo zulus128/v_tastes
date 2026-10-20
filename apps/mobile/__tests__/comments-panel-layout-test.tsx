@@ -21,6 +21,7 @@ const colors = {
 
 let mockCommentsRefetching = false;
 let mockCommentsEmpty = false;
+const mockReactMutation = jest.fn();
 
 function findRefreshControl(
   node: unknown,
@@ -154,7 +155,7 @@ jest.mock('../src/features/comments/api', () => {
       isRefetching: mockCommentsRefetching,
     }),
     useDeleteComment: () => ({ mutate: jest.fn() }),
-    useReactToComment: () => ({ mutate: jest.fn() }),
+    useReactToComment: () => ({ mutate: mockReactMutation }),
   };
 });
 
@@ -341,4 +342,19 @@ it('uses a black comments area when there are no comments', async () => {
   } finally {
     mockCommentsEmpty = false;
   }
+});
+
+it('updates a comment reaction immediately without waiting for the backend', async () => {
+  mockReactMutation.mockReset();
+  const user = userEvent.setup();
+  await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  await user.press(screen.getByLabelText('Like comment by Wade Warren'));
+
+  expect(
+    screen.getByTestId('comment-reaction-count-comment-1').props.children,
+  ).toBe(2);
+  expect(mockReactMutation).toHaveBeenCalledTimes(1);
 });

@@ -1,8 +1,11 @@
 import {
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import type { CommentsPage } from '@tastes/contracts';
+import type { ReactionResult } from '@tastes/firebase-client';
 import {
   useAuthenticatedUserId,
   useTastesApi,
@@ -39,24 +42,85 @@ export function useReactToComment(reviewId: string) {
   const api = useTastesApi();
   const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
+  const queryKey = commentsQueryKey(userId, reviewId);
+  return useMutation<
+    ReactionResult,
+    Error,
+    { commentId: string; idempotencyKey: string },
+    { previous: InfiniteData<CommentsPage> | undefined }
+  >({
+    mutationFn: async ({
       commentId,
       idempotencyKey,
     }: {
       commentId: string;
       idempotencyKey: string;
-    }) =>
-      api.reactToComment({
+    }) => {
+      const response = await api.reactToComment({
         reviewId,
         commentId,
         idempotencyKey,
         reaction: 'like',
-      }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: commentsQueryKey(userId, reviewId),
-      }),
+      });
+      return response.data;
+    },
+    onMutate: async ({ commentId }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<InfiniteData<CommentsPage>>(queryKey);
+      queryClient.setQueryData<InfiniteData<CommentsPage>>(
+        queryKey,
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.map((comment) => {
+                if (comment.id !== commentId) return comment;
+                const active = !comment.reacted;
+                return {
+                  ...comment,
+                  reacted: active,
+                  reactionCount: Math.max(
+                    0,
+                    comment.reactionCount + (active ? 1 : -1),
+                  ),
+                };
+              }),
+            })),
+          };
+        },
+      );
+      return { previous };
+    },
+    onSuccess: (result, { commentId }) => {
+      queryClient.setQueryData<InfiniteData<CommentsPage>>(
+        queryKey,
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.map((comment) =>
+                comment.id === commentId
+                  ? {
+                      ...comment,
+                      reacted: result.active,
+                      reactionCount: result.reactionCount,
+                    }
+                  : comment,
+              ),
+            })),
+          };
+        },
+      );
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(queryKey, context.previous);
+    },
   });
 }
 
