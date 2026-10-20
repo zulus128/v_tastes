@@ -12,6 +12,7 @@ import { responsiveSize } from '../src/ui/responsive';
 const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
 let mockCarouselCount = 0;
 let mockPopularReviews: Array<Record<string, unknown>> = [];
+let mockVenues: Array<Record<string, unknown>> = [];
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
@@ -67,7 +68,9 @@ jest.mock('../src/features/discover/api', () => ({
     },
   }),
   useToggleFollow: () => ({}),
-  useDiscoverVenues: () => ({ data: { pages: [] } }),
+  useDiscoverVenues: () => ({
+    data: { pages: [{ items: mockVenues }] },
+  }),
   useVenueSearch: () => ({ data: { items: [] } }),
   useDiscoverPeople: () => ({ data: { people: [] } }),
 }));
@@ -93,6 +96,7 @@ describe('Discover responsive content', () => {
     mockInsets.top = 0;
     mockCarouselCount = 0;
     mockPopularReviews = [];
+    mockVenues = [];
     jest.restoreAllMocks();
   });
 
@@ -151,6 +155,40 @@ describe('Discover responsive content', () => {
         2 * rowStyle.paddingHorizontal,
     ).toBeCloseTo(contentWidth);
     expect(lastCardStyle.width).toBe(cardStyle.width);
+  });
+
+  it('shows the Figma Popular tag on every place result card', async () => {
+    mockVenues = Array.from({ length: 2 }, (_, index) => ({
+      id: `place-result-${index}`,
+      name: `Place result ${index}`,
+      address: `${index + 1} Test Street`,
+      category: 'Restaurant',
+      rating: 4.4,
+      reviewCount: 100 + index,
+    }));
+    resize(402, 874);
+    await render(<DiscoverScreen {...props} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
+
+    const tags = screen.getAllByText('Popular');
+    expect(tags).toHaveLength(2);
+    tags.forEach((tag) => {
+      const tagStyle = StyleSheet.flatten(tag.props.style);
+      const containerStyle = StyleSheet.flatten(tag.parent!.props.style);
+
+      expect(containerStyle).toMatchObject({
+        top: 6,
+        left: 6,
+        height: 18,
+        paddingHorizontal: 8,
+        borderRadius: 8,
+      });
+      expect(tagStyle).toMatchObject({
+        fontSize: 12,
+        fontWeight: '400',
+        letterSpacing: -0.24,
+      });
+    });
   });
 
   it.each([2, 3])(

@@ -2474,7 +2474,7 @@ function PlaceRow({
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
         <View style={styles.newChip}>
-          <Text style={styles.newChipText}>Popular</Text>
+          <Text style={[styles.newChipText, { letterSpacing: -0.24 }]}>Popular</Text>
         </View>
       </Pressable>
       <Pressable onPress={onOpen} style={styles.placeInfo}>
@@ -3360,12 +3360,16 @@ const createStyles = (colors: ThemeColors) =>
       top: 6,
       left: 6,
       height: 18,
-      paddingHorizontal: 7,
-      borderRadius: 9,
-      backgroundColor: '#E63946',
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
       justifyContent: 'center',
     },
-    newChipText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+    newChipText: {
+      color: colors.onPrimary,
+      fontSize: 12,
+      fontWeight: '400',
+    },
     placeInfo: { flex: 1, minWidth: 0, gap: 3 },
     placeName: { color: colors.text, fontSize: 14, fontWeight: '700' },
     placeAddress: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
