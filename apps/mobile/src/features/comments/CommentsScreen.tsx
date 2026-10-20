@@ -1069,6 +1069,42 @@ export function PaginatedCommentsScreen({
                       ) : null}
                     </Svg>
                   ) : null}
+                  {index === 0 ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.commentsPanelBorderClip,
+                        styles.commentsPanelTopBorder,
+                      ]}
+                      testID="comments-panel-top-border"
+                    >
+                      <View
+                        style={[
+                          styles.commentsPanelBorderShape,
+                          styles.commentsPanelBorderShapeTop,
+                        ]}
+                        testID="comments-panel-top-border-shape"
+                      />
+                    </View>
+                  ) : null}
+                  {index === rootItems.length - 1 ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.commentsPanelBorderClip,
+                        styles.commentsPanelBottomBorder,
+                      ]}
+                      testID="comments-panel-bottom-border"
+                    >
+                      <View
+                        style={[
+                          styles.commentsPanelBorderShape,
+                          styles.commentsPanelBorderShapeBottom,
+                        ]}
+                        testID="comments-panel-bottom-border-shape"
+                      />
+                    </View>
+                  ) : null}
                 </View>
               );
             }}
@@ -1489,20 +1525,38 @@ const createStyles = (colors: ThemeColors) =>
     },
     commentsPanelStart: {
       overflow: 'hidden',
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       backgroundColor: 'transparent',
     },
     commentsPanelEnd: {
       overflow: 'hidden',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      borderBottomWidth: 0,
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
       backgroundColor: 'transparent',
     },
+    commentsPanelBorderClip: {
+      position: 'absolute',
+      right: 0,
+      left: 0,
+      height: 24,
+      overflow: 'hidden',
+      zIndex: 2,
+    },
+    commentsPanelTopBorder: { top: 0 },
+    commentsPanelBottomBorder: { bottom: 0 },
+    commentsPanelBorderShape: {
+      position: 'absolute',
+      right: 0,
+      left: 0,
+      height: 48,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 24,
+    },
+    commentsPanelBorderShapeTop: { top: 0 },
+    commentsPanelBorderShapeBottom: { bottom: 0 },
     // Figma's dotted tree connector is positioned over the rows so the nested
     // row backgrounds cannot hide the vertical segment or its horizontal arms.
     threadConnector: {

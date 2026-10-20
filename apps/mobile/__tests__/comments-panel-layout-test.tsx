@@ -173,16 +173,13 @@ it('rounds the comments panel instead of each comment row', async () => {
 
   expect(StyleSheet.flatten(panelStart.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderTopWidth: responsiveSize(1),
-    borderTopColor: colors.border,
     borderTopLeftRadius: responsiveSize(24),
     borderTopRightRadius: responsiveSize(24),
     backgroundColor: 'transparent',
   });
   expect(StyleSheet.flatten(panelEnd.props.style)).toMatchObject({
     overflow: 'hidden',
-    borderBottomWidth: responsiveSize(1),
-    borderBottomColor: colors.border,
+    borderBottomWidth: responsiveSize(0),
     borderBottomLeftRadius: responsiveSize(24),
     borderBottomRightRadius: responsiveSize(24),
     backgroundColor: 'transparent',
@@ -191,6 +188,36 @@ it('rounds the comments panel instead of each comment row', async () => {
     const style = StyleSheet.flatten(panelEdge.props.style);
     expect(style.borderLeftWidth).toBeUndefined();
     expect(style.borderRightWidth).toBeUndefined();
+  });
+  const topBorder = screen.getByTestId('comments-panel-top-border');
+  const topBorderShape = screen.getByTestId('comments-panel-top-border-shape');
+  const bottomBorder = screen.getByTestId('comments-panel-bottom-border');
+  const bottomBorderShape = screen.getByTestId(
+    'comments-panel-bottom-border-shape',
+  );
+  expect(StyleSheet.flatten(topBorder.props.style)).toMatchObject({
+    top: responsiveSize(0),
+    height: responsiveSize(24),
+    overflow: 'hidden',
+  });
+  expect(StyleSheet.flatten(bottomBorder.props.style)).toMatchObject({
+    bottom: responsiveSize(0),
+    height: responsiveSize(24),
+    overflow: 'hidden',
+  });
+  [topBorderShape, bottomBorderShape].forEach((borderShape) => {
+    expect(StyleSheet.flatten(borderShape.props.style)).toMatchObject({
+      height: responsiveSize(48),
+      borderWidth: responsiveSize(1),
+      borderColor: colors.border,
+      borderRadius: responsiveSize(24),
+    });
+  });
+  expect(StyleSheet.flatten(topBorderShape.props.style)).toMatchObject({
+    top: responsiveSize(0),
+  });
+  expect(StyleSheet.flatten(bottomBorderShape.props.style)).toMatchObject({
+    bottom: responsiveSize(0),
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
