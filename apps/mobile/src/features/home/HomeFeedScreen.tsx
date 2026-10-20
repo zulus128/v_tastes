@@ -1277,8 +1277,14 @@ export function HomeFeedScreen({
         <ActionSheet
           actions={[
             {
+              label: 'Why am I seeing this?',
+              onPress: () => {
+                setRecommendationMenu(false);
+                showToast('Based on your tastes, ratings and saves');
+              },
+            },
+            {
               label: 'Not interested',
-              destructive: true,
               onPress: () => {
                 const recommendationId =
                   recommendationQuery.data?.forYou[0]?.id;
@@ -1289,13 +1295,6 @@ export function HomeFeedScreen({
                 }
                 setRecommendationMenu(false);
                 showToast('Recommendation hidden');
-              },
-            },
-            {
-              label: 'Why am I seeing this?',
-              onPress: () => {
-                setRecommendationMenu(false);
-                showToast('Based on your tastes, ratings and saves');
               },
             },
           ]}
