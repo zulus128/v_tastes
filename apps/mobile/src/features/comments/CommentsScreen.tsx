@@ -547,7 +547,11 @@ function CommentRow({
               <Text style={styles.reactionCount}>{item.reactionCount}</Text>
             ) : null}
           </Pressable>
-          <Pressable onPress={onReply} style={styles.actionIconRow}>
+          <Pressable
+            accessibilityLabel={`Reply to ${item.authorDisplayName}`}
+            onPress={onReply}
+            style={styles.actionIconRow}
+          >
             <ChatIcon
               color={colors.textSecondary}
               height={responsiveSize(20)}
@@ -1074,39 +1078,41 @@ export function PaginatedCommentsScreen({
           style={[
             styles.composer,
             {
-              height: responsiveSize(replyTarget ? 88 : 56) + composerBottom,
+              height: responsiveSize(replyTarget ? 76 : 56) + composerBottom,
               paddingBottom: composerBottom,
             },
           ]}
         >
-          {replyTarget ? (
-            <View style={styles.replyBanner}>
-              <Text numberOfLines={1} style={styles.replyBannerText}>
-                Replying to {replyTarget.authorDisplayName}
-              </Text>
-              <Pressable onPress={() => setReplyTarget(null)}>
-                <Text style={styles.replyClose}>×</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <TextInput
-            editable={!mutation.isPending}
-            maxLength={1_000}
-            onChangeText={(value) => {
-              if (!text && value)
-                setIdempotencyKey(createIdempotencyKey('comment'));
-              setText(value);
-            }}
-            onSubmitEditing={() => void submit()}
-            placeholder={
-              replyTarget
-                ? `Reply to ${replyTarget.authorDisplayName}`
-                : 'Add comment'
-            }
-            placeholderTextColor={colors.placeholder}
-            style={styles.input}
-            value={text}
-          />
+          <View style={styles.composerField}>
+            {replyTarget ? (
+              <View style={styles.replyBanner}>
+                <Text numberOfLines={1} style={styles.replyBannerText}>
+                  Replying to {replyTarget.authorDisplayName}
+                </Text>
+                <Pressable onPress={() => setReplyTarget(null)}>
+                  <Text style={styles.replyClose}>×</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <TextInput
+              editable={!mutation.isPending}
+              maxLength={1_000}
+              onChangeText={(value) => {
+                if (!text && value)
+                  setIdempotencyKey(createIdempotencyKey('comment'));
+                setText(value);
+              }}
+              onSubmitEditing={() => void submit()}
+              placeholder={
+                replyTarget
+                  ? `Reply to ${replyTarget.authorDisplayName}`
+                  : 'Add comment'
+              }
+              placeholderTextColor={colors.placeholder}
+              style={styles.input}
+              value={text}
+            />
+          </View>
           <Pressable
             accessibilityLabel="Send comment"
             disabled={!text.trim() || mutation.isPending}
@@ -1552,20 +1558,22 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: 16,
       paddingTop: 8,
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       gap: 12,
       backgroundColor: colors.surface,
     },
+    composerField: {
+      flex: 1,
+      overflow: 'hidden',
+      borderRadius: theme.radius.pill,
+      backgroundColor: colors.surfaceRaised,
+    },
     replyBanner: {
-      flexBasis: '100%',
       height: 28,
-      paddingHorizontal: 12,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: 10,
     },
     replyBannerText: { flex: 1, color: colors.textMuted, fontSize: 12 },
     replyClose: { color: colors.text, fontSize: 20 },
@@ -1573,9 +1581,8 @@ const createStyles = (colors: ThemeColors) =>
       flex: 1,
       height: 40,
       paddingHorizontal: 14,
-      borderRadius: theme.radius.pill,
       color: colors.text,
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: 'transparent',
     },
     send: {
       width: 40,

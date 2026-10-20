@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { PaginatedCommentsScreen } from '../src/features/comments/CommentsScreen';
 import { responsiveSize } from '../src/ui/responsive';
@@ -214,4 +214,28 @@ it('matches the full-width review panel and shows the dish count tag', async () 
   expect(style.marginHorizontal).toBeUndefined();
   expect(style.borderRadius).toBeUndefined();
   expect(style.borderWidth).toBeUndefined();
+});
+
+it('keeps the reply target and input in one gapless composer field', async () => {
+  await render(
+    <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,
+  );
+
+  const user = userEvent.setup();
+  await user.press(screen.getByLabelText('Reply to Wade Warren'));
+
+  const banner = screen.getByText('Replying to Wade Warren').parent!;
+  const field = banner.parent!;
+  const input = screen.getByPlaceholderText('Reply to Wade Warren');
+
+  expect(StyleSheet.flatten(field.props.style)).toMatchObject({
+    flex: 1,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceRaised,
+  });
+  expect(input.parent).toBe(field);
+  expect(StyleSheet.flatten(banner.props.style).marginBottom).toBeUndefined();
+  expect(StyleSheet.flatten(input.props.style).backgroundColor).toBe(
+    'transparent',
+  );
 });
