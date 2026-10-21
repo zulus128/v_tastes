@@ -229,17 +229,17 @@ describe('Discover responsive content', () => {
     );
   });
 
-  it('keeps map control icons visible on dark buttons in light mode', async () => {
+  it('uses dark map control icons on light buttons in light mode', async () => {
     mockIsDark = false;
     resize(402, 874);
     await render(<DiscoverScreen {...props} />);
     await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
 
     expect(screen.getByTestId('map-location-control-icon').props.color).toBe(
-      '#FFFFFF',
+      '#252A31',
     );
     expect(screen.getByTestId('map-layers-control-icon').props.color).toBe(
-      '#FFFFFF',
+      '#252A31',
     );
   });
 
