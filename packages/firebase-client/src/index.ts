@@ -43,6 +43,7 @@ import type {
   LeaderboardEntry,
   HideReviewInput,
   HideConversationInput,
+  SetConversationPinnedInput,
   ListConversationsInput,
   ListNotificationsInput,
   MarkConversationReadInput,
@@ -122,6 +123,7 @@ export const callableOperationNames = [
   'sendMessage',
   'markConversationRead',
   'hideConversation',
+  'setConversationPinned',
   'setTypingStatus',
   'registerPushToken',
   'unregisterPushToken',
@@ -382,6 +384,11 @@ export function createTastesApi(
       ),
     hideConversation: (input: HideConversationInput) =>
       invoke<HideConversationInput, IdResult>('hideConversation', input),
+    setConversationPinned: (input: SetConversationPinnedInput) =>
+      invoke<SetConversationPinnedInput, IdResult>(
+        'setConversationPinned',
+        input,
+      ),
     setTypingStatus: (input: SetTypingStatusInput) =>
       invoke<SetTypingStatusInput, { conversationId: string; typing: boolean }>(
         'setTypingStatus',
