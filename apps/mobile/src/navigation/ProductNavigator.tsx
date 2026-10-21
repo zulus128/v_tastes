@@ -90,6 +90,7 @@ export type MainTabParamList = {
 };
 
 export type ProductVisualAuditRoute = {
+  filters?: string[];
   root: keyof RootStackParamList;
   tab?: keyof MainTabParamList;
 };
@@ -182,11 +183,13 @@ function tabOptions(
 function MainTabs({
   discoverFilters,
   initialTab,
+  onClearDiscoverFilters,
   user,
   rootNavigation,
 }: {
   discoverFilters: string[];
   initialTab?: keyof MainTabParamList;
+  onClearDiscoverFilters: () => void;
   user: User;
   rootNavigation: RootNavigation;
 }) {
@@ -381,6 +384,7 @@ function MainTabs({
                   navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
+                onClearFilters={onClearDiscoverFilters}
                 onOpenComments={openComments}
                 onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
                 onOpenPlace={openPlace}
@@ -436,7 +440,9 @@ export function ProductNavigator({
   const { colors, isDark } = useAppTheme();
   const queryClient = useQueryClient();
   const { api } = useSession();
-  const [discoverFilters, setDiscoverFilters] = useState<string[]>([]);
+  const [discoverFilters, setDiscoverFilters] = useState<string[]>(
+    visualAuditRoute?.filters ?? [],
+  );
   const warmComments = (reviewId: string) =>
     void prefetchComments(queryClient, api, user.uid, reviewId);
   const prefetchVisibleComments = useCallback(
@@ -475,7 +481,7 @@ export function ProductNavigator({
   }, [colors, isDark]);
   return (
     <NavigationContainer
-      key={`${visualAuditRoute?.root ?? 'MainTabs'}:${visualAuditRoute?.tab ?? ''}`}
+      key={`${visualAuditRoute?.root ?? 'MainTabs'}:${visualAuditRoute?.tab ?? ''}:${visualAuditRoute?.filters?.join(',') ?? ''}`}
       linking={linking}
       theme={navigationTheme}
     >
@@ -488,6 +494,7 @@ export function ProductNavigator({
             <MainTabs
               discoverFilters={discoverFilters}
               initialTab={visualAuditRoute?.tab}
+              onClearDiscoverFilters={() => setDiscoverFilters([])}
               user={user}
               rootNavigation={navigation}
             />

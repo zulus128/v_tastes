@@ -227,6 +227,33 @@ export function useProfileReviews(userId: string) {
     setReviews([]);
     setLoading(true);
     if (__DEV__ && userId === 'visual-audit-user') {
+      setReviews(
+        Array.from({ length: 5 }, (_, index) => ({
+          id: `visual-audit-profile-review-${index + 1}`,
+          authorId: userId,
+          authorDisplayName: 'Alex Morgan',
+          authorUsername: 'alexmorgan',
+          authorPhotoUrl: null,
+          venueId: `visual-audit-profile-venue-${index + 1}`,
+          venueName: [
+            'Gemini750 Restaurant',
+            'Wasabi by Morimoto',
+            'Nisantasi Pasta Lab',
+            'Bosphorus Coffee House',
+            'Uskudar Tea House',
+          ][index]!,
+          venueCity: 'Istanbul',
+          rating: index + 1,
+          text: 'A visual audit review for the profile filter state.',
+          tags: ['casual'],
+          dishReviews: [],
+          status: 'published',
+          commentCount: index,
+          reactionCount: 10 + index,
+          reacted: false,
+          createdAt: `2026-10-${14 - index}T12:00:00.000Z`,
+        })),
+      );
       setLoading(false);
       setError(null);
       setHasMore(false);

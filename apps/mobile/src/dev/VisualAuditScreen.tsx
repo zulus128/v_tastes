@@ -257,11 +257,14 @@ export function VisualAuditScreen({ auditCase }: { auditCase: string }) {
     }
     const tab = productTabs[name];
     const root = productRoots[name];
-    const visualAuditRoute: ProductVisualAuditRoute | undefined = tab
-      ? { root: 'MainTabs', tab }
-      : root
-        ? { root }
-        : undefined;
+    const visualAuditRoute: ProductVisualAuditRoute | undefined =
+      name === 'profile-filtered'
+        ? { filters: ['Rating:3-5'], root: 'MainTabs', tab: 'Profile' }
+        : tab
+          ? { root: 'MainTabs', tab }
+          : root
+            ? { root }
+            : undefined;
     if (visualAuditRoute) {
       return (
         <SessionStateOverrideProvider user={visualAuditUser} visualAudit>

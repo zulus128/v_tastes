@@ -42,6 +42,7 @@ import { ProfileReviewCard } from './ProfileReviewCard';
 import { ProfileDraftCard, type ProfileReviewDraft } from './ProfileDraftCard';
 import { ProfileExtras, type ProfileExtra } from './ProfileExtras';
 import { buildTasteHighlights } from './profileHighlights';
+import { profileReviewFilterSummary } from './profileReviewFilters';
 import { ProfileMapSheet } from './ProfileMapSheet';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -201,6 +202,7 @@ export function ProfileScreen({
   initialFollowing = false,
   onBack,
   onMessage,
+  onClearFilters,
   onOpenComments,
   onOpenFilters,
   onOpenPlace,
@@ -217,6 +219,7 @@ export function ProfileScreen({
   initialFollowing?: boolean;
   onBack: () => void;
   onMessage: (userId: string) => void;
+  onClearFilters: () => void;
   onOpenComments: (reviewId: string) => void;
   onOpenFilters: () => void;
   onOpenPlace: (venueId: string) => void;
@@ -662,6 +665,12 @@ export function ProfileScreen({
     (left, right) =>
       Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)),
   );
+  const activeFilterCount = appliedFilters.length;
+  const filterSummary = profileReviewFilterSummary({
+    filterCount: activeFilterCount,
+    totalCount: profileReviews.reviews.length,
+    visibleCount: sortedReviews.length,
+  });
   const handleVisibleReviewsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken<FeedItem>> }) => {
       const reviewIds = viewableItems.flatMap((token) =>
@@ -893,6 +902,22 @@ export function ProfileScreen({
             <>
               {profileHeader}
               {controls}
+              {activeFilterCount > 0 ? (
+                <View
+                  accessibilityLabel={filterSummary}
+                  style={styles.filterSummary}
+                  testID="profile-review-filter-summary"
+                >
+                  <Text style={styles.filterSummaryText}>{filterSummary}</Text>
+                  <Pressable
+                    accessibilityLabel="Clear profile review filters"
+                    hitSlop={8}
+                    onPress={onClearFilters}
+                  >
+                    <Text style={styles.filterSummaryClear}>Clear</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               {own && draft ? (
                 <View style={styles.draftCardWrap}>
                   <ProfileDraftCard
@@ -1315,6 +1340,29 @@ const createStyles = (colors: ThemeColors) => {
       paddingVertical: 0,
     },
     reviewList: { gap: 14 },
+    filterSummary: {
+      minHeight: 42,
+      marginHorizontal: 15,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: isDark ? '#762827' : '#E7B3B1',
+      borderRadius: 8,
+      backgroundColor: isDark ? '#2B1111' : '#FFF1F0',
+    },
+    filterSummaryText: {
+      flexShrink: 1,
+      color: colors.text,
+      fontSize: 13,
+    },
+    filterSummaryClear: {
+      marginLeft: 12,
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
     reviewItem: { paddingHorizontal: 15 },
     draftCardWrap: { marginHorizontal: 15 },
     listLoader: { marginVertical: 36 },
