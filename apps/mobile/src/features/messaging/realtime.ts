@@ -153,6 +153,7 @@ function summaryFromDocument(
         }
       : null,
     unreadCount: Math.max(0, Number(rawUnreadCounts[userId] ?? 0)),
+    pinned: Array.isArray(data.pinnedFor) && data.pinnedFor.includes(userId),
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
   };
