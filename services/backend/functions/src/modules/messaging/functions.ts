@@ -9,6 +9,7 @@ import {
   registerPushTokenInputSchema,
   renderNotificationCopy,
   sendMessageInputSchema,
+  setConversationPinnedInputSchema,
   setTypingStatusInputSchema,
   unregisterPushTokenInputSchema,
 } from '@tastes/contracts';
@@ -394,6 +395,7 @@ export const listConversations = onCall(callableOptions, async (request) => {
           };
         })(),
         unreadCount: unreadCount(document, uid),
+        pinned: ((document.get('pinnedFor') as unknown[]) ?? []).includes(uid),
         createdAt: timestampToIso(document.get('createdAt')),
         updatedAt: timestampToIso(document.get('updatedAt')),
       };
@@ -706,6 +708,29 @@ export const hideConversation = onCall(callableOptions, async (request) => {
 
   return { id: conversationRef.id };
 });
+
+export const setConversationPinned = onCall(
+  callableOptions,
+  async (request) => {
+    const uid = requireUserId(request);
+    const input = parseInput(setConversationPinnedInputSchema, request.data);
+    const conversationRef = db
+      .collection('conversations')
+      .doc(input.conversationId);
+
+    await db.runTransaction(async (transaction) => {
+      const conversation = await transaction.get(conversationRef);
+      requireParticipant(conversation, uid);
+      transaction.update(
+        conversationRef,
+        'pinnedFor',
+        input.pinned ? FieldValue.arrayUnion(uid) : FieldValue.arrayRemove(uid),
+      );
+    });
+
+    return { id: conversationRef.id };
+  },
+);
 
 export const markConversationRead = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
