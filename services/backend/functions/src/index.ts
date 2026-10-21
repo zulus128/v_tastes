@@ -38,6 +38,7 @@ export {
   pushMessageNotification,
   registerPushToken,
   sendMessage,
+  setConversationPinned,
   setTypingStatus,
   unregisterPushToken,
 } from './modules/messaging/functions';
