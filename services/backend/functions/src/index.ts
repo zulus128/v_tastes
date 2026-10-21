@@ -12,6 +12,7 @@ export {
   listRequests,
   markNotificationRead,
   reportComment,
+  reportUser,
   respondToRequest,
   setUserBlocked,
   updateGroupMembers,

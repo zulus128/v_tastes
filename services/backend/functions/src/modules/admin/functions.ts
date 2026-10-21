@@ -435,12 +435,15 @@ export const getReportedContent = onCall(callableOptions, async (request) => {
 
   return Promise.all(
     snapshot.docs.map(async (document) => {
+      const storedTargetType = String(
+        document.get('targetType') ?? document.get('contentType') ?? 'review',
+      );
       const targetType =
-        String(
-          document.get('targetType') ?? document.get('contentType') ?? 'review',
-        ) === 'comment'
+        storedTargetType === 'comment'
           ? 'comment'
-          : 'review';
+          : storedTargetType === 'user'
+            ? 'user'
+            : 'review';
       const targetId = String(
         document.get('targetId') ??
           document.get('contentId') ??
@@ -456,15 +459,21 @@ export const getReportedContent = onCall(callableOptions, async (request) => {
       let contentPreview = String(document.get('contentPreview') ?? '');
       if (!contentPreview && targetId) {
         const reference =
-          targetType === 'review'
-            ? db.collection('reviews').doc(targetId)
-            : db
-                .collection('reviews')
-                .doc(parentId ?? '')
-                .collection('comments')
-                .doc(targetId);
+          targetType === 'user'
+            ? db.collection('users').doc(targetId)
+            : targetType === 'review'
+              ? db.collection('reviews').doc(targetId)
+              : db
+                  .collection('reviews')
+                  .doc(parentId ?? '')
+                  .collection('comments')
+                  .doc(targetId);
         const content = await reference.get();
-        contentPreview = String(content.get('text') ?? '').slice(0, 280);
+        contentPreview = String(
+          targetType === 'user'
+            ? (content.get('username') ?? content.get('displayName') ?? '')
+            : (content.get('text') ?? ''),
+        ).slice(0, 280);
       }
       return {
         id: document.id,

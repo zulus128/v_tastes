@@ -4,6 +4,7 @@ import {
   listNotificationsInputSchema,
   notificationInputSchema,
   reportCommentInputSchema,
+  reportUserInputSchema,
   requestInputSchema,
   updateGroupMembersInputSchema,
   updateGroupInputSchema,
@@ -893,6 +894,58 @@ export const reportComment = onCall(callableOptions, async (request) => {
       createdAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
+  );
+  await sendNotification({
+    recipientId: uid,
+    type: 'report-received',
+    eventKey: ref.id,
+    targetId: ref.id,
+  });
+  return { id: ref.id };
+});
+
+export const reportUser = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(reportUserInputSchema, request.data);
+  if (input.targetUserId === uid) {
+    throw new HttpsError('invalid-argument', 'You cannot report yourself.');
+  }
+
+  const [profile, targetProfile] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('users').doc(input.targetUserId).get(),
+  ]);
+  if (!profile.exists || profile.get('status') !== 'active') {
+    throw new HttpsError(
+      'failed-precondition',
+      'An active user profile is required.',
+    );
+  }
+  if (!targetProfile.exists || targetProfile.get('status') !== 'active') {
+    throw new HttpsError('not-found', 'The user was not found.');
+  }
+
+  const ref = db
+    .collection('reports')
+    .doc(`user-${uid}-${input.idempotencyKey}`);
+  await ref.set(
+    {
+      reporterId: uid,
+      reporterName: String(profile.get('displayName') ?? 'Tastes user'),
+      targetType: 'user',
+      targetId: input.targetUserId,
+      reason: input.reason,
+      details: input.details ?? null,
+      contentPreview: String(
+        targetProfile.get('username') ??
+          targetProfile.get('displayName') ??
+          input.targetUserId,
+      ).slice(0, 280),
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: false },
   );
   await sendNotification({
     recipientId: uid,

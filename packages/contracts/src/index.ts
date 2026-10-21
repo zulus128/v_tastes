@@ -629,6 +629,13 @@ export const reportCommentInputSchema = z.object({
   details: z.string().trim().max(300).optional(),
 });
 
+export const reportUserInputSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  targetUserId: z.string().min(1).max(128),
+  reason: reportReasonSchema.default('Inappropriate'),
+  details: z.string().trim().max(300).optional(),
+});
+
 export const phoneNumberSchema = z
   .string()
   .trim()
@@ -777,6 +784,7 @@ export type UpdateNotificationPreferencesInput = z.infer<
   typeof updateNotificationPreferencesInputSchema
 >;
 export type ReportCommentInput = z.infer<typeof reportCommentInputSchema>;
+export type ReportUserInput = z.infer<typeof reportUserInputSchema>;
 export type ProfileExtrasInput = z.infer<typeof profileExtrasInputSchema>;
 export type SetUserBlockedInput = z.infer<typeof setUserBlockedInputSchema>;
 export type HealthCheckResult = z.infer<typeof healthCheckResultSchema>;

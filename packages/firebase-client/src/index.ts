@@ -53,6 +53,7 @@ import type {
   SetTypingStatusInput,
   ReportReviewInput,
   ReportCommentInput,
+  ReportUserInput,
   EditReviewInput,
   ImportContactsInput,
   ImportContactsResult,
@@ -186,6 +187,7 @@ export const callableOperationNames = [
   'getMonthlyRecap',
   'updateNotificationPreferences',
   'reportComment',
+  'reportUser',
   'getAdminOverview',
   'getReportedContent',
   'getUserHistory',
@@ -570,6 +572,8 @@ export function createTastesApi(
       ),
     reportComment: (input: ReportCommentInput) =>
       invoke<ReportCommentInput, IdResult>('reportComment', input),
+    reportUser: (input: ReportUserInput) =>
+      invoke<ReportUserInput, IdResult>('reportUser', input),
   };
 }
 

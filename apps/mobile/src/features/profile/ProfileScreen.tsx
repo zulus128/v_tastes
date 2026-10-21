@@ -1,5 +1,5 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import type { FeedItem, Venue } from '@tastes/contracts';
+import type { FeedItem, ReportReason, Venue } from '@tastes/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -25,6 +25,8 @@ import {
 } from 'react-native';
 import SearchIcon from '../../../assets/profile/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
+import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import Svg, { Path } from 'react-native-svg';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { useToggleFollow } from '../discover/api';
@@ -56,6 +58,15 @@ const FALLBACK_MAP_REGION = {
 };
 const MAP_FOCUS_PIN_LIMIT = 5;
 const REVIEW_DRAFT_KEY_PREFIX = '@tastes/review-draft/';
+const PROFILE_REPORT_REASONS = [
+  'Spam',
+  'Inappropriate',
+  'Harassment',
+  'Misinformation',
+  'Hate',
+  'Safety risk',
+  'Something else',
+] as const satisfies readonly ReportReason[];
 
 function fallbackProfile(displayName: string): ProfileData {
   return {
@@ -233,8 +244,7 @@ export function ProfileScreen({
   const { colors, isDark } = useAppTheme();
   const tabBarHeight = useBottomTabBarHeight();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const actionDangerColor =
-    colors.background === '#080808' ? '#D32620' : '#A00E0B';
+  const actionDangerColor = '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
   const visualAudit = useIsVisualAudit();
@@ -256,6 +266,16 @@ export function ProfileScreen({
   const [blocked, setBlocked] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [blockPending, setBlockPending] = useState(false);
+  const [blockConfirmation, setBlockConfirmation] = useState<boolean | null>(
+    null,
+  );
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason>(
+    PROFILE_REPORT_REASONS[0],
+  );
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportPending, setReportPending] = useState(false);
   const [mapVenues, setMapVenues] = useState<Venue[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReload, setMapReload] = useState(0);
@@ -276,6 +296,7 @@ export function ProfileScreen({
   const wishlistScrollRef = useRef<ScrollView>(null);
   const reviewOffset = useRef(0);
   const wishlistOffset = useRef(0);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editSheet = useBottomSheetMotion({
     onClose: () => setEditingReview(false),
     visible: editingReview,
@@ -473,39 +494,67 @@ export function ProfileScreen({
     }
   }
 
+  function showProfileNotice(message: string) {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setProfileNotice(message);
+    noticeTimer.current = setTimeout(() => setProfileNotice(null), 2200);
+  }
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    },
+    [],
+  );
+
   function confirmBlock(nextBlocked: boolean) {
     setProfileMenuOpen(false);
-    Alert.alert(
-      nextBlocked
-        ? `Block ${profile?.displayName ?? 'this user'}?`
-        : `Unblock ${profile?.displayName ?? 'this user'}?`,
-      nextBlocked
-        ? "They can't follow you, message you or see your reviews."
-        : 'They will be able to interact with you again.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: nextBlocked ? 'Block' : 'Unblock',
-          style: nextBlocked ? 'destructive' : 'default',
-          onPress: () => {
-            setBlockPending(true);
-            void api
-              .setUserBlocked({ targetUserId, blocked: nextBlocked })
-              .then(() => {
-                setBlocked(nextBlocked);
-                if (nextBlocked) setFollowing(false);
-              })
-              .catch((error) =>
-                Alert.alert(
-                  `Could not ${nextBlocked ? 'block' : 'unblock'} user`,
-                  apiErrorMessage(error),
-                ),
-              )
-              .finally(() => setBlockPending(false));
-          },
-        },
-      ],
-    );
+    setBlockConfirmation(nextBlocked);
+  }
+
+  async function applyBlock(nextBlocked: boolean) {
+    if (blockPending) return;
+    setBlockPending(true);
+    try {
+      await api.setUserBlocked({ targetUserId, blocked: nextBlocked });
+      setBlocked(nextBlocked);
+      if (nextBlocked) setFollowing(false);
+      setBlockConfirmation(null);
+      const username = profile?.username
+        ? `@${profile.username}`
+        : (profile?.displayName ?? 'User');
+      showProfileNotice(
+        nextBlocked ? `${username} blocked` : `${username} unblocked`,
+      );
+    } catch (error) {
+      Alert.alert(
+        `Could not ${nextBlocked ? 'block' : 'unblock'} user`,
+        apiErrorMessage(error),
+      );
+    } finally {
+      setBlockPending(false);
+    }
+  }
+
+  async function submitProfileReport() {
+    if (reportPending) return;
+    setReportPending(true);
+    try {
+      await api.reportUser({
+        idempotencyKey: createIdempotencyKey('profile-report'),
+        targetUserId,
+        reason: reportReason,
+        ...(reportDetails.trim() ? { details: reportDetails.trim() } : {}),
+      });
+      setReportOpen(false);
+      setReportReason(PROFILE_REPORT_REASONS[0]);
+      setReportDetails('');
+      showProfileNotice('Report sent');
+    } catch (error) {
+      Alert.alert('Could not send report', apiErrorMessage(error));
+    } finally {
+      setReportPending(false);
+    }
   }
 
   async function chooseProfilePhoto() {
@@ -1138,16 +1187,29 @@ export function ProfileScreen({
               }}
               style={styles.actionRow}
             >
+              <PencilIcon color={colors.text} />
               <Text style={styles.actionText}>Share profile</Text>
             </Pressable>
             <Pressable
               disabled={blockPending}
               onPress={() => confirmBlock(!blocked)}
+              style={styles.actionRow}
+            >
+              <PinIcon color={colors.text} />
+              <Text style={styles.actionText}>
+                {blocked ? 'Unblock' : 'Block'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Report user"
+              onPress={() => {
+                setProfileMenuOpen(false);
+                setReportOpen(true);
+              }}
               style={[styles.actionRow, styles.deleteAction]}
             >
-              <Text style={styles.deleteActionText}>
-                {blocked ? 'Unblock user' : 'Block this user'}
-              </Text>
+              <TrashIcon color={actionDangerColor} />
+              <Text style={styles.deleteActionText}>Report</Text>
             </Pressable>
             <View style={styles.actionDivider} />
             <Pressable
@@ -1159,6 +1221,149 @@ export function ProfileScreen({
           </Pressable>
         </Pressable>
       </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => {
+          if (!blockPending) setBlockConfirmation(null);
+        }}
+        transparent
+        visible={blockConfirmation !== null}
+      >
+        <View style={styles.confirmBackdrop}>
+          <Pressable
+            accessibilityLabel="Close block confirmation"
+            disabled={blockPending}
+            onPress={() => setBlockConfirmation(null)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            accessibilityLabel="Block user confirmation"
+            style={styles.confirmCard}
+          >
+            <View style={styles.confirmIcon}>
+              <SuccessMouthPink
+                height={responsiveSize(19)}
+                style={styles.confirmMouthPink}
+                width={responsiveSize(24)}
+              />
+              <SuccessMouthOutline
+                color="#FFFFFF"
+                height={responsiveSize(27)}
+                style={styles.confirmMouthOutline}
+                width={responsiveSize(34)}
+              />
+            </View>
+            <Text style={styles.confirmTitle}>
+              {blockConfirmation
+                ? `Block ${profile?.displayName ?? 'this user'}?`
+                : `Unblock ${profile?.displayName ?? 'this user'}?`}
+            </Text>
+            <Text style={styles.confirmCopy}>
+              {blockConfirmation
+                ? "They can't follow you, message you or see your reviews."
+                : 'They will be able to interact with you again.'}
+            </Text>
+            <View style={styles.confirmActions}>
+              <Pressable
+                disabled={blockPending}
+                onPress={() => setBlockConfirmation(null)}
+                style={styles.confirmButton}
+              >
+                <Text style={styles.confirmButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={
+                  blockConfirmation ? 'Confirm block' : 'Confirm unblock'
+                }
+                disabled={blockPending}
+                onPress={() => void applyBlock(Boolean(blockConfirmation))}
+                style={styles.confirmButton}
+              >
+                {blockPending ? (
+                  <ActivityIndicator color={actionDangerColor} size="small" />
+                ) : (
+                  <Text style={styles.confirmDangerText}>
+                    {blockConfirmation ? 'Block' : 'Unblock'}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setReportOpen(false)}
+        transparent
+        visible={reportOpen}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.reportBackdrop}
+        >
+          <Pressable
+            onPress={() => setReportOpen(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.reportSheet}>
+            <Text style={styles.reportTitle}>
+              Why are you reporting this user?
+            </Text>
+            {PROFILE_REPORT_REASONS.map((reason) => (
+              <Pressable
+                key={reason}
+                onPress={() => setReportReason(reason)}
+                style={styles.reportReasonRow}
+              >
+                <Text style={styles.reportReasonText}>{reason}</Text>
+                <Text style={styles.reportRadio}>
+                  {reportReason === reason ? '◉' : '◯'}
+                </Text>
+              </Pressable>
+            ))}
+            {reportReason === 'Something else' ? (
+              <TextInput
+                maxLength={300}
+                multiline
+                onChangeText={setReportDetails}
+                placeholder="Please provide details (optional)"
+                placeholderTextColor={colors.textMuted}
+                style={styles.reportDetails}
+                value={reportDetails}
+              />
+            ) : null}
+            <View style={styles.reportActions}>
+              <Pressable
+                disabled={reportPending}
+                onPress={() => void submitProfileReport()}
+                style={styles.reportSubmit}
+              >
+                {reportPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.reportSubmitText}>Submit report</Text>
+                )}
+              </Pressable>
+              <Pressable
+                disabled={reportPending}
+                onPress={() => setReportOpen(false)}
+                style={styles.reportCancel}
+              >
+                <Text style={styles.reportCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {profileNotice ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={styles.profileNotice}
+          testID="profile-action-notice"
+        >
+          <Text style={styles.profileNoticeText}>✓ {profileNotice}</Text>
+        </View>
+      ) : null}
       <Modal
         animationType="fade"
         onRequestClose={() => setSelectedReview(null)}
@@ -1414,7 +1619,7 @@ const createStyles = (colors: ThemeColors) => {
       borderWidth: 1,
       borderColor: isDark ? '#45474B' : '#E4E4E4',
       borderRadius: 24,
-      backgroundColor: isDark ? '#161616' : '#FFFFFF',
+      backgroundColor: isDark ? '#080808' : '#FFFFFF',
     },
     actionRow: {
       height: 48,
@@ -1439,7 +1644,7 @@ const createStyles = (colors: ThemeColors) => {
       backgroundColor: isDark ? '#1E0B0A' : 'rgba(160,14,11,0.10)',
     },
     deleteActionText: {
-      color: isDark ? '#D32620' : '#A00E0B',
+      color: '#A00E0B',
       fontSize: 16,
       fontWeight: '500',
       letterSpacing: -0.24,
@@ -1453,6 +1658,166 @@ const createStyles = (colors: ThemeColors) => {
     },
     cancelAction: { backgroundColor: isDark ? '#242424' : 'rgba(0,0,0,0.10)' },
     actionPressed: { opacity: 0.72 },
+    confirmBackdrop: {
+      flex: 1,
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.72)',
+    },
+    confirmCard: {
+      width: '100%',
+      maxWidth: 262,
+      minHeight: 220,
+      paddingTop: 26,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: isDark ? '#766964' : '#D2C8C4',
+      borderRadius: 8,
+      backgroundColor: isDark ? '#352723' : '#FFF8F5',
+    },
+    confirmIcon: {
+      width: 52,
+      height: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: '#C72C28',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.24,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    confirmMouthPink: { position: 'absolute', top: 17, left: 14 },
+    confirmMouthOutline: {
+      position: 'absolute',
+      top: 12,
+      left: 9,
+      transform: [{ scaleY: -1 }],
+    },
+    confirmTitle: {
+      marginTop: 24,
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    confirmCopy: {
+      maxWidth: 210,
+      marginTop: 10,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      textAlign: 'center',
+    },
+    confirmActions: {
+      width: '100%',
+      marginTop: 20,
+      flexDirection: 'row',
+      gap: 8,
+    },
+    confirmButton: {
+      flex: 1,
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 5,
+      backgroundColor: isDark ? '#746C6A' : '#E1D9D6',
+    },
+    confirmButtonText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    confirmDangerText: {
+      color: '#F23832',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    reportBackdrop: {
+      flex: 1,
+      padding: 16,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.72)',
+    },
+    reportSheet: {
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 24,
+      backgroundColor: colors.surfaceRaised,
+    },
+    reportTitle: {
+      marginBottom: 6,
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    reportReasonRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    reportReasonText: { color: colors.text, fontSize: 15 },
+    reportRadio: { color: colors.primary, fontSize: 18 },
+    reportDetails: {
+      minHeight: 82,
+      marginTop: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      color: colors.text,
+      backgroundColor: colors.canvas,
+      textAlignVertical: 'top',
+    },
+    reportActions: { marginTop: 14, flexDirection: 'row', gap: 8 },
+    reportSubmit: {
+      flex: 1,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+    },
+    reportSubmitText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+    reportCancel: {
+      flex: 1,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+    },
+    reportCancelText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    profileNotice: {
+      position: 'absolute',
+      zIndex: 80,
+      top: 162,
+      alignSelf: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      backgroundColor: isDark ? '#242424' : '#FFFFFF',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 5,
+    },
+    profileNoticeText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
     editSheet: {
       padding: 20,
       borderRadius: 24,

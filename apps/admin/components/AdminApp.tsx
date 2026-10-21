@@ -83,7 +83,7 @@ interface ReportItem {
   reporterName: string;
   reason: string;
   details: string;
-  targetType: 'review' | 'comment';
+  targetType: 'review' | 'comment' | 'user';
   targetId: string;
   parentId: string | null;
   contentPreview: string;
@@ -654,21 +654,25 @@ function ReportsView({
               >
                 Dismiss
               </button>
-              <button
-                className="button ghost"
-                onClick={() => {
-                  setText(report.contentPreview);
-                  setSelected({ report, action: 'edit' });
-                }}
-              >
-                Edit
-              </button>
-              <button
-                className="button danger"
-                onClick={() => setSelected({ report, action: 'delete' })}
-              >
-                Remove
-              </button>
+              {report.targetType !== 'user' ? (
+                <>
+                  <button
+                    className="button ghost"
+                    onClick={() => {
+                      setText(report.contentPreview);
+                      setSelected({ report, action: 'edit' });
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="button danger"
+                    onClick={() => setSelected({ report, action: 'delete' })}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : null}
             </div>
           </article>
         ))}
