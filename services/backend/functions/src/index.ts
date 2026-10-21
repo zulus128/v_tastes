@@ -15,6 +15,7 @@ export {
   respondToRequest,
   setUserBlocked,
   updateGroupMembers,
+  updateGroup,
   updateNotificationPreferences,
 } from './modules/community/functions';
 export { requestPhoneOtp, verifyPhoneOtp } from './modules/auth/functions';
@@ -26,8 +27,11 @@ export {
 } from './modules/social/functions';
 export {
   createActivity,
+  deleteActivity,
+  leaveActivity,
   listActivityCandidates,
   respondToActivityInvitation,
+  updateActivity,
 } from './modules/activities/functions';
 export {
   createConversation,

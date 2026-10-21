@@ -6,6 +6,7 @@ import {
   reportCommentInputSchema,
   requestInputSchema,
   updateGroupMembersInputSchema,
+  updateGroupInputSchema,
   updateNotificationPreferencesInputSchema,
   profileExtrasInputSchema,
   setUserBlockedInputSchema,
@@ -615,6 +616,37 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
     })),
   );
   return { id: ref.id };
+});
+
+export const updateGroup = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(updateGroupInputSchema, request.data);
+  const groupRef = db.collection('groups').doc(input.groupId);
+  const conversationRef = db.collection('conversations').doc(input.groupId);
+  await db.runTransaction(async (transaction) => {
+    const [group, conversation] = await Promise.all([
+      transaction.get(groupRef),
+      transaction.get(conversationRef),
+    ]);
+    if (
+      !group.exists ||
+      group.get('status') !== 'active' ||
+      group.get('adminId') !== uid
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Only the active group admin can edit it.',
+      );
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.update(groupRef, { name: input.name, updatedAt: now });
+    if (conversation.exists)
+      transaction.update(conversationRef, {
+        title: input.name,
+        updatedAt: now,
+      });
+  });
+  return { id: input.groupId };
 });
 
 export const leaveGroup = onCall(callableOptions, async (request) => {

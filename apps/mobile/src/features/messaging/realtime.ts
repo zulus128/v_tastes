@@ -389,6 +389,8 @@ export function useConversationMessages(
                   )
                 : [String(data.recipientId ?? '')].filter(Boolean),
               text: String(data.text ?? ''),
+              imageUrl:
+                typeof data.imageUrl === 'string' ? data.imageUrl : null,
               createdAt: toIso(data.createdAt),
             };
           }),

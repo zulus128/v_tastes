@@ -1,6 +1,8 @@
 import {
+  activityInputSchema,
   createActivityInputSchema,
   respondToActivityInvitationInputSchema,
+  updateActivityInputSchema,
 } from '@tastes/contracts';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -393,3 +395,181 @@ export const respondToActivityInvitation = onCall(
     return { id: input.activityId };
   },
 );
+
+export const updateActivity = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(updateActivityInputSchema, request.data);
+  const activityRef = db.collection('activities').doc(input.activityId);
+  const conversationRef = db.collection('conversations').doc(input.activityId);
+  const organizerRef = db.collection('users').doc(uid);
+  const venueRef = db.collection('venues').doc(input.venueId);
+  const selectedIds = [...new Set(input.memberIds)].filter((id) => id !== uid);
+  const startsAt = new Date(input.startsAt);
+  await db.runTransaction(async (transaction) => {
+    const [activity, conversation, organizer, venue] = await Promise.all([
+      transaction.get(activityRef),
+      transaction.get(conversationRef),
+      transaction.get(organizerRef),
+      transaction.get(venueRef),
+    ]);
+    if (
+      !activity.exists ||
+      activity.get('status') !== 'active' ||
+      activity.get('organizerId') !== uid ||
+      !conversation.exists
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Only the active activity organizer can edit it.',
+      );
+    }
+    if (!venue.exists || venue.get('status') !== 'active') {
+      throw new HttpsError('not-found', 'The place was not found.');
+    }
+    const previousIds = Array.isArray(activity.get('participantIds'))
+      ? (activity.get('participantIds') as string[]).filter((id) => id !== uid)
+      : [];
+    const previousStatuses =
+      activity.get('invitationStatuses') &&
+      typeof activity.get('invitationStatuses') === 'object'
+        ? (activity.get('invitationStatuses') as Record<string, unknown>)
+        : {};
+    const addedIds = selectedIds.filter((id) => !previousIds.includes(id));
+    const memberData = await Promise.all(
+      addedIds.flatMap((memberId) => [
+        transaction.get(db.collection('users').doc(memberId)),
+        transaction.get(organizerRef.collection('following').doc(memberId)),
+        transaction.get(
+          db.collection('users').doc(memberId).collection('following').doc(uid),
+        ),
+      ]),
+    );
+    for (let index = 0; index < addedIds.length; index += 1) {
+      if (
+        !memberData[index * 3]?.exists ||
+        memberData[index * 3]?.get('status') !== 'active' ||
+        !memberData[index * 3 + 1]?.exists ||
+        !memberData[index * 3 + 2]?.exists
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'Activities can only include active mutual followers.',
+        );
+      }
+    }
+    const now = FieldValue.serverTimestamp();
+    const participantIds = [uid, ...selectedIds];
+    const statuses = {
+      [uid]: 'accepted',
+      ...Object.fromEntries(
+        selectedIds.map((id) => [
+          id,
+          previousIds.includes(id) &&
+          (previousStatuses[id] === 'accepted' ||
+            previousStatuses[id] === 'pending')
+            ? previousStatuses[id]
+            : 'pending',
+        ]),
+      ),
+    };
+    const shared = {
+      participantIds,
+      invitationStatuses: statuses,
+      venueId: venue.id,
+      venueName: String(venue.get('name') ?? ''),
+      imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
+      startsAt: Timestamp.fromDate(startsAt),
+      updatedAt: now,
+    };
+    transaction.update(activityRef, shared);
+    transaction.update(conversationRef, {
+      ...shared,
+      title: shared.venueName,
+      address: venue.get('address')
+        ? String(venue.get('address'))
+        : String(venue.get('city') ?? ''),
+    });
+    const organizerName = String(organizer.get('displayName') ?? 'Someone');
+    addedIds.forEach((memberId) =>
+      queueNotification(transaction, {
+        recipientId: memberId,
+        type: 'activity-invite',
+        eventKey: input.activityId,
+        actorId: uid,
+        actorName: organizerName,
+        params: { place: shared.venueName || 'an activity' },
+        targetId: input.activityId,
+      }),
+    );
+  });
+  return { id: input.activityId };
+});
+
+export const leaveActivity = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(activityInputSchema, request.data);
+  const activityRef = db.collection('activities').doc(input.activityId);
+  const conversationRef = db.collection('conversations').doc(input.activityId);
+  await db.runTransaction(async (transaction) => {
+    const [activity, conversation] = await Promise.all([
+      transaction.get(activityRef),
+      transaction.get(conversationRef),
+    ]);
+    if (!activity.exists || activity.get('status') !== 'active') {
+      throw new HttpsError('not-found', 'Activity not found.');
+    }
+    if (activity.get('organizerId') === uid) {
+      throw new HttpsError(
+        'failed-precondition',
+        'The organizer must delete the activity instead.',
+      );
+    }
+    const participantIds = (activity.get('participantIds') ?? []) as string[];
+    if (!participantIds.includes(uid)) {
+      throw new HttpsError('not-found', 'Activity not found.');
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.update(activityRef, {
+      participantIds: FieldValue.arrayRemove(uid),
+      updatedAt: now,
+    });
+    if (conversation.exists) {
+      transaction.update(conversationRef, {
+        participantIds: FieldValue.arrayRemove(uid),
+        updatedAt: now,
+      });
+    }
+  });
+  return { id: input.activityId };
+});
+
+export const deleteActivity = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(activityInputSchema, request.data);
+  const activityRef = db.collection('activities').doc(input.activityId);
+  const conversationRef = db.collection('conversations').doc(input.activityId);
+  await db.runTransaction(async (transaction) => {
+    const [activity, conversation] = await Promise.all([
+      transaction.get(activityRef),
+      transaction.get(conversationRef),
+    ]);
+    if (
+      !activity.exists ||
+      activity.get('status') !== 'active' ||
+      activity.get('organizerId') !== uid
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Only the activity organizer can delete it.',
+      );
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.update(activityRef, { status: 'deleted', updatedAt: now });
+    if (conversation.exists)
+      transaction.update(conversationRef, {
+        status: 'deleted',
+        updatedAt: now,
+      });
+  });
+  return { id: input.activityId };
+});

@@ -365,11 +365,31 @@ export const respondToActivityInvitationInputSchema = z.object({
   response: z.enum(['accepted', 'declined']),
 });
 
-export const sendMessageInputSchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
-  conversationId: z.string().min(1).max(128),
-  text: z.string().trim().min(1, 'Enter a message.').max(4_000),
+export const activityInputSchema = z.object({
+  activityId: z.string().min(1).max(128),
 });
+
+export const updateActivityInputSchema = activityInputSchema
+  .extend({
+    venueId: z.string().trim().min(1).max(128),
+    startsAt: z.string().datetime(),
+    memberIds: z.array(z.string().min(1).max(128)).max(20),
+  })
+  .refine((input) => new Set(input.memberIds).size === input.memberIds.length, {
+    message: 'Choose each member only once.',
+    path: ['memberIds'],
+  });
+
+export const sendMessageInputSchema = z
+  .object({
+    idempotencyKey: idempotencyKeySchema,
+    conversationId: z.string().min(1).max(128),
+    text: z.string().trim().max(4_000).default(''),
+    imageUrl: z.string().url().max(2_048).optional(),
+  })
+  .refine((input) => Boolean(input.text || input.imageUrl), {
+    message: 'Enter a message or attach a photo.',
+  });
 
 export const conversationInputSchema = z.object({
   conversationId: z.string().min(1).max(128),
@@ -591,6 +611,9 @@ export const groupInputSchema = z.object({
 export const updateGroupMembersInputSchema = groupInputSchema.extend({
   memberIds: z.array(z.string().min(1).max(128)).max(50),
 });
+export const updateGroupInputSchema = groupInputSchema.extend({
+  name: z.string().trim().min(2).max(60),
+});
 export const updateNotificationPreferencesInputSchema = z.object({
   enabled: z.boolean(),
   push: z.boolean(),
@@ -691,6 +714,8 @@ export type CreateActivityInput = z.infer<typeof createActivityInputSchema>;
 export type RespondToActivityInvitationInput = z.infer<
   typeof respondToActivityInvitationInputSchema
 >;
+export type ActivityInput = z.infer<typeof activityInputSchema>;
+export type UpdateActivityInput = z.infer<typeof updateActivityInputSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type HideConversationInput = z.infer<typeof hideConversationInputSchema>;
@@ -747,6 +772,7 @@ export type GroupInput = z.infer<typeof groupInputSchema>;
 export type UpdateGroupMembersInput = z.infer<
   typeof updateGroupMembersInputSchema
 >;
+export type UpdateGroupInput = z.infer<typeof updateGroupInputSchema>;
 export type UpdateNotificationPreferencesInput = z.infer<
   typeof updateNotificationPreferencesInputSchema
 >;
@@ -973,6 +999,7 @@ export interface ChatMessage {
   recipientId: string;
   recipientIds: string[];
   text: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 

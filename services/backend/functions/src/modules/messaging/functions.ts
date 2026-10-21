@@ -480,6 +480,9 @@ export const getMessages = onCall(callableOptions, async (request) => {
               )
           : [String(document.get('recipientId'))].filter(Boolean),
         text: String(document.get('text')),
+        imageUrl: document.get('imageUrl')
+          ? String(document.get('imageUrl'))
+          : null,
         createdAt: timestampToIso(document.get('createdAt')),
       };
     }),
@@ -614,7 +617,8 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       recipientId: recipientIds.length === 1 ? recipientIds[0] : '',
       recipientIds,
       text: input.text,
-      type: 'text',
+      imageUrl: input.imageUrl ?? null,
+      type: input.imageUrl ? 'image' : 'text',
       status: 'sent',
       createdAt: now,
     });
@@ -635,7 +639,7 @@ export const sendMessage = onCall(callableOptions, async (request) => {
         senderPhotoUrl: user.get('photoUrl')
           ? String(user.get('photoUrl'))
           : null,
-        text: input.text,
+        text: input.text || 'Photo',
         createdAt: now,
       },
       'messageCount',
@@ -669,7 +673,7 @@ export const sendMessage = onCall(callableOptions, async (request) => {
         type: 'message',
         conversationId: conversationRef.id,
         messageId: messageRef.id,
-        preview: input.text.slice(0, 160),
+        preview: (input.text || 'Photo').slice(0, 160),
         readAt: null,
         pushStatus: 'pending',
         createdAt: now,

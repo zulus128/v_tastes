@@ -71,7 +71,7 @@ export type RootStackParamList = {
   Leaderboard: undefined;
   Place: { venueId: string };
   Conversation: { conversationId: string };
-  NewActivity: undefined;
+  NewActivity: { activityId?: string } | undefined;
   ActivityDetails: { activityId: string };
   Notifications: undefined;
   TastesAI: undefined;
@@ -595,13 +595,16 @@ export function ProductNavigator({
           )}
         </RootStack.Screen>
         <RootStack.Screen name="NewActivity">
-          {({ navigation }) => (
+          {({ navigation, route }) => (
             <NewActivityScreen
+              activityId={route.params?.activityId}
               onBack={navigation.goBack}
               onCreated={(activityId) =>
-                navigation.replace('Conversation', {
-                  conversationId: activityId,
-                })
+                route.params?.activityId
+                  ? navigation.goBack()
+                  : navigation.replace('Conversation', {
+                      conversationId: activityId,
+                    })
               }
               userId={user.uid}
             />
@@ -619,6 +622,9 @@ export function ProductNavigator({
             <ActivityDetailsScreen
               activityId={route.params.activityId}
               onBack={navigation.goBack}
+              onEdit={(activityId) =>
+                navigation.navigate('NewActivity', { activityId })
+              }
             />
           )}
         </RootStack.Screen>

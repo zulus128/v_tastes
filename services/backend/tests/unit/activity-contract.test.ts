@@ -1,6 +1,7 @@
 import {
   createActivityInputSchema,
   respondToActivityInvitationInputSchema,
+  updateActivityInputSchema,
 } from '@tastes/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -17,33 +18,74 @@ describe('createActivityInputSchema', () => {
   });
 
   it('requires at least one member', () => {
-    expect(createActivityInputSchema.safeParse({ ...validInput, memberIds: [] }).success).toBe(false);
+    expect(
+      createActivityInputSchema.safeParse({ ...validInput, memberIds: [] })
+        .success,
+    ).toBe(false);
   });
 
   it('rejects duplicate members', () => {
-    expect(createActivityInputSchema.safeParse({
-      ...validInput,
-      memberIds: ['friend-1', 'friend-1'],
-    }).success).toBe(false);
+    expect(
+      createActivityInputSchema.safeParse({
+        ...validInput,
+        memberIds: ['friend-1', 'friend-1'],
+      }).success,
+    ).toBe(false);
   });
 
   it('requires an ISO datetime', () => {
-    expect(createActivityInputSchema.safeParse({ ...validInput, startsAt: 'tomorrow' }).success).toBe(false);
+    expect(
+      createActivityInputSchema.safeParse({
+        ...validInput,
+        startsAt: 'tomorrow',
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe('respondToActivityInvitationInputSchema', () => {
-  it.each(['accepted', 'declined'] as const)('accepts the %s response', (response) => {
-    expect(respondToActivityInvitationInputSchema.safeParse({
-      activityId: 'activity-1',
-      response,
-    }).success).toBe(true);
-  });
+  it.each(['accepted', 'declined'] as const)(
+    'accepts the %s response',
+    (response) => {
+      expect(
+        respondToActivityInvitationInputSchema.safeParse({
+          activityId: 'activity-1',
+          response,
+        }).success,
+      ).toBe(true);
+    },
+  );
 
   it('rejects unsupported invitation responses', () => {
-    expect(respondToActivityInvitationInputSchema.safeParse({
-      activityId: 'activity-1',
-      response: 'maybe',
-    }).success).toBe(false);
+    expect(
+      respondToActivityInvitationInputSchema.safeParse({
+        activityId: 'activity-1',
+        response: 'maybe',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('updateActivityInputSchema', () => {
+  it('accepts editing place, time, and members', () => {
+    expect(
+      updateActivityInputSchema.safeParse({
+        activityId: 'activity-1',
+        memberIds: ['friend-1', 'friend-2'],
+        startsAt: validInput.startsAt,
+        venueId: validInput.venueId,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('allows an organizer to remove every guest', () => {
+    expect(
+      updateActivityInputSchema.safeParse({
+        activityId: 'activity-1',
+        memberIds: [],
+        startsAt: validInput.startsAt,
+        venueId: validInput.venueId,
+      }).success,
+    ).toBe(true);
   });
 });

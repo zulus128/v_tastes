@@ -396,6 +396,9 @@ export function GroupDetailsScreen({
   const [adding, setAdding] = useState(false);
   const [searching, setSearching] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const load = async () => {
     const [g, people] = await Promise.all([
       api.getGroup({ groupId }),
@@ -408,6 +411,25 @@ export function GroupDetailsScreen({
     void load().catch((e) =>
       Alert.alert('Could not load group', apiErrorMessage(e)),
     );
+  }, [api, groupId]);
+  useEffect(() => {
+    let active = true;
+    void api
+      .getMessages({ conversationId: groupId, cursor: null, limit: 50 })
+      .then((result) => {
+        if (active)
+          setMediaUrls(
+            result.data.items.flatMap((message) =>
+              message.imageUrl ? [message.imageUrl] : [],
+            ),
+          );
+      })
+      .catch(() => {
+        if (active) setMediaUrls([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [api, groupId]);
   const normalizedMemberQuery = memberQuery.trim();
   useEffect(() => {
@@ -450,6 +472,17 @@ export function GroupDetailsScreen({
       </Screen>
     );
   const admin = currentUserId === group.adminId;
+  const saveName = async () => {
+    const name = nameDraft.trim();
+    if (name.length < 2) return;
+    try {
+      await api.updateGroup({ groupId, name });
+      setGroup((current) => (current ? { ...current, name } : current));
+      setEditingName(false);
+    } catch (error) {
+      Alert.alert('Could not update group', apiErrorMessage(error));
+    }
+  };
   const update = async (ids: string[], userId: string) => {
     setUpdatingUserId(userId);
     try {
@@ -485,10 +518,19 @@ export function GroupDetailsScreen({
   return (
     <Screen style={styles.screen}>
       <Header
+        action={admin ? (editingName ? 'Save' : 'Edit') : undefined}
+        actionDisabled={editingName && nameDraft.trim().length < 2}
+        onAction={() => {
+          if (editingName) void saveName();
+          else {
+            setNameDraft(group.name);
+            setEditingName(true);
+          }
+        }}
         onBack={onBack}
         safeTop={insets.top}
         styles={styles}
-        title="Group details"
+        title={group.name}
       />
       <FlatList
         contentContainerStyle={styles.details}
@@ -497,16 +539,43 @@ export function GroupDetailsScreen({
         keyExtractor={(item) => `${item.kind}-${item.person.userId}`}
         ListHeaderComponent={
           <>
-            <View style={styles.groupAvatarLarge}>
-              <Text style={styles.groupAvatarLargeText}>
-                {group.name
-                  .split(' ')
-                  .map((v) => v[0])
-                  .join('')
-                  .slice(0, 2)}
-              </Text>
-            </View>
-            <Text style={styles.detailsTitle}>{group.name}</Text>
+            <Text style={styles.detailSectionTitle}>MEDIA</Text>
+            {mediaUrls.length ? (
+              <View style={styles.groupMediaGrid}>
+                {mediaUrls.slice(0, 6).map((url, index) => (
+                  <Image
+                    key={`${url}-${index}`}
+                    source={{ uri: url }}
+                    style={styles.groupMediaPhoto}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => onOpenConversation(groupId)}
+                style={styles.groupMediaEmpty}
+              >
+                <Text style={styles.groupMediaEmptyTitle}>
+                  No shared photos yet
+                </Text>
+                <Text style={styles.groupMediaEmptyCopy}>
+                  Open chat and use + to add media.
+                </Text>
+              </Pressable>
+            )}
+            {editingName ? (
+              <TextInput
+                autoFocus
+                maxLength={60}
+                onChangeText={setNameDraft}
+                placeholder="Group name"
+                placeholderTextColor={colors.placeholder}
+                style={styles.detailsNameInput}
+                value={nameDraft}
+              />
+            ) : (
+              <Text style={styles.detailsTitle}>{group.name}</Text>
+            )}
             <Text style={styles.detailsSubtitle}>
               {group.members.length}{' '}
               {group.members.length === 1 ? 'member' : 'members'}
@@ -980,6 +1049,45 @@ function createStyles(colors: ThemeColors) {
     },
     createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
     details: { paddingBottom: 40 },
+    detailSectionTitle: {
+      marginTop: 20,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    groupMediaGrid: {
+      marginHorizontal: 16,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    groupMediaPhoto: {
+      width: '31.8%',
+      aspectRatio: 1,
+      borderRadius: 10,
+      backgroundColor: colors.skeleton,
+    },
+    groupMediaEmpty: {
+      minHeight: 112,
+      marginHorizontal: 16,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    groupMediaEmptyTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    groupMediaEmptyCopy: {
+      marginTop: 5,
+      color: colors.textMuted,
+      fontSize: 12,
+    },
     groupAvatarLarge: {
       width: 118,
       height: 118,
@@ -996,6 +1104,20 @@ function createStyles(colors: ThemeColors) {
       color: colors.text,
       fontSize: 22,
       fontWeight: '800',
+      textAlign: 'center',
+    },
+    detailsNameInput: {
+      height: 46,
+      marginTop: 14,
+      marginHorizontal: 32,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 12,
+      color: colors.text,
+      backgroundColor: colors.surface,
+      fontSize: 18,
+      fontWeight: '700',
       textAlign: 'center',
     },
     detailsSubtitle: {

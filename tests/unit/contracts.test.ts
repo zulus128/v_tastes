@@ -279,6 +279,14 @@ describe('public API contracts', () => {
       text: 'Hello',
     });
     expect(
+      sendMessageInputSchema.safeParse({
+        conversationId: 'conversation-1',
+        idempotencyKey: 'message-photo-001',
+        imageUrl: 'https://storage.example/photo.jpg',
+        text: '',
+      }).success,
+    ).toBe(true);
+    expect(
       getMessagesInputSchema.parse({ conversationId: 'conversation-1' }),
     ).toEqual({
       conversationId: 'conversation-1',

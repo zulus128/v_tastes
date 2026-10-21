@@ -18,6 +18,7 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { doc, getDoc } from 'firebase/firestore';
 import BookmarkBodyIcon from '../../../assets/activities/bookmark-body.svg';
 import BookmarkBodyLightIcon from '../../../assets/activities/bookmark-body-light.svg';
 import BookmarkLineIcon from '../../../assets/activities/bookmark-line.svg';
@@ -26,6 +27,7 @@ import SearchTuneIcon from '../../../assets/activities/place-tuning.svg';
 import SearchTuneLightIcon from '../../../assets/activities/place-tuning-light.svg';
 import PenIcon from '../../../assets/create-review/pen.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
+import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -65,10 +67,12 @@ function formatTime(date: Date): string {
 }
 
 export function NewActivityScreen({
+  activityId,
   onBack,
   onCreated,
   userId,
 }: {
+  activityId?: string;
   onBack: () => void;
   onCreated: (activityId: string) => void;
   userId: string;
@@ -89,6 +93,7 @@ export function NewActivityScreen({
   const [timeOpen, setTimeOpen] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingActivity, setLoadingActivity] = useState(Boolean(activityId));
   const [idempotencyKey, setIdempotencyKey] = useState(() =>
     createIdempotencyKey('activity'),
   );
@@ -112,6 +117,42 @@ export function NewActivityScreen({
     };
   }, [api]);
 
+  useEffect(() => {
+    if (!activityId) return;
+    let active = true;
+    void getDoc(doc(firestore, 'activities', activityId))
+      .then(async (snapshot) => {
+        if (!snapshot.exists()) throw new Error('Activity not found.');
+        const data = snapshot.data();
+        const venueId = String(data.venueId ?? '');
+        const place = await api.getPlace({ venueId });
+        if (!active) return;
+        setVenue(place.data.venue);
+        setStartsAt(
+          data.startsAt && typeof data.startsAt.toDate === 'function'
+            ? data.startsAt.toDate()
+            : new Date(String(data.startsAt ?? Date.now())),
+        );
+        setMemberIds(
+          Array.isArray(data.participantIds)
+            ? data.participantIds.filter(
+                (value): value is string =>
+                  typeof value === 'string' && value !== data.organizerId,
+              )
+            : [],
+        );
+      })
+      .catch((error) =>
+        Alert.alert('Could not load activity', apiErrorMessage(error)),
+      )
+      .finally(() => {
+        if (active) setLoadingActivity(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activityId, api]);
+
   const selectedMembers = candidates.filter((candidate) =>
     memberIds.includes(candidate.userId),
   );
@@ -131,17 +172,29 @@ export function NewActivityScreen({
     if (!venue || !valid || submitting) return;
     setSubmitting(true);
     try {
-      const created = await api.createActivity({
-        idempotencyKey,
-        memberIds,
-        startsAt: startsAt.toISOString(),
-        venueId: venue.id,
-      });
+      const created = activityId
+        ? await api.updateActivity({
+            activityId,
+            memberIds,
+            startsAt: startsAt.toISOString(),
+            venueId: venue.id,
+          })
+        : await api.createActivity({
+            idempotencyKey,
+            memberIds,
+            startsAt: startsAt.toISOString(),
+            venueId: venue.id,
+          });
       setIdempotencyKey(createIdempotencyKey('activity'));
       Alert.alert(
-        'Activity created',
+        activityId ? 'Activity updated' : 'Activity created',
         `${venue.name} · ${startsAt.toLocaleString()}`,
-        [{ text: 'Open chat', onPress: () => onCreated(created.data.id) }],
+        [
+          {
+            text: activityId ? 'Done' : 'Open chat',
+            onPress: () => onCreated(created.data.id),
+          },
+        ],
       );
     } catch (error) {
       Alert.alert('Could not create activity', apiErrorMessage(error));
@@ -160,179 +213,186 @@ export function NewActivityScreen({
         >
           <Text style={styles.back}>‹</Text>
         </Pressable>
-        <Text style={styles.navTitle}>New activity</Text>
+        <Text style={styles.navTitle}>
+          {activityId ? 'Edit activity' : 'New activity'}
+        </Text>
         <View style={styles.navButton} />
       </View>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingBottom:
-              Math.max(insets.bottom, responsiveSize(14)) + responsiveSize(78),
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.sectionLabel}>PLACE</Text>
-        {venue ? (
-          <View style={styles.venueCard}>
-            <Image
-              source={venueImage(venue.imageUrl)}
-              style={styles.venueImage}
-            />
-            <View style={styles.venueCopy}>
-              <Text numberOfLines={2} style={styles.venueName}>
-                {venue.name}
-              </Text>
-              <Text numberOfLines={2} style={styles.venueAddress}>
-                {venue.address ?? venue.city}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Change place"
-              onPress={() => setPlaceOpen(true)}
-              style={styles.edit}
-            >
-              <PenIcon
-                color={colors.text}
-                height={responsiveSize(18)}
-                width={responsiveSize(18)}
-              />
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            onPress={() => setPlaceOpen(true)}
-            style={styles.outlineButton}
-          >
-            <Text style={styles.outlineButtonText}>Select Place</Text>
-          </Pressable>
-        )}
-
-        <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>TIME</Text>
-        <View style={styles.calendar}>
-          <View style={styles.calendarHeader}>
-            <Text style={styles.month}>
-              {month.toLocaleDateString(undefined, {
-                month: 'long',
-                year: 'numeric',
-              })}
-            </Text>
-            <View style={styles.monthActions}>
-              <Pressable
-                onPress={() =>
-                  setMonth(
-                    new Date(month.getFullYear(), month.getMonth() - 1, 1),
-                  )
-                }
-              >
-                <Text style={styles.monthArrow}>‹</Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  setMonth(
-                    new Date(month.getFullYear(), month.getMonth() + 1, 1),
-                  )
-                }
-              >
-                <Text style={styles.monthArrow}>›</Text>
-              </Pressable>
-            </View>
-          </View>
-          <View style={styles.weekRow}>
-            {weekdays.map((day) => (
-              <Text key={day} style={styles.weekday}>
-                {day}
-              </Text>
-            ))}
-          </View>
-          <View style={styles.days}>
-            {cells.map((day, index) => {
-              const selected =
-                day !== null &&
-                startsAt.getFullYear() === month.getFullYear() &&
-                startsAt.getMonth() === month.getMonth() &&
-                startsAt.getDate() === day;
-              const past =
-                day !== null &&
-                new Date(
-                  month.getFullYear(),
-                  month.getMonth(),
-                  day,
-                  23,
-                  59,
-                ).getTime() < Date.now();
-              return (
-                <Pressable
-                  disabled={day === null || past}
-                  key={`${day ?? 'blank'}-${index}`}
-                  onPress={() => day && chooseDay(day)}
-                  style={styles.dayCell}
-                >
-                  <View
-                    style={[styles.dayCircle, selected && styles.daySelected]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        past && styles.dayPast,
-                        selected && styles.daySelectedText,
-                      ]}
-                    >
-                      {day ?? ''}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Time</Text>
-            <Pressable
-              onPress={() => setTimeOpen(true)}
-              style={styles.timePill}
-            >
-              <Text style={styles.timeValue}>{formatTime(startsAt)}</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>MEMBERS</Text>
-        {selectedMembers.map((member) => (
-          <View key={member.userId} style={styles.memberRow}>
-            <Avatar member={member} styles={styles} />
-            <View style={styles.memberCopy}>
-              <Text style={styles.memberName}>{member.displayName}</Text>
-              <Text style={styles.memberHandle}>
-                {member.username ? `@${member.username}` : 'Mutual follower'}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel={`Remove ${member.displayName}`}
-              onPress={() =>
-                setMemberIds((current) =>
-                  current.filter((id) => id !== member.userId),
-                )
-              }
-            >
-              <Text style={styles.remove}>×</Text>
-            </Pressable>
-          </View>
-        ))}
-        <Pressable
-          disabled={loadingCandidates}
-          onPress={() => setMembersOpen(true)}
-          style={styles.addMember}
+      {loadingActivity ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : (
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingBottom:
+                Math.max(insets.bottom, responsiveSize(14)) +
+                responsiveSize(78),
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
         >
-          {loadingCandidates ? (
-            <ActivityIndicator color={colors.primary} />
+          <Text style={styles.sectionLabel}>PLACE</Text>
+          {venue ? (
+            <View style={styles.venueCard}>
+              <Image
+                source={venueImage(venue.imageUrl)}
+                style={styles.venueImage}
+              />
+              <View style={styles.venueCopy}>
+                <Text numberOfLines={2} style={styles.venueName}>
+                  {venue.name}
+                </Text>
+                <Text numberOfLines={2} style={styles.venueAddress}>
+                  {venue.address ?? venue.city}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Change place"
+                onPress={() => setPlaceOpen(true)}
+                style={styles.edit}
+              >
+                <PenIcon
+                  color={colors.text}
+                  height={responsiveSize(18)}
+                  width={responsiveSize(18)}
+                />
+              </Pressable>
+            </View>
           ) : (
-            <Text style={styles.addMemberText}>+</Text>
+            <Pressable
+              onPress={() => setPlaceOpen(true)}
+              style={styles.outlineButton}
+            >
+              <Text style={styles.outlineButtonText}>Select Place</Text>
+            </Pressable>
           )}
-        </Pressable>
-      </ScrollView>
+
+          <View style={styles.divider} />
+          <Text style={styles.sectionLabel}>TIME</Text>
+          <View style={styles.calendar}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.month}>
+                {month.toLocaleDateString(undefined, {
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </Text>
+              <View style={styles.monthActions}>
+                <Pressable
+                  onPress={() =>
+                    setMonth(
+                      new Date(month.getFullYear(), month.getMonth() - 1, 1),
+                    )
+                  }
+                >
+                  <Text style={styles.monthArrow}>‹</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    setMonth(
+                      new Date(month.getFullYear(), month.getMonth() + 1, 1),
+                    )
+                  }
+                >
+                  <Text style={styles.monthArrow}>›</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View style={styles.weekRow}>
+              {weekdays.map((day) => (
+                <Text key={day} style={styles.weekday}>
+                  {day}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.days}>
+              {cells.map((day, index) => {
+                const selected =
+                  day !== null &&
+                  startsAt.getFullYear() === month.getFullYear() &&
+                  startsAt.getMonth() === month.getMonth() &&
+                  startsAt.getDate() === day;
+                const past =
+                  day !== null &&
+                  new Date(
+                    month.getFullYear(),
+                    month.getMonth(),
+                    day,
+                    23,
+                    59,
+                  ).getTime() < Date.now();
+                return (
+                  <Pressable
+                    disabled={day === null || past}
+                    key={`${day ?? 'blank'}-${index}`}
+                    onPress={() => day && chooseDay(day)}
+                    style={styles.dayCell}
+                  >
+                    <View
+                      style={[styles.dayCircle, selected && styles.daySelected]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          past && styles.dayPast,
+                          selected && styles.daySelectedText,
+                        ]}
+                      >
+                        {day ?? ''}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeLabel}>Time</Text>
+              <Pressable
+                onPress={() => setTimeOpen(true)}
+                style={styles.timePill}
+              >
+                <Text style={styles.timeValue}>{formatTime(startsAt)}</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+          <Text style={styles.sectionLabel}>MEMBERS</Text>
+          {selectedMembers.map((member) => (
+            <View key={member.userId} style={styles.memberRow}>
+              <Avatar member={member} styles={styles} />
+              <View style={styles.memberCopy}>
+                <Text style={styles.memberName}>{member.displayName}</Text>
+                <Text style={styles.memberHandle}>
+                  {member.username ? `@${member.username}` : 'Mutual follower'}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel={`Remove ${member.displayName}`}
+                onPress={() =>
+                  setMemberIds((current) =>
+                    current.filter((id) => id !== member.userId),
+                  )
+                }
+              >
+                <Text style={styles.remove}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            disabled={loadingCandidates}
+            onPress={() => setMembersOpen(true)}
+            style={styles.addMember}
+          >
+            {loadingCandidates ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={styles.addMemberText}>+</Text>
+            )}
+          </Pressable>
+        </ScrollView>
+      )}
 
       <View
         style={[
@@ -351,7 +411,9 @@ export function NewActivityScreen({
           {submitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.createText}>Create activity</Text>
+            <Text style={styles.createText}>
+              {activityId ? 'Save changes' : 'Create activity'}
+            </Text>
           )}
         </Pressable>
       </View>

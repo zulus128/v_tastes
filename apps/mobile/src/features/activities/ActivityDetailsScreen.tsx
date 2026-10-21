@@ -2,6 +2,7 @@ import { doc, getDoc, onSnapshot, type DocumentData } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -12,7 +13,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import restaurantImage from '../../../assets/discover/restaurant.png';
+import { apiErrorMessage } from '@tastes/firebase-client';
 import { firestore } from '../../infrastructure/firebase';
+import {
+  useAuthenticatedUserId,
+  useTastesApi,
+} from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
@@ -27,6 +33,7 @@ type ActivityDetails = {
   organizerId: string;
   startsAt: Date;
   venue: {
+    id: string;
     address: string;
     category: string;
     city: string;
@@ -56,15 +63,21 @@ function memberFromData(id: string, data: DocumentData | undefined): Member {
 export function ActivityDetailsScreen({
   activityId,
   onBack,
+  onEdit,
 }: {
   activityId: string;
   onBack: () => void;
+  onEdit: (activityId: string) => void;
 }) {
+  const api = useTastesApi();
+  const currentUserId = useAuthenticatedUserId();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [details, setDetails] = useState<ActivityDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     if (__DEV__ && activityId === 'visual-audit-activity') {
@@ -72,6 +85,7 @@ export function ActivityDetailsScreen({
         organizerId: 'visual-audit-user',
         startsAt: new Date('2026-09-20T19:00:00Z'),
         venue: {
+          id: 'visual-audit-venue',
           address: '38 Beauchamp Place',
           category: 'Restaurant',
           city: 'London',
@@ -116,6 +130,7 @@ export function ActivityDetailsScreen({
               organizerId: String(data.organizerId ?? ''),
               startsAt,
               venue: {
+                id: venueId,
                 address:
                   typeof venue?.address === 'string' ? venue.address : '',
                 category:
@@ -145,6 +160,27 @@ export function ActivityDetailsScreen({
     );
   }, [activityId]);
 
+  useEffect(() => {
+    if (!details) return;
+    let active = true;
+    void api
+      .getMessages({ conversationId: activityId, cursor: null, limit: 50 })
+      .then((result) => {
+        if (active)
+          setMediaUrls(
+            result.data.items.flatMap((message) =>
+              message.imageUrl ? [message.imageUrl] : [],
+            ),
+          );
+      })
+      .catch(() => {
+        if (active) setMediaUrls([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activityId, api, details?.startsAt]);
+
   if (!details) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -170,6 +206,38 @@ export function ActivityDetailsScreen({
   });
   const price =
     details.venue.priceLevel > 0 ? '$'.repeat(details.venue.priceLevel) : null;
+  const admin =
+    currentUserId === details.organizerId ||
+    (__DEV__ && activityId === 'visual-audit-activity');
+  const finish = async (action: 'delete' | 'leave') => {
+    try {
+      if (action === 'delete') await api.deleteActivity({ activityId });
+      else await api.leaveActivity({ activityId });
+      onBack();
+    } catch (actionError) {
+      Alert.alert(`Could not ${action} activity`, apiErrorMessage(actionError));
+    }
+  };
+  const removeMember = async (memberId: string) => {
+    setUpdatingMemberId(memberId);
+    try {
+      await api.updateActivity({
+        activityId,
+        venueId: details.venue.id,
+        startsAt: details.startsAt.toISOString(),
+        memberIds: details.members
+          .filter(
+            (member) =>
+              member.id !== memberId && member.id !== details.organizerId,
+          )
+          .map((member) => member.id),
+      });
+    } catch (actionError) {
+      Alert.alert('Could not remove member', apiErrorMessage(actionError));
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
   return (
     <View style={styles.screen}>
       <FlatList
@@ -199,7 +267,44 @@ export function ActivityDetailsScreen({
                 <Text numberOfLines={1} style={styles.navTitle}>
                   {details.venue.name}
                 </Text>
-                <View style={styles.navButton} />
+                <View style={styles.navActions}>
+                  {admin ? (
+                    <Pressable
+                      accessibilityLabel="Edit activity"
+                      onPress={() => onEdit(activityId)}
+                      style={styles.navButton}
+                    >
+                      <Text style={styles.navActionText}>✎</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    accessibilityLabel={
+                      admin ? 'Delete activity' : 'Leave activity'
+                    }
+                    onPress={() =>
+                      Alert.alert(
+                        admin ? 'Delete activity?' : 'Leave activity?',
+                        admin
+                          ? 'This will remove the activity for everyone.'
+                          : 'You will lose access to this activity chat.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: admin ? 'Delete' : 'Leave',
+                            style: 'destructive',
+                            onPress: () =>
+                              void finish(admin ? 'delete' : 'leave'),
+                          },
+                        ],
+                      )
+                    }
+                    style={styles.navButton}
+                  >
+                    <Text style={[styles.navActionText, styles.dangerText]}>
+                      {admin ? '⌫' : '↗'}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
               <View style={styles.datePill}>
                 <Text style={styles.dateText}>
@@ -229,12 +334,26 @@ export function ActivityDetailsScreen({
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>MEDIA</Text>
-              <View style={styles.mediaEmpty}>
-                <Text style={styles.mediaEmptyTitle}>No shared photos yet</Text>
-                <Text style={styles.mediaEmptyCopy}>
-                  Photos shared in this activity will appear here.
-                </Text>
-              </View>
+              {mediaUrls.length ? (
+                <View style={styles.mediaGrid}>
+                  {mediaUrls.slice(0, 6).map((url, index) => (
+                    <Image
+                      key={`${url}-${index}`}
+                      source={{ uri: url }}
+                      style={styles.mediaPhoto}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.mediaEmpty}>
+                  <Text style={styles.mediaEmptyTitle}>
+                    No shared photos yet
+                  </Text>
+                  <Text style={styles.mediaEmptyCopy}>
+                    Use the + button in chat to add photos here.
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -267,8 +386,45 @@ export function ActivityDetailsScreen({
                 {member.username ? `@${member.username}` : 'Tastes member'}
               </Text>
             </View>
+            {admin && member.id !== details.organizerId ? (
+              <Pressable
+                accessibilityLabel={`Remove ${member.displayName}`}
+                disabled={updatingMemberId !== null}
+                onPress={() =>
+                  Alert.alert(
+                    `Remove ${member.displayName}?`,
+                    'They will lose access to this activity and its chat.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Remove',
+                        style: 'destructive',
+                        onPress: () => void removeMember(member.id),
+                      },
+                    ],
+                  )
+                }
+                style={styles.removeMember}
+              >
+                {updatingMemberId === member.id ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Text style={styles.removeMemberText}>⌫</Text>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         )}
+        ListFooterComponent={
+          admin ? (
+            <Pressable
+              onPress={() => onEdit(activityId)}
+              style={styles.inviteButton}
+            >
+              <Text style={styles.inviteButtonText}>＋ Invite members</Text>
+            </Pressable>
+          ) : null
+        }
         showsVerticalScrollIndicator={false}
         windowSize={5}
       />
@@ -306,6 +462,9 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    navActions: { flexDirection: 'row' },
+    navActionText: { color: '#FFFFFF', fontSize: 22, fontWeight: '600' },
+    dangerText: { color: colors.primary },
     back: { color: '#FFFFFF', fontSize: 38, lineHeight: 39, fontWeight: '300' },
     navTitle: {
       flex: 1,
@@ -390,6 +549,13 @@ function createStyles(colors: ThemeColors) {
     },
     mediaEmptyTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
     mediaEmptyCopy: { color: colors.textMuted, marginTop: 5, fontSize: 12 },
+    mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    mediaPhoto: {
+      width: '31.8%',
+      aspectRatio: 1,
+      borderRadius: 10,
+      backgroundColor: colors.skeleton,
+    },
     memberRow: {
       minHeight: 76,
       flexDirection: 'row',
@@ -414,6 +580,23 @@ function createStyles(colors: ThemeColors) {
     },
     avatarInitial: { color: colors.onPrimary, fontWeight: '700' },
     memberCopy: { flex: 1, marginLeft: 10 },
+    removeMember: {
+      width: 38,
+      height: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    removeMemberText: { color: colors.primary, fontSize: 23 },
+    inviteButton: {
+      height: 48,
+      marginHorizontal: 16,
+      marginTop: 20,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    inviteButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
     memberTitleRow: { flexDirection: 'row', alignItems: 'center' },
     memberName: { color: colors.text, fontSize: 15, fontWeight: '600' },
     organizer: {

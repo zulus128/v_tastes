@@ -1,8 +1,10 @@
 import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc, onSnapshot, type DocumentData } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +28,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SendIcon from '../../../assets/ai/send.svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
-import { firestore } from '../../infrastructure/firebase';
+import { firestore, storage } from '../../infrastructure/firebase';
+import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -178,9 +181,14 @@ function MessageBubble({
         mine ? styles.mineBubble : styles.theirBubble,
       ]}
     >
-      <Text style={[styles.messageText, mine && styles.mineText]}>
-        {item.text}
-      </Text>
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
+      ) : null}
+      {item.text ? (
+        <Text style={[styles.messageText, mine && styles.mineText]}>
+          {item.text}
+        </Text>
+      ) : null}
       <Text style={[styles.messageTime, mine && styles.mineTime]}>
         {messageTime(item.createdAt)}
       </Text>
@@ -562,6 +570,45 @@ export function ChatScreen({
     }
   }
 
+  async function sendPhoto() {
+    if (sending) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permission needed',
+        'Allow photo library access to share a photo in this chat.',
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.82,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const pendingKey = createIdempotencyKey('message-photo');
+    const path = `chat-images/${userId}/${conversationId}/${pendingKey}.jpg`;
+    setSending(true);
+    try {
+      await uploadJpegImageVariant({
+        actions: [{ resize: { width: 1440 } }],
+        compress: 0.76,
+        path,
+        uri: result.assets[0].uri,
+      });
+      const imageUrl = await getDownloadURL(storageRef(storage, path));
+      await api.sendMessage({
+        conversationId,
+        idempotencyKey: pendingKey,
+        imageUrl,
+        text: '',
+      });
+    } catch (error) {
+      Alert.alert('Could not send photo', apiErrorMessage(error));
+    } finally {
+      setSending(false);
+    }
+  }
+
   const error =
     conversationError ?? realtimeMessages.error ?? messageHistory.error;
   return (
@@ -825,6 +872,14 @@ export function ChatScreen({
             },
           ]}
         >
+          <Pressable
+            accessibilityLabel="Add photo"
+            disabled={sending || Boolean(conversationError)}
+            onPress={() => void sendPhoto()}
+            style={styles.mediaButton}
+          >
+            <Text style={styles.mediaButtonText}>＋</Text>
+          </Pressable>
           <TextInput
             blurOnSubmit={false}
             editable={!sending && !conversationError}
@@ -1017,6 +1072,13 @@ function createStyles(colors: ThemeColors) {
       transform: [{ scaleY: 1 }],
     },
     messageRow: { width: '100%', marginVertical: 3 },
+    messageImage: {
+      width: 210,
+      height: 160,
+      marginBottom: 4,
+      borderRadius: 14,
+      backgroundColor: colors.skeleton,
+    },
     mineRow: { alignItems: 'flex-end' },
     theirRow: { alignItems: 'flex-start' },
     groupMessage: {
@@ -1113,6 +1175,23 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.hairline,
       backgroundColor: colors.background,
+    },
+    mediaButton: {
+      width: 38,
+      height: 38,
+      marginRight: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    mediaButtonText: {
+      color: colors.text,
+      fontSize: 25,
+      lineHeight: 27,
+      fontWeight: '300',
     },
     input: {
       flex: 1,

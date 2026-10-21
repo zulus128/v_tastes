@@ -10,6 +10,8 @@ import type {
   CheckUsernameAvailabilityInput,
   ConversationSummary,
   CreateActivityInput,
+  ActivityInput,
+  UpdateActivityInput,
   CreateConversationInput,
   CreateGroupInput,
   CreateFolderInput,
@@ -91,6 +93,7 @@ import type {
   SetUserBlockedInput,
   RequestInput,
   UpdateGroupMembersInput,
+  UpdateGroupInput,
   UpdateNotificationPreferencesInput,
   NotificationPreferences,
   MonthlyRecapResult,
@@ -117,6 +120,9 @@ export const callableOperationNames = [
   'createConversation',
   'listActivityCandidates',
   'createActivity',
+  'updateActivity',
+  'leaveActivity',
+  'deleteActivity',
   'respondToActivityInvitation',
   'listConversations',
   'getMessages',
@@ -172,6 +178,7 @@ export const callableOperationNames = [
   'respondToRequest',
   'createGroup',
   'getGroup',
+  'updateGroup',
   'updateGroupMembers',
   'leaveGroup',
   'getProfileExtras',
@@ -363,6 +370,12 @@ export function createTastesApi(
       ),
     createActivity: (input: CreateActivityInput) =>
       invoke<CreateActivityInput, IdResult>('createActivity', input),
+    updateActivity: (input: UpdateActivityInput) =>
+      invoke<UpdateActivityInput, IdResult>('updateActivity', input),
+    leaveActivity: (input: ActivityInput) =>
+      invoke<ActivityInput, IdResult>('leaveActivity', input),
+    deleteActivity: (input: ActivityInput) =>
+      invoke<ActivityInput, IdResult>('deleteActivity', input),
     respondToActivityInvitation: (input: RespondToActivityInvitationInput) =>
       invoke<RespondToActivityInvitationInput, IdResult>(
         'respondToActivityInvitation',
@@ -530,6 +543,8 @@ export function createTastesApi(
       invoke<CreateGroupInput, IdResult>('createGroup', input),
     getGroup: (input: GroupInput) =>
       invoke<GroupInput, TastesGroup>('getGroup', input),
+    updateGroup: (input: UpdateGroupInput) =>
+      invoke<UpdateGroupInput, IdResult>('updateGroup', input),
     updateGroupMembers: (input: UpdateGroupMembersInput) =>
       invoke<UpdateGroupMembersInput, IdResult>('updateGroupMembers', input),
     leaveGroup: (input: GroupInput) =>
