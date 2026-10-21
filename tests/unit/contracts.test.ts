@@ -13,6 +13,7 @@ import {
   registerPushTokenInputSchema,
   requestPhoneOtpInputSchema,
   sendMessageInputSchema,
+  setConversationPinnedInputSchema,
   updateProfileSettingsInputSchema,
   verifyPhoneOtpInputSchema,
 } from '@tastes/contracts';
@@ -295,6 +296,12 @@ describe('public API contracts', () => {
       conversationId: 'conversation-1',
       throughMessageId: 'message-1',
     });
+    expect(
+      setConversationPinnedInputSchema.parse({
+        conversationId: 'conversation-1',
+        pinned: true,
+      }),
+    ).toEqual({ conversationId: 'conversation-1', pinned: true });
     expect(
       registerPushTokenInputSchema.safeParse({
         token: 'ExpoPushToken[abcdefghijklmnopqrstuv]',

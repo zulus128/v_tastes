@@ -1,7 +1,7 @@
 import type { ConversationSummary } from '@tastes/contracts';
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,18 +11,22 @@ import {
   ImageBackground,
   PanResponder,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { UserAvatar } from '../profile/avatar';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { useConversationInbox } from './realtime';
 import { NewDialogSheet } from './NewDialogSheet';
 import {
@@ -49,17 +53,129 @@ function relativeTime(iso: string): string {
   });
 }
 
+function PinActionIcon({ color }: { color: string }) {
+  return (
+    <Svg height={20} viewBox="0 0 24 24" width={20}>
+      <Path
+        d="m14.8 4.4 4.8 4.8-3 1.5-2.3 4.6-2.1-2.1-5.4 5.4-1.4-1.4 5.4-5.4-2.1-2.1 4.6-2.3 1.5-3Z"
+        fill="none"
+        stroke={color}
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+      />
+    </Svg>
+  );
+}
+
+function TrashActionIcon({ color }: { color: string }) {
+  return (
+    <Svg height={20} viewBox="0 0 24 24" width={20}>
+      <Path
+        d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"
+        fill="none"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.6}
+      />
+    </Svg>
+  );
+}
+
+function DeleteConversationSheet({
+  deleting,
+  onClose,
+  onDelete,
+  visible,
+}: {
+  deleting: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+  visible: boolean;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createDeleteSheetStyles(colors), [colors]);
+  const sheet = useBottomSheetMotion({ onClose, visible });
+
+  return (
+    <Modal
+      animationType="none"
+      onRequestClose={sheet.close}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.backdrop}>
+        <Pressable
+          accessibilityLabel="Keep chat"
+          onPress={sheet.close}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View
+          style={[
+            styles.sheet,
+            { transform: [{ translateY: sheet.translateY }] },
+          ]}
+        >
+          <View style={styles.dragArea} {...sheet.panHandlers}>
+            <View style={styles.handle} />
+          </View>
+          <Text style={styles.sheetTitle}>Delete this chat?</Text>
+          <Text style={styles.sheetBody}>
+            This chat will be deleted only for you.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={deleting}
+            onPress={sheet.close}
+            style={({ pressed }) => [
+              styles.keepButton,
+              pressed && styles.sheetButtonPressed,
+            ]}
+          >
+            <Text style={styles.keepButtonText}>Keep chat</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={deleting}
+            onPress={onDelete}
+            style={({ pressed }) => [
+              styles.deleteConfirmButton,
+              pressed && styles.sheetButtonPressed,
+            ]}
+          >
+            {deleting ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={styles.deleteConfirmText}>Delete</Text>
+            )}
+          </Pressable>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 function ConversationRow({
   conversation,
   deleting,
-  onDelete,
+  onCloseActions,
   onOpen,
+  onOpenActions,
+  onPin,
+  onRequestDelete,
+  pinning,
+  swipeOpen,
   styles,
 }: {
   conversation: ConversationSummary;
   deleting: boolean;
-  onDelete: () => void;
+  onCloseActions: () => void;
   onOpen: () => void;
+  onOpenActions: () => void;
+  onPin: () => void;
+  onRequestDelete: () => void;
+  pinning: boolean;
+  swipeOpen: boolean;
   styles: ReturnType<typeof createStyles>;
 }) {
   const participant = conversation.otherParticipant;
@@ -85,73 +201,123 @@ function ConversationRow({
         ? 'You: '
         : '';
   const translateX = useMemo(() => new Animated.Value(0), []);
-  const deleteActionWidth = responsiveSize(82);
-  const deleteThreshold = responsiveSize(64);
+  const actionWidth = responsiveSize(116);
+  const openThreshold = responsiveSize(42);
   const swipeStartThreshold = responsiveSize(8);
+  const dragStartX = useRef(0);
+  useEffect(() => {
+    Animated.spring(translateX, {
+      toValue: swipeOpen ? -actionWidth : 0,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 0,
+    }).start();
+  }, [actionWidth, swipeOpen, translateX]);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          gesture.dx < -swipeStartThreshold &&
+          (gesture.dx < -swipeStartThreshold ||
+            (swipeOpen && gesture.dx > swipeStartThreshold)) &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderGrant: () => {
+          translateX.stopAnimation((value) => {
+            dragStartX.current = value;
+          });
+        },
         onPanResponderMove: (_, gesture) => {
           translateX.setValue(
-            Math.max(-deleteActionWidth, Math.min(0, gesture.dx)),
+            Math.max(
+              -actionWidth,
+              Math.min(0, dragStartX.current + gesture.dx),
+            ),
           );
         },
         onPanResponderRelease: (_, gesture) => {
+          const finalX = dragStartX.current + gesture.dx;
+          const shouldOpen = swipeOpen
+            ? gesture.dx < openThreshold
+            : finalX < -openThreshold;
+          if (shouldOpen) onOpenActions();
+          else onCloseActions();
           Animated.spring(translateX, {
-            toValue: 0,
+            toValue: shouldOpen ? -actionWidth : 0,
             useNativeDriver: true,
-          }).start(() => {
-            if (gesture.dx < -deleteThreshold && !deleting) onDelete();
-          });
+            speed: 24,
+            bounciness: 0,
+          }).start();
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, {
-            toValue: 0,
+            toValue: swipeOpen ? -actionWidth : 0,
             useNativeDriver: true,
+            speed: 24,
+            bounciness: 0,
           }).start();
         },
       }),
     [
-      deleteActionWidth,
-      deleteThreshold,
-      deleting,
-      onDelete,
+      actionWidth,
+      onCloseActions,
+      onOpenActions,
+      openThreshold,
       swipeStartThreshold,
+      swipeOpen,
       translateX,
     ],
   );
   return (
     <View style={styles.swipeRow}>
-      <Animated.View
-        style={[styles.deleteAction, { transform: [{ translateX }] }]}
+      <View
+        accessibilityElementsHidden={!swipeOpen}
+        importantForAccessibility={swipeOpen ? 'yes' : 'no-hide-descendants'}
+        style={styles.swipeActions}
       >
+        <Pressable
+          accessibilityLabel={conversation.pinned ? 'Unpin chat' : 'Pin chat'}
+          accessibilityRole="button"
+          disabled={pinning}
+          onPress={onPin}
+          style={({ pressed }) => [
+            styles.swipeActionButton,
+            pressed && styles.swipeActionPressed,
+          ]}
+        >
+          {pinning ? (
+            <ActivityIndicator color="#8D929A" size="small" />
+          ) : (
+            <PinActionIcon
+              color={conversation.pinned ? '#C8322B' : '#8D929A'}
+            />
+          )}
+        </Pressable>
         <Pressable
           accessibilityLabel={`Delete conversation with ${title}`}
           accessibilityRole="button"
           disabled={deleting}
-          onPress={onDelete}
-          style={styles.deleteButton}
+          onPress={onRequestDelete}
+          style={({ pressed }) => [
+            styles.swipeActionButton,
+            pressed && styles.swipeActionPressed,
+          ]}
         >
           {deleting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color="#C8322B" />
           ) : (
-            <>
-              <Text style={styles.deleteIcon}>⌫</Text>
-              <Text style={styles.deleteText}>Delete</Text>
-            </>
+            <TrashActionIcon color="#C8322B" />
           )}
         </Pressable>
-      </Animated.View>
+      </View>
       <Animated.View
         style={[styles.swipeContent, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
         <Pressable
           accessibilityRole="button"
-          onPress={onOpen}
+          onPress={() => {
+            if (swipeOpen) onCloseActions();
+            else onOpen();
+          }}
           style={({ pressed }) => [
             styles.row,
             activity && styles.activityRow,
@@ -228,6 +394,14 @@ function ConversationRow({
                       ? 'Group created'
                       : 'Conversation started')}
               </Text>
+              {conversation.pinned ? (
+                <View
+                  accessibilityLabel="Pinned chat"
+                  style={styles.pinnedBadge}
+                >
+                  <PinActionIcon color="#8D929A" />
+                </View>
+              ) : null}
               {unread ? (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
@@ -267,6 +441,15 @@ export function ConversationsScreen({
   );
   const [requestCount, setRequestCount] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pinningId, setPinningId] = useState<string | null>(null);
+  const [swipedConversationId, setSwipedConversationId] = useState<
+    string | null
+  >(null);
+  const [deleteCandidate, setDeleteCandidate] =
+    useState<ConversationSummary | null>(null);
+  const [pinnedOverrides, setPinnedOverrides] = useState<
+    Record<string, boolean>
+  >({});
   // This only feeds the badge count next to the Requests button, and the
   // inbox stays mounted behind other screens (e.g. an open chat), so a
   // transient failure here must fail quietly rather than interrupt whatever
@@ -304,10 +487,13 @@ export function ConversationsScreen({
     inbox.data.forEach((conversation) =>
       byId.set(conversation.id, conversation),
     );
-    return [...byId.values()].sort((left, right) =>
-      compareConversations(left, right),
-    );
-  }, [conversationHistory.data?.pages, inbox.data]);
+    return [...byId.values()]
+      .map((conversation) => ({
+        ...conversation,
+        pinned: pinnedOverrides[conversation.id] ?? conversation.pinned,
+      }))
+      .sort((left, right) => compareConversations(left, right));
+  }, [conversationHistory.data?.pages, inbox.data, pinnedOverrides]);
   const pendingInvitation = inboxItems.find(
     (conversation) =>
       conversation.kind === 'activity' &&
@@ -337,10 +523,40 @@ export function ConversationsScreen({
       try {
         await api.hideConversation({ conversationId });
         await conversationHistory.refetch();
+        setDeleteCandidate(null);
+        setSwipedConversationId(null);
       } catch {
         Alert.alert('Could not delete chat', 'Please try again.');
       } finally {
         setDeletingId(null);
+      }
+    },
+    [api, conversationHistory],
+  );
+
+  const pinConversation = useCallback(
+    async (conversation: ConversationSummary) => {
+      const pinned = !conversation.pinned;
+      setPinningId(conversation.id);
+      setPinnedOverrides((current) => ({
+        ...current,
+        [conversation.id]: pinned,
+      }));
+      setSwipedConversationId(null);
+      try {
+        await api.setConversationPinned({
+          conversationId: conversation.id,
+          pinned,
+        });
+        await conversationHistory.refetch();
+      } catch {
+        setPinnedOverrides((current) => ({
+          ...current,
+          [conversation.id]: conversation.pinned,
+        }));
+        Alert.alert('Could not update chat', 'Please try again.');
+      } finally {
+        setPinningId(null);
       }
     },
     [api, conversationHistory],
@@ -459,8 +675,13 @@ export function ConversationsScreen({
               <ConversationRow
                 conversation={item}
                 deleting={deletingId === item.id}
-                onDelete={() => void deleteConversation(item.id)}
+                onCloseActions={() => setSwipedConversationId(null)}
                 onOpen={() => onOpenConversation(item.id)}
+                onOpenActions={() => setSwipedConversationId(item.id)}
+                onPin={() => void pinConversation(item)}
+                onRequestDelete={() => setDeleteCandidate(item)}
+                pinning={pinningId === item.id}
+                swipeOpen={swipedConversationId === item.id}
                 styles={styles}
               />
             )}
@@ -468,6 +689,18 @@ export function ConversationsScreen({
           />
         )}
       </ImageBackground>
+      <DeleteConversationSheet
+        deleting={Boolean(deleteCandidate && deletingId === deleteCandidate.id)}
+        onClose={() => {
+          if (deletingId) return;
+          setDeleteCandidate(null);
+          setSwipedConversationId(null);
+        }}
+        onDelete={() => {
+          if (deleteCandidate) void deleteConversation(deleteCandidate.id);
+        }}
+        visible={deleteCandidate !== null}
+      />
       <NewDialogSheet
         onClose={() => setNewDialogOpen(false)}
         onNewActivity={onNewActivity}
@@ -575,24 +808,26 @@ function createStyles(colors: ThemeColors) {
       overflow: 'hidden',
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      backgroundColor: colors.canvas,
     },
-    swipeContent: {},
-    deleteAction: {
+    swipeContent: { backgroundColor: colors.canvas },
+    swipeActions: {
       position: 'absolute',
       top: 0,
-      right: -82,
+      right: 0,
       bottom: 0,
-      width: 82,
-      backgroundColor: colors.danger,
+      width: 116,
+      flexDirection: 'row',
+      borderLeftWidth: 1,
+      borderLeftColor: colors.border,
+      backgroundColor: colors.surfaceRaised,
     },
-    deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    deleteIcon: { color: '#FFFFFF', fontSize: 22, lineHeight: 24 },
-    deleteText: {
-      marginTop: 2,
-      color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: '600',
+    swipeActionButton: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
+    swipeActionPressed: { backgroundColor: colors.border },
     row: {
       minHeight: 76,
       paddingHorizontal: 16,
@@ -645,6 +880,14 @@ function createStyles(colors: ThemeColors) {
     previewRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center' },
     preview: { flex: 1, color: colors.textMuted, fontSize: 14 },
     unreadPreview: { color: colors.textSecondary, fontWeight: '600' },
+    pinnedBadge: {
+      width: 24,
+      height: 24,
+      marginLeft: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      transform: [{ scale: 0.78 }],
+    },
     badge: {
       minWidth: 21,
       height: 21,
@@ -698,3 +941,81 @@ function createStyles(colors: ThemeColors) {
     },
   });
 }
+
+const createDeleteSheetStyles = (colors: ThemeColors) =>
+  responsiveStyleSheet({
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.7)',
+    },
+    sheet: {
+      paddingTop: 34,
+      paddingHorizontal: 20,
+      paddingBottom: 24,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    dragArea: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    handle: {
+      position: 'absolute',
+      top: 10,
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+    },
+    sheetTitle: {
+      color: colors.text,
+      fontSize: 18,
+      lineHeight: 23,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    sheetBody: {
+      marginTop: 8,
+      color: colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    keepButton: {
+      width: '100%',
+      height: 48,
+      marginTop: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    keepButtonText: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    deleteConfirmButton: {
+      width: '100%',
+      minHeight: 44,
+      marginTop: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteConfirmText: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    sheetButtonPressed: { opacity: 0.7 },
+  });

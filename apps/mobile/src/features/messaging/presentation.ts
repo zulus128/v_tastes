@@ -12,6 +12,8 @@ export function compareConversations(
   right: ConversationSummary,
   now = Date.now(),
 ): number {
+  if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+
   // A newly received personal message must be immediately visible even when
   // there are upcoming activity rows pinned in the inbox. Once it is read,
   // the normal upcoming-activity and recency ordering resumes.
