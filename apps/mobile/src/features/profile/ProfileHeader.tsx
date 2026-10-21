@@ -12,6 +12,7 @@ import lightPattern from '../../../assets/figma-backgrounds/home-feed-pattern.pn
 import darkPattern from '../../../assets/onboarding/pattern-screen.png';
 import followIcon from '../../../assets/profile/follow.png';
 import messageIcon from '../../../assets/profile/message.png';
+import FollowingCheckIcon from '../../../assets/discover/following-check.svg';
 import BackIcon from '../../../assets/leaderboard/back.svg';
 import SettingsIcon from '../../../assets/profile/settings.svg';
 import ShareIcon from '../../../assets/profile/share.svg';
@@ -129,21 +130,39 @@ export function ProfileHeader({
           {!own ? (
             <View style={styles.publicActions}>
               <Pressable
+                accessibilityLabel={following ? 'Unfollow' : 'Follow'}
+                accessibilityState={{
+                  busy: followPending,
+                  selected: following,
+                }}
                 disabled={followPending}
                 onPress={onToggleFollow}
                 style={[
                   styles.followAction,
                   following && styles.followingAction,
+                  following && !isDark && styles.followingActionLight,
                 ]}
               >
                 {followPending ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator
+                    color={following && !isDark ? colors.primary : '#FFFFFF'}
+                  />
                 ) : (
                   <View style={styles.actionLabel}>
-                    {!following ? (
+                    {following ? (
+                      <FollowingCheckIcon
+                        height={responsiveSize(20)}
+                        width={responsiveSize(20)}
+                      />
+                    ) : (
                       <Image source={followIcon} style={styles.followIcon} />
-                    ) : null}
-                    <Text style={styles.followActionText}>
+                    )}
+                    <Text
+                      style={[
+                        styles.followActionText,
+                        following && !isDark && styles.followingActionTextLight,
+                      ]}
+                    >
                       {following ? 'Following' : 'Follow'}
                     </Text>
                   </View>
@@ -382,7 +401,12 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       backgroundColor: '#C9312B',
     },
-    followingAction: { backgroundColor: '#8E2824' },
+    followingAction: {
+      borderWidth: 1,
+      borderColor: '#B82E29',
+      backgroundColor: '#2A1513',
+    },
+    followingActionLight: { backgroundColor: 'rgba(184,46,41,0.08)' },
     actionLabel: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -397,6 +421,7 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '600',
       letterSpacing: 0.7,
     },
+    followingActionTextLight: { color: colors.primary },
     messageAction: {
       flex: 1,
       height: 45,
