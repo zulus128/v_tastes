@@ -26,6 +26,7 @@ function conversation(
     memberCount: 1,
     lastMessage: null,
     unreadCount: 0,
+    pinned: false,
     createdAt: '2026-09-15T08:00:00.000Z',
     updatedAt: '2026-09-15T08:00:00.000Z',
     ...overrides,
@@ -33,6 +34,22 @@ function conversation(
 }
 
 describe('messaging presentation', () => {
+  it('keeps user-pinned chats at the top', () => {
+    const pinned = conversation('pinned', {
+      pinned: true,
+      updatedAt: '2026-09-14T08:00:00.000Z',
+    });
+    const recent = conversation('recent', {
+      updatedAt: '2026-09-15T09:30:00.000Z',
+    });
+
+    expect(
+      [recent, pinned]
+        .sort((a, b) => compareConversations(a, b))
+        .map((item) => item.id),
+    ).toEqual(['pinned', 'recent']);
+  });
+
   it('puts newly received personal chats above pinned upcoming activities', () => {
     const now = new Date('2026-09-15T10:00:00.000Z').getTime();
     const activity = conversation('activity', {
