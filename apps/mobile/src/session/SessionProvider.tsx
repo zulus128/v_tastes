@@ -23,6 +23,10 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { Image } from 'react-native';
+import visualAuditGroupMediaOne from '../../assets/home/recommendation.jpg';
+import visualAuditGroupMediaThree from '../../assets/home/dish-2.png';
+import visualAuditGroupMediaTwo from '../../assets/home/dish-1.jpg';
 import { identifyAnalyticsUser } from '../infrastructure/analytics';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
@@ -54,6 +58,12 @@ interface SessionContextValue {
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+const visualAuditGroupMedia = [
+  Image.resolveAssetSource(visualAuditGroupMediaOne).uri,
+  Image.resolveAssetSource(visualAuditGroupMediaTwo).uri,
+  Image.resolveAssetSource(visualAuditGroupMediaThree).uri,
+];
 
 function visualAuditData(operation: string): unknown {
   switch (operation) {
@@ -92,9 +102,24 @@ function visualAuditData(operation: string): unknown {
     case 'getFriendFeed':
     case 'getPlaceReviews':
     case 'listConversations':
-    case 'getMessages':
     case 'getLeaderboard':
       return { items: [], nextCursor: null };
+    case 'getMessages':
+      return {
+        items: Array.from({ length: 21 }, (_, index) => ({
+          id: `visual-audit-message-${index + 1}`,
+          conversationId: 'visual-audit-group',
+          senderId: index % 2 ? 'visual-member-1' : 'visual-audit-user',
+          senderDisplayName: index % 2 ? 'Cameron Williamson' : 'Alex Morgan',
+          senderPhotoUrl: null,
+          recipientId: '',
+          recipientIds: [],
+          text: '',
+          imageUrl: visualAuditGroupMedia[index % visualAuditGroupMedia.length],
+          createdAt: `2026-10-20T${String(20 - (index % 10)).padStart(2, '0')}:00:00.000Z`,
+        })),
+        nextCursor: null,
+      };
     case 'getVenues':
       return {
         items: [
@@ -267,7 +292,7 @@ function visualAuditData(operation: string): unknown {
     case 'getGroup':
       return {
         id: 'visual-audit-group',
-        name: 'Tastes group',
+        name: "Joe's Shanghai Soup Dumpling Restaurant",
         adminId: 'visual-audit-user',
         members: [
           {
@@ -277,6 +302,28 @@ function visualAuditData(operation: string): unknown {
             photoUrl: null,
             admin: true,
           },
+          ...[
+            'Cameron Williamson',
+            'Jane Cooper',
+            'Wade Warren',
+            'Brooklyn Simmons',
+            'Kristin Watson',
+            'Martin Baena',
+            'Luke Cooper',
+            'Emma Wilson',
+            'Tyson Mike',
+            'Leslie Alexander',
+            'Annette Black',
+            'Jenny Wilson',
+            'Guy Hawkins',
+            'Robert Fox',
+          ].map((displayName, index) => ({
+            userId: `visual-member-${index + 1}`,
+            displayName,
+            username: displayName.toLowerCase().replace(/\s+/g, '.'),
+            photoUrl: null,
+            admin: false,
+          })),
         ],
         pendingMembers: [],
         createdAt: '2026-09-01T12:00:00.000Z',
@@ -284,8 +331,22 @@ function visualAuditData(operation: string): unknown {
     case 'importContacts':
       return { matches: [] };
     case 'listRequests':
-    case 'listActivityCandidates':
       return [];
+    case 'listActivityCandidates':
+      return [
+        {
+          userId: 'visual-candidate-1',
+          displayName: 'Dianne Russell',
+          username: 'dianne.russell',
+          photoUrl: null,
+        },
+        {
+          userId: 'visual-candidate-2',
+          displayName: 'Courtney Henry',
+          username: 'courtney.henry',
+          photoUrl: null,
+        },
+      ];
     case 'getUnreadNotificationCount':
       return { count: 0 };
     case 'getFavourites':

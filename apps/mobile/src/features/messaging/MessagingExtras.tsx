@@ -5,10 +5,12 @@ import type {
 } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   ImageBackground,
@@ -23,16 +25,21 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import SearchIcon from '../../../assets/discover/search.svg';
+import GroupBackIcon from '../../../assets/leaderboard/back.svg';
+import GroupEditIcon from '../../../assets/create-review/pen.svg';
+import GroupInviteIcon from '../../../assets/messaging/group-invite.svg';
+import GroupTrashIcon from '../../../assets/messaging/group-trash.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
-import { formatDisplayDate } from '../../infrastructure/date';
 import {
   useAuthenticatedUserId,
   useTastesApi,
 } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
+import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
+import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { PatternBackgroundLift, Screen } from '../../ui/components';
 import { requestsQueryKey } from '../queryKeys';
 
@@ -399,6 +406,15 @@ export function GroupDetailsScreen({
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [confirmAction, setConfirmAction] = useState<
+    | null
+    | { type: 'delete' | 'leave' }
+    | { type: 'remove'; userId: string; name: string }
+  >(null);
+  const confirmationSheet = useBottomSheetMotion({
+    onClose: () => setConfirmAction(null),
+    visible: confirmAction !== null,
+  });
   const load = async () => {
     const [g, people] = await Promise.all([
       api.getGroup({ groupId }),
@@ -461,15 +477,15 @@ export function GroupDetailsScreen({
   }, [adding, api, normalizedMemberQuery]);
   if (!group)
     return (
-      <Screen style={styles.screen}>
-        <Header
+      <View style={styles.groupDetailsScreen}>
+        <GroupDetailsHeader
           onBack={onBack}
           safeTop={insets.top}
           styles={styles}
           title="Group details"
         />
         <ActivityIndicator color={colors.primary} style={styles.loader} />
-      </Screen>
+      </View>
     );
   const admin = currentUserId === group.adminId;
   const saveName = async () => {
@@ -507,20 +523,40 @@ export function GroupDetailsScreen({
       !pendingMembers.some((member) => member.userId === candidate.userId),
   );
   const detailRows = [
-    ...(adding
-      ? available.map((person) => ({ kind: 'available' as const, person }))
-      : []),
     ...pendingMembers.map((person) => ({ kind: 'pending' as const, person })),
     ...group.members.map((person) => ({ kind: 'member' as const, person })),
   ];
-  const firstPendingIndex = adding ? available.length : 0;
-  const firstMemberIndex = firstPendingIndex + pendingMembers.length;
+  const firstPendingIndex = 0;
+  const firstMemberIndex = pendingMembers.length;
+  const closeInviteMembers = () => {
+    setAdding(false);
+    setMemberQuery('');
+  };
+  const runConfirmedAction = async (
+    action: Exclude<typeof confirmAction, null>,
+  ) => {
+    if (!action) return;
+    if (action.type === 'remove') {
+      await update(
+        group.members
+          .filter((member) => member.userId !== action.userId)
+          .map((member) => member.userId),
+        action.userId,
+      );
+      return;
+    }
+    await api.leaveGroup({ groupId });
+    onBack();
+  };
   return (
-    <Screen style={styles.screen}>
-      <Header
-        action={admin ? (editingName ? 'Save' : 'Edit') : undefined}
-        actionDisabled={editingName && nameDraft.trim().length < 2}
-        onAction={() => {
+    <View style={styles.groupDetailsScreen}>
+      <GroupDetailsHeader
+        admin={admin}
+        editingName={editingName}
+        nameDraft={nameDraft}
+        onChangeName={setNameDraft}
+        onDelete={() => setConfirmAction({ type: admin ? 'delete' : 'leave' })}
+        onEdit={() => {
           if (editingName) void saveName();
           else {
             setNameDraft(group.name);
@@ -542,13 +578,34 @@ export function GroupDetailsScreen({
             <Text style={styles.detailSectionTitle}>MEDIA</Text>
             {mediaUrls.length ? (
               <View style={styles.groupMediaGrid}>
-                {mediaUrls.slice(0, 6).map((url, index) => (
-                  <Image
-                    key={`${url}-${index}`}
-                    source={{ uri: url }}
-                    style={styles.groupMediaPhoto}
-                  />
-                ))}
+                {mediaUrls.slice(0, 6).map((url, index) => {
+                  const overflow = index === 5 && mediaUrls.length > 6;
+                  return (
+                    <Pressable
+                      accessibilityLabel={
+                        overflow
+                          ? `Open ${mediaUrls.length - 5} more group photos`
+                          : 'Open group photo in chat'
+                      }
+                      accessibilityRole="button"
+                      key={`${url}-${index}`}
+                      onPress={() => onOpenConversation(groupId)}
+                      style={styles.groupMediaPhoto}
+                    >
+                      <Image
+                        source={{ uri: url }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      {overflow ? (
+                        <View style={styles.groupMediaOverflow}>
+                          <Text style={styles.groupMediaOverflowText}>
+                            +{mediaUrls.length - 5}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : (
               <Pressable
@@ -559,89 +616,21 @@ export function GroupDetailsScreen({
                   No shared photos yet
                 </Text>
                 <Text style={styles.groupMediaEmptyCopy}>
-                  Open chat and use + to add media.
+                  Share the first photo in the group chat.
                 </Text>
               </Pressable>
             )}
-            {editingName ? (
-              <TextInput
-                autoFocus
-                maxLength={60}
-                onChangeText={setNameDraft}
-                placeholder="Group name"
-                placeholderTextColor={colors.placeholder}
-                style={styles.detailsNameInput}
-                value={nameDraft}
-              />
-            ) : (
-              <Text style={styles.detailsTitle}>{group.name}</Text>
-            )}
-            <Text style={styles.detailsSubtitle}>
-              {group.members.length}{' '}
-              {group.members.length === 1 ? 'member' : 'members'}
-              {pendingMembers.length > 0
-                ? ` · ${pendingMembers.length} invited`
-                : ''}
-              {' · '}Created {formatDisplayDate(group.createdAt)}
-            </Text>
-            <Pressable
-              onPress={() => onOpenConversation(groupId)}
-              style={styles.primaryOutline}
-            >
-              <Text style={styles.primaryOutlineText}>Open group chat</Text>
-            </Pressable>
-            {admin ? (
-              <Pressable
-                onPress={() => {
-                  setAdding((value) => !value);
-                  setMemberQuery('');
-                }}
-                style={styles.primaryOutline}
-              >
-                <Text style={styles.primaryOutlineText}>
-                  {adding ? 'Done' : '+ Add members'}
-                </Text>
-              </Pressable>
-            ) : null}
-            {adding ? (
-              <View style={[styles.search, styles.detailsSearch]}>
-                <Text style={styles.searchGlyph}>⌕</Text>
-                <TextInput
-                  autoCorrect={false}
-                  onChangeText={setMemberQuery}
-                  placeholder="Search people"
-                  placeholderTextColor={colors.placeholder}
-                  style={styles.searchInput}
-                  value={memberQuery}
-                />
-              </View>
-            ) : null}
-            {adding && searching ? (
-              <ActivityIndicator
-                color={colors.primary}
-                style={styles.searchLoader}
-              />
-            ) : null}
           </>
         }
         ListFooterComponent={
-          <Pressable
-            onPress={() =>
-              Alert.alert(admin ? 'Delete group?' : 'Leave group?', undefined, [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: admin ? 'Delete' : 'Leave',
-                  style: 'destructive',
-                  onPress: () => void api.leaveGroup({ groupId }).then(onBack),
-                },
-              ])
-            }
-            style={styles.danger}
-          >
-            <Text style={styles.dangerText}>
-              {admin ? 'Delete group' : 'Leave group'}
-            </Text>
-          </Pressable>
+          !admin ? (
+            <Pressable
+              onPress={() => setConfirmAction({ type: 'leave' })}
+              style={styles.danger}
+            >
+              <Text style={styles.dangerText}>Leave group</Text>
+            </Pressable>
+          ) : null
         }
         maxToRenderPerBatch={8}
         renderItem={({ item, index }) => {
@@ -664,82 +653,316 @@ export function GroupDetailsScreen({
                   photoUrl={person.photoUrl}
                   styles={styles}
                 />
-                {item.kind === 'available' ? (
-                  <>
-                    <Text style={[styles.personName, { flex: 1 }]}>
-                      {person.displayName}
-                    </Text>
-                    <Pressable
-                      accessibilityLabel={`Add ${person.displayName}`}
-                      accessibilityRole="button"
-                      disabled={updatingUserId !== null}
-                      hitSlop={8}
-                      onPress={() =>
-                        void update(
-                          [
-                            ...group.members.map((member) => member.userId),
-                            person.userId,
-                          ],
-                          person.userId,
-                        )
-                      }
-                      style={styles.addMember}
-                    >
-                      {updatingUserId === person.userId ? (
-                        <ActivityIndicator color={colors.primary} />
-                      ) : (
-                        <Text style={styles.addMemberText}>Add</Text>
-                      )}
-                    </Pressable>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.personCopy}>
-                      <Text style={styles.personName}>
-                        {person.displayName}
-                      </Text>
-                      <Text style={styles.personHandle}>
-                        {item.kind === 'pending'
-                          ? 'Invitation pending'
-                          : person.username
-                            ? `@${person.username}`
-                            : ''}
-                      </Text>
-                    </View>
-                    {item.kind === 'member' &&
-                    'admin' in person &&
-                    person.admin ? (
-                      <View style={styles.admin}>
-                        <Text style={styles.adminText}>Admin</Text>
-                      </View>
-                    ) : item.kind === 'member' && admin ? (
-                      <Pressable
-                        accessibilityLabel={`Remove ${person.displayName}`}
-                        onPress={() =>
-                          void update(
-                            group.members
-                              .filter(
-                                (candidate) =>
-                                  candidate.userId !== person.userId,
-                              )
-                              .map((candidate) => candidate.userId),
-                            person.userId,
-                          )
-                        }
-                        style={styles.remove}
-                      >
-                        <Text style={styles.removeText}>⌫</Text>
-                      </Pressable>
-                    ) : null}
-                  </>
-                )}
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{person.displayName}</Text>
+                  <Text style={styles.personHandle}>
+                    {item.kind === 'pending'
+                      ? 'Invitation pending'
+                      : person.username
+                        ? `@${person.username}`
+                        : ''}
+                  </Text>
+                </View>
+                {item.kind === 'member' && 'admin' in person && person.admin ? (
+                  <View style={styles.admin}>
+                    <Text style={styles.adminText}>Admin</Text>
+                  </View>
+                ) : item.kind === 'member' && admin ? (
+                  <Pressable
+                    accessibilityLabel={`Remove ${person.displayName}`}
+                    accessibilityRole="button"
+                    disabled={updatingUserId !== null}
+                    onPress={() =>
+                      setConfirmAction({
+                        type: 'remove',
+                        userId: person.userId,
+                        name: person.displayName,
+                      })
+                    }
+                    style={styles.remove}
+                  >
+                    {updatingUserId === person.userId ? (
+                      <ActivityIndicator color={colors.text} />
+                    ) : (
+                      <GroupTrashIcon
+                        color={colors.text}
+                        height={responsiveSize(20)}
+                        width={responsiveSize(19)}
+                      />
+                    )}
+                  </Pressable>
+                ) : null}
               </View>
             </>
           );
         }}
         windowSize={5}
       />
-    </Screen>
+      {admin ? (
+        <LinearGradient
+          colors={['transparent', colors.canvas, colors.canvas]}
+          locations={[0, 0.28, 1]}
+          style={[
+            styles.groupDetailsFooter,
+            { paddingBottom: Math.max(responsiveSize(24), insets.bottom) },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setAdding(true)}
+            style={styles.inviteMembersButton}
+          >
+            <GroupInviteIcon
+              color="#FFFFFF"
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+            <Text style={styles.inviteMembersText}>Invite members</Text>
+          </Pressable>
+        </LinearGradient>
+      ) : null}
+      <Modal onRequestClose={closeInviteMembers} visible={adding}>
+        <View style={styles.inviteScreen}>
+          <GroupDetailsHeader
+            onBack={closeInviteMembers}
+            safeTop={insets.top}
+            styles={styles}
+            title="Invite members"
+          />
+          <View style={[styles.search, styles.inviteSearch]}>
+            <SearchIcon
+              color={colors.textSecondary}
+              height={responsiveSize(24)}
+              style={styles.searchIcon}
+              width={responsiveSize(24)}
+            />
+            <TextInput
+              autoCorrect={false}
+              onChangeText={setMemberQuery}
+              placeholder="Search people"
+              placeholderTextColor={colors.placeholder}
+              style={styles.searchInput}
+              value={memberQuery}
+            />
+          </View>
+          {searching ? (
+            <ActivityIndicator color={colors.primary} style={styles.loader} />
+          ) : (
+            <FlatList
+              data={available}
+              keyExtractor={(person) => person.userId}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: person }) => (
+                <View style={styles.person}>
+                  <Avatar
+                    name={person.displayName}
+                    photoUrl={person.photoUrl}
+                    styles={styles}
+                  />
+                  <View style={styles.personCopy}>
+                    <Text style={styles.personName}>{person.displayName}</Text>
+                    <Text style={styles.personHandle}>
+                      {person.username ? `@${person.username}` : ''}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityLabel={`Invite ${person.displayName}`}
+                    accessibilityRole="button"
+                    disabled={updatingUserId !== null}
+                    onPress={() =>
+                      void update(
+                        [
+                          ...group.members.map((member) => member.userId),
+                          person.userId,
+                        ],
+                        person.userId,
+                      )
+                    }
+                    style={styles.addMember}
+                  >
+                    {updatingUserId === person.userId ? (
+                      <ActivityIndicator color={colors.primary} />
+                    ) : (
+                      <Text style={styles.addMemberText}>Invite</Text>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
+      <Modal
+        animationType="none"
+        onRequestClose={confirmationSheet.close}
+        transparent
+        visible={confirmAction !== null}
+      >
+        <View style={styles.confirmationBackdrop}>
+          <Pressable
+            accessibilityLabel="Close confirmation"
+            onPress={confirmationSheet.close}
+            style={StyleSheet.absoluteFill}
+          />
+          <Animated.View
+            style={[
+              styles.confirmationSheet,
+              { transform: [{ translateY: confirmationSheet.translateY }] },
+            ]}
+          >
+            <View
+              style={styles.confirmationDragArea}
+              {...confirmationSheet.panHandlers}
+            >
+              <View style={styles.confirmationHandle} />
+            </View>
+            <Text style={styles.confirmationTitle}>
+              {confirmAction?.type === 'remove'
+                ? 'Remove this member?'
+                : confirmAction?.type === 'leave'
+                  ? 'Leave this group?'
+                  : 'Delete this group?'}
+            </Text>
+            <Text style={styles.confirmationBody}>
+              {confirmAction?.type === 'remove'
+                ? 'Are you sure you want to remove this member?'
+                : confirmAction?.type === 'leave'
+                  ? 'Are you sure you want to leave this group?'
+                  : 'Are you sure you want to delete this group?'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={confirmationSheet.close}
+              style={styles.confirmationPrimary}
+            >
+              <Text style={styles.confirmationPrimaryText}>
+                {confirmAction?.type === 'remove'
+                  ? 'Keep member'
+                  : confirmAction?.type === 'leave'
+                    ? 'Stay in group'
+                    : 'Keep group'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const action = confirmAction;
+                if (!action) return;
+                confirmationSheet.closeThen(() => {
+                  void runConfirmedAction(action).catch((error) =>
+                    Alert.alert(
+                      'Could not update group',
+                      apiErrorMessage(error),
+                    ),
+                  );
+                });
+              }}
+              style={styles.confirmationDanger}
+            >
+              <Text style={styles.confirmationDangerText}>
+                {confirmAction?.type === 'remove'
+                  ? 'Remove'
+                  : confirmAction?.type === 'leave'
+                    ? 'Leave'
+                    : 'Delete'}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function GroupDetailsHeader({
+  admin = false,
+  editingName = false,
+  nameDraft = '',
+  onBack,
+  onChangeName,
+  onDelete,
+  onEdit,
+  safeTop,
+  styles,
+  title,
+}: {
+  admin?: boolean;
+  editingName?: boolean;
+  nameDraft?: string;
+  onBack: () => void;
+  onChangeName?: (value: string) => void;
+  onDelete?: () => void;
+  onEdit?: () => void;
+  safeTop: number;
+  styles: ReturnType<typeof createStyles>;
+  title: string;
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <View
+      style={[
+        styles.groupDetailsHeader,
+        { height: responsiveSize(48) + safeTop, paddingTop: safeTop },
+      ]}
+    >
+      <Pressable
+        accessibilityLabel="Back"
+        accessibilityRole="button"
+        onPress={onBack}
+        style={styles.groupHeaderIconButton}
+      >
+        <GroupBackIcon
+          color={colors.text}
+          height={responsiveSize(16)}
+          width={responsiveSize(9)}
+        />
+      </Pressable>
+      {editingName ? (
+        <TextInput
+          autoFocus
+          maxLength={60}
+          onChangeText={onChangeName}
+          selectTextOnFocus
+          style={styles.groupHeaderNameInput}
+          value={nameDraft}
+        />
+      ) : (
+        <Text numberOfLines={1} style={styles.groupHeaderTitle}>
+          {title}
+        </Text>
+      )}
+      <View style={styles.groupHeaderActions}>
+        {admin ? (
+          <Pressable
+            accessibilityLabel={editingName ? 'Save group name' : 'Edit group'}
+            accessibilityRole="button"
+            disabled={editingName && nameDraft.trim().length < 2}
+            onPress={onEdit}
+            style={styles.groupHeaderIconButton}
+          >
+            <GroupEditIcon
+              color={colors.text}
+              height={responsiveSize(20)}
+              width={responsiveSize(20)}
+            />
+          </Pressable>
+        ) : null}
+        {onDelete ? (
+          <Pressable
+            accessibilityLabel={admin ? 'Delete group' : 'Leave group'}
+            accessibilityRole="button"
+            onPress={onDelete}
+            style={styles.groupHeaderIconButton}
+          >
+            <GroupTrashIcon
+              color={colors.danger}
+              height={responsiveSize(20)}
+              width={responsiveSize(19)}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -830,6 +1053,8 @@ function Empty({
 function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
+    groupDetailsScreen: { flex: 1, backgroundColor: colors.canvas },
+    inviteScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupScreen: { flex: 1, backgroundColor: colors.canvas },
     newGroupHeader: { backgroundColor: colors.surface },
     patternBody: { flex: 1 },
@@ -1048,7 +1273,44 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.primary,
     },
     createGroupText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-    details: { paddingBottom: 40 },
+    groupDetailsHeader: {
+      paddingHorizontal: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      backgroundColor: colors.background,
+      overflow: 'hidden',
+    },
+    groupHeaderIconButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    groupHeaderTitle: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '500',
+    },
+    groupHeaderNameInput: {
+      flex: 1,
+      height: 36,
+      paddingHorizontal: 10,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 10,
+      color: colors.text,
+      backgroundColor: colors.surfaceRaised,
+      fontSize: 16,
+    },
+    groupHeaderActions: {
+      minWidth: 88,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    details: { paddingBottom: 112 },
     detailSectionTitle: {
       marginTop: 20,
       marginHorizontal: 16,
@@ -1060,21 +1322,37 @@ function createStyles(colors: ThemeColors) {
       marginHorizontal: 16,
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 6,
+      gap: 5,
     },
     groupMediaPhoto: {
-      width: '31.8%',
+      width: '32.4%',
       aspectRatio: 1,
       borderRadius: 10,
       backgroundColor: colors.skeleton,
+      overflow: 'hidden',
+    },
+    groupMediaOverflow: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(8,8,8,0.74)',
+    },
+    groupMediaOverflowText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '500',
     },
     groupMediaEmpty: {
-      minHeight: 112,
+      height: 120,
       marginHorizontal: 16,
       borderWidth: 1,
       borderStyle: 'dashed',
       borderColor: colors.border,
-      borderRadius: 12,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1156,7 +1434,113 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    removeText: { color: colors.danger, fontSize: 20 },
+    groupDetailsFooter: {
+      position: 'absolute',
+      right: 0,
+      bottom: 0,
+      left: 0,
+      paddingTop: 34,
+      paddingHorizontal: 36,
+    },
+    inviteMembersButton: {
+      height: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 27,
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.45,
+      shadowRadius: 14,
+      elevation: 7,
+    },
+    inviteMembersText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '500',
+      letterSpacing: 1.2,
+    },
+    inviteSearch: {
+      marginTop: 16,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      flex: 0,
+    },
+    confirmationBackdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.72)',
+    },
+    confirmationSheet: {
+      minHeight: 236,
+      paddingTop: 38,
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    confirmationDragArea: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmationHandle: {
+      position: 'absolute',
+      top: 10,
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.textMuted,
+    },
+    confirmationTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    confirmationBody: {
+      marginTop: 9,
+      color: colors.textMuted,
+      fontSize: 14,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    confirmationPrimary: {
+      width: '100%',
+      height: 50,
+      marginTop: 26,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    confirmationPrimaryText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    confirmationDanger: {
+      width: '100%',
+      minHeight: 22,
+      marginTop: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmationDangerText: {
+      color: colors.danger,
+      fontSize: 16,
+      fontWeight: '500',
+    },
     danger: {
       height: 48,
       margin: 20,
