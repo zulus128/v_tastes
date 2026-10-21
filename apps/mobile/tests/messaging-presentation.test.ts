@@ -6,6 +6,7 @@ import {
   conversationAvatarUrls,
   reservationCountdown,
 } from '../src/features/messaging/presentation';
+import { conversationReadReceipt } from '../src/features/messaging/readReceipt';
 
 function conversation(
   id: string,
@@ -139,5 +140,26 @@ describe('messaging presentation', () => {
       'https://example.com/a.jpg',
       'https://example.com/b.jpg',
     ]);
+  });
+
+  it('shows when the latest outgoing message was read', () => {
+    expect(
+      conversationReadReceipt({
+        participantIds: ['me', 'friend', 'another-friend'],
+        userId: 'me',
+        lastMessageId: 'message-2',
+        lastReadMessageIds: {
+          friend: 'message-2',
+          'another-friend': 'message-1',
+        },
+        lastReadAt: {
+          friend: { toDate: () => new Date('2026-10-21T10:14:00.000Z') },
+          'another-friend': '2026-10-21T10:15:00.000Z',
+        },
+      }),
+    ).toEqual({
+      readByCount: 1,
+      readAt: '2026-10-21T10:14:00.000Z',
+    });
   });
 });

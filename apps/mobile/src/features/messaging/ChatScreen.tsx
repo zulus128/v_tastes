@@ -157,6 +157,7 @@ function MessageBubble({
   item,
   mine,
   read,
+  readAt,
   sender,
   showAvatar,
   showSender,
@@ -165,6 +166,7 @@ function MessageBubble({
   item: ChatMessage;
   mine: boolean;
   read: boolean;
+  readAt: string | null;
   sender?: Pick<ConversationParticipant, 'displayName' | 'photoUrl'>;
   showAvatar: boolean;
   showSender: boolean;
@@ -230,7 +232,11 @@ function MessageBubble({
       ) : (
         bubble
       )}
-      {read ? <Text style={styles.readReceipt}>Read</Text> : null}
+      {read ? (
+        <Text style={styles.readReceipt}>
+          Read{readAt ? ` · ${messageTime(readAt)}` : ''}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -371,6 +377,7 @@ export function ChatScreen({
   const [groupTitle, setGroupTitle] = useState<string | null>(null);
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [readByCount, setReadByCount] = useState(0);
+  const [readAt, setReadAt] = useState<string | null>(null);
   const [someoneTyping, setSomeoneTyping] = useState(false);
   const [conversationError, setConversationError] = useState<Error | null>(
     null,
@@ -446,6 +453,7 @@ export function ChatScreen({
           );
           setLastMessageId(details.lastMessageId);
           setReadByCount(details.readByCount);
+          setReadAt(details.readAt);
           setSomeoneTyping(details.someoneTyping);
           setConversationError(null);
           if (
@@ -838,6 +846,7 @@ export function ChatScreen({
                       item.message.id === lastMessageId &&
                       readByCount > 0
                     }
+                    readAt={readAt}
                     sender={
                       item.message.senderId === userId
                         ? ownSender

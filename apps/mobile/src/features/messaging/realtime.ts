@@ -20,6 +20,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 import { useIsVisualAudit } from '../../session/SessionProvider';
+import { conversationReadReceipt } from './readReceipt';
 
 const INBOX_LIMIT = 50;
 const MESSAGE_LIMIT = 50;
@@ -39,6 +40,7 @@ type ConversationDetails = {
   lastMessageId: string | null;
   unreadCount: number;
   readByCount: number;
+  readAt: string | null;
   someoneTyping: boolean;
 };
 
@@ -355,7 +357,39 @@ export function useConversationMessages(
 
   useEffect(() => {
     if (visualAudit) {
-      setState({ data: [], error: null, loading: false });
+      setState({
+        data:
+          conversationId === 'visual-audit-conversation'
+            ? [
+                {
+                  id: 'visual-audit-read-message',
+                  conversationId,
+                  senderId: userId,
+                  senderDisplayName: 'You',
+                  senderPhotoUrl: null,
+                  recipientId: 'visual-audit-friend',
+                  recipientIds: ['visual-audit-friend'],
+                  text: 'The dish is good',
+                  imageUrl: null,
+                  createdAt: '2026-10-21T10:13:00.000Z',
+                },
+                {
+                  id: 'visual-audit-reply',
+                  conversationId,
+                  senderId: 'visual-audit-friend',
+                  senderDisplayName: 'Cameron Williamson',
+                  senderPhotoUrl: null,
+                  recipientId: userId,
+                  recipientIds: [userId],
+                  text: 'Hello',
+                  imageUrl: null,
+                  createdAt: '2026-10-21T10:12:00.000Z',
+                },
+              ]
+            : [],
+        error: null,
+        loading: false,
+      });
       return undefined;
     }
     const messagesQuery = query(
@@ -422,9 +456,24 @@ export function subscribeConversationDetails(
       activityId: null,
       imageUrl: null,
       kind: 'direct',
-      lastMessageId: null,
-      participant: null,
-      readByCount: 0,
+      lastMessageId:
+        conversationId === 'visual-audit-conversation'
+          ? 'visual-audit-read-message'
+          : null,
+      participant:
+        conversationId === 'visual-audit-conversation'
+          ? {
+              userId: 'visual-audit-friend',
+              displayName: 'Cameron Williamson',
+              username: 'cameronw',
+              photoUrl: null,
+            }
+          : null,
+      readByCount: conversationId === 'visual-audit-conversation' ? 1 : 0,
+      readAt:
+        conversationId === 'visual-audit-conversation'
+          ? '2026-10-21T10:14:00.000Z'
+          : null,
       someoneTyping: false,
       title: 'Conversation',
       unreadCount: 0,
@@ -460,11 +509,22 @@ export function subscribeConversationDetails(
         data.lastReadMessageIds && typeof data.lastReadMessageIds === 'object'
           ? (data.lastReadMessageIds as Record<string, unknown>)
           : {};
+      const readTimes =
+        data.lastReadAt && typeof data.lastReadAt === 'object'
+          ? (data.lastReadAt as Record<string, unknown>)
+          : {};
       const typing =
         data.typing && typeof data.typing === 'object'
           ? (data.typing as Record<string, unknown>)
           : {};
       const lastMessageId = lastMessage ? String(lastMessage.id ?? '') : null;
+      const receipt = conversationReadReceipt({
+        participantIds,
+        userId,
+        lastMessageId,
+        lastReadMessageIds: readMessageIds,
+        lastReadAt: readTimes,
+      });
       const base = {
         kind:
           data.kind === 'activity' || data.kind === 'group'
@@ -487,11 +547,8 @@ export function subscribeConversationDetails(
             : null,
         lastMessageId,
         unreadCount: Math.max(0, Number(unreadCounts[userId] ?? 0)),
-        readByCount: lastMessageId
-          ? participantIds.filter(
-              (id) => id !== userId && readMessageIds[id] === lastMessageId,
-            ).length
-          : 0,
+        readByCount: receipt.readByCount,
+        readAt: receipt.readAt,
         someoneTyping: Object.entries(typing).some(([id, value]) => {
           if (
             id === userId ||
