@@ -831,6 +831,8 @@ function InviteOption({
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
+  const { colors, isDark } = useAppTheme();
+
   return (
     <Pressable
       accessibilityLabel={title}
@@ -839,16 +841,25 @@ function InviteOption({
       style={styles.actionRow}
     >
       <LinearGradient
-        colors={['#331F21', '#171213']}
+        colors={
+          isDark
+            ? ['#331F21', '#171213']
+            : [colors.surfaceRaised, colors.surface]
+        }
         style={styles.actionIconTile}
       >
-        <Icon height={responsiveSize(32)} width={responsiveSize(32)} />
+        <Icon
+          color={isDark ? '#FFFFFF' : colors.text}
+          height={responsiveSize(32)}
+          width={responsiveSize(32)}
+        />
       </LinearGradient>
       <View style={styles.actionCopy}>
         <Text style={styles.actionText}>{title}</Text>
         <Text style={styles.actionSubtitle}>{detail}</Text>
       </View>
       <InviteChevronIcon
+        color={isDark ? '#FFFFFF' : colors.textSecondary}
         height={responsiveSize(16)}
         width={responsiveSize(10)}
       />
@@ -2386,7 +2397,12 @@ export function PostSignupOnboardingFlow({
                     contact.invited && styles.invitedButton,
                   ]}
                 >
-                  <Text style={styles.inviteText}>
+                  <Text
+                    style={[
+                      styles.inviteText,
+                      contact.invited && styles.invitedText,
+                    ]}
+                  >
                     {contact.userId
                       ? contact.invited
                         ? 'Following'
@@ -3685,8 +3701,13 @@ const createStyles = (
       paddingHorizontal: 13,
       backgroundColor: colors.primary,
     },
-    invitedButton: { backgroundColor: colors.surfaceRaised },
+    invitedButton: {
+      backgroundColor: colors.surfaceRaised,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
     inviteText: { color: colors.onPrimary, fontSize: 11 },
+    invitedText: { color: colors.textSecondary },
     inviteScroll: {
       position: 'absolute',
       top: landscape ? 80 : 108,
@@ -3768,42 +3789,42 @@ const createStyles = (
       minHeight: 80,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: 'rgba(230,57,70,0.42)',
-      backgroundColor: '#211516',
+      borderColor: isDark ? 'rgba(230,57,70,0.42)' : colors.border,
+      backgroundColor: isDark ? '#211516' : colors.surface,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 14,
       paddingLeft: 14,
       paddingRight: 16,
       paddingVertical: 15,
-      shadowColor: '#E53845',
-      shadowOpacity: 0.18,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 0 },
+      shadowColor: isDark ? '#E53845' : '#000000',
+      shadowOpacity: isDark ? 0.18 : 0.08,
+      shadowRadius: isDark ? 14 : 8,
+      shadowOffset: { width: 0, height: isDark ? 0 : 2 },
     },
     actionIconTile: {
       width: 50,
       height: 50,
       flexShrink: 0,
       borderWidth: 1,
-      borderColor: 'rgba(230,57,70,0.28)',
+      borderColor: isDark ? 'rgba(230,57,70,0.28)' : colors.border,
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#000000',
-      shadowOpacity: 0.4,
+      shadowOpacity: isDark ? 0.4 : 0.08,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 3 },
     },
     actionCopy: { flex: 1, gap: 3 },
     actionText: {
-      color: '#FFFFFF',
+      color: colors.text,
       fontSize: 16,
       lineHeight: 19,
       fontWeight: '600',
     },
     actionSubtitle: {
-      color: 'rgba(255,255,255,0.55)',
+      color: colors.textSecondary,
       fontSize: 13,
       lineHeight: 16,
     },

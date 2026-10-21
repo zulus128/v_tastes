@@ -633,6 +633,53 @@ describe('onboarding in resizable windows', () => {
     ).toBeOnTheScreen();
   });
 
+  it('uses light surfaces and readable copy for invitation actions', async () => {
+    resize(402, 874);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'light');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="invite"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByRole('button', { name: 'Share your invite link' }).props
+          .style,
+      ),
+    ).toMatchObject({
+      backgroundColor: '#FFFFFF',
+      borderColor: '#E4E4E4',
+    });
+    expect(
+      StyleSheet.flatten(
+        screen.getByText('Share your invite link').props.style,
+      ),
+    ).toMatchObject({ color: '#000000' });
+  });
+
+  it('keeps the disabled Following action readable in the light theme', async () => {
+    resize(402, 874);
+    await AsyncStorage.setItem('@tastes/theme-preference', 'light');
+    await render(
+      <PostSignupOnboardingFlow
+        initialScreen="contacts"
+        onAuthenticationRequired={jest.fn()}
+        onComplete={jest.fn()}
+        visualAudit
+      />,
+      { wrapper: Providers },
+    );
+
+    expect(
+      StyleSheet.flatten(screen.getByText('Following').props.style),
+    ).toMatchObject({ color: '#677083' });
+  });
+
   it('scales the invitation sparkles with the three friend illustrations', async () => {
     resize(804, 1748);
     await AsyncStorage.setItem('@tastes/theme-preference', 'dark');
