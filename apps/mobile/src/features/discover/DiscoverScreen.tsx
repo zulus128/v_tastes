@@ -1447,16 +1447,30 @@ function PlacesMap({
         <Pressable
           accessibilityLabel="Zoom in"
           onPress={() => void zoomMap(1)}
-          style={styles.mapControlButton}
+          style={[
+            styles.mapControlButton,
+            !isDark && styles.mapControlButtonLight,
+          ]}
         >
-          <Text style={styles.mapZoomGlyph}>+</Text>
+          <Text
+            style={[styles.mapZoomGlyph, !isDark && styles.mapControlIconLight]}
+          >
+            +
+          </Text>
         </Pressable>
         <Pressable
           accessibilityLabel="Zoom out"
           onPress={() => void zoomMap(-1)}
-          style={styles.mapControlButton}
+          style={[
+            styles.mapControlButton,
+            !isDark && styles.mapControlButtonLight,
+          ]}
         >
-          <Text style={styles.mapZoomGlyph}>−</Text>
+          <Text
+            style={[styles.mapZoomGlyph, !isDark && styles.mapControlIconLight]}
+          >
+            −
+          </Text>
         </Pressable>
         <Pressable
           accessibilityLabel="My location"
@@ -1464,11 +1478,13 @@ function PlacesMap({
           onPress={() => void goToCurrentLocation()}
           style={[
             styles.mapControlButton,
+            !isDark && styles.mapControlButtonLight,
             locationEnabled && styles.mapControlButtonActive,
+            !isDark && locationEnabled && styles.mapControlButtonActiveLight,
           ]}
         >
           <MapLocateIcon
-            color="#FFFFFF"
+            color={isDark ? '#FFFFFF' : '#252A31'}
             height={responsiveSize(18)}
             testID="map-location-control-icon"
             width={responsiveSize(18)}
@@ -1480,11 +1496,13 @@ function PlacesMap({
           onPress={() => setLayersOpen((value) => !value)}
           style={[
             styles.mapControlButton,
+            !isDark && styles.mapControlButtonLight,
             layersOpen && styles.mapControlButtonActive,
+            !isDark && layersOpen && styles.mapControlButtonActiveLight,
           ]}
         >
           <MapLayersControlIcon
-            color="#FFFFFF"
+            color={isDark ? '#FFFFFF' : '#252A31'}
             height={responsiveSize(20)}
             testID="map-layers-control-icon"
             width={responsiveSize(20)}
@@ -3650,7 +3668,23 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    mapControlButtonLight: {
+      borderColor: '#D5D9DF',
+      backgroundColor: 'rgba(255,255,255,0.94)',
+      shadowColor: '#18202B',
+      shadowOpacity: 0.16,
+      shadowRadius: 7,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    },
+    mapControlIconLight: {
+      color: '#252A31',
+    },
     mapControlButtonActive: {
+      borderColor: colors.primary,
+    },
+    mapControlButtonActiveLight: {
+      backgroundColor: '#FFF3F2',
       borderColor: colors.primary,
     },
     layersMenu: {
