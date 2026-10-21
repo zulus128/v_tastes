@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
+import SearchIcon from '../../../assets/profile/search.svg';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
 import { UserAvatar } from '../profile/avatar';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -580,7 +581,11 @@ export function ConversationsScreen({
         </View>
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <SearchIcon
+              color={colors.textSecondary}
+              height={responsiveSize(20)}
+              width={responsiveSize(20)}
+            />
             <TextInput
               autoCorrect={false}
               onChangeText={setSearch}
@@ -773,16 +778,11 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
     },
-    searchIcon: {
-      color: colors.textSecondary,
-      fontSize: 22,
-      marginRight: 8,
-      marginTop: -2,
-    },
     searchInput: {
       flex: 1,
       color: colors.text,
       fontSize: 16,
+      marginLeft: 8,
       paddingVertical: 0,
     },
     requests: { color: colors.textSecondary, fontSize: 14 },
