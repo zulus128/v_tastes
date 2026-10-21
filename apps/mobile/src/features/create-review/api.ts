@@ -2,6 +2,7 @@ import type { ReviewTag } from '@tastes/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { useTastesApi } from '../../session/SessionProvider';
+import { dishReviewPayload } from './reviewPayload';
 
 export interface DishReviewDraft {
   id: string;
@@ -25,11 +26,7 @@ async function uploadDishPhoto(
   dish: DishReviewDraft,
 ) {
   if (!dish.photoUri) {
-    return {
-      id: dish.id,
-      rating: dish.rating,
-      title: dish.title.trim(),
-    };
+    return dishReviewPayload(dish);
   }
   const photoPath = `review-images/${userId}/${idempotencyKey}/${dish.id}`;
   const thumbnailPath = `${photoPath}-thumbnail`;
@@ -51,11 +48,9 @@ async function uploadDishPhoto(
     }),
   ]);
   return {
-    id: dish.id,
+    ...dishReviewPayload(dish),
     photoPath,
     thumbnailPath,
-    rating: dish.rating,
-    title: dish.title.trim(),
   };
 }
 

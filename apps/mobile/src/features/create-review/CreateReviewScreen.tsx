@@ -602,7 +602,7 @@ export function CreateReviewScreen({
               <Text style={styles.errorBannerText}>
                 {submitError === 'offline'
                   ? "You're offline. Your review is kept as a draft until you're back."
-                  : "Couldn't post your review.\nCheck your connection and try again."}
+                  : "Couldn't post your review.\nPlease try again."}
               </Text>
             </View>
           ) : null}
