@@ -377,6 +377,10 @@ export const conversationInputSchema = z.object({
 
 export const hideConversationInputSchema = conversationInputSchema;
 
+export const setConversationPinnedInputSchema = conversationInputSchema.extend({
+  pinned: z.boolean(),
+});
+
 export const markConversationReadInputSchema = conversationInputSchema.extend({
   throughMessageId: z.string().min(1).max(128),
 });
@@ -690,6 +694,9 @@ export type RespondToActivityInvitationInput = z.infer<
 export type SendMessageInput = z.infer<typeof sendMessageInputSchema>;
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
 export type HideConversationInput = z.infer<typeof hideConversationInputSchema>;
+export type SetConversationPinnedInput = z.infer<
+  typeof setConversationPinnedInputSchema
+>;
 export type MarkConversationReadInput = z.infer<
   typeof markConversationReadInputSchema
 >;
@@ -952,6 +959,7 @@ export interface ConversationSummary {
     createdAt: string;
   } | null;
   unreadCount: number;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }
