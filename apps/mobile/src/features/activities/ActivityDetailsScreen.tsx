@@ -12,7 +12,14 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ActivityBackIcon from '../../../assets/activities/back.svg';
+import ActivityCalendarIcon from '../../../assets/activities/calendar.svg';
+import ActivityEditIcon from '../../../assets/activities/edit.svg';
+import ActivityLeaveIcon from '../../../assets/activities/leave.svg';
+import ActivityStarIcon from '../../../assets/activities/star.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
+import ActivityInviteIcon from '../../../assets/messaging/group-invite.svg';
+import ActivityTrashIcon from '../../../assets/messaging/group-trash.svg';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { firestore } from '../../infrastructure/firebase';
 import {
@@ -95,7 +102,20 @@ export function ActivityDetailsScreen({
           rating: 4.8,
           reviewCount: 24,
         },
-        members: [],
+        members: [
+          {
+            id: 'visual-audit-user',
+            displayName: 'Jane Cooper',
+            username: 'janec',
+            photoUrl: null,
+          },
+          {
+            id: 'visual-audit-member',
+            displayName: 'Cameron Williamson',
+            username: 'cameronw',
+            photoUrl: null,
+          },
+        ],
       });
       setError(null);
       return undefined;
@@ -262,7 +282,10 @@ export function ActivityDetailsScreen({
                   onPress={onBack}
                   style={styles.navButton}
                 >
-                  <Text style={styles.back}>‹</Text>
+                  <ActivityBackIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(24)}
+                  />
                 </Pressable>
                 <Text numberOfLines={1} style={styles.navTitle}>
                   {details.venue.name}
@@ -274,7 +297,10 @@ export function ActivityDetailsScreen({
                       onPress={() => onEdit(activityId)}
                       style={styles.navButton}
                     >
-                      <Text style={styles.navActionText}>✎</Text>
+                      <ActivityEditIcon
+                        height={responsiveSize(20)}
+                        width={responsiveSize(20)}
+                      />
                     </Pressable>
                   ) : null}
                   <Pressable
@@ -300,24 +326,43 @@ export function ActivityDetailsScreen({
                     }
                     style={styles.navButton}
                   >
-                    <Text style={[styles.navActionText, styles.dangerText]}>
-                      {admin ? '⌫' : '↗'}
-                    </Text>
+                    {admin ? (
+                      <ActivityTrashIcon
+                        color={colors.primary}
+                        height={responsiveSize(20)}
+                        width={responsiveSize(19)}
+                      />
+                    ) : (
+                      <ActivityLeaveIcon
+                        height={responsiveSize(24)}
+                        width={responsiveSize(24)}
+                      />
+                    )}
                   </Pressable>
                 </View>
               </View>
               <View style={styles.datePill}>
+                <ActivityCalendarIcon
+                  height={responsiveSize(20)}
+                  width={responsiveSize(20)}
+                />
                 <Text style={styles.dateText}>
-                  ▣ {date}, {time}
+                  {date}, {time}
                 </Text>
               </View>
             </View>
 
             <View style={styles.placeCard}>
               <View style={styles.ratingRow}>
-                <Text style={styles.rating}>
-                  ★ {details.venue.rating.toFixed(1)}
-                </Text>
+                <View style={styles.rating}>
+                  <ActivityStarIcon
+                    height={responsiveSize(14)}
+                    width={responsiveSize(14)}
+                  />
+                  <Text style={styles.ratingText}>
+                    {details.venue.rating.toFixed(1)}
+                  </Text>
+                </View>
                 <Text style={styles.reviews}>
                   {details.venue.reviewCount} reviews
                 </Text>
@@ -409,7 +454,11 @@ export function ActivityDetailsScreen({
                 {updatingMemberId === member.id ? (
                   <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
-                  <Text style={styles.removeMemberText}>⌫</Text>
+                  <ActivityTrashIcon
+                    color={colors.text}
+                    height={responsiveSize(20)}
+                    width={responsiveSize(19)}
+                  />
                 )}
               </Pressable>
             ) : null}
@@ -421,7 +470,12 @@ export function ActivityDetailsScreen({
               onPress={() => onEdit(activityId)}
               style={styles.inviteButton}
             >
-              <Text style={styles.inviteButtonText}>＋ Invite members</Text>
+              <ActivityInviteIcon
+                color="#FFFFFF"
+                height={responsiveSize(24)}
+                width={responsiveSize(24)}
+              />
+              <Text style={styles.inviteButtonText}>Invite members</Text>
             </Pressable>
           ) : null
         }
@@ -463,9 +517,6 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     navActions: { flexDirection: 'row' },
-    navActionText: { color: '#FFFFFF', fontSize: 22, fontWeight: '600' },
-    dangerText: { color: colors.primary },
-    back: { color: '#FFFFFF', fontSize: 38, lineHeight: 39, fontWeight: '300' },
     navTitle: {
       flex: 1,
       color: '#FFFFFF',
@@ -480,6 +531,9 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 12,
       height: 37,
       borderRadius: 19,
+      flexDirection: 'row',
+      gap: 6,
+      alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: 'rgba(22,22,22,0.78)',
     },
@@ -497,14 +551,16 @@ function createStyles(colors: ThemeColors) {
     },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     rating: {
-      color: '#FFFFFF',
+      flexDirection: 'row',
+      gap: 4,
+      alignItems: 'center',
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 16,
       overflow: 'hidden',
       backgroundColor: colors.primary,
-      fontWeight: '700',
     },
+    ratingText: { color: '#FFFFFF', fontWeight: '700' },
     reviews: { color: colors.textMuted, fontSize: 14 },
     placeName: {
       color: colors.text,
@@ -586,12 +642,13 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    removeMemberText: { color: colors.primary, fontSize: 23 },
     inviteButton: {
       height: 48,
       marginHorizontal: 16,
       marginTop: 20,
       borderRadius: 24,
+      flexDirection: 'row',
+      gap: 8,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
