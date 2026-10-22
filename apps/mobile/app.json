@@ -18,6 +18,9 @@
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
       "associatedDomains": ["applinks:tastesapp.com"],
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
+      },
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,

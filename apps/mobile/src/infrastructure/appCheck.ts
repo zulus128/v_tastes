@@ -3,8 +3,10 @@ import {
   CustomProvider as WebCustomProvider,
   initializeAppCheck as initializeWebAppCheck,
 } from 'firebase/app-check';
+import * as Application from 'expo-application';
 import { TurboModuleRegistry } from 'react-native';
 import { captureException } from './observability';
+import { selectAppleAppCheckProvider } from './appCheckProvider';
 
 let initialized = false;
 
@@ -26,7 +28,10 @@ export function configureAppCheck(): void {
       provider.configure({
         android: { provider: __DEV__ ? 'debug' : 'playIntegrity' },
         apple: {
-          provider: __DEV__ ? 'debug' : 'appAttestWithDeviceCheckFallback',
+          provider: selectAppleAppCheckProvider(
+            __DEV__,
+            Application.nativeBuildVersion,
+          ),
           ...(process.env.EXPO_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN
             ? {
                 debugToken:
