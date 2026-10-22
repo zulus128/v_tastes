@@ -2,6 +2,7 @@ import type { ConversationSummary } from '@tastes/contracts';
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +10,6 @@ import {
   FlatList,
   Image,
   ImageBackground,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -205,7 +205,9 @@ function ConversationRow({
   const actionWidth = responsiveSize(116);
   const openThreshold = responsiveSize(42);
   const swipeStartThreshold = responsiveSize(8);
-  const dragStartX = useRef(0);
+  const touchStart = useRef({ pageX: 0, pageY: 0, translateX: 0 });
+  const touchPosition = useRef({ pageX: 0, pageY: 0 });
+  const handlingSwipe = useRef(false);
   useEffect(() => {
     Animated.spring(translateX, {
       toValue: swipeOpen ? -actionWidth : 0,
@@ -214,59 +216,58 @@ function ConversationRow({
       bounciness: 0,
     }).start();
   }, [actionWidth, swipeOpen, translateX]);
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          (gesture.dx < -swipeStartThreshold ||
-            (swipeOpen && gesture.dx > swipeStartThreshold)) &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
-        onPanResponderGrant: () => {
-          translateX.stopAnimation((value) => {
-            dragStartX.current = value;
-          });
-        },
-        onPanResponderMove: (_, gesture) => {
-          translateX.setValue(
-            Math.max(
-              -actionWidth,
-              Math.min(0, dragStartX.current + gesture.dx),
-            ),
-          );
-        },
-        onPanResponderRelease: (_, gesture) => {
-          const finalX = dragStartX.current + gesture.dx;
-          const shouldOpen = swipeOpen
-            ? gesture.dx < openThreshold
-            : finalX < -openThreshold;
-          if (shouldOpen) onOpenActions();
-          else onCloseActions();
-          Animated.spring(translateX, {
-            toValue: shouldOpen ? -actionWidth : 0,
-            useNativeDriver: true,
-            speed: 24,
-            bounciness: 0,
-          }).start();
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(translateX, {
-            toValue: swipeOpen ? -actionWidth : 0,
-            useNativeDriver: true,
-            speed: 24,
-            bounciness: 0,
-          }).start();
-        },
-      }),
-    [
-      actionWidth,
-      onCloseActions,
-      onOpenActions,
-      openThreshold,
-      swipeStartThreshold,
-      swipeOpen,
-      translateX,
-    ],
+  const onTouchStart = useCallback(
+    (event: GestureResponderEvent) => {
+      const { pageX, pageY } = event.nativeEvent;
+      handlingSwipe.current = false;
+      touchPosition.current = { pageX, pageY };
+      translateX.stopAnimation((value) => {
+        touchStart.current = { pageX, pageY, translateX: value };
+      });
+    },
+    [translateX],
   );
+  const onTouchMove = useCallback(
+    (event: GestureResponderEvent) => {
+      const { pageX, pageY } = event.nativeEvent;
+      touchPosition.current = { pageX, pageY };
+      const dx = pageX - touchStart.current.pageX;
+      const dy = pageY - touchStart.current.pageY;
+      if (
+        !handlingSwipe.current &&
+        Math.abs(dx) > swipeStartThreshold &&
+        Math.abs(dx) > Math.abs(dy)
+      ) {
+        handlingSwipe.current = true;
+      }
+      if (!handlingSwipe.current) return;
+      translateX.setValue(
+        Math.max(-actionWidth, Math.min(0, touchStart.current.translateX + dx)),
+      );
+    },
+    [actionWidth, swipeStartThreshold, translateX],
+  );
+  const onTouchEnd = useCallback(() => {
+    if (!handlingSwipe.current) return;
+    const dx = touchPosition.current.pageX - touchStart.current.pageX;
+    const finalX = touchStart.current.translateX + dx;
+    const shouldOpen = swipeOpen ? dx < openThreshold : finalX < -openThreshold;
+    if (shouldOpen) onOpenActions();
+    else onCloseActions();
+    Animated.spring(translateX, {
+      toValue: shouldOpen ? -actionWidth : 0,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 0,
+    }).start();
+  }, [
+    actionWidth,
+    onCloseActions,
+    onOpenActions,
+    openThreshold,
+    swipeOpen,
+    translateX,
+  ]);
   return (
     <View style={styles.swipeRow}>
       <View
@@ -311,14 +312,20 @@ function ConversationRow({
       </View>
       <Animated.View
         style={[styles.swipeContent, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
       >
         <Pressable
+          accessibilityHint="Swipe left or press and hold for chat actions"
           accessibilityRole="button"
+          delayLongPress={350}
+          onLongPress={onOpenActions}
           onPress={() => {
+            if (handlingSwipe.current) return;
             if (swipeOpen) onCloseActions();
             else onOpen();
           }}
+          onTouchEnd={onTouchEnd}
+          onTouchMove={onTouchMove}
+          onTouchStart={onTouchStart}
           style={({ pressed }) => [
             styles.row,
             activity && styles.activityRow,
