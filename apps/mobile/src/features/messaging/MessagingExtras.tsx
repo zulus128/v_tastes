@@ -32,6 +32,7 @@ import GroupTrashIcon from '../../../assets/messaging/group-trash.svg';
 import UserHeartIcon from '../../../assets/messaging/user-heart.svg';
 import UserHeartLightIcon from '../../../assets/messaging/user-heart-light.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
+import { imageSourceForUrl } from '../../dev/visualAuditMedia';
 import {
   useAuthenticatedUserId,
   useTastesApi,
@@ -593,8 +594,9 @@ export function GroupDetailsScreen({
                       style={styles.groupMediaPhoto}
                     >
                       <Image
-                        source={{ uri: url }}
-                        style={StyleSheet.absoluteFill}
+                        source={imageSourceForUrl(url)}
+                        resizeMode="cover"
+                        style={styles.groupMediaImage}
                       />
                       {overflow ? (
                         <View style={styles.groupMediaOverflow}>
@@ -1330,6 +1332,10 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 10,
       backgroundColor: colors.skeleton,
       overflow: 'hidden',
+    },
+    groupMediaImage: {
+      width: '100%',
+      height: '100%',
     },
     groupMediaOverflow: {
       position: 'absolute',

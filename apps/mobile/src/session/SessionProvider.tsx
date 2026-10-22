@@ -23,10 +23,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { Image } from 'react-native';
-import visualAuditGroupMediaOne from '../../assets/home/recommendation.jpg';
-import visualAuditGroupMediaThree from '../../assets/home/dish-2.png';
-import visualAuditGroupMediaTwo from '../../assets/home/dish-1.jpg';
+import { visualAuditMediaIds } from '../dev/visualAuditMedia';
 import { identifyAnalyticsUser } from '../infrastructure/analytics';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
@@ -58,12 +55,6 @@ interface SessionContextValue {
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
-
-const visualAuditGroupMedia = [
-  Image.resolveAssetSource(visualAuditGroupMediaOne).uri,
-  Image.resolveAssetSource(visualAuditGroupMediaTwo).uri,
-  Image.resolveAssetSource(visualAuditGroupMediaThree).uri,
-];
 
 function visualAuditData(operation: string): unknown {
   switch (operation) {
@@ -115,7 +106,7 @@ function visualAuditData(operation: string): unknown {
           recipientId: '',
           recipientIds: [],
           text: '',
-          imageUrl: visualAuditGroupMedia[index % visualAuditGroupMedia.length],
+          imageUrl: visualAuditMediaIds[index % visualAuditMediaIds.length],
           createdAt: `2026-10-20T${String(20 - (index % 10)).padStart(2, '0')}:00:00.000Z`,
         })),
         nextCursor: null,

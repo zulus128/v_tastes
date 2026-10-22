@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SendIcon from '../../../assets/ai/send.svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
+import { imageSourceForUrl } from '../../dev/visualAuditMedia';
 import { firestore, storage } from '../../infrastructure/firebase';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
@@ -184,7 +185,10 @@ function MessageBubble({
       ]}
     >
       {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
+        <Image
+          source={imageSourceForUrl(item.imageUrl)}
+          style={styles.messageImage}
+        />
       ) : null}
       {item.text ? (
         <Text style={[styles.messageText, mine && styles.mineText]}>

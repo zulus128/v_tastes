@@ -21,6 +21,7 @@ import restaurantImage from '../../../assets/discover/restaurant.png';
 import ActivityInviteIcon from '../../../assets/messaging/group-invite.svg';
 import ActivityTrashIcon from '../../../assets/messaging/group-trash.svg';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import { imageSourceForUrl } from '../../dev/visualAuditMedia';
 import { firestore } from '../../infrastructure/firebase';
 import {
   useAuthenticatedUserId,
@@ -384,7 +385,7 @@ export function ActivityDetailsScreen({
                   {mediaUrls.slice(0, 6).map((url, index) => (
                     <Image
                       key={`${url}-${index}`}
-                      source={{ uri: url }}
+                      source={imageSourceForUrl(url)}
                       style={styles.mediaPhoto}
                     />
                   ))}

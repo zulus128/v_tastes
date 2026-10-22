@@ -23,9 +23,26 @@ import BookmarkBodyIcon from '../../../assets/activities/bookmark-body.svg';
 import BookmarkBodyLightIcon from '../../../assets/activities/bookmark-body-light.svg';
 import BookmarkLineIcon from '../../../assets/activities/bookmark-line.svg';
 import BookmarkLineLightIcon from '../../../assets/activities/bookmark-line-light.svg';
+import ActivityAddIcon from '../../../assets/activities/add.svg';
+import ActivityBackIcon from '../../../assets/activities/back.svg';
+import CaretDownIcon from '../../../assets/activities/caret-down.svg';
+import ActivityConfirmIcon from '../../../assets/activities/confirm.svg';
+import MemberSelectedIcon from '../../../assets/activities/member-selected.svg';
+import MemberUnselectedIcon from '../../../assets/activities/member-unselected.svg';
+import PlaceAddIcon from '../../../assets/activities/place-add.svg';
 import SearchTuneIcon from '../../../assets/activities/place-tuning.svg';
 import SearchTuneLightIcon from '../../../assets/activities/place-tuning-light.svg';
 import PenIcon from '../../../assets/create-review/pen.svg';
+import CafeCupIcon from '../../../assets/create-review/place-filter-cafe-cup.svg';
+import CafeSteamLeftIcon from '../../../assets/create-review/place-filter-cafe-steam-left.svg';
+import CafeSteamRightIcon from '../../../assets/create-review/place-filter-cafe-steam-right.svg';
+import BarFilterIcon from '../../../assets/create-review/place-filter-bar.svg';
+import RestaurantFilterIcon from '../../../assets/create-review/place-filter-restaurant.svg';
+import TrendingFilterIcon from '../../../assets/create-review/place-filter-trending.svg';
+import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
+import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
+import PlaceSelectorCloseIcon from '../../../assets/create-review/place-selector-close.svg';
+import PlaceSelectorSearchIcon from '../../../assets/create-review/place-selector-search.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
@@ -211,7 +228,10 @@ export function NewActivityScreen({
           onPress={onBack}
           style={styles.navButton}
         >
-          <Text style={styles.back}>‹</Text>
+          <ActivityBackIcon
+            height={responsiveSize(24)}
+            width={responsiveSize(24)}
+          />
         </Pressable>
         <Text style={styles.navTitle}>
           {activityId ? 'Edit activity' : 'New activity'}
@@ -286,7 +306,10 @@ export function NewActivityScreen({
                     )
                   }
                 >
-                  <Text style={styles.monthArrow}>‹</Text>
+                  <ActivityBackIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(24)}
+                  />
                 </Pressable>
                 <Pressable
                   onPress={() =>
@@ -295,7 +318,11 @@ export function NewActivityScreen({
                     )
                   }
                 >
-                  <Text style={styles.monthArrow}>›</Text>
+                  <ActivityBackIcon
+                    height={responsiveSize(24)}
+                    style={styles.chevronRight}
+                    width={responsiveSize(24)}
+                  />
                 </Pressable>
               </View>
             </View>
@@ -376,7 +403,10 @@ export function NewActivityScreen({
                   )
                 }
               >
-                <Text style={styles.remove}>×</Text>
+                <PlaceSelectorClearIcon
+                  height={responsiveSize(24)}
+                  width={responsiveSize(24)}
+                />
               </Pressable>
             </View>
           ))}
@@ -388,7 +418,10 @@ export function NewActivityScreen({
             {loadingCandidates ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
-              <Text style={styles.addMemberText}>+</Text>
+              <ActivityAddIcon
+                height={responsiveSize(24)}
+                width={responsiveSize(24)}
+              />
             )}
           </Pressable>
         </ScrollView>
@@ -491,7 +524,10 @@ function SheetHeader({
         onPress={onClose}
         style={styles.closeCircle}
       >
-        <Text style={styles.closeText}>×</Text>
+        <PlaceSelectorCloseIcon
+          height={responsiveSize(30)}
+          width={responsiveSize(30)}
+        />
       </Pressable>
     </View>
   );
@@ -582,7 +618,11 @@ function PlaceSelector({
           />
           <View style={styles.sheetSearchRow}>
             <View style={styles.sheetSearch}>
-              <Text style={styles.searchGlyph}>⌕</Text>
+              <PlaceSelectorSearchIcon
+                height={responsiveSize(24)}
+                style={styles.searchIcon}
+                width={responsiveSize(24)}
+              />
               <TextInput
                 onChangeText={setSearch}
                 placeholder="Restaurant"
@@ -595,7 +635,10 @@ function PlaceSelector({
                   accessibilityLabel="Clear search"
                   onPress={() => setSearch('')}
                 >
-                  <Text style={styles.searchClear}>×</Text>
+                  <PlaceSelectorClearIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(24)}
+                  />
                 </Pressable>
               ) : null}
             </View>
@@ -671,14 +714,18 @@ function PlaceSelector({
                   onPress={() => setCategoryFilter(active ? null : filter)}
                   style={[styles.filter, active && styles.filterActive]}
                 >
-                  <Text style={styles.filterText}>
-                    {filter === 'Restaurant'
-                      ? '⚒'
-                      : filter === 'Cafe'
-                        ? '☕'
-                        : '▽'}{' '}
-                    {filter}
-                  </Text>
+                  {filter === 'Restaurant' ? (
+                    <RestaurantFilterIcon height={14} width={14} />
+                  ) : filter === 'Cafe' ? (
+                    <View style={styles.cafeIcon}>
+                      <CafeSteamLeftIcon style={styles.cafeSteamLeft} />
+                      <CafeSteamRightIcon style={styles.cafeSteamRight} />
+                      <CafeCupIcon style={styles.cafeCup} />
+                    </View>
+                  ) : (
+                    <BarFilterIcon height={14} width={14} />
+                  )}
+                  <Text style={styles.filterText}>{filter}</Text>
                 </Pressable>
               );
             })}
@@ -686,13 +733,15 @@ function PlaceSelector({
               onPress={() => setPriceFilter((active) => !active)}
               style={[styles.filter, priceFilter && styles.filterActive]}
             >
-              <Text style={styles.filterText}>$$⌄</Text>
+              <Text style={styles.filterText}>$$</Text>
+              <CaretDownIcon height={14} width={14} />
             </Pressable>
             <Pressable
               onPress={() => setTrendingFilter((active) => !active)}
               style={[styles.filter, trendingFilter && styles.filterActive]}
             >
-              <Text style={styles.filterText}>♨ Trending</Text>
+              <TrendingFilterIcon height={14} width={14} />
+              <Text style={styles.filterText}>Trending</Text>
             </Pressable>
           </ScrollView>
           <FlatList
@@ -727,15 +776,18 @@ function PlaceSelector({
                     {item.address ?? item.city}
                   </Text>
                   <View style={styles.placeMeta}>
-                    <Text style={styles.rating}>
-                      ★ {(item.rating ?? 0).toFixed(1)}
-                    </Text>
+                    <View style={styles.ratingPill}>
+                      <PlaceRatingStarIcon height={14} width={14} />
+                      <Text style={styles.rating}>
+                        {(item.rating ?? 0).toFixed(1)}
+                      </Text>
+                    </View>
                     <Text numberOfLines={1} style={styles.reviews}>
                       {item.reviewCount ?? 0} reviews
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.rowPlus}>⊕</Text>
+                <PlaceAddIcon height={20} width={20} />
               </Pressable>
             )}
           />
@@ -884,7 +936,11 @@ function MemberSelector({
             title="Select Members"
           />
           <View style={styles.sheetSearch}>
-            <Text style={styles.searchGlyph}>⌕</Text>
+            <PlaceSelectorSearchIcon
+              height={responsiveSize(24)}
+              style={styles.searchIcon}
+              width={responsiveSize(24)}
+            />
             <TextInput
               onChangeText={setSearch}
               placeholder="Search friends"
@@ -921,8 +977,19 @@ function MemberSelector({
                       {item.username ? `@${item.username}` : 'Mutual follower'}
                     </Text>
                   </View>
-                  <View style={[styles.radio, checked && styles.radioChecked]}>
-                    <Text style={styles.check}>{checked ? '✓' : ''}</Text>
+                  <View style={styles.radio}>
+                    {checked ? (
+                      <>
+                        <MemberSelectedIcon height={22} width={22} />
+                        <ActivityConfirmIcon
+                          height={10}
+                          style={styles.radioCheck}
+                          width={14}
+                        />
+                      </>
+                    ) : (
+                      <MemberUnselectedIcon height={24} width={24} />
+                    )}
                   </View>
                 </Pressable>
               );
@@ -940,7 +1007,8 @@ function MemberSelector({
                 draft.length === 0 && styles.disabled,
               ]}
             >
-              <Text style={styles.confirmText}>✓ Confirm</Text>
+              <ActivityConfirmIcon height={18} width={18} />
+              <Text style={styles.confirmText}>Confirm</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -1045,12 +1113,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    back: {
-      color: colors.text,
-      fontSize: 38,
-      lineHeight: 39,
-      fontWeight: '300',
-    },
+    chevronRight: { transform: [{ rotate: '180deg' }] },
     navTitle: {
       flex: 1,
       color: colors.text,
@@ -1121,7 +1184,6 @@ function createStyles(colors: ThemeColors) {
     },
     month: { color: colors.text, fontSize: 17, fontWeight: '700' },
     monthActions: { flexDirection: 'row', gap: 25 },
-    monthArrow: { color: colors.primary, fontSize: 32, lineHeight: 34 },
     weekRow: { marginTop: 5, flexDirection: 'row' },
     weekday: {
       width: '14.2857%',
@@ -1188,7 +1250,6 @@ function createStyles(colors: ThemeColors) {
     memberCopy: { flex: 1, marginLeft: 10 },
     memberName: { color: colors.text, fontSize: 15, fontWeight: '600' },
     memberHandle: { color: colors.textSecondary, marginTop: 2, fontSize: 12 },
-    remove: { color: colors.text, fontSize: 25, padding: 10 },
     addMember: {
       width: 44,
       height: 44,
@@ -1201,7 +1262,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    addMemberText: { color: colors.text, fontSize: 28, fontWeight: '300' },
     footer: {
       position: 'absolute',
       left: 0,
@@ -1261,16 +1321,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     sheetTitle: { color: colors.text, fontSize: 20, fontWeight: '700' },
-    closeCircle: {
-      width: 30,
-      height: 30,
-      borderWidth: 2,
-      borderColor: colors.text,
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    closeText: { color: colors.text, fontSize: 21, lineHeight: 22 },
+    closeCircle: { width: 30, height: 30 },
     sheetDragArea: {
       height: 28,
       alignItems: 'center',
@@ -1299,7 +1350,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
     },
-    searchGlyph: { color: colors.textSecondary, fontSize: 21, marginRight: 8 },
+    searchIcon: { marginRight: 8 },
     sheetSearchInput: {
       flex: 1,
       color: colors.text,
@@ -1307,7 +1358,6 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 0,
     },
     searchPlaceholder: { color: colors.placeholder },
-    searchClear: { color: colors.textSecondary, fontSize: 22 },
     searchAction: {
       width: 24,
       height: 24,
@@ -1331,6 +1381,8 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 14,
+      flexDirection: 'row',
+      gap: 3,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.background,
@@ -1360,13 +1412,17 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
     },
-    rating: {
-      color: '#FFFFFF',
+    ratingPill: {
       paddingHorizontal: 11,
       paddingVertical: 6,
       borderRadius: 16,
-      overflow: 'hidden',
+      flexDirection: 'row',
+      gap: 4,
+      alignItems: 'center',
       backgroundColor: colors.primary,
+    },
+    rating: {
+      color: '#FFFFFF',
       fontWeight: '700',
     },
     reviews: {
@@ -1376,7 +1432,10 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       lineHeight: 16,
     },
-    rowPlus: { color: colors.text, fontSize: 23 },
+    cafeIcon: { width: 14, height: 14 },
+    cafeSteamLeft: { position: 'absolute', left: 3, top: 0 },
+    cafeSteamRight: { position: 'absolute', left: 8, top: 0 },
+    cafeCup: { position: 'absolute', left: 1, top: 6 },
     candidateRow: {
       minHeight: 76,
       paddingHorizontal: 16,
@@ -1386,19 +1445,12 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     radio: {
-      width: 23,
-      height: 23,
-      borderWidth: 1.5,
-      borderColor: colors.text,
-      borderRadius: 12,
+      width: 24,
+      height: 24,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    radioChecked: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary,
-    },
-    check: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+    radioCheck: { position: 'absolute' },
     sheetFooter: {
       padding: 16,
       flexDirection: 'row',
@@ -1419,6 +1471,8 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       minHeight: 45,
       borderRadius: 24,
+      flexDirection: 'row',
+      gap: 8,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
