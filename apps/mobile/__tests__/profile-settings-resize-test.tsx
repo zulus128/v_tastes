@@ -1,9 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { Animated, Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProfileSettingsSheet } from '../src/features/profile/ProfileSettingsSheet';
+import { ProfileExtras } from '../src/features/profile/ProfileExtras';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -41,7 +48,28 @@ const mockUpdateProfileSettings = jest.fn();
 jest.mock('../src/session/SessionProvider', () => {
   const api = {
     getProfileExtras: async () => ({
-      data: { notificationPreferences: { categories: {} } },
+      data: {
+        blocked: false,
+        followers: [],
+        following: [
+          {
+            userId: 'jane',
+            displayName: 'Jane Cooper',
+            username: 'janec',
+            photoUrl: null,
+            following: true,
+          },
+        ],
+        level: 1,
+        xp: 0,
+        notificationPreferences: {
+          enabled: true,
+          push: true,
+          email: true,
+          sms: false,
+          categories: {},
+        },
+      },
     }),
     updateProfileSettings: mockUpdateProfileSettings,
   };
@@ -113,6 +141,29 @@ it('keeps account actions inside the scroll area above the fixed footer', async 
   );
   expect(footerStyle.position).not.toBe('absolute');
   expect(footerStyle.flexShrink).toBe(0);
+});
+
+it('uses a light themed surface for the Following button', async () => {
+  await render(
+    <ProfileExtras
+      onClose={jest.fn()}
+      onOpenProfile={jest.fn()}
+      screen="following"
+      targetUserId="profile-owner"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  const button = await screen.findByLabelText('Unfollow Jane Cooper');
+  const buttonStyle = StyleSheet.flatten(button.props.style);
+  const labelStyle = StyleSheet.flatten(
+    within(button).getByText('Following').props.style,
+  );
+
+  expect(buttonStyle.backgroundColor).toBe('rgba(184,47,41,0.08)');
+  expect(buttonStyle.borderColor).toBe('#B82F29');
+  expect(labelStyle.color).toBe('#B82F29');
 });
 
 it('opens the Bio editor and accepts the full 80-character value', async () => {
