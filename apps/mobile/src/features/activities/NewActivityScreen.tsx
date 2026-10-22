@@ -411,6 +411,7 @@ export function NewActivityScreen({
             </View>
           ))}
           <Pressable
+            accessibilityLabel="Select members"
             disabled={loadingCandidates}
             onPress={() => setMembersOpen(true)}
             style={styles.addMember}
@@ -815,7 +816,12 @@ function MemberSelector({
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState(selectedIds);
   const { height: viewportHeight } = useWindowDimensions();
-  const collapsedHeight = responsiveSize(250);
+  // The collapsed sheet must fit the header, search field, one candidate row,
+  // and the actions. 250px forced the search field to collapse in landscape.
+  const collapsedHeight = Math.min(
+    responsiveSize(300),
+    viewportHeight - responsiveSize(24),
+  );
   const expandedHeight = Math.max(
     collapsedHeight,
     viewportHeight - responsiveSize(86),
@@ -935,7 +941,10 @@ function MemberSelector({
             styles={styles}
             title="Select Members"
           />
-          <View style={styles.sheetSearch}>
+          <View
+            style={[styles.sheetSearch, styles.memberSearch]}
+            testID="activity-member-search"
+          >
             <PlaceSelectorSearchIcon
               height={responsiveSize(24)}
               style={styles.searchIcon}
@@ -1349,6 +1358,13 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
+    },
+    memberSearch: {
+      flex: 0,
+      flexShrink: 0,
+      marginTop: 12,
+      marginHorizontal: 16,
+      marginBottom: 8,
     },
     searchIcon: { marginRight: 8 },
     sheetSearchInput: {
