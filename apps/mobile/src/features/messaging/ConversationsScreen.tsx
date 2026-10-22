@@ -138,9 +138,11 @@ function ConversationRow({
   onPin,
   onRequestDelete,
   pinning,
+  actionIconColor,
   swipeOpen,
   styles,
 }: {
+  actionIconColor: string;
   conversation: ConversationSummary;
   deleting: boolean;
   onCloseActions: () => void;
@@ -175,7 +177,7 @@ function ConversationRow({
         ? 'You: '
         : '';
   const translateX = useMemo(() => new Animated.Value(0), []);
-  const actionWidth = responsiveSize(116);
+  const actionWidth = responsiveSize(88);
   const [actionsVisible, setActionsVisible] = useState(swipeOpen);
   const openThreshold = responsiveSize(42);
   const swipeStartThreshold = responsiveSize(8);
@@ -267,9 +269,9 @@ function ConversationRow({
           ]}
         >
           {pinning ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={actionIconColor} size="small" />
           ) : (
-            <PinActionIcon color="#FFFFFF" fill="#FFFFFF" />
+            <PinActionIcon color={actionIconColor} />
           )}
         </Pressable>
         <Pressable
@@ -386,7 +388,7 @@ function ConversationRow({
                   accessibilityLabel="Pinned chat"
                   style={styles.pinnedBadge}
                 >
-                  <PinnedStatusIcon color="#FFFFFF" fill="#FFFFFF" />
+                  <PinnedStatusIcon color={actionIconColor} />
                 </View>
               ) : null}
               {unread ? (
@@ -664,6 +666,7 @@ export function ConversationsScreen({
             windowSize={7}
             renderItem={({ item }) => (
               <ConversationRow
+                actionIconColor={colors.text}
                 conversation={item}
                 deleting={deletingId === item.id}
                 onCloseActions={() => setSwipedConversationId(null)}
@@ -797,25 +800,27 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
       backgroundColor: 'transparent',
     },
-    swipeContent: { backgroundColor: 'transparent' },
+    swipeContent: {
+      backgroundColor: isDark ? colors.background : colors.surface,
+    },
     swipeActions: {
       position: 'absolute',
       top: 0,
       right: 0,
       bottom: 0,
-      width: 116,
+      width: 88,
       flexDirection: 'row',
-      borderLeftWidth: 1,
-      borderLeftColor: '#45474B',
-      backgroundColor: '#282828',
+      backgroundColor: isDark ? colors.surfaceRaised : colors.surface,
     },
     hiddenSwipeActions: { opacity: 0 },
     swipeActionButton: {
-      flex: 1,
+      width: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    swipeActionPressed: { backgroundColor: '#45474B' },
+    swipeActionPressed: {
+      backgroundColor: isDark ? colors.border : colors.surfaceRaised,
+    },
     row: {
       minHeight: 76,
       paddingHorizontal: 16,
