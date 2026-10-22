@@ -17,8 +17,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
+import DeleteActionIcon from '../../../assets/messaging/chat-delete-action.svg';
+import PinActionIcon from '../../../assets/messaging/chat-pin-action.svg';
+import PinnedStatusIcon from '../../../assets/messaging/chat-pinned-status.svg';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import SearchIcon from '../../../assets/profile/search.svg';
 import { ActivityInviteModal } from '../activities/ActivityInviteModal';
@@ -52,35 +54,6 @@ function relativeTime(iso: string): string {
     day: 'numeric',
     month: 'short',
   });
-}
-
-function PinActionIcon({ color }: { color: string }) {
-  return (
-    <Svg height={20} viewBox="0 0 24 24" width={20}>
-      <Path
-        d="m14.8 4.4 4.8 4.8-3 1.5-2.3 4.6-2.1-2.1-5.4 5.4-1.4-1.4 5.4-5.4-2.1-2.1 4.6-2.3 1.5-3Z"
-        fill="none"
-        stroke={color}
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-      />
-    </Svg>
-  );
-}
-
-function TrashActionIcon({ color }: { color: string }) {
-  return (
-    <Svg height={20} viewBox="0 0 24 24" width={20}>
-      <Path
-        d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"
-        fill="none"
-        stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.6}
-      />
-    </Svg>
-  );
 }
 
 function DeleteConversationSheet({
@@ -203,18 +176,22 @@ function ConversationRow({
         : '';
   const translateX = useMemo(() => new Animated.Value(0), []);
   const actionWidth = responsiveSize(116);
+  const [actionsVisible, setActionsVisible] = useState(swipeOpen);
   const openThreshold = responsiveSize(42);
   const swipeStartThreshold = responsiveSize(8);
   const touchStart = useRef({ pageX: 0, pageY: 0, translateX: 0 });
   const touchPosition = useRef({ pageX: 0, pageY: 0 });
   const handlingSwipe = useRef(false);
   useEffect(() => {
+    if (swipeOpen) setActionsVisible(true);
     Animated.spring(translateX, {
       toValue: swipeOpen ? -actionWidth : 0,
       useNativeDriver: true,
       speed: 24,
       bounciness: 0,
-    }).start();
+    }).start(({ finished }) => {
+      if (finished && !swipeOpen) setActionsVisible(false);
+    });
   }, [actionWidth, swipeOpen, translateX]);
   const onTouchStart = useCallback(
     (event: GestureResponderEvent) => {
@@ -239,6 +216,7 @@ function ConversationRow({
         Math.abs(dx) > Math.abs(dy)
       ) {
         handlingSwipe.current = true;
+        setActionsVisible(true);
       }
       if (!handlingSwipe.current) return;
       translateX.setValue(
@@ -273,7 +251,10 @@ function ConversationRow({
       <View
         accessibilityElementsHidden={!swipeOpen}
         importantForAccessibility={swipeOpen ? 'yes' : 'no-hide-descendants'}
-        style={styles.swipeActions}
+        style={[
+          styles.swipeActions,
+          !actionsVisible && styles.hiddenSwipeActions,
+        ]}
       >
         <Pressable
           accessibilityLabel={conversation.pinned ? 'Unpin chat' : 'Pin chat'}
@@ -286,11 +267,9 @@ function ConversationRow({
           ]}
         >
           {pinning ? (
-            <ActivityIndicator color="#8D929A" size="small" />
+            <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
-            <PinActionIcon
-              color={conversation.pinned ? '#C8322B' : '#8D929A'}
-            />
+            <PinActionIcon color="#FFFFFF" fill="#FFFFFF" />
           )}
         </Pressable>
         <Pressable
@@ -304,9 +283,9 @@ function ConversationRow({
           ]}
         >
           {deleting ? (
-            <ActivityIndicator color="#C8322B" />
+            <ActivityIndicator color="#B82F29" />
           ) : (
-            <TrashActionIcon color="#C8322B" />
+            <DeleteActionIcon color="#B82F29" fill="#B82F29" />
           )}
         </Pressable>
       </View>
@@ -407,7 +386,7 @@ function ConversationRow({
                   accessibilityLabel="Pinned chat"
                   style={styles.pinnedBadge}
                 >
-                  <PinActionIcon color="#8D929A" />
+                  <PinnedStatusIcon color="#FFFFFF" fill="#FFFFFF" />
                 </View>
               ) : null}
               {unread ? (
@@ -731,6 +710,7 @@ export function ConversationsScreen({
 }
 
 function createStyles(colors: ThemeColors) {
+  const isDark = colors.background === '#080808';
   return responsiveStyleSheet({
     screen: { flex: 1 },
     patternBody: { flex: 1 },
@@ -811,13 +791,13 @@ function createStyles(colors: ThemeColors) {
     list: { flex: 1 },
     emptyContent: { flexGrow: 1 },
     swipeRow: {
-      minHeight: 82,
+      minHeight: 76,
       overflow: 'hidden',
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      backgroundColor: colors.canvas,
+      backgroundColor: 'transparent',
     },
-    swipeContent: { backgroundColor: colors.canvas },
+    swipeContent: { backgroundColor: 'transparent' },
     swipeActions: {
       position: 'absolute',
       top: 0,
@@ -826,15 +806,16 @@ function createStyles(colors: ThemeColors) {
       width: 116,
       flexDirection: 'row',
       borderLeftWidth: 1,
-      borderLeftColor: colors.border,
-      backgroundColor: colors.surfaceRaised,
+      borderLeftColor: '#45474B',
+      backgroundColor: '#282828',
     },
+    hiddenSwipeActions: { opacity: 0 },
     swipeActionButton: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    swipeActionPressed: { backgroundColor: colors.border },
+    swipeActionPressed: { backgroundColor: '#45474B' },
     row: {
       minHeight: 76,
       paddingHorizontal: 16,
@@ -882,18 +863,25 @@ function createStyles(colors: ThemeColors) {
     },
     activityMeta: { color: colors.textSecondary, marginTop: 2, fontSize: 13 },
     unreadName: { fontWeight: '800' },
-    time: { color: colors.textMuted, marginLeft: 10, fontSize: 12 },
+    time: {
+      color: isDark ? '#677083' : colors.textMuted,
+      marginLeft: 10,
+      fontSize: 12,
+    },
     unreadTime: { color: colors.primary, fontWeight: '700' },
     previewRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center' },
-    preview: { flex: 1, color: colors.textMuted, fontSize: 14 },
+    preview: {
+      flex: 1,
+      color: isDark ? '#AAB2C5' : colors.textSecondary,
+      fontSize: 14,
+    },
     unreadPreview: { color: colors.textSecondary, fontWeight: '600' },
     pinnedBadge: {
-      width: 24,
-      height: 24,
+      width: 16,
+      height: 16,
       marginLeft: 6,
       alignItems: 'center',
       justifyContent: 'center',
-      transform: [{ scale: 0.78 }],
     },
     badge: {
       minWidth: 21,
