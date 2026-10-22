@@ -2,11 +2,18 @@ import { isRelaxedTestEnvironment } from './runtime-environment';
 
 export const callableOptions = {
   region: 'europe-west1',
-  // Enable only after the mobile app initializes native App Check providers.
-  enforceAppCheck:
-    process.env.ENFORCE_APP_CHECK === 'true' &&
-    !isRelaxedTestEnvironment(),
+  // Production callables are deny-by-default. Tests and local emulators are the
+  // only environments allowed to bypass attestation.
+  enforceAppCheck: !isRelaxedTestEnvironment(),
   cors: true,
   invoker: 'public',
   maxInstances: 10,
+} as const;
+
+// The admin console is a separate web client protected by staff claims. It
+// does not yet ship a web App Check provider, so keep its endpoints explicit
+// rather than silently weakening the mobile callable policy.
+export const adminCallableOptions = {
+  ...callableOptions,
+  enforceAppCheck: false,
 } as const;

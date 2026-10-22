@@ -28,11 +28,22 @@ pnpm test:auth
 
 The `Deploy production` GitHub Actions workflow runs after a successful CI run
 on `main` and can also be started manually. Configure the protected
-`production` environment with `FIREBASE_SERVICE_ACCOUNT`. Before the first
-email-enabled deploy, create the Firebase Functions secret
-`SENDGRID_API_KEY` and set `TRANSACTIONAL_EMAIL_FROM` to a verified SendGrid
-sender. Production should set `ENFORCE_APP_CHECK=true`; previews and emulators
-may keep it disabled until their native App Check providers are configured.
+`production` environment with `FIREBASE_SERVICE_ACCOUNT`.
+
+Before the first email- and SMS-enabled deploy, create these Firebase Functions
+secrets:
+
+- `SENDGRID_API_KEY`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_VERIFY_SERVICE_SID`
+
+Set `TRANSACTIONAL_EMAIL_FROM` to a verified SendGrid sender. The Twilio service
+must be a Verify service with an SMS channel enabled. App Check enforcement is
+enabled by default for every mobile callable in deployed environments; only
+unit tests and the local Firebase emulators bypass attestation. Admin web
+callables remain protected by staff claims and intentionally do not require App
+Check until the admin console configures a web App Check provider.
 
 The separate `Build and submit TestFlight` workflow is intentionally manual.
 It uses the production EAS profile, increments the native build number, and

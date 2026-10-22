@@ -1,9 +1,8 @@
-const RELAXED_TEST_PROJECT_IDS = new Set([
-  // Temporary Firebase test contour. Remove this entry when the project becomes production.
-  'tastes-934e6',
-]);
+const RELAXED_TEST_PROJECT_IDS = new Set<string>();
 
-function firebaseConfigProjectId(environment: NodeJS.ProcessEnv): string | undefined {
+function firebaseConfigProjectId(
+  environment: NodeJS.ProcessEnv,
+): string | undefined {
   const firebaseConfig = environment.FIREBASE_CONFIG;
   if (!firebaseConfig) return undefined;
 
@@ -15,7 +14,9 @@ function firebaseConfigProjectId(environment: NodeJS.ProcessEnv): string | undef
   }
 }
 
-export function isFirebaseEmulator(environment: NodeJS.ProcessEnv = process.env): boolean {
+export function isFirebaseEmulator(
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
   return environment.FUNCTIONS_EMULATOR === 'true';
 }
 

@@ -13,15 +13,21 @@ describe('runtime environment', () => {
     expect(isRelaxedTestEnvironment(environment)).toBe(true);
   });
 
-  it('relaxes checks in the temporary Firebase test contour', () => {
-    expect(isRelaxedTestEnvironment({ GCLOUD_PROJECT: 'tastes-934e6' })).toBe(true);
-    expect(isRelaxedTestEnvironment({
-      FIREBASE_CONFIG: JSON.stringify({ projectId: 'tastes-934e6' }),
-    })).toBe(true);
+  it('keeps checks enabled in the deployed production project', () => {
+    expect(isRelaxedTestEnvironment({ GCLOUD_PROJECT: 'tastes-934e6' })).toBe(
+      false,
+    );
+    expect(
+      isRelaxedTestEnvironment({
+        FIREBASE_CONFIG: JSON.stringify({ projectId: 'tastes-934e6' }),
+      }),
+    ).toBe(false);
   });
 
   it('keeps checks enabled for any other deployed project', () => {
-    expect(isRelaxedTestEnvironment({ GCLOUD_PROJECT: 'tastes-production' })).toBe(false);
+    expect(
+      isRelaxedTestEnvironment({ GCLOUD_PROJECT: 'tastes-production' }),
+    ).toBe(false);
     expect(isRelaxedTestEnvironment({})).toBe(false);
   });
 });

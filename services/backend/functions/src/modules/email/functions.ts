@@ -22,7 +22,7 @@ const emailSecrets =
   process.env.FUNCTIONS_EMULATOR === 'true' ? [] : [sendgridApiKey];
 
 const requestSchema = z.object({
-  kind: z.enum(['email-verification', 'password-reset']),
+  kind: z.enum(['email-verification', 'password-reset', 'password-changed']),
 });
 
 async function sendForUser(
@@ -40,7 +40,7 @@ async function sendForUser(
   const actionUrl =
     kind === 'email-verification'
       ? await getAuth().generateEmailVerificationLink(user.email)
-      : kind === 'password-reset' || kind === 'password-changed'
+      : kind === 'password-reset'
         ? await getAuth().generatePasswordResetLink(user.email)
         : undefined;
   await sendTransactionalEmail({

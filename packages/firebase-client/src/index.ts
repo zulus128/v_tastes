@@ -527,7 +527,7 @@ export function createTastesApi(
         {},
       ),
     requestAccountEmail: (input: {
-      kind: 'email-verification' | 'password-reset';
+      kind: 'email-verification' | 'password-reset' | 'password-changed';
     }) => invoke<typeof input, { sent: true }>('requestAccountEmail', input),
     listNotifications: (input: ListNotificationsInput = { limit: 20 }) =>
       invoke<ListNotificationsInput, Page<AppNotification>>(

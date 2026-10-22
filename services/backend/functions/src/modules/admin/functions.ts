@@ -16,7 +16,7 @@ import {
   sendNotification,
   sendNotifications,
 } from '../../shared/notifications';
-import { callableOptions } from '../../shared/options';
+import { adminCallableOptions } from '../../shared/options';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { privateUserReference } from '../../shared/user-data';
@@ -331,168 +331,174 @@ async function notifySavedPlaceChange(
   }
 }
 
-export const getAdminOverview = onCall(callableOptions, async (request) => {
-  requireStaff(request);
-  const now = Date.now();
-  const [
-    users,
-    reviews,
-    reports,
-    venues,
-    users24h,
-    users7d,
-    users30d,
-    activeUsers24h,
-    activeUsers30d,
-    reviews24h,
-    reviews7d,
-    reviews30d,
-    analytics,
-    reviewCities,
-  ] = await Promise.all([
-    db.collection('users').count().get(),
-    db.collection('reviews').count().get(),
-    db.collection('reports').where('status', '==', 'pending').count().get(),
-    db.collection('venues').where('status', '==', 'active').count().get(),
-    db
-      .collection('users')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('users')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('users')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('users')
-      .where('lastSeenAt', '>=', Timestamp.fromMillis(now - 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('users')
-      .where('lastSeenAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('reviews')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('reviews')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000))
-      .count()
-      .get(),
-    db
-      .collection('reviews')
-      .where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
-      .count()
-      .get(),
-    getAnalyticsMetrics(),
-    getReviewCities(),
-  ]);
+export const getAdminOverview = onCall(
+  adminCallableOptions,
+  async (request) => {
+    requireStaff(request);
+    const now = Date.now();
+    const [
+      users,
+      reviews,
+      reports,
+      venues,
+      users24h,
+      users7d,
+      users30d,
+      activeUsers24h,
+      activeUsers30d,
+      reviews24h,
+      reviews7d,
+      reviews30d,
+      analytics,
+      reviewCities,
+    ] = await Promise.all([
+      db.collection('users').count().get(),
+      db.collection('reviews').count().get(),
+      db.collection('reports').where('status', '==', 'pending').count().get(),
+      db.collection('venues').where('status', '==', 'active').count().get(),
+      db
+        .collection('users')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('users')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('users')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('users')
+        .where('lastSeenAt', '>=', Timestamp.fromMillis(now - 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('users')
+        .where('lastSeenAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('reviews')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('reviews')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 7 * 86_400_000))
+        .count()
+        .get(),
+      db
+        .collection('reviews')
+        .where('createdAt', '>=', Timestamp.fromMillis(now - 30 * 86_400_000))
+        .count()
+        .get(),
+      getAnalyticsMetrics(),
+      getReviewCities(),
+    ]);
 
-  return {
-    totalUsers: users.data().count,
-    totalReviews: reviews.data().count,
-    pendingReports: reports.data().count,
-    activeVenues: venues.data().count,
-    newUsers: {
-      last24Hours: users24h.data().count,
-      last7Days: users7d.data().count,
-      last30Days: users30d.data().count,
-    },
-    newReviews: {
-      last24Hours: reviews24h.data().count,
-      last7Days: reviews7d.data().count,
-      last30Days: reviews30d.data().count,
-    },
-    analytics: {
-      ...analytics,
-      // Standard GA4 reports can lag behind live usage. lastSeenAt is written by the
-      // authenticated session path, so these operational DAU/MAU values update immediately.
-      dau: activeUsers24h.data().count,
-      mau: activeUsers30d.data().count,
-    },
-    reviewCities,
-  };
-});
+    return {
+      totalUsers: users.data().count,
+      totalReviews: reviews.data().count,
+      pendingReports: reports.data().count,
+      activeVenues: venues.data().count,
+      newUsers: {
+        last24Hours: users24h.data().count,
+        last7Days: users7d.data().count,
+        last30Days: users30d.data().count,
+      },
+      newReviews: {
+        last24Hours: reviews24h.data().count,
+        last7Days: reviews7d.data().count,
+        last30Days: reviews30d.data().count,
+      },
+      analytics: {
+        ...analytics,
+        // Standard GA4 reports can lag behind live usage. lastSeenAt is written by the
+        // authenticated session path, so these operational DAU/MAU values update immediately.
+        dau: activeUsers24h.data().count,
+        mau: activeUsers30d.data().count,
+      },
+      reviewCities,
+    };
+  },
+);
 
-export const getReportedContent = onCall(callableOptions, async (request) => {
-  requireStaff(request);
-  const snapshot = await db
-    .collection('reports')
-    .where('status', '==', 'pending')
-    .orderBy('createdAt', 'desc')
-    .limit(100)
-    .get();
+export const getReportedContent = onCall(
+  adminCallableOptions,
+  async (request) => {
+    requireStaff(request);
+    const snapshot = await db
+      .collection('reports')
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .get();
 
-  return Promise.all(
-    snapshot.docs.map(async (document) => {
-      const storedTargetType = String(
-        document.get('targetType') ?? document.get('contentType') ?? 'review',
-      );
-      const targetType =
-        storedTargetType === 'comment'
-          ? 'comment'
-          : storedTargetType === 'user'
-            ? 'user'
-            : 'review';
-      const targetId = String(
-        document.get('targetId') ??
-          document.get('contentId') ??
-          document.get('reviewId') ??
-          '',
-      );
-      const parentId =
-        targetType === 'comment'
-          ? String(
-              document.get('parentId') ?? document.get('reviewId') ?? '',
-            ) || null
-          : null;
-      let contentPreview = String(document.get('contentPreview') ?? '');
-      if (!contentPreview && targetId) {
-        const reference =
-          targetType === 'user'
-            ? db.collection('users').doc(targetId)
-            : targetType === 'review'
-              ? db.collection('reviews').doc(targetId)
-              : db
-                  .collection('reviews')
-                  .doc(parentId ?? '')
-                  .collection('comments')
-                  .doc(targetId);
-        const content = await reference.get();
-        contentPreview = String(
-          targetType === 'user'
-            ? (content.get('username') ?? content.get('displayName') ?? '')
-            : (content.get('text') ?? ''),
-        ).slice(0, 280);
-      }
-      return {
-        id: document.id,
-        reporterId: String(document.get('reporterId') ?? ''),
-        reporterName: String(document.get('reporterName') ?? 'Tastes user'),
-        reason: String(document.get('reason') ?? 'Other'),
-        details: String(document.get('details') ?? ''),
-        targetType,
-        targetId,
-        parentId,
-        contentPreview,
-        status: String(document.get('status') ?? 'pending'),
-        createdAt: timestampToIso(document.get('createdAt')),
-      };
-    }),
-  );
-});
+    return Promise.all(
+      snapshot.docs.map(async (document) => {
+        const storedTargetType = String(
+          document.get('targetType') ?? document.get('contentType') ?? 'review',
+        );
+        const targetType =
+          storedTargetType === 'comment'
+            ? 'comment'
+            : storedTargetType === 'user'
+              ? 'user'
+              : 'review';
+        const targetId = String(
+          document.get('targetId') ??
+            document.get('contentId') ??
+            document.get('reviewId') ??
+            '',
+        );
+        const parentId =
+          targetType === 'comment'
+            ? String(
+                document.get('parentId') ?? document.get('reviewId') ?? '',
+              ) || null
+            : null;
+        let contentPreview = String(document.get('contentPreview') ?? '');
+        if (!contentPreview && targetId) {
+          const reference =
+            targetType === 'user'
+              ? db.collection('users').doc(targetId)
+              : targetType === 'review'
+                ? db.collection('reviews').doc(targetId)
+                : db
+                    .collection('reviews')
+                    .doc(parentId ?? '')
+                    .collection('comments')
+                    .doc(targetId);
+          const content = await reference.get();
+          contentPreview = String(
+            targetType === 'user'
+              ? (content.get('username') ?? content.get('displayName') ?? '')
+              : (content.get('text') ?? ''),
+          ).slice(0, 280);
+        }
+        return {
+          id: document.id,
+          reporterId: String(document.get('reporterId') ?? ''),
+          reporterName: String(document.get('reporterName') ?? 'Tastes user'),
+          reason: String(document.get('reason') ?? 'Other'),
+          details: String(document.get('details') ?? ''),
+          targetType,
+          targetId,
+          parentId,
+          contentPreview,
+          status: String(document.get('status') ?? 'pending'),
+          createdAt: timestampToIso(document.get('createdAt')),
+        };
+      }),
+    );
+  },
+);
 
-export const dismissReport = onCall(callableOptions, async (request) => {
+export const dismissReport = onCall(adminCallableOptions, async (request) => {
   const actorId = requireStaff(request).uid;
   const input = parseInput(reportIdInputSchema, request.data);
   const report = await db.collection('reports').doc(input.reportId).get();
@@ -508,7 +514,7 @@ export const dismissReport = onCall(callableOptions, async (request) => {
   return { id: input.reportId };
 });
 
-export const deleteContent = onCall(callableOptions, async (request) => {
+export const deleteContent = onCall(adminCallableOptions, async (request) => {
   const actorId = requireStaff(request).uid;
   const input = parseInput(contentActionInputSchema, request.data);
   const reference = contentReference(input);
@@ -551,7 +557,7 @@ export const deleteContent = onCall(callableOptions, async (request) => {
   return { id: input.targetId };
 });
 
-export const editContent = onCall(callableOptions, async (request) => {
+export const editContent = onCall(adminCallableOptions, async (request) => {
   const actorId = requireStaff(request).uid;
   const input = parseInput(editContentInputSchema, request.data);
   const reference = contentReference(input);
@@ -580,7 +586,7 @@ export const editContent = onCall(callableOptions, async (request) => {
   return { id: input.targetId };
 });
 
-export const searchUsers = onCall(callableOptions, async (request) => {
+export const searchUsers = onCall(adminCallableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(searchInputSchema, request.data);
   const query = input.query.toLowerCase();
@@ -646,7 +652,7 @@ export const searchUsers = onCall(callableOptions, async (request) => {
   }));
 });
 
-export const getUserHistory = onCall(callableOptions, async (request) => {
+export const getUserHistory = onCall(adminCallableOptions, async (request) => {
   requireStaff(request);
   const input = parseInput(z.object({ userId: idSchema }), request.data);
   const userReference = db.collection('users').doc(input.userId);
@@ -775,16 +781,16 @@ async function updateUserStatus(
   return { id: input.userId, status };
 }
 
-export const suspendUser = onCall(callableOptions, (request) =>
+export const suspendUser = onCall(adminCallableOptions, (request) =>
   updateUserStatus(request, 'suspended', 'suspend'),
 );
-export const banUser = onCall(callableOptions, (request) =>
+export const banUser = onCall(adminCallableOptions, (request) =>
   updateUserStatus(request, 'banned', 'ban'),
 );
-export const unbanUser = onCall(callableOptions, (request) =>
+export const unbanUser = onCall(adminCallableOptions, (request) =>
   updateUserStatus(request, 'active', 'unban'),
 );
-export const reinstateUser = onCall(callableOptions, (request) =>
+export const reinstateUser = onCall(adminCallableOptions, (request) =>
   updateUserStatus(request, 'active', 'reinstate'),
 );
 
@@ -830,92 +836,97 @@ export const reinstateExpiredSuspensions = onSchedule(
   },
 );
 
-export const searchAdminVenues = onCall(callableOptions, async (request) => {
-  requireStaff(request);
-  const input = parseInput(searchInputSchema, request.data);
-  const query = input.query.toLowerCase();
-  const snapshot = await db.collection('venues').limit(1_000).get();
-  return snapshot.docs
-    .filter((venue) => venue.get('status') !== 'removed')
-    .filter(
-      (venue) =>
-        !query ||
-        [
-          venue.id,
-          venue.get('name'),
-          venue.get('city'),
-          venue.get('category'),
-        ].some((value) =>
-          String(value ?? '')
-            .toLowerCase()
-            .includes(query),
-        ),
-    )
-    .slice(0, 100)
-    .map((venue) => ({
-      id: venue.id,
-      name: String(venue.get('name') ?? ''),
-      city: String(venue.get('city') ?? ''),
-      address: String(venue.get('address') ?? ''),
-      category: String(venue.get('category') ?? ''),
-      status: String(venue.get('status') ?? 'pending'),
-      featured: Boolean(venue.get('featured')),
-      hotSpot: Boolean(venue.get('hotSpot')),
-      reviewCount: Number(venue.get('reviewCount') ?? 0),
-      imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
-      photoUrls: Array.isArray(venue.get('photoUrls'))
-        ? (venue.get('photoUrls') as unknown[]).filter(
-            (value): value is string => typeof value === 'string',
-          )
-        : [],
-      priceLevel:
-        venue.get('priceLevel') == null
-          ? null
-          : Number(venue.get('priceLevel')),
-      latitude:
-        venue.get('latitude') == null ? null : Number(venue.get('latitude')),
-      longitude:
-        venue.get('longitude') == null ? null : Number(venue.get('longitude')),
-      googlePlaceId: venue.get('googlePlaceId')
-        ? String(venue.get('googlePlaceId'))
-        : null,
-      discoverTags: Array.isArray(venue.get('discoverTags'))
-        ? (venue.get('discoverTags') as unknown[]).filter(
-            (value): value is z.infer<typeof discoverTagSchema> =>
-              discoverTagSchema.safeParse(value).success,
-          )
-        : [],
-      phone: venue.get('phone') ? String(venue.get('phone')) : null,
-      website: venue.get('website') ? String(venue.get('website')) : null,
-      openingHours: Array.isArray(venue.get('openingHours'))
-        ? (venue.get('openingHours') as unknown[]).flatMap((value) => {
-            if (!value || typeof value !== 'object') return [];
-            const item = value as { day?: unknown; hours?: unknown };
-            return typeof item.day === 'string' &&
-              typeof item.hours === 'string'
-              ? [{ day: item.day, hours: item.hours }]
-              : [];
-          })
-        : [],
-      placeTags: Array.isArray(venue.get('placeTags'))
-        ? (venue.get('placeTags') as unknown[]).filter(
-            (value): value is string => typeof value === 'string',
-          )
-        : [],
-      popularDishes: Array.isArray(venue.get('popularDishes'))
-        ? (venue.get('popularDishes') as unknown[]).flatMap((value) => {
-            if (!value || typeof value !== 'object') return [];
-            const item = value as { name?: unknown; rating?: unknown };
-            return typeof item.name === 'string' &&
-              typeof item.rating === 'number'
-              ? [{ name: item.name, rating: item.rating }]
-              : [];
-          })
-        : [],
-    }));
-});
+export const searchAdminVenues = onCall(
+  adminCallableOptions,
+  async (request) => {
+    requireStaff(request);
+    const input = parseInput(searchInputSchema, request.data);
+    const query = input.query.toLowerCase();
+    const snapshot = await db.collection('venues').limit(1_000).get();
+    return snapshot.docs
+      .filter((venue) => venue.get('status') !== 'removed')
+      .filter(
+        (venue) =>
+          !query ||
+          [
+            venue.id,
+            venue.get('name'),
+            venue.get('city'),
+            venue.get('category'),
+          ].some((value) =>
+            String(value ?? '')
+              .toLowerCase()
+              .includes(query),
+          ),
+      )
+      .slice(0, 100)
+      .map((venue) => ({
+        id: venue.id,
+        name: String(venue.get('name') ?? ''),
+        city: String(venue.get('city') ?? ''),
+        address: String(venue.get('address') ?? ''),
+        category: String(venue.get('category') ?? ''),
+        status: String(venue.get('status') ?? 'pending'),
+        featured: Boolean(venue.get('featured')),
+        hotSpot: Boolean(venue.get('hotSpot')),
+        reviewCount: Number(venue.get('reviewCount') ?? 0),
+        imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
+        photoUrls: Array.isArray(venue.get('photoUrls'))
+          ? (venue.get('photoUrls') as unknown[]).filter(
+              (value): value is string => typeof value === 'string',
+            )
+          : [],
+        priceLevel:
+          venue.get('priceLevel') == null
+            ? null
+            : Number(venue.get('priceLevel')),
+        latitude:
+          venue.get('latitude') == null ? null : Number(venue.get('latitude')),
+        longitude:
+          venue.get('longitude') == null
+            ? null
+            : Number(venue.get('longitude')),
+        googlePlaceId: venue.get('googlePlaceId')
+          ? String(venue.get('googlePlaceId'))
+          : null,
+        discoverTags: Array.isArray(venue.get('discoverTags'))
+          ? (venue.get('discoverTags') as unknown[]).filter(
+              (value): value is z.infer<typeof discoverTagSchema> =>
+                discoverTagSchema.safeParse(value).success,
+            )
+          : [],
+        phone: venue.get('phone') ? String(venue.get('phone')) : null,
+        website: venue.get('website') ? String(venue.get('website')) : null,
+        openingHours: Array.isArray(venue.get('openingHours'))
+          ? (venue.get('openingHours') as unknown[]).flatMap((value) => {
+              if (!value || typeof value !== 'object') return [];
+              const item = value as { day?: unknown; hours?: unknown };
+              return typeof item.day === 'string' &&
+                typeof item.hours === 'string'
+                ? [{ day: item.day, hours: item.hours }]
+                : [];
+            })
+          : [],
+        placeTags: Array.isArray(venue.get('placeTags'))
+          ? (venue.get('placeTags') as unknown[]).filter(
+              (value): value is string => typeof value === 'string',
+            )
+          : [],
+        popularDishes: Array.isArray(venue.get('popularDishes'))
+          ? (venue.get('popularDishes') as unknown[]).flatMap((value) => {
+              if (!value || typeof value !== 'object') return [];
+              const item = value as { name?: unknown; rating?: unknown };
+              return typeof item.name === 'string' &&
+                typeof item.rating === 'number'
+                ? [{ name: item.name, rating: item.rating }]
+                : [];
+            })
+          : [],
+      }));
+  },
+);
 
-export const upsertVenue = onCall(callableOptions, async (request) => {
+export const upsertVenue = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(venueInputSchema, request.data);
   const { venueId, ...venueData } = input;
@@ -947,7 +958,7 @@ export const upsertVenue = onCall(callableOptions, async (request) => {
   return { id: reference.id };
 });
 
-export const createVenue = onCall(callableOptions, async (request) => {
+export const createVenue = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(createVenueInputSchema, request.data);
   const reference = db.collection('venues').doc();
@@ -964,7 +975,7 @@ export const createVenue = onCall(callableOptions, async (request) => {
   return { id: reference.id };
 });
 
-export const updateVenue = onCall(callableOptions, async (request) => {
+export const updateVenue = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(updateVenueInputSchema, request.data);
   const { venueId, ...venueData } = input;
@@ -981,7 +992,7 @@ export const updateVenue = onCall(callableOptions, async (request) => {
   return { id: reference.id };
 });
 
-export const setVenueStatus = onCall(callableOptions, async (request) => {
+export const setVenueStatus = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(venueStatusInputSchema, request.data);
   await db.collection('venues').doc(input.venueId).update({
@@ -1005,7 +1016,7 @@ export const setVenueStatus = onCall(callableOptions, async (request) => {
   return { id: input.venueId };
 });
 
-export const setVenueFlags = onCall(callableOptions, async (request) => {
+export const setVenueFlags = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(venueFlagsInputSchema, request.data);
   await db.collection('venues').doc(input.venueId).update({
@@ -1021,7 +1032,7 @@ export const setVenueFlags = onCall(callableOptions, async (request) => {
   return { id: input.venueId };
 });
 
-export const mergeVenues = onCall(callableOptions, async (request) => {
+export const mergeVenues = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(mergeVenuesInputSchema, request.data);
   const source = db.collection('venues').doc(input.sourceVenueId);
@@ -1079,7 +1090,7 @@ export const mergeVenues = onCall(callableOptions, async (request) => {
  * city is given. Staff only, and always subject to the recipient's promotions preference.
  */
 export const sendCampaignNotification = onCall(
-  callableOptions,
+  adminCallableOptions,
   async (request) => {
     const actorId = requireAdmin(request);
     const input = parseInput(sendCampaignNotificationInputSchema, request.data);

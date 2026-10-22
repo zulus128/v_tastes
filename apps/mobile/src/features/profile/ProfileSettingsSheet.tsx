@@ -35,6 +35,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from 'firebase/auth';
 import homeFeedPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import backIcon from '../../../assets/onboarding/back.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
@@ -144,6 +149,11 @@ export function ProfileSettingsSheet({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [accountSecurityOpen, setAccountSecurityOpen] = useState(false);
+  const [passwordEditorOpen, setPasswordEditorOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [privacyPreferences, setPrivacyPreferences] =
     useState<PrivacyPreferences>(defaultPrivacyPreferences);
@@ -491,26 +501,61 @@ export function ProfileSettingsSheet({
     });
   }
 
-  function resetPassword() {
-    const emailAddress = auth.currentUser?.email;
-    if (!emailAddress) {
+  function openPasswordEditor() {
+    if (!auth.currentUser?.email) {
       Alert.alert(
         'Email unavailable',
         'Add an email address before changing your password.',
       );
       return;
     }
-    void api
-      .requestAccountEmail({ kind: 'password-reset' })
-      .then(() =>
-        Alert.alert(
-          'Check your email',
-          `A password reset link was sent to ${emailAddress}.`,
-        ),
-      )
-      .catch((error) =>
-        Alert.alert('Could not send reset email', apiErrorMessage(error)),
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordEditorOpen(true);
+  }
+
+  async function changePassword() {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.email) return;
+    if (newPassword.length < 8) {
+      Alert.alert('Password too short', 'Use at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords do not match', 'Re-enter the new password.');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword,
       );
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
+      setPasswordEditorOpen(false);
+      try {
+        await api.requestAccountEmail({ kind: 'password-changed' });
+        Alert.alert(
+          'Password changed',
+          `A confirmation was sent to ${currentUser.email}.`,
+        );
+      } catch (notificationError) {
+        captureException(notificationError, {
+          operation: 'password-changed-email',
+        });
+        Alert.alert(
+          'Password changed',
+          'Your password was updated, but the confirmation email could not be sent.',
+        );
+      }
+    } catch (error) {
+      Alert.alert('Could not change password', apiErrorMessage(error));
+    } finally {
+      setChangingPassword(false);
+    }
   }
 
   function verifyEmail() {
@@ -1108,7 +1153,8 @@ export function ProfileSettingsSheet({
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={resetPassword}
+                  accessibilityLabel="Change password"
+                  onPress={openPasswordEditor}
                   style={styles.securityRow}
                 >
                   <Text style={styles.notificationLabel}>Change password</Text>
@@ -1198,6 +1244,68 @@ export function ProfileSettingsSheet({
               </View>
             </ImageBackground>
           </Animated.View>
+          {passwordEditorOpen ? (
+            <View style={styles.editorOverlay}>
+              <Pressable
+                accessibilityLabel="Close password editor"
+                onPress={() => setPasswordEditorOpen(false)}
+                style={styles.modalBackdrop}
+              />
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                pointerEvents="box-none"
+                style={styles.editorContainer}
+              >
+                <View style={styles.editor}>
+                  <Text style={styles.editorTitle}>Change password</Text>
+                  <TextInput
+                    accessibilityLabel="Current password"
+                    autoCapitalize="none"
+                    autoFocus
+                    onChangeText={setCurrentPassword}
+                    placeholder="Current password"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry
+                    style={styles.input}
+                    value={currentPassword}
+                  />
+                  <TextInput
+                    accessibilityLabel="New password"
+                    autoCapitalize="none"
+                    onChangeText={setNewPassword}
+                    placeholder="New password"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry
+                    style={styles.input}
+                    value={newPassword}
+                  />
+                  <TextInput
+                    accessibilityLabel="Confirm new password"
+                    autoCapitalize="none"
+                    onChangeText={setConfirmPassword}
+                    onSubmitEditing={() => void changePassword()}
+                    placeholder="Confirm new password"
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry
+                    style={styles.input}
+                    value={confirmPassword}
+                  />
+                  <Pressable
+                    accessibilityLabel="Save new password"
+                    disabled={changingPassword}
+                    onPress={() => void changePassword()}
+                    style={styles.saveButton}
+                  >
+                    {changingPassword ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.saveText}>Save password</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </KeyboardAvoidingView>
+            </View>
+          ) : null}
           {editing !== null ? (
             <View style={styles.editorOverlay}>
               <Pressable
