@@ -1,28 +1,27 @@
 import { getApp as getWebApp } from 'firebase/app';
 import {
   CustomProvider as WebCustomProvider,
+  getToken as getWebAppCheckToken,
   initializeAppCheck as initializeWebAppCheck,
 } from 'firebase/app-check';
 import * as Application from 'expo-application';
-import { TurboModuleRegistry } from 'react-native';
 import { captureException } from './observability';
 import { selectAppleAppCheckProvider } from './appCheckProvider';
 
 let initialized = false;
+let initializationPromise: Promise<void> | null = null;
+let refreshToken: (() => Promise<void>) | null = null;
 
-export function configureAppCheck(): void {
+export function configureAppCheck(): Promise<void> {
   if (initialized || process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS === 'true')
-    return;
+    return Promise.resolve();
+  if (initializationPromise) return initializationPromise;
 
-  // OTA bundles must keep running on the previous native binary. App Check is
-  // activated automatically after the next build includes its native module.
-  if (!TurboModuleRegistry.get('NativeRNFBTurboAppCheck')) return;
-
-  void Promise.all([
+  initializationPromise = Promise.all([
     import('@react-native-firebase/app'),
     import('@react-native-firebase/app-check'),
   ])
-    .then(([firebaseApp, firebaseAppCheck]) => {
+    .then(async ([firebaseApp, firebaseAppCheck]) => {
       const provider =
         new firebaseAppCheck.ReactNativeFirebaseAppCheckProvider();
       provider.configure({
@@ -48,7 +47,13 @@ export function configureAppCheck(): void {
           isTokenAutoRefreshEnabled: true,
         },
       );
-      initializeWebAppCheck(getWebApp(), {
+
+      // Fetch once before the callable client can make its first protected
+      // request. In particular, this prevents the post-OTP session check from
+      // racing the asynchronous native provider initialization.
+      await firebaseAppCheck.getToken(nativeAppCheck, true);
+
+      const webAppCheck = initializeWebAppCheck(getWebApp(), {
         provider: new WebCustomProvider({
           getToken: async () => {
             const result = await firebaseAppCheck.getToken(nativeAppCheck);
@@ -60,9 +65,27 @@ export function configureAppCheck(): void {
         }),
         isTokenAutoRefreshEnabled: true,
       });
+
+      refreshToken = async () => {
+        await firebaseAppCheck.getToken(nativeAppCheck, true);
+        await getWebAppCheckToken(webAppCheck, true);
+      };
+
+      // Warm the web SDK's internal token provider too. Firebase Functions
+      // reads this provider when it builds the X-Firebase-AppCheck header.
+      await refreshToken();
       initialized = true;
     })
-    .catch((error) =>
-      captureException(error, { operation: 'initialize-app-check' }),
-    );
+    .catch((error) => {
+      initializationPromise = null;
+      captureException(error, { operation: 'initialize-app-check' });
+      throw error;
+    });
+
+  return initializationPromise;
+}
+
+export async function refreshAppCheckToken(): Promise<void> {
+  await configureAppCheck();
+  await refreshToken?.();
 }

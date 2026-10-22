@@ -32,7 +32,9 @@ import { responsiveStyleSheet } from './src/ui/responsive';
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 configureObservability();
-configureAppCheck();
+void configureAppCheck().catch(() => {
+  // SessionProvider surfaces the initialization failure with a retry action.
+});
 
 function ResponsiveAppFrame({ children }: PropsWithChildren) {
   const { colors } = useAppTheme();

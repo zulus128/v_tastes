@@ -1,5 +1,6 @@
 import {
   createTastesApi,
+  normalizeApiError,
   type TastesApi,
   type TastesApiError,
 } from '@tastes/firebase-client';
@@ -25,6 +26,10 @@ import {
 } from 'react';
 import { visualAuditMediaIds } from '../dev/visualAuditMedia';
 import { identifyAnalyticsUser } from '../infrastructure/analytics';
+import {
+  configureAppCheck,
+  refreshAppCheckToken,
+} from '../infrastructure/appCheck';
 import { auth, functions } from '../infrastructure/firebase';
 import { captureException, track } from '../infrastructure/observability';
 import {
@@ -410,10 +415,28 @@ export function SessionProvider({ children }: PropsWithChildren) {
     setState({ status: 'anonymous', user: null });
   }, []);
 
+  const handleUnauthenticated = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      await clearLocalSession();
+      return;
+    }
+
+    try {
+      // Callable Functions also use `unauthenticated` for a missing App Check
+      // token. Keep a valid Firebase Auth session instead of sending the user
+      // back to the phone screen; a genuine expired/revoked session fails this
+      // forced refresh and is cleared below.
+      await currentUser.getIdToken(true);
+    } catch {
+      await clearLocalSession();
+    }
+  }, [clearLocalSession]);
+
   const api = useMemo(
     () =>
       createTastesApi(functions, {
-        onUnauthenticated: clearLocalSession,
+        onUnauthenticated: handleUnauthenticated,
         onError: (error, operation) => {
           // A conversation can disappear while a stale deep link or cached route is
           // still open. The chat screen renders this as an ordinary empty/error
@@ -441,7 +464,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           });
         },
       }),
-    [clearLocalSession],
+    [handleUnauthenticated],
   );
 
   const logout = useCallback(async () => {
@@ -480,7 +503,22 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const loadStatus = useCallback(
     async (user: User) => {
       try {
-        const result = await api.getSessionStatus();
+        await configureAppCheck();
+        let result;
+        try {
+          result = await api.getSessionStatus();
+        } catch (error) {
+          if (
+            normalizeApiError(error).code !== 'unauthenticated' ||
+            !auth.currentUser
+          )
+            throw error;
+
+          // A token can expire while the app is suspended. Refresh App Check
+          // once and repeat the session request without discarding Firebase Auth.
+          await refreshAppCheckToken();
+          result = await api.getSessionStatus();
+        }
         setMinimumSupportedIosBuild(
           Math.max(0, Number(result.data.minimumSupportedIosBuild ?? 0)),
         );
@@ -516,8 +554,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
           user,
         });
       } catch (error) {
-        if ((error as TastesApiError).code !== 'unauthenticated') {
-          setState({ status: 'error', user, error: error as TastesApiError });
+        if (auth.currentUser) {
+          setState({ status: 'error', user, error: normalizeApiError(error) });
         }
       }
     },
