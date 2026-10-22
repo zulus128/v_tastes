@@ -23,7 +23,7 @@ module.exports = function withRNFirebaseSimulator(config) {
 
       podfile = podfile.replace(
         "'react-native-config',\n      '--json',",
-        "'react-native-config',\n      '--exclude',\n      '@react-native-firebase/app',\n      '--exclude',\n      '@react-native-firebase/analytics',\n      '--exclude',\n      '@react-native-firebase/app-check',\n      '--json',",
+        "'react-native-config',\n      '--exclude',\n      '@react-native-firebase/analytics',\n      '--json',",
       );
 
       fs.writeFileSync(podfilePath, podfile);

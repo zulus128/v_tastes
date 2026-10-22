@@ -16,11 +16,7 @@ export default function configureExpo({ config }: ConfigContext): ExpoConfig {
     ? appJson.expo.plugins
         ?.filter((plugin) => {
           const name = Array.isArray(plugin) ? plugin[0] : plugin;
-          return (
-            name !== '@react-native-firebase/app' &&
-            name !== '@react-native-firebase/analytics' &&
-            name !== '@react-native-firebase/app-check'
-          );
+          return name !== '@react-native-firebase/analytics';
         })
         .concat('./plugins/withRNFirebaseSimulator')
     : appJson.expo.plugins;
@@ -31,11 +27,7 @@ export default function configureExpo({ config }: ConfigContext): ExpoConfig {
     autolinking: simulatorBuild
       ? {
           ...(baseConfig.autolinking ?? {}),
-          exclude: [
-            '@react-native-firebase/app',
-            '@react-native-firebase/analytics',
-            '@react-native-firebase/app-check',
-          ],
+          exclude: ['@react-native-firebase/analytics'],
         }
       : baseConfig.autolinking,
     android: {
