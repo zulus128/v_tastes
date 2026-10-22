@@ -12,6 +12,7 @@ const nonCallableExports = new Set([
   'reinstateExpiredSuspensions',
   'resetMonthlyXp',
   'sendMonthlyRecapNotifications',
+  'sendWelcomeEmail',
   'sendMonthlyRecapReminders',
   'sendReminderNotifications',
   'sendTrendingSavedPlaceNotifications',

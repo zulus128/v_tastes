@@ -1,4 +1,5 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   defaultNotificationPreferences,
   notificationCategoryLabels,
@@ -40,7 +41,7 @@ import pattern from '../../../assets/onboarding/pattern-screen.png';
 import InviteUsersIcon from '../../../assets/profile/invite-users.svg';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
-import { storage } from '../../infrastructure/firebase';
+import { auth, storage } from '../../infrastructure/firebase';
 import { captureException } from '../../infrastructure/observability';
 import {
   SideSlideScreen,
@@ -82,6 +83,20 @@ const appearanceOptions: readonly {
   { label: 'Light', description: 'Always use the light theme', value: 'light' },
   { label: 'Dark', description: 'Always use the dark theme', value: 'dark' },
 ];
+
+type PrivacyPreferences = {
+  privateAccount: boolean;
+  showWishlist: boolean;
+  showCity: boolean;
+  allowMessagesFromEveryone: boolean;
+};
+
+const defaultPrivacyPreferences: PrivacyPreferences = {
+  privateAccount: true,
+  showWishlist: true,
+  showCity: true,
+  allowMessagesFromEveryone: false,
+};
 
 export function ProfileSettingsSheet({
   fallbackName,
@@ -128,6 +143,10 @@ export function ProfileSettingsSheet({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [accountSecurityOpen, setAccountSecurityOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [privacyPreferences, setPrivacyPreferences] =
+    useState<PrivacyPreferences>(defaultPrivacyPreferences);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(
     defaultNotificationPreferences,
@@ -144,6 +163,18 @@ export function ProfileSettingsSheet({
       onRequestClose: () => setNotificationsOpen(false),
       visible: notificationsOpen,
     });
+  const { close: closeAccountSecurity, translateX: accountSecurityTranslateX } =
+    useSideSlideTransition({
+      frameWidth: viewportWidth,
+      onRequestClose: () => setAccountSecurityOpen(false),
+      visible: accountSecurityOpen,
+    });
+  const { close: closePrivacy, translateX: privacyTranslateX } =
+    useSideSlideTransition({
+      frameWidth: viewportWidth,
+      onRequestClose: () => setPrivacyOpen(false),
+      visible: privacyOpen,
+    });
   const { close: closeCity, translateX: cityTranslateX } =
     useSideSlideTransition({
       frameWidth: viewportWidth,
@@ -158,7 +189,24 @@ export function ProfileSettingsSheet({
     setNotificationsOpen(false);
     setAppearanceOpen(false);
     setCityOpen(false);
+    setAccountSecurityOpen(false);
+    setPrivacyOpen(false);
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    void AsyncStorage.getItem(`@tastes/privacy/${userId}`).then((stored) => {
+      if (!stored) return;
+      try {
+        setPrivacyPreferences({
+          ...defaultPrivacyPreferences,
+          ...(JSON.parse(stored) as Partial<PrivacyPreferences>),
+        });
+      } catch {
+        setPrivacyPreferences(defaultPrivacyPreferences);
+      }
+    });
+  }, [userId, visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -427,6 +475,73 @@ export function ProfileSettingsSheet({
     });
   }
 
+  function savePrivacyPreference(
+    key: keyof PrivacyPreferences,
+    value: boolean,
+  ) {
+    setPrivacyPreferences((current) => {
+      const next = { ...current, [key]: value };
+      void AsyncStorage.setItem(
+        `@tastes/privacy/${userId}`,
+        JSON.stringify(next),
+      ).catch(() =>
+        Alert.alert('Could not save privacy settings', 'Please try again.'),
+      );
+      return next;
+    });
+  }
+
+  function resetPassword() {
+    const emailAddress = auth.currentUser?.email;
+    if (!emailAddress) {
+      Alert.alert(
+        'Email unavailable',
+        'Add an email address before changing your password.',
+      );
+      return;
+    }
+    void api
+      .requestAccountEmail({ kind: 'password-reset' })
+      .then(() =>
+        Alert.alert(
+          'Check your email',
+          `A password reset link was sent to ${emailAddress}.`,
+        ),
+      )
+      .catch((error) =>
+        Alert.alert('Could not send reset email', apiErrorMessage(error)),
+      );
+  }
+
+  function verifyEmail() {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.email) {
+      Alert.alert(
+        'Email unavailable',
+        'Add an email address through your sign-in method first.',
+      );
+      return;
+    }
+    if (currentUser.emailVerified) {
+      Alert.alert('Email verified', currentUser.email);
+      return;
+    }
+    void api
+      .requestAccountEmail({ kind: 'email-verification' })
+      .then(() =>
+        Alert.alert(
+          'Check your email',
+          `A verification link was sent to ${currentUser.email}.`,
+        ),
+      )
+      .catch((error) =>
+        Alert.alert(
+          'Could not send verification email',
+          apiErrorMessage(error),
+        ),
+      );
+  }
+
   const rows: Array<{
     field?: EditableField;
     label: string;
@@ -463,6 +578,11 @@ export function ProfileSettingsSheet({
           onPress: () => setCityOpen(true),
         },
         {
+          label: 'Account & security',
+          onPress: () => setAccountSecurityOpen(true),
+        },
+        { label: 'Privacy', onPress: () => setPrivacyOpen(true) },
+        {
           label: 'Appearance',
           value:
             appearanceOptions.find((option) => option.value === preference)
@@ -479,11 +599,15 @@ export function ProfileSettingsSheet({
         onRequestClose={
           cityOpen
             ? closeCity
-            : appearanceOpen
-              ? closeAppearance
-              : notificationsOpen
-                ? closeNotifications
-                : onClose
+            : accountSecurityOpen
+              ? closeAccountSecurity
+              : privacyOpen
+                ? closePrivacy
+                : appearanceOpen
+                  ? closeAppearance
+                  : notificationsOpen
+                    ? closeNotifications
+                    : onClose
         }
         ref={settingsSlide}
         visible={visible}
@@ -920,6 +1044,160 @@ export function ProfileSettingsSheet({
               />
             </ImageBackground>
           </Animated.View>
+          <Animated.View
+            testID="account-security-settings-pane"
+            pointerEvents={accountSecurityOpen ? 'auto' : 'none'}
+            style={[
+              styles.notificationsScreen,
+              { transform: [{ translateX: accountSecurityTranslateX }] },
+            ]}
+          >
+            <ImageBackground
+              imageStyle={styles.patternImage}
+              resizeMode="stretch"
+              source={isDark ? pattern : homeFeedPattern}
+              style={styles.notificationBackground}
+            >
+              <PatternBackgroundLift />
+              <View
+                style={[
+                  styles.header,
+                  {
+                    height: responsiveSize(48) + insets.top,
+                    paddingTop: insets.top,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Back to settings"
+                  onPress={() => closeAccountSecurity()}
+                  style={styles.headerButton}
+                >
+                  <Image source={backIcon} style={styles.backIcon} />
+                </Pressable>
+                <Text style={styles.title}>Account &amp; security</Text>
+                <View style={styles.headerButton} />
+              </View>
+              <View style={styles.accountSecurityContent}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={verifyEmail}
+                  style={styles.securityRow}
+                >
+                  <Text style={styles.notificationLabel}>Email</Text>
+                  <Text numberOfLines={1} style={styles.securityValue}>
+                    {auth.currentUser?.email ?? 'Not added'}
+                  </Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    Alert.alert(
+                      'Phone number',
+                      'Phone number changes require verification and are managed through your sign-in method.',
+                    )
+                  }
+                  style={styles.securityRow}
+                >
+                  <Text style={styles.notificationLabel}>Phone number</Text>
+                  <Text numberOfLines={1} style={styles.securityValue}>
+                    {auth.currentUser?.phoneNumber ?? 'Not added'}
+                  </Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={resetPassword}
+                  style={styles.securityRow}
+                >
+                  <Text style={styles.notificationLabel}>Change password</Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              </View>
+            </ImageBackground>
+          </Animated.View>
+          <Animated.View
+            testID="privacy-settings-pane"
+            pointerEvents={privacyOpen ? 'auto' : 'none'}
+            style={[
+              styles.notificationsScreen,
+              { transform: [{ translateX: privacyTranslateX }] },
+            ]}
+          >
+            <ImageBackground
+              imageStyle={styles.patternImage}
+              resizeMode="stretch"
+              source={isDark ? pattern : homeFeedPattern}
+              style={styles.notificationBackground}
+            >
+              <PatternBackgroundLift />
+              <View
+                style={[
+                  styles.header,
+                  {
+                    height: responsiveSize(48) + insets.top,
+                    paddingTop: insets.top,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Back to settings"
+                  onPress={() => closePrivacy()}
+                  style={styles.headerButton}
+                >
+                  <Image source={backIcon} style={styles.backIcon} />
+                </Pressable>
+                <Text style={styles.title}>Privacy</Text>
+                <View style={styles.headerButton} />
+              </View>
+              <View style={styles.accountSecurityContent}>
+                <NotificationSetting
+                  label="Private account"
+                  onChange={(value) =>
+                    savePrivacyPreference('privateAccount', value)
+                  }
+                  styles={styles}
+                  value={privacyPreferences.privateAccount}
+                />
+                <NotificationSetting
+                  label="Show my wishlist on my profile"
+                  onChange={(value) =>
+                    savePrivacyPreference('showWishlist', value)
+                  }
+                  styles={styles}
+                  value={privacyPreferences.showWishlist}
+                />
+                <NotificationSetting
+                  label="Show my city"
+                  onChange={(value) => savePrivacyPreference('showCity', value)}
+                  styles={styles}
+                  value={privacyPreferences.showCity}
+                />
+                <NotificationSetting
+                  label="Allow messages from everyone"
+                  onChange={(value) =>
+                    savePrivacyPreference('allowMessagesFromEveryone', value)
+                  }
+                  styles={styles}
+                  value={privacyPreferences.allowMessagesFromEveryone}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    Alert.alert(
+                      'Blocked accounts',
+                      'You have no blocked accounts.',
+                    )
+                  }
+                  style={styles.securityRow}
+                >
+                  <Text style={styles.notificationLabel}>Blocked accounts</Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              </View>
+            </ImageBackground>
+          </Animated.View>
           {editing !== null ? (
             <View style={styles.editorOverlay}>
               <Pressable
@@ -1279,6 +1557,28 @@ function createStyles(
       transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }],
     },
     appearanceContent: { paddingTop: 24, paddingHorizontal: 16 },
+    accountSecurityContent: {
+      paddingTop: 20,
+      paddingHorizontal: 16,
+      gap: 6,
+    },
+    securityRow: {
+      height: 50,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.hairline,
+      borderRadius: 100,
+      backgroundColor: colors.background,
+    },
+    securityValue: {
+      maxWidth: '50%',
+      color: colors.textMuted,
+      fontSize: 15,
+      fontWeight: '500',
+      textAlign: 'right',
+    },
     appearanceIntro: {
       marginBottom: 16,
       paddingHorizontal: 8,

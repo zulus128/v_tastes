@@ -15,7 +15,15 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-jest.mock('../src/infrastructure/firebase', () => ({ storage: {} }));
+jest.mock('../src/infrastructure/firebase', () => ({
+  auth: {
+    currentUser: {
+      email: 'tester@example.com',
+      phoneNumber: '+447700900123',
+    },
+  },
+  storage: {},
+}));
 jest.mock('../src/infrastructure/observability', () => ({
   captureException: jest.fn(),
 }));
@@ -27,6 +35,7 @@ jest.mock('firebase/storage', () => ({
   uploadBytes: jest.fn(),
   deleteObject: jest.fn(),
 }));
+jest.mock('firebase/auth', () => ({ sendPasswordResetEmail: jest.fn() }));
 const mockUpdateProfileSettings = jest.fn();
 
 jest.mock('../src/session/SessionProvider', () => {
@@ -146,6 +155,31 @@ it('enforces the 30-character username limit before saving', async () => {
   await fireEvent.press(screen.getByLabelText('Edit Username'));
 
   expect(screen.getByLabelText('Username').props.maxLength).toBe(30);
+});
+
+it('opens the Figma account security and privacy destinations', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  expect(screen.getByLabelText('Edit Account & security')).toBeTruthy();
+  expect(screen.getByLabelText('Edit Privacy')).toBeTruthy();
+
+  await fireEvent.press(screen.getByLabelText('Edit Account & security'));
+  expect(screen.getByTestId('account-security-settings-pane')).toBeTruthy();
+  expect(screen.getByText('tester@example.com')).toBeTruthy();
+
+  await fireEvent.press(screen.getByLabelText('Edit Privacy'));
+  expect(screen.getByTestId('privacy-settings-pane')).toBeTruthy();
+  expect(screen.getByText('Private account')).toBeTruthy();
+  expect(screen.getByText('Blocked accounts')).toBeTruthy();
 });
 
 it('offers to save a city typed outside the suggested city list', async () => {

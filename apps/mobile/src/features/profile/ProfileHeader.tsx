@@ -4,7 +4,6 @@ import {
   Image,
   ImageBackground,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -383,9 +382,10 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     statDivider: {
-      width: StyleSheet.hairlineWidth,
+      width: 1,
       height: 28,
-      backgroundColor: colors.border,
+      backgroundColor: colors.text,
+      opacity: 0.22,
     },
     publicActions: {
       marginTop: 13,

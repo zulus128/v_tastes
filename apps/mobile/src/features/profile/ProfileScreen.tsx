@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import SearchIcon from '../../../assets/profile/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import NoReviewsIcon from '../../../assets/profile/no-reviews.svg';
 import SuccessMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
 import Svg, { Path } from 'react-native-svg';
@@ -994,12 +995,17 @@ export function ProfileScreen({
                 </Pressable>
               </View>
             ) : !profileReviews.loading ? (
-              <View style={styles.empty}>
+              <View style={styles.reviewsEmpty}>
+                <NoReviewsIcon
+                  color={colors.text}
+                  height={responsiveSize(60)}
+                  width={responsiveSize(60)}
+                />
                 <Text style={styles.emptyTitle}>No reviews yet</Text>
                 <Text style={styles.emptyCopy}>
                   {own
                     ? 'Your reviews will appear here.'
-                    : 'This person has not posted a review yet.'}
+                    : "This user hasn't posted any reviews."}
                 </Text>
               </View>
             ) : null
@@ -1583,11 +1589,20 @@ const createStyles = (colors: ThemeColors) => {
       borderRadius: 24,
       backgroundColor: colors.surface,
     },
-    emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+    reviewsEmpty: {
+      minHeight: 300,
+      width: 300,
+      paddingVertical: 48,
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '700' },
     emptyCopy: {
       color: colors.textSecondary,
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: 15,
+      lineHeight: 20,
       textAlign: 'center',
     },
     retryButton: {

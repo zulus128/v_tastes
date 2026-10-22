@@ -107,6 +107,7 @@ import { httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 
 export const callableOperationNames = [
   'healthCheck',
+  'requestAccountEmail',
   'requestPhoneOtp',
   'verifyPhoneOtp',
   'getSessionStatus',
@@ -525,6 +526,9 @@ export function createTastesApi(
         'getUnreadNotificationCount',
         {},
       ),
+    requestAccountEmail: (input: {
+      kind: 'email-verification' | 'password-reset';
+    }) => invoke<typeof input, { sent: true }>('requestAccountEmail', input),
     listNotifications: (input: ListNotificationsInput = { limit: 20 }) =>
       invoke<ListNotificationsInput, Page<AppNotification>>(
         'listNotifications',

@@ -1,4 +1,8 @@
 export { healthCheck } from './modules/health/functions';
+export {
+  requestAccountEmail,
+  sendWelcomeEmail,
+} from './modules/email/functions';
 export { ingestMobileTelemetry } from './modules/observability/functions';
 export { askTastesAi } from './modules/ai/functions';
 export {

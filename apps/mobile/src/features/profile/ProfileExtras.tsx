@@ -17,6 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SearchIcon from '../../../assets/profile/followers-search.svg';
 import TrashIcon from '../../../assets/profile/followers-trash.svg';
 import VoiceIcon from '../../../assets/profile/followers-voice.svg';
+import NoFollowersIcon from '../../../assets/profile/no-followers.svg';
+import NoFollowingIcon from '../../../assets/profile/no-following.svg';
+import NoPeopleFoundIcon from '../../../assets/profile/no-people-found.svg';
+import FollowingCheckIcon from '../../../assets/profile/following-check-figma.svg';
 import BackIcon from '../../../assets/leaderboard/back.svg';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -56,6 +60,9 @@ export function ProfileExtras({
   const [removingFollowerId, setRemovingFollowerId] = useState<string | null>(
     null,
   );
+  const [followPendingIds, setFollowPendingIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const slide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
@@ -84,6 +91,7 @@ export function ProfileExtras({
     if (!visible) {
       setPeopleSearch('');
       setRemovingFollowerId(null);
+      setFollowPendingIds(new Set());
     }
   }, [visible]);
 
@@ -159,6 +167,55 @@ export function ProfileExtras({
     );
   };
 
+  const toggleFollow = (userId: string, following: boolean) => {
+    if (followPendingIds.has(userId)) return;
+    setFollowPendingIds((current) => new Set(current).add(userId));
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            followers: current.followers.map((person) =>
+              person.userId === userId
+                ? { ...person, following: !following }
+                : person,
+            ),
+            following: current.following.map((person) =>
+              person.userId === userId
+                ? { ...person, following: !following }
+                : person,
+            ),
+          }
+        : current,
+    );
+    const request = following
+      ? api.unfollowUser({ targetUserId: userId })
+      : api.followUser({ targetUserId: userId });
+    void request
+      .catch(() => {
+        setData((current) =>
+          current
+            ? {
+                ...current,
+                followers: current.followers.map((person) =>
+                  person.userId === userId ? { ...person, following } : person,
+                ),
+                following: current.following.map((person) =>
+                  person.userId === userId ? { ...person, following } : person,
+                ),
+              }
+            : current,
+        );
+        Alert.alert('Could not update follow status', 'Please try again.');
+      })
+      .finally(() =>
+        setFollowPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(userId);
+          return next;
+        }),
+      );
+  };
+
   return (
     <SideSlideScreen onRequestClose={onClose} ref={slide} visible={visible}>
       <View style={styles.screen}>
@@ -168,7 +225,7 @@ export function ProfileExtras({
             {
               height:
                 responsiveSize(
-                  screen === 'followers' || screen === 'following' ? 106 : 60,
+                  screen === 'followers' || screen === 'following' ? 118 : 60,
                 ) + insets.top,
               paddingTop: insets.top,
             },
@@ -247,7 +304,43 @@ export function ProfileExtras({
                   color={colors.primary}
                   style={styles.peopleLoading}
                 />
-              ) : null
+              ) : (
+                <View style={styles.peopleEmpty}>
+                  {normalizedSearch ? (
+                    <NoPeopleFoundIcon
+                      color={colors.text}
+                      height={responsiveSize(60)}
+                      width={responsiveSize(60)}
+                    />
+                  ) : screen === 'followers' ? (
+                    <NoFollowersIcon
+                      color={colors.text}
+                      height={responsiveSize(60)}
+                      width={responsiveSize(60)}
+                    />
+                  ) : (
+                    <NoFollowingIcon
+                      color={colors.text}
+                      height={responsiveSize(60)}
+                      width={responsiveSize(60)}
+                    />
+                  )}
+                  <Text style={styles.peopleEmptyTitle}>
+                    {normalizedSearch
+                      ? 'No people found'
+                      : screen === 'followers'
+                        ? 'No followers yet'
+                        : "You're not following\nanyone yet"}
+                  </Text>
+                  <Text style={styles.peopleEmptyCopy}>
+                    {normalizedSearch
+                      ? 'Try a different name or username.'
+                      : screen === 'followers'
+                        ? 'Share your profile so people can find you.'
+                        : 'Find people in Discover → People.'}
+                  </Text>
+                </View>
+              )
             }
             maxToRenderPerBatch={8}
             renderItem={({ item: person }) => (
@@ -303,6 +396,46 @@ export function ProfileExtras({
                         height={responsiveSize(25)}
                         width={responsiveSize(24)}
                       />
+                    )}
+                  </Pressable>
+                ) : !own ? (
+                  <Pressable
+                    accessibilityLabel={
+                      person.following
+                        ? `Unfollow ${person.displayName}`
+                        : `Follow ${person.displayName}`
+                    }
+                    disabled={followPendingIds.has(person.userId)}
+                    onPress={() =>
+                      toggleFollow(person.userId, person.following)
+                    }
+                    style={[
+                      styles.followButton,
+                      person.following && styles.followingButton,
+                    ]}
+                  >
+                    {followPendingIds.has(person.userId) ? (
+                      <ActivityIndicator
+                        color={person.following ? colors.primary : '#FFFFFF'}
+                        size="small"
+                      />
+                    ) : (
+                      <>
+                        {person.following ? (
+                          <FollowingCheckIcon
+                            height={responsiveSize(14)}
+                            width={responsiveSize(14)}
+                          />
+                        ) : null}
+                        <Text
+                          style={[
+                            styles.followText,
+                            person.following && styles.followingText,
+                          ]}
+                        >
+                          {person.following ? 'Following' : 'Follow'}
+                        </Text>
+                      </>
                     )}
                   </Pressable>
                 ) : null}
@@ -385,7 +518,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomRightRadius: 24,
       overflow: 'hidden',
     },
-    peopleHeader: { height: 106 },
+    peopleHeader: { height: 118 },
     headerTitleRow: {
       height: 60,
       paddingHorizontal: 6,
@@ -434,8 +567,28 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    peopleList: { paddingBottom: 30 },
+    peopleList: { flexGrow: 1, paddingBottom: 30 },
     peopleLoading: { marginTop: 32 },
+    peopleEmpty: {
+      width: 300,
+      marginTop: 74,
+      alignSelf: 'center',
+      alignItems: 'center',
+      gap: 12,
+    },
+    peopleEmptyTitle: {
+      color: colors.text,
+      fontSize: 20,
+      lineHeight: 24,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    peopleEmptyCopy: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
     person: {
       height: 76,
       paddingHorizontal: 16,
@@ -487,6 +640,24 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    followButton: {
+      minWidth: 84,
+      minHeight: 36,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderRadius: 36,
+      backgroundColor: '#B82F29',
+    },
+    followingButton: {
+      borderWidth: 1,
+      borderColor: '#B82F29',
+      backgroundColor: '#2A1513',
+    },
+    followText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    followingText: { color: colors.text },
     settings: { paddingHorizontal: 16, paddingBottom: 30 },
     notificationGap: { height: 14 },
     setting: {
