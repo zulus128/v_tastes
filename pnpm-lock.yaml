@@ -147,6 +147,9 @@ importers:
       '@react-native-firebase/app':
         specifier: ^26.2.0
         version: 26.2.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)))(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
+      '@react-native-firebase/app-check':
+        specifier: ^26.2.0
+        version: 26.2.0(@react-native-firebase/app@26.2.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)))(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(expo@57.0.9)
       '@react-navigation/bottom-tabs':
         specifier: ^7.18.14
         version: 7.18.14(8ab9a23c908a85413744bf503be04536)
@@ -2476,6 +2479,15 @@ packages:
 
   '@react-native-firebase/analytics@26.2.0':
     resolution: {integrity: sha512-0yD1GhMbKwQmO3uvNkq5Xw4Rgc248g7e8ZNTBEvQlsfI8WOIAt4sM5EDYw3MFB8MFu5GVpZ43TP11SJ2/atUxA==}
+    peerDependencies:
+      '@react-native-firebase/app': 26.2.0
+      expo: '>=47.0.0'
+    peerDependenciesMeta:
+      expo:
+        optional: true
+
+  '@react-native-firebase/app-check@26.2.0':
+    resolution: {integrity: sha512-iQ3xNfFoxip+CrEse3yUsGDZnpLUM13pYngbxb72AZVEJ1IIiDFIf5hdW/689rfj/7A/gSrbcSyISbA1uBeTgg==}
     peerDependencies:
       '@react-native-firebase/app': 26.2.0
       expo: '>=47.0.0'
@@ -11874,6 +11886,12 @@ snapshots:
     dependencies:
       '@react-native-firebase/app': 26.2.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)))(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
       superstruct: 2.0.2
+    optionalDependencies:
+      expo: 57.0.9(@babel/core@7.29.7(supports-color@8.1.1))(@expo/dom-webview@57.0.1)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)(typescript@6.0.3)
+
+  '@react-native-firebase/app-check@26.2.0(@react-native-firebase/app@26.2.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)))(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3))(expo@57.0.9)':
+    dependencies:
+      '@react-native-firebase/app': 26.2.0(@react-native-async-storage/async-storage@2.2.0(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)))(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
     optionalDependencies:
       expo: 57.0.9(@babel/core@7.29.7(supports-color@8.1.1))(@expo/dom-webview@57.0.1)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.2.0(supports-color@8.1.1)(typescript@6.0.3))(@react-native/jest-preset@0.86.2(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)(typescript@6.0.3)
 

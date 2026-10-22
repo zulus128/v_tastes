@@ -24,6 +24,20 @@ pnpm test:rules
 pnpm test:auth
 ```
 
+## Production deployment
+
+The `Deploy production` GitHub Actions workflow runs after a successful CI run
+on `main` and can also be started manually. Configure the protected
+`production` environment with `FIREBASE_SERVICE_ACCOUNT`. Before the first
+email-enabled deploy, create the Firebase Functions secret
+`SENDGRID_API_KEY` and set `TRANSACTIONAL_EMAIL_FROM` to a verified SendGrid
+sender. Production should set `ENFORCE_APP_CHECK=true`; previews and emulators
+may keep it disabled until their native App Check providers are configured.
+
+The separate `Build and submit TestFlight` workflow is intentionally manual.
+It uses the production EAS profile, increments the native build number, and
+submits the resulting iOS build using the protected `EXPO_TOKEN` secret.
+
 ## Places configuration
 
 `searchVenues` always searches active Firestore venues. To supplement those results with

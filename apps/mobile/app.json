@@ -17,19 +17,14 @@
     },
     "ios": {
       "bundleIdentifier": "com.vkassin.tastes",
-      "associatedDomains": [
-        "applinks:tastesapp.com"
-      ],
+      "associatedDomains": ["applinks:tastesapp.com"],
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSContactsUsageDescription": "Tastes uses your contacts to help you find and invite friends.",
-        "UIBackgroundModes": [
-          "fetch",
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["fetch", "remote-notification"]
       },
       "appleTeamId": "7TTF49AXF6"
     },
@@ -39,10 +34,7 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ],
+          "category": ["BROWSABLE", "DEFAULT"],
           "data": [
             {
               "host": "tastesapp.com",
@@ -91,6 +83,7 @@
         }
       ],
       "@react-native-firebase/analytics",
+      "@react-native-firebase/app-check",
       [
         "expo-build-properties",
         {

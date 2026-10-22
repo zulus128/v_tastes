@@ -13,10 +13,16 @@ export default function configureExpo({ config }: ConfigContext): ExpoConfig {
   const otaRevision = process.env.EXPO_PUBLIC_OTA_REVISION?.trim() || '0';
   const simulatorBuild = process.env.EXPO_PUBLIC_SIMULATOR_BUILD === 'true';
   const plugins = simulatorBuild
-    ? appJson.expo.plugins?.filter((plugin) => {
-        const name = Array.isArray(plugin) ? plugin[0] : plugin;
-        return name !== '@react-native-firebase/app' && name !== '@react-native-firebase/analytics';
-      }).concat('./plugins/withRNFirebaseSimulator')
+    ? appJson.expo.plugins
+        ?.filter((plugin) => {
+          const name = Array.isArray(plugin) ? plugin[0] : plugin;
+          return (
+            name !== '@react-native-firebase/app' &&
+            name !== '@react-native-firebase/analytics' &&
+            name !== '@react-native-firebase/app-check'
+          );
+        })
+        .concat('./plugins/withRNFirebaseSimulator')
     : appJson.expo.plugins;
   return {
     ...config,
@@ -25,12 +31,18 @@ export default function configureExpo({ config }: ConfigContext): ExpoConfig {
     autolinking: simulatorBuild
       ? {
           ...(baseConfig.autolinking ?? {}),
-          exclude: ['@react-native-firebase/app', '@react-native-firebase/analytics'],
+          exclude: [
+            '@react-native-firebase/app',
+            '@react-native-firebase/analytics',
+            '@react-native-firebase/app-check',
+          ],
         }
       : baseConfig.autolinking,
     android: {
       ...appJson.expo.android,
-      ...(googleMapsApiKey ? { config: { googleMaps: { apiKey: googleMapsApiKey } } } : {}),
+      ...(googleMapsApiKey
+        ? { config: { googleMaps: { apiKey: googleMapsApiKey } } }
+        : {}),
     },
     extra: {
       ...appJson.expo.extra,
