@@ -48,7 +48,7 @@ export function ProfileExtras({
   visible: boolean;
 }) {
   const api = useTastesApi();
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [enabled, setEnabled] = useState(true);
@@ -412,6 +412,9 @@ export function ProfileExtras({
                     style={[
                       styles.followButton,
                       person.following && styles.followingButton,
+                      person.following &&
+                        !isDark &&
+                        styles.followingButtonLight,
                     ]}
                   >
                     {followPendingIds.has(person.userId) ? (
@@ -431,6 +434,9 @@ export function ProfileExtras({
                           style={[
                             styles.followText,
                             person.following && styles.followingText,
+                            person.following &&
+                              !isDark &&
+                              styles.followingTextLight,
                           ]}
                         >
                           {person.following ? 'Following' : 'Follow'}
@@ -656,8 +662,12 @@ function createStyles(colors: ThemeColors) {
       borderColor: '#B82F29',
       backgroundColor: '#2A1513',
     },
+    followingButtonLight: {
+      backgroundColor: 'rgba(184,47,41,0.08)',
+    },
     followText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
     followingText: { color: colors.text },
+    followingTextLight: { color: colors.primary },
     settings: { paddingHorizontal: 16, paddingBottom: 30 },
     notificationGap: { height: 14 },
     setting: {
