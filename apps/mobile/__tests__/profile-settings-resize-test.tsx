@@ -233,7 +233,7 @@ it('opens the Figma account security and privacy destinations', async () => {
   expect(screen.getByText('Blocked accounts')).toBeTruthy();
 });
 
-it('keeps iOS password autofill from covering the change-password fields', async () => {
+it('suppresses the native iOS password accessory over change-password fields', async () => {
   await render(
     <ProfileSettingsSheet
       fallbackName="Test User"
@@ -256,7 +256,7 @@ it('keeps iOS password autofill from covering the change-password fields', async
     const input = screen.getByLabelText(label);
     expect(input.props.autoComplete).toBe('off');
     expect(input.props.importantForAutofill).toBe('no');
-    expect(input.props.textContentType).toBe('none');
+    expect(input.props.textContentType).toBe('oneTimeCode');
     expect(input.props.secureTextEntry).toBe(true);
   }
 });

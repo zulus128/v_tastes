@@ -1274,7 +1274,7 @@ export function ProfileSettingsSheet({
                     returnKeyType="next"
                     secureTextEntry
                     style={styles.input}
-                    textContentType="none"
+                    textContentType="oneTimeCode"
                     value={currentPassword}
                   />
                   <TextInput
@@ -1293,7 +1293,7 @@ export function ProfileSettingsSheet({
                     returnKeyType="next"
                     secureTextEntry
                     style={styles.input}
-                    textContentType="none"
+                    textContentType="oneTimeCode"
                     value={newPassword}
                   />
                   <TextInput
@@ -1310,7 +1310,7 @@ export function ProfileSettingsSheet({
                     returnKeyType="done"
                     secureTextEntry
                     style={styles.input}
-                    textContentType="none"
+                    textContentType="oneTimeCode"
                     value={confirmPassword}
                   />
                   <Pressable
