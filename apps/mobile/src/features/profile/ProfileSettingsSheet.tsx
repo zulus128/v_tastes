@@ -154,6 +154,8 @@ export function ProfileSettingsSheet({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const newPasswordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [privacyPreferences, setPrivacyPreferences] =
     useState<PrivacyPreferences>(defaultPrivacyPreferences);
@@ -1261,33 +1263,54 @@ export function ProfileSettingsSheet({
                   <TextInput
                     accessibilityLabel="Current password"
                     autoCapitalize="none"
+                    autoComplete="off"
+                    autoCorrect={false}
                     autoFocus
+                    importantForAutofill="no"
                     onChangeText={setCurrentPassword}
+                    onSubmitEditing={() => newPasswordInputRef.current?.focus()}
                     placeholder="Current password"
                     placeholderTextColor={colors.textMuted}
+                    returnKeyType="next"
                     secureTextEntry
                     style={styles.input}
+                    textContentType="none"
                     value={currentPassword}
                   />
                   <TextInput
                     accessibilityLabel="New password"
                     autoCapitalize="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    importantForAutofill="no"
                     onChangeText={setNewPassword}
+                    onSubmitEditing={() =>
+                      confirmPasswordInputRef.current?.focus()
+                    }
                     placeholder="New password"
                     placeholderTextColor={colors.textMuted}
+                    ref={newPasswordInputRef}
+                    returnKeyType="next"
                     secureTextEntry
                     style={styles.input}
+                    textContentType="none"
                     value={newPassword}
                   />
                   <TextInput
                     accessibilityLabel="Confirm new password"
                     autoCapitalize="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    importantForAutofill="no"
                     onChangeText={setConfirmPassword}
                     onSubmitEditing={() => void changePassword()}
                     placeholder="Confirm new password"
                     placeholderTextColor={colors.textMuted}
+                    ref={confirmPasswordInputRef}
+                    returnKeyType="done"
                     secureTextEntry
                     style={styles.input}
+                    textContentType="none"
                     value={confirmPassword}
                   />
                   <Pressable

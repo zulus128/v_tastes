@@ -233,6 +233,34 @@ it('opens the Figma account security and privacy destinations', async () => {
   expect(screen.getByText('Blocked accounts')).toBeTruthy();
 });
 
+it('keeps iOS password autofill from covering the change-password fields', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getByLabelText('Edit Account & security'));
+  await fireEvent.press(screen.getByLabelText('Change password'));
+
+  for (const label of [
+    'Current password',
+    'New password',
+    'Confirm new password',
+  ]) {
+    const input = screen.getByLabelText(label);
+    expect(input.props.autoComplete).toBe('off');
+    expect(input.props.importantForAutofill).toBe('no');
+    expect(input.props.textContentType).toBe('none');
+    expect(input.props.secureTextEntry).toBe(true);
+  }
+});
+
 it('offers to save a city typed outside the suggested city list', async () => {
   await render(
     <ProfileSettingsSheet
