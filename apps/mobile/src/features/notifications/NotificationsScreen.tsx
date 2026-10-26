@@ -298,7 +298,7 @@ export function NotificationsScreen({
               (busy || pressed) && styles.pressed,
             ]}
           >
-            <Text style={styles.actionText}>Accept</Text>
+            <Text style={[styles.actionText, styles.acceptText]}>Accept</Text>
           </Pressable>
           <Pressable
             accessibilityLabel={`Decline request from ${item.senderName}`}
@@ -310,7 +310,7 @@ export function NotificationsScreen({
               (busy || pressed) && styles.pressed,
             ]}
           >
-            <Text style={styles.actionText}>Decline</Text>
+            <Text style={[styles.actionText, styles.declineText]}>Decline</Text>
           </Pressable>
         </View>
       </View>
@@ -623,11 +623,12 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       backgroundColor: colors.canvas,
     },
     actionText: {
-      color: colors.text,
       fontSize: 13,
       fontWeight: '500',
       letterSpacing: 0.6,
     },
+    acceptText: { color: colors.onPrimary },
+    declineText: { color: colors.text },
     emptyBackground: { flex: 1, backgroundColor: colors.canvas },
     emptyPatternImage: { opacity: isDark ? 1 : 0.08 },
     empty: {
