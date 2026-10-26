@@ -161,6 +161,7 @@ function DishPhoto({
   if (state.uri)
     return (
       <Image
+        onError={() => setState({ failed: true })}
         resizeMode="cover"
         source={{ uri: state.uri }}
         style={styles.dishImage}
@@ -301,9 +302,7 @@ function MainReview({
                 >
                   <DishPhoto
                     fallbackSource={
-                      seededReview
-                        ? seededDishPhotos[index % seededDishPhotos.length]
-                        : undefined
+                      seededDishPhotos[index % seededDishPhotos.length]
                     }
                     path={dish.thumbnailPath ?? dish.photoPath}
                     styles={styles}
@@ -1188,7 +1187,7 @@ export function PaginatedCommentsScreen({
               }}
               onSubmitEditing={() => void submit()}
               placeholder="Add comment"
-              placeholderTextColor="rgba(217,221,229,0.4)"
+              placeholderTextColor={colors.placeholder}
               style={styles.input}
               value={text}
             />
@@ -1306,7 +1305,7 @@ export function PaginatedCommentsScreen({
 
 const createStyles = (colors: ThemeColors) =>
   responsiveStyleSheet({
-    keyboardAvoiding: { flex: 1, backgroundColor: colors.surfaceRaised },
+    keyboardAvoiding: { flex: 1, backgroundColor: colors.canvas },
     header: {
       height: 102,
       paddingTop: 54,
@@ -1316,7 +1315,7 @@ const createStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     back: {
       width: 52,
@@ -1331,7 +1330,7 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '300',
     },
     title: { color: colors.text, fontSize: 17, fontWeight: '700' },
-    list: { flex: 1, backgroundColor: colors.background },
+    list: { flex: 1, backgroundColor: colors.canvas },
     content: {
       flexGrow: 1,
       paddingTop: 0,
@@ -1341,7 +1340,7 @@ const createStyles = (colors: ThemeColors) =>
     emptyContent: { backgroundColor: colors.background },
     commentsFooter: {
       flexGrow: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
     mainReview: {
@@ -1566,13 +1565,13 @@ const createStyles = (colors: ThemeColors) =>
       position: 'relative',
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     commentsPanelStart: {
       overflow: 'hidden',
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      backgroundColor: 'transparent',
+      backgroundColor: colors.surface,
     },
     commentsPanelBorderClip: {
       position: 'absolute',
@@ -1589,7 +1588,7 @@ const createStyles = (colors: ThemeColors) =>
       left: 0,
       height: 48,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.textMuted,
       borderRadius: 24,
     },
     commentsPanelBorderShapeTop: { top: 0 },
@@ -1607,7 +1606,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingVertical: 12,
       flexDirection: 'row',
       gap: 7,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     nestedRow: { paddingLeft: 63 },
     highlightedRow: {
@@ -1659,13 +1658,13 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'flex-end',
       gap: 12,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surface,
     },
     composerField: {
       flex: 1,
       overflow: 'hidden',
       borderRadius: theme.radius.pill,
-      backgroundColor: 'rgba(255,255,255,0.08)',
+      backgroundColor: colors.surfaceRaised,
     },
     replyBanner: {
       height: 28,

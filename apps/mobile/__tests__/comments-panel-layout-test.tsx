@@ -183,7 +183,7 @@ it('rounds only the top of the comments panel', async () => {
     overflow: 'hidden',
     borderTopLeftRadius: responsiveSize(24),
     borderTopRightRadius: responsiveSize(24),
-    backgroundColor: 'transparent',
+    backgroundColor: colors.surface,
   });
   [panelStart, lastThread].forEach((panelEdge) => {
     const style = StyleSheet.flatten(panelEdge.props.style);
@@ -200,7 +200,7 @@ it('rounds only the top of the comments panel', async () => {
   expect(StyleSheet.flatten(topBorderShape.props.style)).toMatchObject({
     height: responsiveSize(48),
     borderWidth: responsiveSize(1),
-    borderColor: colors.border,
+    borderColor: colors.textMuted,
     borderRadius: responsiveSize(24),
     top: responsiveSize(0),
   });
@@ -208,7 +208,7 @@ it('rounds only the top of the comments panel', async () => {
   expect(screen.queryByTestId('comments-panel-bottom-border-shape')).toBeNull();
   const commentsList = screen.getByTestId('comments-list');
   expect(StyleSheet.flatten(commentsList.props.style)).toMatchObject({
-    backgroundColor: colors.background,
+    backgroundColor: colors.canvas,
   });
   expect(
     StyleSheet.flatten(commentsList.props.contentContainerStyle),
@@ -217,7 +217,7 @@ it('rounds only the top of the comments panel', async () => {
     StyleSheet.flatten(commentsList.props.ListFooterComponentStyle),
   ).toMatchObject({
     flexGrow: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   });
   [firstRow, secondRow].forEach((row) => {
     const style = StyleSheet.flatten(row.props.style);
@@ -239,7 +239,7 @@ it('shows the Figma top bar radius over the raised review backdrop', async () =>
     borderBottomRightRadius: responsiveSize(24),
   });
   expect(StyleSheet.flatten(header.parent!.props.style)).toMatchObject({
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.canvas,
   });
 });
 
@@ -272,7 +272,7 @@ it('keeps the reply target and input in one gapless composer field', async () =>
   expect(StyleSheet.flatten(field.props.style)).toMatchObject({
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceRaised,
   });
   expect(input.parent).toBe(field);
   expect(StyleSheet.flatten(banner.props.style).marginBottom).toBeUndefined();
@@ -298,15 +298,15 @@ it('matches the Figma composer dimensions and colors', async () => {
   const composer = field.parent!;
   const send = screen.getByLabelText('Send comment');
 
-  expect(input.props.placeholderTextColor).toBe('rgba(217,221,229,0.4)');
+  expect(input.props.placeholderTextColor).toBe(colors.placeholder);
   expect(StyleSheet.flatten(composer.props.style)).toMatchObject({
     paddingHorizontal: responsiveSize(16),
     paddingTop: responsiveSize(8),
     gap: responsiveSize(12),
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   });
   expect(StyleSheet.flatten(field.props.style)).toMatchObject({
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceRaised,
   });
   expect(StyleSheet.flatten(input.props.style)).toMatchObject({
     height: responsiveSize(40),
