@@ -2,7 +2,6 @@ import { apiErrorMessage } from '@tastes/firebase-client';
 import type { FeedItem, ReportReason, Venue } from '@tastes/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
-import { doc, onSnapshot } from 'firebase/firestore';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
@@ -31,7 +30,8 @@ import SuccessMouthPink from '../../../assets/create-review/success-mouth-pink.s
 import Svg, { Path } from 'react-native-svg';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { useToggleFollow } from '../discover/api';
-import { firestore, storage } from '../../infrastructure/firebase';
+import { storage } from '../../infrastructure/firebase';
+import { isViewerFollowingProfile } from './profileRelationship';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
@@ -335,7 +335,11 @@ export function ProfileScreen({
     void api
       .getProfileExtras({ targetUserId })
       .then((result) => {
-        if (active) setBlocked(result.data.blocked);
+        if (!active) return;
+        setBlocked(result.data.blocked);
+        setFollowing(
+          isViewerFollowingProfile(result.data.followers, currentUserId),
+        );
       })
       .catch(() => {
         if (active) setBlocked(false);
@@ -343,14 +347,7 @@ export function ProfileScreen({
     return () => {
       active = false;
     };
-  }, [api, own, targetUserId]);
-  useEffect(() => {
-    if (own) return undefined;
-    return onSnapshot(
-      doc(firestore, 'users', currentUserId, 'following', targetUserId),
-      (snapshot) => setFollowing(snapshot.exists()),
-    );
-  }, [currentUserId, own, targetUserId]);
+  }, [api, currentUserId, own, targetUserId]);
   useFocusEffect(
     useMemo(
       () => () => {
