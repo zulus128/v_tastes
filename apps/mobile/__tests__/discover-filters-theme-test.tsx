@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Keyboard, StyleSheet } from 'react-native';
 import { DiscoverFiltersScreen } from '../src/features/discover/DiscoverFiltersScreen';
 
 const mockLightColors = {
@@ -73,6 +73,21 @@ it('uses the active theme on the filters screen', async () => {
   expect(StyleSheet.flatten(screen.getByText('Filter').props.style).color).toBe(
     '#FFFFFF',
   );
+});
+
+it('dismisses an existing keyboard when the filter screen opens', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
+
+  await render(
+    <DiscoverFiltersScreen
+      initialValues={[]}
+      onApply={jest.fn()}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  dismiss.mockRestore();
 });
 
 it('does not render or reapply the retired Vegetarian filter', async () => {

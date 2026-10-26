@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Keyboard,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -85,6 +92,9 @@ export function DiscoverFiltersScreen({
   onApply: (values: string[]) => void;
   onBack: () => void;
 }) {
+  useEffect(() => {
+    Keyboard.dismiss();
+  }, []);
   const { colors } = useAppTheme();
   const userId = useAuthenticatedUserId();
   const insets = useSafeAreaInsets();

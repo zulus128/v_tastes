@@ -19,7 +19,13 @@ import type { DiscoverPerson } from '@tastes/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { User } from 'firebase/auth';
-import { Alert, InteractionManager, Linking, View } from 'react-native';
+import {
+  Alert,
+  InteractionManager,
+  Keyboard,
+  Linking,
+  View,
+} from 'react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PaginatedCommentsScreen } from '../features/comments/CommentsScreen';
 import { NewActivityScreen } from '../features/activities/NewActivityScreen';
@@ -397,7 +403,10 @@ function MainTabs({
                 onPrefetchComments={prefetchVisibleComments}
                 onPrefetchPlaces={prefetchVisiblePlaces}
                 onContinueDraft={() => navigation.navigate('Create')}
-                onSettings={() => setSettingsVisible(true)}
+                onSettings={() => {
+                  Keyboard.dismiss();
+                  setSettingsVisible(true);
+                }}
                 targetUserId={targetUserId}
               />
             );
@@ -753,7 +762,10 @@ export function ProductNavigator({
             />
           )}
         </RootStack.Screen>
-        <RootStack.Screen name="DiscoverFilters">
+        <RootStack.Screen
+          name="DiscoverFilters"
+          options={{ gestureEnabled: false }}
+        >
           {({ navigation }) => (
             <DiscoverFiltersScreen
               initialValues={discoverFilters}
