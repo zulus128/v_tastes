@@ -1441,8 +1441,13 @@ function PlacesMap({
           },
         ]}
       />
-      <View
-        style={[styles.mapControls, { top: headerHeight + responsiveSize(18) }]}
+      <Animated.View
+        style={[
+          styles.mapControls,
+          splitLayout
+            ? { top: headerHeight + responsiveSize(18) }
+            : { bottom: Animated.add(sheetHeight, responsiveSize(16)) },
+        ]}
       >
         <Pressable
           accessibilityLabel="Zoom in"
@@ -1508,12 +1513,14 @@ function PlacesMap({
             width={responsiveSize(20)}
           />
         </Pressable>
-      </View>
+      </Animated.View>
       {layersOpen ? (
-        <View
+        <Animated.View
           style={[
             styles.layersMenu,
-            { top: headerHeight + responsiveSize(18) },
+            splitLayout
+              ? { top: headerHeight + responsiveSize(18) }
+              : { bottom: Animated.add(sheetHeight, responsiveSize(16)) },
           ]}
         >
           <Text style={styles.layersTitle}>Show on map</Text>
@@ -1535,7 +1542,7 @@ function PlacesMap({
             onPress={() => toggleMapLayer('openNow')}
             styles={styles}
           />
-        </View>
+        </Animated.View>
       ) : null}
       {sheetDismissed && !sidePanelLayout ? (
         <Pressable
@@ -3646,7 +3653,8 @@ const createStyles = (colors: ThemeColors) =>
     mapLayerMarkerCategory: { marginTop: 2, color: '#D9D9D9', fontSize: 11 },
     mapControls: {
       position: 'absolute',
-      zIndex: 5,
+      zIndex: 10,
+      elevation: 10,
       right: 16,
       flexDirection: 'column',
       gap: 10,
@@ -3689,7 +3697,8 @@ const createStyles = (colors: ThemeColors) =>
     },
     layersMenu: {
       position: 'absolute',
-      zIndex: 6,
+      zIndex: 11,
+      elevation: 11,
       right: 66,
       width: 190,
       paddingHorizontal: 15,
