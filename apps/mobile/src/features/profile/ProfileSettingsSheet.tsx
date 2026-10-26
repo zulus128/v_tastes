@@ -21,6 +21,7 @@ import {
   Animated,
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -197,7 +198,12 @@ export function ProfileSettingsSheet({
   const placeSlide = useRef<SideSlideScreenHandle>(null);
 
   useEffect(() => {
-    if (visible) return;
+    if (visible) {
+      Keyboard.dismiss();
+      setEditing(null);
+      setPlaceOpen(false);
+      return;
+    }
     setNotificationsOpen(false);
     setAppearanceOpen(false);
     setCityOpen(false);

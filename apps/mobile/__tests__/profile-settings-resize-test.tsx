@@ -7,7 +7,7 @@ import {
   within,
 } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
-import { Animated, Dimensions, StyleSheet } from 'react-native';
+import { Animated, Dimensions, Keyboard, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProfileSettingsSheet } from '../src/features/profile/ProfileSettingsSheet';
 import { ProfileExtras } from '../src/features/profile/ProfileExtras';
@@ -120,6 +120,7 @@ afterEach(async () => {
 });
 
 it('keeps account actions inside the scroll area above the fixed footer', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
   await render(
     <ProfileSettingsSheet
       fallbackName="Test User"
@@ -141,6 +142,7 @@ it('keeps account actions inside the scroll area above the fixed footer', async 
   );
   expect(footerStyle.position).not.toBe('absolute');
   expect(footerStyle.flexShrink).toBe(0);
+  expect(dismiss).toHaveBeenCalled();
 });
 
 it('uses a light themed surface for the Following button', async () => {
