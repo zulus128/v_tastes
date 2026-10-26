@@ -27,25 +27,24 @@ import ActivityAddIcon from '../../../assets/activities/add.svg';
 import ActivityAddLightIcon from '../../../assets/activities/add-light.svg';
 import ActivityBackIcon from '../../../assets/activities/back.svg';
 import ActivityBackLightIcon from '../../../assets/activities/back-light.svg';
-import CaretDownIcon from '../../../assets/activities/caret-down.svg';
+import CaretDownIcon from '../../../assets/comments/caret-down.svg';
 import ActivityConfirmIcon from '../../../assets/activities/confirm.svg';
 import MemberSelectedIcon from '../../../assets/activities/member-selected.svg';
 import MemberUnselectedIcon from '../../../assets/activities/member-unselected.svg';
-import PlaceAddIcon from '../../../assets/activities/place-add.svg';
+import PlaceAddCircleIcon from '../../../assets/create-review/select-place-circle.svg';
+import PlaceAddPlusIcon from '../../../assets/create-review/select-place-plus.svg';
 import SearchTuneIcon from '../../../assets/activities/place-tuning.svg';
 import SearchTuneLightIcon from '../../../assets/activities/place-tuning-light.svg';
 import PenIcon from '../../../assets/create-review/pen.svg';
-import CafeCupIcon from '../../../assets/create-review/place-filter-cafe-cup.svg';
-import CafeSteamLeftIcon from '../../../assets/create-review/place-filter-cafe-steam-left.svg';
-import CafeSteamRightIcon from '../../../assets/create-review/place-filter-cafe-steam-right.svg';
-import BarFilterIcon from '../../../assets/create-review/place-filter-bar.svg';
-import RestaurantFilterIcon from '../../../assets/create-review/place-filter-restaurant.svg';
-import TrendingFilterIcon from '../../../assets/create-review/place-filter-trending.svg';
+import BarFilterIcon from '../../../assets/discover/filter-bar.svg';
+import CafeFilterIcon from '../../../assets/discover/filter-cafe.svg';
+import RestaurantFilterIcon from '../../../assets/discover/filter-restaurant.svg';
+import TrendingFilterIcon from '../../../assets/discover/filter-trending.svg';
 import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
 import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
 import PlaceSelectorClearLightIcon from '../../../assets/create-review/place-selector-clear-light.svg';
-import PlaceSelectorCloseIcon from '../../../assets/create-review/place-selector-close.svg';
-import PlaceSelectorSearchIcon from '../../../assets/create-review/place-selector-search.svg';
+import PlaceSelectorCloseIcon from '../../../assets/recap/story/close-circle.svg';
+import PlaceSelectorSearchIcon from '../../../assets/favourites/search.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
@@ -502,6 +501,7 @@ export function NewActivityScreen({
       />
       <MemberSelector
         candidates={candidates}
+        dark={isDark}
         onClose={() => setMembersOpen(false)}
         onConfirm={(ids) => {
           setMemberIds(ids);
@@ -512,6 +512,7 @@ export function NewActivityScreen({
         visible={membersOpen}
       />
       <TimeSelector
+        dark={isDark}
         onClose={() => setTimeOpen(false)}
         onSelect={(hour, minute) => {
           const next = new Date(startsAt);
@@ -546,10 +547,12 @@ function Avatar({
 }
 
 function SheetHeader({
+  iconColor,
   onClose,
   styles,
   title,
 }: {
+  iconColor: string;
   onClose: () => void;
   styles: ReturnType<typeof createStyles>;
   title: string;
@@ -563,6 +566,7 @@ function SheetHeader({
         style={styles.closeCircle}
       >
         <PlaceSelectorCloseIcon
+          color={iconColor}
           height={responsiveSize(30)}
           width={responsiveSize(30)}
         />
@@ -589,7 +593,7 @@ function PlaceSelector({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<
     'Cafe' | 'Club' | 'Restaurant' | null
-  >('Restaurant');
+  >(null);
   const [priceFilter, setPriceFilter] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
   const [trendingFilter, setTrendingFilter] = useState(false);
@@ -629,6 +633,7 @@ function PlaceSelector({
       (venue) => !trendingFilter || venue.discoverTags?.includes('trending'),
     );
   const sheet = useBottomSheetMotion({ onClose, visible });
+  const iconColor = dark ? '#FFFFFF' : '#657084';
   return (
     <Modal
       animationType="none"
@@ -650,6 +655,7 @@ function PlaceSelector({
             <View style={styles.sheetHandle} />
           </View>
           <SheetHeader
+            iconColor={iconColor}
             onClose={sheet.close}
             styles={styles}
             title="Select Place"
@@ -657,6 +663,7 @@ function PlaceSelector({
           <View style={styles.sheetSearchRow}>
             <View style={styles.sheetSearch}>
               <PlaceSelectorSearchIcon
+                color={iconColor}
                 height={responsiveSize(24)}
                 style={styles.searchIcon}
                 width={responsiveSize(24)}
@@ -760,15 +767,15 @@ function PlaceSelector({
                   style={[styles.filter, active && styles.filterActive]}
                 >
                   {filter === 'Restaurant' ? (
-                    <RestaurantFilterIcon height={14} width={14} />
+                    <RestaurantFilterIcon
+                      color={iconColor}
+                      height={14}
+                      width={14}
+                    />
                   ) : filter === 'Cafe' ? (
-                    <View style={styles.cafeIcon}>
-                      <CafeSteamLeftIcon style={styles.cafeSteamLeft} />
-                      <CafeSteamRightIcon style={styles.cafeSteamRight} />
-                      <CafeCupIcon style={styles.cafeCup} />
-                    </View>
+                    <CafeFilterIcon color={iconColor} height={14} width={14} />
                   ) : (
-                    <BarFilterIcon height={14} width={14} />
+                    <BarFilterIcon color={iconColor} height={14} width={14} />
                   )}
                   <Text style={styles.filterText}>{filter}</Text>
                 </Pressable>
@@ -779,13 +786,13 @@ function PlaceSelector({
               style={[styles.filter, priceFilter && styles.filterActive]}
             >
               <Text style={styles.filterText}>$$</Text>
-              <CaretDownIcon height={14} width={14} />
+              <CaretDownIcon color={iconColor} height={14} width={14} />
             </Pressable>
             <Pressable
               onPress={() => setTrendingFilter((active) => !active)}
               style={[styles.filter, trendingFilter && styles.filterActive]}
             >
-              <TrendingFilterIcon height={14} width={14} />
+              <TrendingFilterIcon color={iconColor} height={14} width={14} />
               <Text style={styles.filterText}>Trending</Text>
             </Pressable>
           </ScrollView>
@@ -832,7 +839,19 @@ function PlaceSelector({
                     </Text>
                   </View>
                 </View>
-                <PlaceAddIcon height={20} width={20} />
+                <View style={styles.placeAddIcon}>
+                  <PlaceAddCircleIcon
+                    color={iconColor}
+                    height={20}
+                    width={20}
+                  />
+                  <PlaceAddPlusIcon
+                    color={iconColor}
+                    height={7}
+                    style={styles.placeAddPlus}
+                    width={7}
+                  />
+                </View>
               </Pressable>
             )}
           />
@@ -844,6 +863,7 @@ function PlaceSelector({
 
 function MemberSelector({
   candidates,
+  dark,
   onClose,
   onConfirm,
   selectedIds,
@@ -851,6 +871,7 @@ function MemberSelector({
   visible,
 }: {
   candidates: ActivityCandidate[];
+  dark: boolean;
   onClose: () => void;
   onConfirm: (ids: string[]) => void;
   selectedIds: string[];
@@ -981,6 +1002,7 @@ function MemberSelector({
             <View style={styles.sheetGrabber} />
           </View>
           <SheetHeader
+            iconColor={dark ? '#FFFFFF' : '#657084'}
             onClose={onClose}
             styles={styles}
             title="Select Members"
@@ -990,6 +1012,7 @@ function MemberSelector({
             testID="activity-member-search"
           >
             <PlaceSelectorSearchIcon
+              color={dark ? '#FFFFFF' : '#657084'}
               height={responsiveSize(24)}
               style={styles.searchIcon}
               width={responsiveSize(24)}
@@ -1071,12 +1094,14 @@ function MemberSelector({
 }
 
 function TimeSelector({
+  dark,
   onClose,
   onSelect,
   styles,
   value,
   visible,
 }: {
+  dark: boolean;
   onClose: () => void;
   onSelect: (hour: number, minute: number) => void;
   styles: ReturnType<typeof createStyles>;
@@ -1100,7 +1125,12 @@ function TimeSelector({
     >
       <View style={styles.centerBackdrop}>
         <View style={styles.timeSheet}>
-          <SheetHeader onClose={onClose} styles={styles} title="Select time" />
+          <SheetHeader
+            iconColor={dark ? '#FFFFFF' : '#657084'}
+            onClose={onClose}
+            styles={styles}
+            title="Select time"
+          />
           <Text style={styles.pickerLabel}>HOUR</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {Array.from({ length: 24 }, (_, item) => (
@@ -1492,6 +1522,13 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       lineHeight: 16,
     },
+    placeAddIcon: {
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeAddPlus: { position: 'absolute' },
     cafeIcon: { width: 14, height: 14 },
     cafeSteamLeft: { position: 'absolute', left: 3, top: 0 },
     cafeSteamRight: { position: 'absolute', left: 8, top: 0 },
