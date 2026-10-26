@@ -24,7 +24,9 @@ import BookmarkBodyLightIcon from '../../../assets/activities/bookmark-body-ligh
 import BookmarkLineIcon from '../../../assets/activities/bookmark-line.svg';
 import BookmarkLineLightIcon from '../../../assets/activities/bookmark-line-light.svg';
 import ActivityAddIcon from '../../../assets/activities/add.svg';
+import ActivityAddLightIcon from '../../../assets/activities/add-light.svg';
 import ActivityBackIcon from '../../../assets/activities/back.svg';
+import ActivityBackLightIcon from '../../../assets/activities/back-light.svg';
 import CaretDownIcon from '../../../assets/activities/caret-down.svg';
 import ActivityConfirmIcon from '../../../assets/activities/confirm.svg';
 import MemberSelectedIcon from '../../../assets/activities/member-selected.svg';
@@ -41,6 +43,7 @@ import RestaurantFilterIcon from '../../../assets/create-review/place-filter-res
 import TrendingFilterIcon from '../../../assets/create-review/place-filter-trending.svg';
 import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
 import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
+import PlaceSelectorClearLightIcon from '../../../assets/create-review/place-selector-clear-light.svg';
 import PlaceSelectorCloseIcon from '../../../assets/create-review/place-selector-close.svg';
 import PlaceSelectorSearchIcon from '../../../assets/create-review/place-selector-search.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
@@ -228,10 +231,17 @@ export function NewActivityScreen({
           onPress={onBack}
           style={styles.navButton}
         >
-          <ActivityBackIcon
-            height={responsiveSize(24)}
-            width={responsiveSize(24)}
-          />
+          {isDark ? (
+            <ActivityBackIcon
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+          ) : (
+            <ActivityBackLightIcon
+              height={responsiveSize(24)}
+              width={responsiveSize(24)}
+            />
+          )}
         </Pressable>
         <Text style={styles.navTitle}>
           {activityId ? 'Edit activity' : 'New activity'}
@@ -306,10 +316,17 @@ export function NewActivityScreen({
                     )
                   }
                 >
-                  <ActivityBackIcon
-                    height={responsiveSize(24)}
-                    width={responsiveSize(24)}
-                  />
+                  {isDark ? (
+                    <ActivityBackIcon
+                      height={responsiveSize(24)}
+                      width={responsiveSize(24)}
+                    />
+                  ) : (
+                    <ActivityBackLightIcon
+                      height={responsiveSize(24)}
+                      width={responsiveSize(24)}
+                    />
+                  )}
                 </Pressable>
                 <Pressable
                   onPress={() =>
@@ -318,11 +335,19 @@ export function NewActivityScreen({
                     )
                   }
                 >
-                  <ActivityBackIcon
-                    height={responsiveSize(24)}
-                    style={styles.chevronRight}
-                    width={responsiveSize(24)}
-                  />
+                  {isDark ? (
+                    <ActivityBackIcon
+                      height={responsiveSize(24)}
+                      style={styles.chevronRight}
+                      width={responsiveSize(24)}
+                    />
+                  ) : (
+                    <ActivityBackLightIcon
+                      height={responsiveSize(24)}
+                      style={styles.chevronRight}
+                      width={responsiveSize(24)}
+                    />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -403,10 +428,17 @@ export function NewActivityScreen({
                   )
                 }
               >
-                <PlaceSelectorClearIcon
-                  height={responsiveSize(24)}
-                  width={responsiveSize(24)}
-                />
+                {isDark ? (
+                  <PlaceSelectorClearIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(24)}
+                  />
+                ) : (
+                  <PlaceSelectorClearLightIcon
+                    height={responsiveSize(24)}
+                    width={responsiveSize(24)}
+                  />
+                )}
               </Pressable>
             </View>
           ))}
@@ -418,8 +450,13 @@ export function NewActivityScreen({
           >
             {loadingCandidates ? (
               <ActivityIndicator color={colors.primary} />
-            ) : (
+            ) : isDark ? (
               <ActivityAddIcon
+                height={responsiveSize(24)}
+                width={responsiveSize(24)}
+              />
+            ) : (
+              <ActivityAddLightIcon
                 height={responsiveSize(24)}
                 width={responsiveSize(24)}
               />
@@ -636,10 +673,17 @@ function PlaceSelector({
                   accessibilityLabel="Clear search"
                   onPress={() => setSearch('')}
                 >
-                  <PlaceSelectorClearIcon
-                    height={responsiveSize(24)}
-                    width={responsiveSize(24)}
-                  />
+                  {dark ? (
+                    <PlaceSelectorClearIcon
+                      height={responsiveSize(24)}
+                      width={responsiveSize(24)}
+                    />
+                  ) : (
+                    <PlaceSelectorClearLightIcon
+                      height={responsiveSize(24)}
+                      width={responsiveSize(24)}
+                    />
+                  )}
                 </Pressable>
               ) : null}
             </View>
