@@ -126,12 +126,18 @@ const selectableReviewTags = new Set<ReviewTag>(
   tagOptions.map((tag) => tag.value),
 );
 
-function PlaceFilterCafeIcon() {
+function PlaceFilterCafeIcon({ color }: { color: string }) {
   return (
     <View style={placeFilterIconStyles.cafe}>
-      <PlaceFilterCafeSteamLeft style={placeFilterIconStyles.cafeSteamLeft} />
-      <PlaceFilterCafeSteamRight style={placeFilterIconStyles.cafeSteamRight} />
-      <PlaceFilterCafeCup style={placeFilterIconStyles.cafeCup} />
+      <PlaceFilterCafeSteamLeft
+        color={color}
+        style={placeFilterIconStyles.cafeSteamLeft}
+      />
+      <PlaceFilterCafeSteamRight
+        color={color}
+        style={placeFilterIconStyles.cafeSteamRight}
+      />
+      <PlaceFilterCafeCup color={color} style={placeFilterIconStyles.cafeCup} />
     </View>
   );
 }
@@ -1939,11 +1945,11 @@ export function PlaceSelector({
               hitSlop={12}
               onPress={() => dismiss()}
             >
-              <PlaceSelectorCloseIcon />
+              <PlaceSelectorCloseIcon color={colors.text} />
             </Pressable>
           </View>
           <View style={styles.searchBox}>
-            <PlaceSelectorSearchIcon />
+            <PlaceSelectorSearchIcon color={colors.textSecondary} />
             <TextInput
               autoCapitalize="none"
               onChangeText={setSearch}
@@ -1954,7 +1960,7 @@ export function PlaceSelector({
             />
             {search ? (
               <Pressable onPress={() => setSearch('')}>
-                <PlaceSelectorClearIcon />
+                <PlaceSelectorClearIcon color={colors.textSecondary} />
               </Pressable>
             ) : null}
           </View>
@@ -1974,7 +1980,7 @@ export function PlaceSelector({
                   style={[styles.filter, active && styles.filterActive]}
                 >
                   <View style={styles.filterIcon}>
-                    <FilterIcon />
+                    <FilterIcon color={colors.textSecondary} />
                   </View>
                   <Text maxFontSizeMultiplier={1.3} style={styles.filterText}>
                     {filter.label}

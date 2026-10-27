@@ -429,6 +429,7 @@ export function NewActivityScreen({
               >
                 {isDark ? (
                   <PlaceSelectorClearIcon
+                    color={colors.text}
                     height={responsiveSize(24)}
                     width={responsiveSize(24)}
                   />
@@ -682,6 +683,7 @@ function PlaceSelector({
                 >
                   {dark ? (
                     <PlaceSelectorClearIcon
+                      color={iconColor}
                       height={responsiveSize(24)}
                       width={responsiveSize(24)}
                     />
