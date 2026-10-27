@@ -431,14 +431,16 @@ function MainTabs({
           visible={placeSelectorVisible}
         />
       ) : null}
-      <ProfileSettingsSheet
-        fallbackName={user.displayName ?? 'Your profile'}
-        onClose={() => setSettingsVisible(false)}
-        onDeleteAccount={deleteAccount}
-        onLogout={logout}
-        userId={user.uid}
-        visible={settingsVisible}
-      />
+      {settingsVisible ? (
+        <ProfileSettingsSheet
+          fallbackName={user.displayName ?? 'Your profile'}
+          onClose={() => setSettingsVisible(false)}
+          onDeleteAccount={deleteAccount}
+          onLogout={logout}
+          userId={user.uid}
+          visible
+        />
+      ) : null}
     </>
   );
 }

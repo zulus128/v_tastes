@@ -205,6 +205,7 @@ export function ProfileSettingsSheet({
       const retryTimer = setTimeout(dismissSettingsKeyboard, 250);
       setEditing(null);
       setPlaceOpen(false);
+      setPasswordEditorOpen(false);
       return () => {
         cancelAnimationFrame(animationFrame);
         clearTimeout(retryTimer);
@@ -215,6 +216,9 @@ export function ProfileSettingsSheet({
     setCityOpen(false);
     setAccountSecurityOpen(false);
     setPrivacyOpen(false);
+    setEditing(null);
+    setPlaceOpen(false);
+    setPasswordEditorOpen(false);
   }, [visible]);
 
   useEffect(() => {
@@ -1274,7 +1278,7 @@ export function ProfileSettingsSheet({
               </View>
             </ImageBackground>
           </Animated.View>
-          {passwordEditorOpen ? (
+          {visible && passwordEditorOpen ? (
             <View style={styles.editorOverlay}>
               <Pressable
                 accessibilityLabel="Close password editor"
@@ -1357,7 +1361,7 @@ export function ProfileSettingsSheet({
               </KeyboardAvoidingView>
             </View>
           ) : null}
-          {editing !== null ? (
+          {visible && editing !== null ? (
             <View style={styles.editorOverlay}>
               <Pressable
                 accessibilityLabel="Close profile editor"
@@ -1418,75 +1422,77 @@ export function ProfileSettingsSheet({
         </ImageBackground>
       </SideSlideScreen>
 
-      <SideSlideScreen
-        onRequestClose={() => {
-          dismissSettingsKeyboard();
-          setPlaceOpen(false);
-        }}
-        ref={placeSlide}
-        visible={placeOpen}
-      >
-        <View style={styles.screen}>
-          <View
-            style={[
-              styles.header,
-              {
-                height: responsiveSize(48) + insets.top,
-                paddingTop: insets.top,
-              },
-            ]}
-          >
-            <Pressable
-              onPress={() => {
-                dismissSettingsKeyboard();
-                placeSlide.current?.close();
-              }}
-              style={styles.headerButton}
+      {visible && placeOpen ? (
+        <SideSlideScreen
+          onRequestClose={() => {
+            dismissSettingsKeyboard();
+            setPlaceOpen(false);
+          }}
+          ref={placeSlide}
+          visible
+        >
+          <View style={styles.screen}>
+            <View
+              style={[
+                styles.header,
+                {
+                  height: responsiveSize(48) + insets.top,
+                  paddingTop: insets.top,
+                },
+              ]}
             >
-              <Image source={backIcon} style={styles.backIcon} />
-            </Pressable>
-            <Text style={styles.title}>Favourite place</Text>
-            <View style={styles.headerButton} />
-          </View>
-          <View style={styles.placeContent}>
-            <TextInput
-              autoFocus
-              onChangeText={setPlaceQuery}
-              placeholder="Search places"
-              placeholderTextColor={colors.textMuted}
-              ref={placeSearchInputRef}
-              style={styles.searchInput}
-              value={placeQuery}
-            />
-            {searching ? (
-              <ActivityIndicator
-                color={colors.primary}
-                style={styles.searchLoader}
+              <Pressable
+                onPress={() => {
+                  dismissSettingsKeyboard();
+                  placeSlide.current?.close();
+                }}
+                style={styles.headerButton}
+              >
+                <Image source={backIcon} style={styles.backIcon} />
+              </Pressable>
+              <Text style={styles.title}>Favourite place</Text>
+              <View style={styles.headerButton} />
+            </View>
+            <View style={styles.placeContent}>
+              <TextInput
+                autoFocus
+                onChangeText={setPlaceQuery}
+                placeholder="Search places"
+                placeholderTextColor={colors.textMuted}
+                ref={placeSearchInputRef}
+                style={styles.searchInput}
+                value={placeQuery}
               />
-            ) : (
-              places.map((place) => (
-                <Pressable
-                  key={place.id}
-                  onPress={() => {
-                    setFavoritePlace(place.name);
-                    void save({ favoriteVenueId: place.id });
-                  }}
-                  style={styles.placeRow}
-                >
-                  <View style={styles.placeCopy}>
-                    <Text style={styles.placeName}>{place.name}</Text>
-                    <Text style={styles.placeMeta}>
-                      {place.city}
-                      {place.address ? ` · ${place.address}` : ''}
-                    </Text>
-                  </View>
-                  <Text style={styles.chevron}>›</Text>
-                </Pressable>
-              ))
-            )}
+              {searching ? (
+                <ActivityIndicator
+                  color={colors.primary}
+                  style={styles.searchLoader}
+                />
+              ) : (
+                places.map((place) => (
+                  <Pressable
+                    key={place.id}
+                    onPress={() => {
+                      setFavoritePlace(place.name);
+                      void save({ favoriteVenueId: place.id });
+                    }}
+                    style={styles.placeRow}
+                  >
+                    <View style={styles.placeCopy}>
+                      <Text style={styles.placeName}>{place.name}</Text>
+                      <Text style={styles.placeMeta}>
+                        {place.city}
+                        {place.address ? ` · ${place.address}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.chevron}>›</Text>
+                  </Pressable>
+                ))
+              )}
+            </View>
           </View>
-        </View>
-      </SideSlideScreen>
+        </SideSlideScreen>
+      ) : null}
     </>
   );
 }
