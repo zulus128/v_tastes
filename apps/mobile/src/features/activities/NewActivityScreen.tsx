@@ -43,8 +43,8 @@ import TrendingFilterIcon from '../../../assets/discover/filter-trending.svg';
 import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
 import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
 import PlaceSelectorClearLightIcon from '../../../assets/create-review/place-selector-clear-light.svg';
-import PlaceSelectorCloseIcon from '../../../assets/recap/story/close-circle.svg';
-import PlaceSelectorSearchIcon from '../../../assets/favourites/search.svg';
+import PlaceSelectorCloseIcon from '../../../assets/activities/close.svg';
+import PlaceSelectorSearchIcon from '../../../assets/activities/search.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
@@ -633,7 +633,7 @@ function PlaceSelector({
       (venue) => !trendingFilter || venue.discoverTags?.includes('trending'),
     );
   const sheet = useBottomSheetMotion({ onClose, visible });
-  const iconColor = dark ? '#FFFFFF' : '#657084';
+  const iconColor = dark ? '#FFFFFF' : '#252A31';
   return (
     <Modal
       animationType="none"

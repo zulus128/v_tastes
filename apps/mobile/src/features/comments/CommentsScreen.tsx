@@ -35,6 +35,8 @@ import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import SendIcon from '../../../assets/comments/send.svg';
+import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
+import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import avatarKristin from '../../../assets/discover/avatar-kristin.png';
 import loungePhoto from '../../../assets/discover/lounge.png';
 import restaurantPhoto from '../../../assets/discover/restaurant.png';
@@ -187,9 +189,11 @@ function DishPhoto({
 }
 
 function RatingStars({
+  color,
   rating,
   styles,
 }: {
+  color: string;
   rating: number;
   styles: ReturnType<typeof createStyles>;
 }) {
@@ -203,12 +207,21 @@ function RatingStars({
         const fill = Math.max(0, Math.min(1, clamped - star + 1));
         return (
           <View key={star} style={styles.ratingStarCell}>
-            <Text style={[styles.reviewStars, styles.reviewEmptyStars]}>★</Text>
+            <ReviewStarOutline
+              color={color}
+              height={responsiveSize(17.9166)}
+              opacity={0.3}
+              width={responsiveSize(17.9179)}
+            />
             {fill > 0 ? (
               <View
                 style={[styles.ratingStarFill, { width: `${fill * 100}%` }]}
               >
-                <Text style={styles.reviewStars}>★</Text>
+                <ReviewStarFilled
+                  color={color}
+                  height={responsiveSize(16.6666)}
+                  width={responsiveSize(16.6671)}
+                />
               </View>
             ) : null}
           </View>
@@ -280,7 +293,11 @@ function MainReview({
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>
             <Text style={styles.reviewVenue}>{review.venueName}</Text>
-            <RatingStars rating={review.rating} styles={styles} />
+            <RatingStars
+              color={colors.primary}
+              rating={review.rating}
+              styles={styles}
+            />
           </View>
           {review.tags[0] ? (
             <Text style={styles.reviewTag}>
@@ -1377,8 +1394,14 @@ const createStyles = (colors: ThemeColors) =>
     },
     reviewVenueCopy: { flex: 1, gap: 4 },
     reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '700' },
-    ratingStars: { flexDirection: 'row', gap: 1 },
-    ratingStarCell: { width: 17, height: 22, overflow: 'hidden' },
+    ratingStars: { flexDirection: 'row', gap: 2 },
+    ratingStarCell: {
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
     ratingStarFill: {
       position: 'absolute',
       left: 0,
@@ -1386,8 +1409,6 @@ const createStyles = (colors: ThemeColors) =>
       bottom: 0,
       overflow: 'hidden',
     },
-    reviewStars: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
-    reviewEmptyStars: { color: colors.textMuted },
     reviewTag: {
       overflow: 'hidden',
       paddingHorizontal: 11,
