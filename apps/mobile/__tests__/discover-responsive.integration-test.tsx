@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import type { Ref } from 'react';
 import {
   Animated,
   Dimensions,
@@ -15,6 +16,7 @@ let mockFavouritePlaces: Array<Record<string, unknown>> = [];
 let mockPopularReviews: Array<Record<string, unknown>> = [];
 let mockVenues: Array<Record<string, unknown>> = [];
 let mockIsDark = true;
+const mockAnimateToRegion = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
@@ -49,10 +51,19 @@ jest.mock('../src/features/favourites/api', () => ({
   useFavourites: () => ({ data: { places: mockFavouritePlaces } }),
 }));
 jest.mock('react-native-maps', () => {
+  const React = jest.requireActual('react');
   const { View } = jest.requireActual('react-native');
+  const MapView = React.forwardRef(
+    (props: Record<string, unknown>, ref: Ref<unknown>) => {
+      React.useImperativeHandle(ref, () => ({
+        animateToRegion: mockAnimateToRegion,
+      }));
+      return <View {...props} testID="discover-map" />;
+    },
+  );
   return {
     __esModule: true,
-    default: () => <View testID="discover-map" />,
+    default: MapView,
     Marker: View,
   };
 });
@@ -111,6 +122,7 @@ describe('Discover responsive content', () => {
     mockPopularReviews = [];
     mockVenues = [];
     mockIsDark = true;
+    mockAnimateToRegion.mockReset();
     jest.restoreAllMocks();
   });
 
@@ -240,6 +252,24 @@ describe('Discover responsive content', () => {
     );
     expect(screen.getByTestId('map-layers-control-icon').props.color).toBe(
       '#252A31',
+    );
+  });
+
+  it('changes the map region when zoom controls are pressed', async () => {
+    resize(402, 874);
+    await render(<DiscoverScreen {...props} />);
+    await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
+
+    await fireEvent.press(screen.getByLabelText('Zoom in'));
+    expect(mockAnimateToRegion).toHaveBeenLastCalledWith(
+      expect.objectContaining({ latitudeDelta: 0.065, longitudeDelta: 0.06 }),
+      220,
+    );
+
+    await fireEvent.press(screen.getByLabelText('Zoom out'));
+    expect(mockAnimateToRegion).toHaveBeenLastCalledWith(
+      expect.objectContaining({ latitudeDelta: 0.13, longitudeDelta: 0.12 }),
+      220,
     );
   });
 

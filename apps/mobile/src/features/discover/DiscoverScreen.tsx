@@ -1325,16 +1325,21 @@ function PlacesMap({
     mapRef.current?.animateToRegion(next, 450);
   }
 
-  async function zoomMap(delta: number) {
-    const camera = await mapRef.current?.getCamera();
-    if (!camera) return;
-    mapRef.current?.animateCamera(
-      {
-        ...camera,
-        zoom: Math.max(2, Math.min(20, (camera.zoom ?? 12) + delta)),
-      },
-      { duration: 220 },
-    );
+  function zoomMap(delta: number) {
+    const scale = delta > 0 ? 0.5 : 2;
+    const next = {
+      ...region,
+      latitudeDelta: Math.max(
+        0.002,
+        Math.min(120, region.latitudeDelta * scale),
+      ),
+      longitudeDelta: Math.max(
+        0.002,
+        Math.min(120, region.longitudeDelta * scale),
+      ),
+    };
+    setRegion(next);
+    mapRef.current?.animateToRegion(next, 220);
   }
 
   function focusFirstSearchResult() {
@@ -1451,7 +1456,7 @@ function PlacesMap({
       >
         <Pressable
           accessibilityLabel="Zoom in"
-          onPress={() => void zoomMap(1)}
+          onPress={() => zoomMap(1)}
           style={[
             styles.mapControlButton,
             !isDark && styles.mapControlButtonLight,
@@ -1465,7 +1470,7 @@ function PlacesMap({
         </Pressable>
         <Pressable
           accessibilityLabel="Zoom out"
-          onPress={() => void zoomMap(-1)}
+          onPress={() => zoomMap(-1)}
           style={[
             styles.mapControlButton,
             !isDark && styles.mapControlButtonLight,
