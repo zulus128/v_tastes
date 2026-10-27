@@ -262,6 +262,30 @@ it('dismisses the keyboard before notifications and while scrolling them', async
   expect(dismiss).toHaveBeenCalledTimes(dismissCountBeforeDrag + 1);
 });
 
+it('centers notification switches inside their rows', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getAllByText('Notifications')[0]);
+  const slot = await screen.findByTestId(
+    'notification-switch-slot-New followers & friend requests',
+  );
+
+  expect(StyleSheet.flatten(slot.props.style)).toMatchObject({
+    alignItems: 'center',
+    height: '100%',
+    justifyContent: 'center',
+  });
+});
+
 it('suppresses the native iOS password accessory over change-password fields', async () => {
   await render(
     <ProfileSettingsSheet

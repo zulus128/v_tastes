@@ -24,6 +24,7 @@ import {
   InteractionManager,
   Keyboard,
   Linking,
+  TextInput,
   View,
 } from 'react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -404,6 +405,9 @@ function MainTabs({
                 onPrefetchPlaces={prefetchVisiblePlaces}
                 onContinueDraft={() => navigation.navigate('Create')}
                 onSettings={() => {
+                  const focusedInput = TextInput.State.currentlyFocusedInput();
+                  TextInput.State.blurTextInput(focusedInput);
+                  focusedInput?.blur();
                   Keyboard.dismiss();
                   setSettingsVisible(true);
                 }}

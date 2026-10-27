@@ -10,6 +10,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -295,6 +296,7 @@ export function ProfileScreen({
   const [refreshing, setRefreshing] = useState(false);
   const reviewListRef = useRef<FlatList<FeedItem>>(null);
   const wishlistScrollRef = useRef<ScrollView>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const reviewOffset = useRef(0);
   const wishlistOffset = useRef(0);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -302,6 +304,35 @@ export function ProfileScreen({
     onClose: () => setEditingReview(false),
     visible: editingReview,
   });
+
+  const openSettings = useCallback(() => {
+    const searchInput = searchInputRef.current;
+    if (!searchInput?.isFocused()) {
+      Keyboard.dismiss();
+      onSettings();
+      return;
+    }
+
+    let opened = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    const keyboardSubscription = Keyboard.addListener(
+      'keyboardDidHide',
+      finishOpening,
+    );
+
+    function finishOpening() {
+      if (opened) return;
+      opened = true;
+      keyboardSubscription.remove();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      onSettings();
+    }
+
+    TextInput.State.blurTextInput(TextInput.State.currentlyFocusedInput());
+    searchInput.blur();
+    Keyboard.dismiss();
+    fallbackTimer = setTimeout(finishOpening, 800);
+  }, [onSettings]);
 
   async function reactToProfileReview(
     reviewId: string,
@@ -826,6 +857,7 @@ export function ProfileScreen({
             onChangeText={setSearch}
             placeholder="Search"
             placeholderTextColor={colors.textMuted}
+            ref={searchInputRef}
             style={styles.searchInput}
             value={search}
           />
@@ -1120,7 +1152,7 @@ export function ProfileScreen({
       )}
       <ProfileTopBar
         onBack={onBack}
-        onSettings={onSettings}
+        onSettings={openSettings}
         onShare={() =>
           own
             ? void Share.share({

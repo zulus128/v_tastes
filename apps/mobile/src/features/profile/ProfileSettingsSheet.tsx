@@ -200,10 +200,15 @@ export function ProfileSettingsSheet({
 
   useEffect(() => {
     if (visible) {
-      Keyboard.dismiss();
+      dismissSettingsKeyboard();
+      const animationFrame = requestAnimationFrame(dismissSettingsKeyboard);
+      const retryTimer = setTimeout(dismissSettingsKeyboard, 250);
       setEditing(null);
       setPlaceOpen(false);
-      return;
+      return () => {
+        cancelAnimationFrame(animationFrame);
+        clearTimeout(retryTimer);
+      };
     }
     setNotificationsOpen(false);
     setAppearanceOpen(false);
@@ -298,6 +303,9 @@ export function ProfileSettingsSheet({
 
   function dismissSettingsKeyboard() {
     placeSearchInputRef.current?.blur();
+    const focusedInput = TextInput.State.currentlyFocusedInput();
+    TextInput.State.blurTextInput(focusedInput);
+    focusedInput?.blur();
     Keyboard.dismiss();
   }
 
@@ -1501,14 +1509,19 @@ function NotificationSetting({
       style={[styles.notificationRow, disabled && styles.notificationDisabled]}
     >
       <Text style={styles.notificationLabel}>{label}</Text>
-      <Switch
-        disabled={disabled}
-        onValueChange={onChange}
-        style={styles.notificationSwitch}
-        thumbColor="#FFFFFF"
-        trackColor={{ false: '#5A5B60', true: '#C8322D' }}
-        value={value}
-      />
+      <View
+        style={styles.notificationSwitchSlot}
+        testID={`notification-switch-slot-${label}`}
+      >
+        <Switch
+          disabled={disabled}
+          onValueChange={onChange}
+          style={styles.notificationSwitch}
+          thumbColor="#FFFFFF"
+          trackColor={{ false: '#5A5B60', true: '#C8322D' }}
+          value={value}
+        />
+      </View>
     </View>
   );
 }
@@ -1711,8 +1724,14 @@ function createStyles(
       letterSpacing: -0.41,
     },
     notificationSwitch: {
-      marginRight: -4,
       transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }],
+    },
+    notificationSwitchSlot: {
+      width: 44,
+      height: '100%',
+      marginRight: -4,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     appearanceContent: { paddingTop: 24, paddingHorizontal: 16 },
     accountSecurityContent: {
