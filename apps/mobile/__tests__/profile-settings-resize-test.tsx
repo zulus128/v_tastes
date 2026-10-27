@@ -142,6 +142,8 @@ it('keeps account actions inside the scroll area above the fixed footer', async 
   );
   expect(footerStyle.position).not.toBe('absolute');
   expect(footerStyle.flexShrink).toBe(0);
+  expect(scroll.props.keyboardDismissMode).toBe('on-drag');
+  fireEvent(scroll, 'scrollBeginDrag');
   expect(dismiss).toHaveBeenCalled();
 });
 

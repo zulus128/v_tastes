@@ -157,6 +157,7 @@ export function ProfileSettingsSheet({
   const [changingPassword, setChangingPassword] = useState(false);
   const newPasswordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
+  const placeSearchInputRef = useRef<TextInput>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [privacyPreferences, setPrivacyPreferences] =
     useState<PrivacyPreferences>(defaultPrivacyPreferences);
@@ -281,6 +282,8 @@ export function ProfileSettingsSheet({
   }
 
   async function save(input: UpdateProfileSettingsInput) {
+    placeSearchInputRef.current?.blur();
+    Keyboard.dismiss();
     setSaving(true);
     try {
       await api.updateProfileSettings(input);
@@ -292,6 +295,11 @@ export function ProfileSettingsSheet({
     } finally {
       setSaving(false);
     }
+  }
+
+  function dismissPlaceKeyboard() {
+    placeSearchInputRef.current?.blur();
+    Keyboard.dismiss();
   }
 
   async function chooseProfilePhoto(camera: boolean) {
@@ -705,7 +713,9 @@ export function ProfileSettingsSheet({
             <ActivityIndicator color={colors.primary} style={styles.loader} />
           ) : (
             <ScrollView
+              keyboardDismissMode="on-drag"
               keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={() => Keyboard.dismiss()}
               showsVerticalScrollIndicator={false}
               style={styles.contentScroll}
               contentContainerStyle={[
@@ -1397,7 +1407,10 @@ export function ProfileSettingsSheet({
       </SideSlideScreen>
 
       <SideSlideScreen
-        onRequestClose={() => setPlaceOpen(false)}
+        onRequestClose={() => {
+          dismissPlaceKeyboard();
+          setPlaceOpen(false);
+        }}
         ref={placeSlide}
         visible={placeOpen}
       >
@@ -1412,7 +1425,10 @@ export function ProfileSettingsSheet({
             ]}
           >
             <Pressable
-              onPress={() => placeSlide.current?.close()}
+              onPress={() => {
+                dismissPlaceKeyboard();
+                placeSlide.current?.close();
+              }}
               style={styles.headerButton}
             >
               <Image source={backIcon} style={styles.backIcon} />
@@ -1426,6 +1442,7 @@ export function ProfileSettingsSheet({
               onChangeText={setPlaceQuery}
               placeholder="Search places"
               placeholderTextColor={colors.textMuted}
+              ref={placeSearchInputRef}
               style={styles.searchInput}
               value={placeQuery}
             />
