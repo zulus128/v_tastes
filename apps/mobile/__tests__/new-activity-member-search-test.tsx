@@ -20,34 +20,53 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
+let mockIsDark = true;
+
+const mockDarkColors = {
+  primary: '#B82F29',
+  primaryPressed: '#AD3324',
+  primaryBorder: '#4C1816',
+  danger: '#FF3B30',
+  onPrimary: '#FFFFFF',
+  brandGradientStart: '#560E0B',
+  brandGradientEnd: '#4C1816',
+  background: '#080808',
+  canvas: '#161616',
+  surface: '#161616',
+  surfaceRaised: '#282828',
+  surfaceMuted: '#222222',
+  border: '#45474B',
+  hairline: 'rgba(255,255,255,0.08)',
+  text: '#FFFFFF',
+  textSecondary: '#AAB2C5',
+  textMuted: 'rgba(255,255,255,0.58)',
+  placeholder: 'rgba(255,255,255,0.40)',
+  switchTrack: '#222222',
+  switchThumb: '#D9DDE5',
+  skeleton: '#2E2E2E',
+  skeletonMuted: '#242424',
+  discoverSkeleton: '#262626',
+};
+
+const mockLightColors = {
+  ...mockDarkColors,
+  background: '#FFFFFF',
+  canvas: '#F2EFEA',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F1F1F1',
+  surfaceMuted: '#F6F6F6',
+  border: '#D9D9D9',
+  hairline: 'rgba(0,0,0,0.08)',
+  text: '#111111',
+  textSecondary: '#697386',
+  textMuted: 'rgba(0,0,0,0.58)',
+  placeholder: 'rgba(0,0,0,0.40)',
+};
+
 jest.mock('../src/ui/ThemeProvider', () => ({
   useAppTheme: () => ({
-    colors: {
-      primary: '#B82F29',
-      primaryPressed: '#AD3324',
-      primaryBorder: '#4C1816',
-      danger: '#FF3B30',
-      onPrimary: '#FFFFFF',
-      brandGradientStart: '#560E0B',
-      brandGradientEnd: '#4C1816',
-      background: '#080808',
-      canvas: '#161616',
-      surface: '#161616',
-      surfaceRaised: '#282828',
-      surfaceMuted: '#222222',
-      border: '#45474B',
-      hairline: 'rgba(255,255,255,0.08)',
-      text: '#FFFFFF',
-      textSecondary: '#AAB2C5',
-      textMuted: 'rgba(255,255,255,0.58)',
-      placeholder: 'rgba(255,255,255,0.40)',
-      switchTrack: '#222222',
-      switchThumb: '#D9DDE5',
-      skeleton: '#2E2E2E',
-      skeletonMuted: '#242424',
-      discoverSkeleton: '#262626',
-    },
-    isDark: true,
+    colors: mockIsDark ? mockDarkColors : mockLightColors,
+    isDark: mockIsDark,
   }),
 }));
 
@@ -88,6 +107,7 @@ describe('New activity member selector', () => {
   const initialScreen = Dimensions.get('screen');
 
   beforeEach(() => {
+    mockIsDark = true;
     mockListActivityCandidates.mockClear();
     const landscape = { width: 667, height: 375, scale: 2, fontScale: 1 };
     Dimensions.set({ window: landscape, screen: landscape });
@@ -123,5 +143,40 @@ describe('New activity member selector', () => {
     expect(style.flexShrink).toBe(0);
     expect(screen.getByPlaceholderText('Search friends')).toBeOnTheScreen();
     expect(screen.getByText('Piah P')).toBeOnTheScreen();
+  });
+
+  it('uses the Figma light surfaces and activity accent', async () => {
+    mockIsDark = false;
+
+    await render(
+      <NewActivityScreen
+        onBack={jest.fn()}
+        onCreated={jest.fn()}
+        userId="organizer"
+      />,
+    );
+
+    await waitFor(() => expect(mockListActivityCandidates).toHaveBeenCalled());
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('new-activity-screen').props.style)
+        .backgroundColor,
+    ).toBe('#F2EFEA');
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('new-activity-navigation').props.style,
+      ).backgroundColor,
+    ).toBe('#FFFFFF');
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('new-activity-calendar').props.style,
+      ).backgroundColor,
+    ).toBe('#FFFFFF');
+
+    const submitStyle = StyleSheet.flatten(
+      screen.getByTestId('new-activity-submit').props.style,
+    );
+    expect(submitStyle.backgroundColor).toBe('#F23B4C');
+    expect(submitStyle.borderColor).toBe('#FBD0D3');
   });
 });

@@ -282,8 +282,7 @@ export function ProfileSettingsSheet({
   }
 
   async function save(input: UpdateProfileSettingsInput) {
-    placeSearchInputRef.current?.blur();
-    Keyboard.dismiss();
+    dismissSettingsKeyboard();
     setSaving(true);
     try {
       await api.updateProfileSettings(input);
@@ -297,7 +296,7 @@ export function ProfileSettingsSheet({
     }
   }
 
-  function dismissPlaceKeyboard() {
+  function dismissSettingsKeyboard() {
     placeSearchInputRef.current?.blur();
     Keyboard.dismiss();
   }
@@ -461,6 +460,7 @@ export function ProfileSettingsSheet({
   }
 
   function openNotifications() {
+    dismissSettingsKeyboard();
     setNotificationsOpen(true);
     setNotificationsLoading(true);
     void api
@@ -753,6 +753,7 @@ export function ProfileSettingsSheet({
                     accessibilityRole="button"
                     key={row.label}
                     onPress={() => {
+                      dismissSettingsKeyboard();
                       if (row.onPress) row.onPress();
                       else if (row.field) beginEdit(row.field);
                     }}
@@ -902,10 +903,13 @@ export function ProfileSettingsSheet({
                 />
               ) : (
                 <ScrollView
+                  testID="notification-settings-scroll"
                   contentContainerStyle={[
                     styles.notificationSettings,
                     { paddingBottom: responsiveSize(30) + insets.bottom },
                   ]}
+                  keyboardDismissMode="on-drag"
+                  onScrollBeginDrag={() => Keyboard.dismiss()}
                 >
                   <NotificationSetting
                     label="Enable notifications"
@@ -1408,7 +1412,7 @@ export function ProfileSettingsSheet({
 
       <SideSlideScreen
         onRequestClose={() => {
-          dismissPlaceKeyboard();
+          dismissSettingsKeyboard();
           setPlaceOpen(false);
         }}
         ref={placeSlide}
@@ -1426,7 +1430,7 @@ export function ProfileSettingsSheet({
           >
             <Pressable
               onPress={() => {
-                dismissPlaceKeyboard();
+                dismissSettingsKeyboard();
                 placeSlide.current?.close();
               }}
               style={styles.headerButton}

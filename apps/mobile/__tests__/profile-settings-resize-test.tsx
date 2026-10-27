@@ -213,6 +213,7 @@ it('enforces the 30-character username limit before saving', async () => {
 });
 
 it('opens the Figma account security and privacy destinations', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
   await render(
     <ProfileSettingsSheet
       fallbackName="Test User"
@@ -232,9 +233,33 @@ it('opens the Figma account security and privacy destinations', async () => {
   expect(screen.getByText('tester@example.com')).toBeTruthy();
 
   await fireEvent.press(screen.getByLabelText('Edit Privacy'));
+  expect(dismiss).toHaveBeenCalled();
   expect(screen.getByTestId('privacy-settings-pane')).toBeTruthy();
   expect(screen.getByText('Private account')).toBeTruthy();
   expect(screen.getByText('Blocked accounts')).toBeTruthy();
+});
+
+it('dismisses the keyboard before notifications and while scrolling them', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getAllByText('Notifications')[0]);
+  expect(dismiss).toHaveBeenCalled();
+
+  const scroll = await screen.findByTestId('notification-settings-scroll');
+  expect(scroll.props.keyboardDismissMode).toBe('on-drag');
+  const dismissCountBeforeDrag = dismiss.mock.calls.length;
+  fireEvent(scroll, 'scrollBeginDrag');
+  expect(dismiss).toHaveBeenCalledTimes(dismissCountBeforeDrag + 1);
 });
 
 it('suppresses the native iOS password accessory over change-password fields', async () => {

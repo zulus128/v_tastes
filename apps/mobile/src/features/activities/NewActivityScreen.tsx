@@ -97,8 +97,9 @@ export function NewActivityScreen({
   userId: string;
 }) {
   const { colors, isDark } = useAppTheme();
+  const activityAccent = isDark ? colors.primary : '#F23B4C';
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const api = useTastesApi();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [startsAt, setStartsAt] = useState(initialStart);
@@ -223,8 +224,11 @@ export function NewActivityScreen({
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={[styles.navigation, { paddingTop: insets.top }]}>
+    <View style={styles.screen} testID="new-activity-screen">
+      <View
+        style={[styles.navigation, { paddingTop: insets.top }]}
+        testID="new-activity-navigation"
+      >
         <Pressable
           accessibilityLabel="Back"
           onPress={onBack}
@@ -237,6 +241,7 @@ export function NewActivityScreen({
             />
           ) : (
             <ActivityBackLightIcon
+              color={colors.text}
               height={responsiveSize(24)}
               width={responsiveSize(24)}
             />
@@ -299,7 +304,7 @@ export function NewActivityScreen({
 
           <View style={styles.divider} />
           <Text style={styles.sectionLabel}>TIME</Text>
-          <View style={styles.calendar}>
+          <View style={styles.calendar} testID="new-activity-calendar">
             <View style={styles.calendarHeader}>
               <Text style={styles.month}>
                 {month.toLocaleDateString(undefined, {
@@ -322,6 +327,7 @@ export function NewActivityScreen({
                     />
                   ) : (
                     <ActivityBackLightIcon
+                      color={activityAccent}
                       height={responsiveSize(24)}
                       width={responsiveSize(24)}
                     />
@@ -342,6 +348,7 @@ export function NewActivityScreen({
                     />
                   ) : (
                     <ActivityBackLightIcon
+                      color={activityAccent}
                       height={responsiveSize(24)}
                       style={styles.chevronRight}
                       width={responsiveSize(24)}
@@ -457,6 +464,7 @@ export function NewActivityScreen({
               />
             ) : (
               <ActivityAddLightIcon
+                color={activityAccent}
                 height={responsiveSize(24)}
                 width={responsiveSize(24)}
               />
@@ -478,6 +486,7 @@ export function NewActivityScreen({
             styles.createButton,
             (!valid || submitting) && styles.disabled,
           ]}
+          testID="new-activity-submit"
         >
           {submitting ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -1179,7 +1188,9 @@ function TimeSelector({
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, isDark: boolean) {
+  const activityPrimary = isDark ? colors.primary : '#F23B4C';
+  const activityPrimaryRing = isDark ? colors.primaryBorder : '#FBD0D3';
   return responsiveStyleSheet({
     screen: { flex: 1, backgroundColor: colors.canvas },
     navigation: {
@@ -1190,7 +1201,7 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 12,
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
-      backgroundColor: colors.background,
+      backgroundColor: isDark ? colors.background : colors.surface,
     },
     navButton: {
       width: 44,
@@ -1218,7 +1229,7 @@ function createStyles(colors: ThemeColors) {
       height: 45,
       marginHorizontal: 16,
       borderWidth: 1,
-      borderColor: colors.primary,
+      borderColor: activityPrimary,
       borderStyle: 'dashed',
       borderRadius: 24,
       alignItems: 'center',
@@ -1260,7 +1271,7 @@ function createStyles(colors: ThemeColors) {
       marginHorizontal: 16,
       padding: 12,
       borderRadius: 13,
-      backgroundColor: colors.background,
+      backgroundColor: isDark ? colors.background : colors.surface,
     },
     calendarHeader: {
       flexDirection: 'row',
@@ -1290,10 +1301,12 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    daySelected: { backgroundColor: colors.primaryBorder },
+    daySelected: {
+      backgroundColor: isDark ? colors.primaryBorder : 'rgba(242,59,76,0.14)',
+    },
     dayText: { color: colors.text, fontSize: 15 },
     dayPast: { color: colors.textMuted, opacity: 0.35 },
-    daySelectedText: { color: colors.primary, fontWeight: '700' },
+    daySelectedText: { color: activityPrimary, fontWeight: '700' },
     timeRow: {
       marginTop: 5,
       paddingTop: 13,
@@ -1308,7 +1321,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 20,
-      backgroundColor: colors.surfaceRaised,
+      backgroundColor: isDark ? colors.surfaceRaised : '#EFEFEF',
     },
     timeValue: { color: colors.text, fontSize: 16 },
     memberRow: {
@@ -1341,7 +1354,7 @@ function createStyles(colors: ThemeColors) {
       marginLeft: 16,
       marginTop: 5,
       borderWidth: 1,
-      borderColor: colors.primary,
+      borderColor: activityPrimary,
       borderStyle: 'dashed',
       borderRadius: 22,
       alignItems: 'center',
@@ -1359,11 +1372,11 @@ function createStyles(colors: ThemeColors) {
     createButton: {
       height: 54,
       borderWidth: 5,
-      borderColor: colors.primaryBorder,
+      borderColor: activityPrimaryRing,
       borderRadius: 27,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
+      backgroundColor: activityPrimary,
     },
     createText: {
       color: '#FFFFFF',
