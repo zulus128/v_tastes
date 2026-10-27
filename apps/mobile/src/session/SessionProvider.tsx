@@ -37,7 +37,10 @@ import {
   unregisterPushNotifications,
 } from '../infrastructure/pushNotifications';
 import { queryClient, queryPersister } from '../infrastructure/query';
-import { authenticatedPhase } from './model';
+import {
+  authenticatedPhase,
+  shouldClearSessionAfterTokenRefresh,
+} from './model';
 
 export type SessionState =
   | { status: 'booting'; user: null }
@@ -428,8 +431,13 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // back to the phone screen; a genuine expired/revoked session fails this
       // forced refresh and is cleared below.
       await currentUser.getIdToken(true);
-    } catch {
-      await clearLocalSession();
+    } catch (error) {
+      // Network and App Check failures can occur while an OTA restarts the JS
+      // runtime. They do not invalidate Firebase Auth and must never erase the
+      // persisted user. Only Firebase's terminal token errors justify sign-out.
+      if (shouldClearSessionAfterTokenRefresh(error)) {
+        await clearLocalSession();
+      }
     }
   }, [clearLocalSession]);
 
