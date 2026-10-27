@@ -1115,12 +1115,14 @@ export function ProfileSettingsSheet({
                 <Text style={styles.title}>City</Text>
                 <View style={styles.headerButton} />
               </View>
-              <CityPicker
-                initialSearch={profile?.city ?? ''}
-                onCustomSelect={(name) => void save({ city: name })}
-                onSelect={(name) => void save({ city: name })}
-                topPadding={24}
-              />
+              {cityOpen ? (
+                <CityPicker
+                  initialSearch={profile?.city ?? ''}
+                  onCustomSelect={(name) => void save({ city: name })}
+                  onSelect={(name) => void save({ city: name })}
+                  topPadding={24}
+                />
+              ) : null}
             </ImageBackground>
           </Animated.View>
           <Animated.View

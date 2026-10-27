@@ -333,6 +333,25 @@ it('offers to save a city typed outside the suggested city list', async () => {
   expect(screen.getByText('Use this city')).toBeTruthy();
 });
 
+it('does not mount the auto-focused city search when settings first opens', async () => {
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  expect(screen.queryByPlaceholderText('Search')).toBeNull();
+
+  await fireEvent.press(screen.getByLabelText('Edit City'));
+
+  expect(screen.getByPlaceholderText('Search').props.autoFocus).toBe(true);
+});
+
 it('applies an appearance change after the settings pane closes', async () => {
   const animations: Array<{
     finish?: (result: { finished: boolean }) => void;
