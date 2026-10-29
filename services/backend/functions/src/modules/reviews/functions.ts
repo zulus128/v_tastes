@@ -52,14 +52,21 @@ export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getFeedInputSchema, request.data);
   const cursor = decodeCursor(input.cursor);
-  const hiddenReviews = await db
-    .collection('users')
-    .doc(uid)
-    .collection('hiddenReviews')
-    .get();
+  const [hiddenReviews, blockedUsers, blockedByUsers] = await Promise.all([
+    db.collection('users').doc(uid).collection('hiddenReviews').get(),
+    db.collection('users').doc(uid).collection('blocked').get(),
+    db.collectionGroup('blocked').where('userId', '==', uid).get(),
+  ]);
   const hiddenReviewIds = new Set(
     hiddenReviews.docs.map((document) => document.id),
   );
+  const blockedUserIds = new Set([
+    ...blockedUsers.docs.map((document) => document.id),
+    ...blockedByUsers.docs.flatMap((document) => {
+      const owner = document.ref.parent.parent;
+      return owner ? [owner.id] : [];
+    }),
+  ]);
   const applyCursor = (query: Query): Query =>
     cursor
       ? query.startAfter(
@@ -124,7 +131,9 @@ export const getFeed = onCall(callableOptions, async (request) => {
   }
 
   const visibleCandidates = candidates.filter(
-    (document) => !hiddenReviewIds.has(document.id),
+    (document) =>
+      !hiddenReviewIds.has(document.id) &&
+      !blockedUserIds.has(String(document.get('authorId') ?? '')),
   );
   const pageDocs = visibleCandidates.slice(0, input.limit);
   const last = pageDocs.at(-1);

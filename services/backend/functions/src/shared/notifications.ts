@@ -39,16 +39,27 @@ export function notificationDocumentId(request: NotificationRequest): string {
     .digest('hex');
 }
 
-export function notificationPreferences(profile: DocumentSnapshot | undefined): NotificationPreferences {
+export function notificationPreferences(
+  profile: DocumentSnapshot | undefined,
+): NotificationPreferences {
   const stored = profile?.get('notificationPreferences');
-  if (!stored || typeof stored !== 'object') return defaultNotificationPreferences;
+  if (!stored || typeof stored !== 'object')
+    return defaultNotificationPreferences;
   const value = stored as Partial<NotificationPreferences>;
+  const storedCategories = (value.categories ?? {}) as Record<string, boolean>;
+  const migratedRewards =
+    typeof storedCategories.rewards === 'boolean'
+      ? storedCategories.rewards
+      : storedCategories.badges;
   return {
     ...defaultNotificationPreferences,
     ...value,
     categories: {
       ...defaultNotificationPreferences.categories,
-      ...(value.categories ?? {}),
+      ...storedCategories,
+      ...(typeof migratedRewards === 'boolean'
+        ? { rewards: migratedRewards }
+        : {}),
     },
   };
 }
@@ -87,18 +98,32 @@ function notificationReference(request: NotificationRequest) {
 }
 
 /** Queues a notification inside an existing transaction. Never notifies the actor about their own action. */
-export function queueNotification(transaction: Transaction, request: NotificationRequest): void {
+export function queueNotification(
+  transaction: Transaction,
+  request: NotificationRequest,
+): void {
   if (!request.recipientId || request.recipientId === request.actorId) return;
-  transaction.set(notificationReference(request), notificationDocument(request), { merge: true });
+  transaction.set(
+    notificationReference(request),
+    notificationDocument(request),
+    { merge: true },
+  );
 }
 
-export function queueNotificationInBatch(batch: WriteBatch, request: NotificationRequest): void {
+export function queueNotificationInBatch(
+  batch: WriteBatch,
+  request: NotificationRequest,
+): void {
   if (!request.recipientId || request.recipientId === request.actorId) return;
-  batch.set(notificationReference(request), notificationDocument(request), { merge: true });
+  batch.set(notificationReference(request), notificationDocument(request), {
+    merge: true,
+  });
 }
 
 /** Sends a single notification outside a transaction. Failures never break the caller. */
-export async function sendNotification(request: NotificationRequest): Promise<void> {
+export async function sendNotification(
+  request: NotificationRequest,
+): Promise<void> {
   if (!request.recipientId || request.recipientId === request.actorId) return;
   try {
     const reference = notificationReference(request);
@@ -109,30 +134,48 @@ export async function sendNotification(request: NotificationRequest): Promise<vo
     await reference.create(notificationDocument(request));
   } catch (error) {
     if ((error as { code?: unknown }).code === 6) return;
-    console.warn(`Unable to store the ${request.type} notification for ${request.recipientId}.`, error);
+    console.warn(
+      `Unable to store the ${request.type} notification for ${request.recipientId}.`,
+      error,
+    );
   }
 }
 
 /** Fans a notification out to many recipients in chunked batches. */
-export async function sendNotifications(requests: NotificationRequest[]): Promise<number> {
+export async function sendNotifications(
+  requests: NotificationRequest[],
+): Promise<number> {
   const pending = requests
-    .filter((request) => request.recipientId && request.recipientId !== request.actorId)
+    .filter(
+      (request) =>
+        request.recipientId && request.recipientId !== request.actorId,
+    )
     .slice(0, NOTIFICATION_FAN_OUT_LIMIT);
   let written = 0;
   for (let index = 0; index < pending.length; index += BATCH_WRITE_LIMIT) {
     const chunk = pending.slice(index, index + BATCH_WRITE_LIMIT);
     const references = chunk.map(notificationReference);
     const existing = await db.getAll(...references);
-    const missing = chunk.filter((_, chunkIndex) => !existing[chunkIndex]?.exists);
+    const missing = chunk.filter(
+      (_, chunkIndex) => !existing[chunkIndex]?.exists,
+    );
     if (missing.length === 0) continue;
     const batch = db.batch();
-    missing.forEach((request) => batch.create(notificationReference(request), notificationDocument(request)));
+    missing.forEach((request) =>
+      batch.create(
+        notificationReference(request),
+        notificationDocument(request),
+      ),
+    );
     try {
       await batch.commit();
       written += missing.length;
     } catch (error) {
       if ((error as { code?: unknown }).code !== 6) {
-        console.warn(`Unable to fan out ${missing.length} ${missing[0]?.type} notifications.`, error);
+        console.warn(
+          `Unable to fan out ${missing.length} ${missing[0]?.type} notifications.`,
+          error,
+        );
       }
     }
   }
@@ -150,7 +193,15 @@ export async function notificationAllowed(
 }
 
 /** Recipients that follow the given user, capped at the fan-out limit. */
-export async function followerIds(userId: string, limit = NOTIFICATION_FAN_OUT_LIMIT): Promise<string[]> {
-  const followers = await db.collection('users').doc(userId).collection('followers').limit(limit).get();
+export async function followerIds(
+  userId: string,
+  limit = NOTIFICATION_FAN_OUT_LIMIT,
+): Promise<string[]> {
+  const followers = await db
+    .collection('users')
+    .doc(userId)
+    .collection('followers')
+    .limit(limit)
+    .get();
   return followers.docs.map((follower) => follower.id);
 }

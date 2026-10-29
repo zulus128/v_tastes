@@ -267,7 +267,7 @@ export const notificationCatalog: Record<
   'friend-review': {
     type: 'friend-review',
     group: 'friendsActivity',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'comment',
     targetType: 'review',
@@ -277,7 +277,7 @@ export const notificationCatalog: Record<
   'saved-place-review': {
     type: 'saved-place-review',
     group: 'friendsActivity',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'comment',
     targetType: 'review',
@@ -287,7 +287,7 @@ export const notificationCatalog: Record<
   'city-first-review': {
     type: 'city-first-review',
     group: 'friendsActivity',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'comment',
     targetType: 'place',

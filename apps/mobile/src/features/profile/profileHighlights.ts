@@ -1,4 +1,8 @@
-import type { FeedItem, Venue } from '@tastes/contracts';
+import type {
+  FeedItem,
+  ProfileReviewHighlights,
+  Venue,
+} from '@tastes/contracts';
 import type { ProfileData } from './api';
 
 export type TasteHighlight = {
@@ -60,11 +64,13 @@ export function buildTasteHighlights({
   favoritePlaceName,
   profile,
   reviews,
+  summary,
   venues,
 }: {
   favoritePlaceName: string | null;
   profile: ProfileData;
   reviews: readonly FeedItem[];
+  summary?: ProfileReviewHighlights | null;
   venues: readonly Venue[];
 }): TasteHighlight[] {
   const venuesById = new Map(venues.map((venue) => [venue.id, venue]));
@@ -75,8 +81,14 @@ export function buildTasteHighlights({
       ? [category]
       : [];
   });
-  const topCuisine = mostCommon(cuisines);
-  const topVibe = mostCommon(reviews.flatMap((review) => review.tags));
+  const fallbackCuisine = mostCommon(cuisines);
+  const fallbackVibe = mostCommon(reviews.flatMap((review) => review.tags));
+  const topCuisine = summary?.topCuisine
+    ? ([summary.topCuisine, summary.topCuisineCount] as const)
+    : fallbackCuisine;
+  const topVibe = summary?.topVibe
+    ? ([summary.topVibe, summary.topVibeCount] as const)
+    : fallbackVibe;
   const cuisineValue =
     topCuisine?.[0] ?? profile.favoriteCuisines[0] ?? 'Not set';
   const vibeValue = topVibe?.[0] ?? 'Not set';

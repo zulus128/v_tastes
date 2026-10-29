@@ -35,7 +35,11 @@ import {
   sendNotification,
   sendNotifications,
 } from '../../shared/notifications';
-import { levelForXp } from '../../shared/rewards';
+import {
+  computeRewards,
+  levelForXp,
+  storedRewardProgress,
+} from '../../shared/rewards';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { enforceRateLimit } from '../../shared/mutations';
@@ -100,7 +104,10 @@ export const listNotifications = onCall(
         actorName: doc.get('actorName') ?? null,
         actorPhotoUrl:
           (actorId ? actorPhotoById.get(String(actorId)) : null) ?? null,
-        targetType: doc.get('targetType') ?? definition?.targetType ?? null,
+        targetType:
+          doc.get('targetType') === 'rewards'
+            ? 'leaderboard'
+            : (doc.get('targetType') ?? definition?.targetType ?? null),
         targetId: doc.get('targetId') ?? null,
         unread: doc.get('unread') !== false,
         createdAt: timestampToIso(doc.get('createdAt')),
@@ -723,25 +730,97 @@ export const getProfileExtras = onCall(
     const profileId = input.targetUserId ?? viewerId;
     const userRef = db.collection('users').doc(profileId);
     const viewerRef = db.collection('users').doc(viewerId);
-    const [profile, followers, following, viewerFollowingProfile, blocked] =
-      await Promise.all([
-        userRef.get(),
-        userRef.collection('followers').limit(100).get(),
-        userRef.collection('following').limit(100).get(),
-        viewerRef.collection('following').doc(profileId).get(),
-        db
-          .collection('users')
-          .doc(viewerId)
-          .collection('blocked')
-          .doc(profileId)
-          .get(),
-      ]);
+    const [
+      profile,
+      followers,
+      following,
+      viewerFollowingProfile,
+      blocked,
+      blockedByProfile,
+    ] = await Promise.all([
+      userRef.get(),
+      userRef.collection('followers').limit(100).get(),
+      userRef.collection('following').limit(100).get(),
+      viewerRef.collection('following').doc(profileId).get(),
+      viewerRef.collection('blocked').doc(profileId).get(),
+      userRef.collection('blocked').doc(viewerId).get(),
+    ]);
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError(
         'failed-precondition',
         'An active user profile is required.',
       );
     }
+    if (profileId !== viewerId && blockedByProfile.exists) {
+      throw new HttpsError(
+        'permission-denied',
+        'This profile is unavailable.',
+        {
+          reason: 'user-blocked',
+        },
+      );
+    }
+    const storedRewards =
+      profile.get('rewardProgressDirty') === true
+        ? null
+        : storedRewardProgress(profile.get('rewardProgress'));
+    const rewards = storedRewards ?? (await computeRewards(profileId));
+    const reviewSnapshot = await db
+      .collection('reviews')
+      .where('authorId', '==', profileId)
+      .where('status', '==', 'published')
+      .limit(500)
+      .get();
+    const venueIds = [
+      ...new Set(
+        reviewSnapshot.docs
+          .map((review) => String(review.get('venueId') ?? ''))
+          .filter(Boolean),
+      ),
+    ];
+    const venueSnapshots = venueIds.length
+      ? await db.getAll(
+          ...venueIds.map((venueId) => db.collection('venues').doc(venueId)),
+        )
+      : [];
+    const venueCategories = new Map(
+      venueSnapshots.map((venue) => [
+        venue.id,
+        String(venue.get('category') ?? '').trim(),
+      ]),
+    );
+    const mostCommon = (values: string[]) => {
+      const counts = new Map<string, number>();
+      values
+        .filter(Boolean)
+        .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+      return (
+        [...counts].sort(
+          (left, right) =>
+            right[1] - left[1] || left[0].localeCompare(right[0]),
+        )[0] ?? null
+      );
+    };
+    const genericCategories = new Set(['bar', 'cafe', 'coffee', 'restaurant']);
+    const topCuisine = mostCommon(
+      reviewSnapshot.docs.flatMap((review) => {
+        const category = venueCategories.get(
+          String(review.get('venueId') ?? ''),
+        );
+        return category && !genericCategories.has(category.toLocaleLowerCase())
+          ? [category]
+          : [];
+      }),
+    );
+    const topVibe = mostCommon(
+      reviewSnapshot.docs.flatMap((review) =>
+        Array.isArray(review.get('tags'))
+          ? (review.get('tags') as unknown[]).filter(
+              (value): value is string => typeof value === 'string',
+            )
+          : [],
+      ),
+    );
     const followerProfiles = followers.size
       ? await db.getAll(
           ...followers.docs.map((document) =>
@@ -803,6 +882,13 @@ export const getProfileExtras = onCall(
       })),
       level: levelForXp(xp),
       xp,
+      rewards,
+      reviewHighlights: {
+        topCuisine: topCuisine?.[0] ?? null,
+        topCuisineCount: topCuisine?.[1] ?? 0,
+        topVibe: topVibe?.[0] ?? null,
+        topVibeCount: topVibe?.[1] ?? 0,
+      },
       notificationPreferences: notificationPreferences(profile),
     };
   },

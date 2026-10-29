@@ -174,9 +174,15 @@ export function ProfileMapSheet({
                 <View style={styles.emptyIcon}>
                   <EmptyMapIcon />
                 </View>
-                <Text style={styles.emptyTitle}>No places on your map yet</Text>
+                <Text style={styles.emptyTitle}>
+                  {placeCount > 0
+                    ? 'Locations unavailable'
+                    : 'No places on your map yet'}
+                </Text>
                 <Text style={styles.emptyCopy}>
-                  Places you review or save show up here.
+                  {placeCount > 0
+                    ? 'Your reviews are available, but these places do not have map coordinates yet.'
+                    : 'Places you review or save show up here.'}
                 </Text>
               </View>
             )}

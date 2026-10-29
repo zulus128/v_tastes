@@ -1,5 +1,10 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import type { FeedItem, ReportReason, Venue } from '@tastes/contracts';
+import type {
+  FeedItem,
+  ProfileReviewHighlights,
+  ReportReason,
+  Venue,
+} from '@tastes/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -265,6 +270,8 @@ export function ProfileScreen({
   const [extra, setExtra] = useState<ProfileExtra>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [reviewHighlights, setReviewHighlights] =
+    useState<ProfileReviewHighlights | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [blockPending, setBlockPending] = useState(false);
   const [blockConfirmation, setBlockConfirmation] = useState<boolean | null>(
@@ -357,20 +364,24 @@ export function ProfileScreen({
     [initialFollowing, targetUserId],
   );
   useEffect(() => {
-    if (own) {
-      setBlocked(false);
-      return;
-    }
     let active = true;
     void api
-      .getProfileExtras({ targetUserId })
+      .getProfileExtras(own ? {} : { targetUserId })
       .then((result) => {
         if (!active) return;
+        setReviewHighlights(result.data.reviewHighlights);
+        if (own) {
+          setBlocked(false);
+          return;
+        }
         setBlocked(result.data.blocked);
         setFollowing(result.data.viewerFollowing);
       })
       .catch(() => {
-        if (active) setBlocked(false);
+        if (active) {
+          setBlocked(false);
+          setReviewHighlights(null);
+        }
       });
     return () => {
       active = false;
@@ -764,6 +775,7 @@ export function ProfileScreen({
     favoritePlaceName,
     profile: displayedProfile,
     reviews: profileReviews.reviews,
+    summary: reviewHighlights,
     venues: mapVenues,
   });
   const mapPlaces = profileReviews.reviews

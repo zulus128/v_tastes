@@ -14,8 +14,17 @@ service cloud.firestore {
       return signedIn() && request.auth.token.role in ['moderator', 'admin'];
     }
 
+    function isBlockedPair(otherUid) {
+      return signedIn()
+        && otherUid != request.auth.uid
+        && (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)/blocked/$(otherUid))
+          || exists(/databases/$(database)/documents/users/$(otherUid)/blocked/$(request.auth.uid))
+        );
+    }
+
     match /users/{uid} {
-      allow read: if signedIn();
+      allow read: if signedIn() && !isBlockedPair(uid);
       allow write: if false;
 
       match /folders/{folderId} {
@@ -45,7 +54,8 @@ service cloud.firestore {
 
     match /reviews/{reviewId} {
       allow read: if signedIn()
-        && (resource.data.status == 'published' || resource.data.authorId == request.auth.uid || isStaff());
+        && (resource.data.status == 'published' || resource.data.authorId == request.auth.uid || isStaff())
+        && (isStaff() || !isBlockedPair(resource.data.authorId));
       allow write: if false;
 
       match /comments/{commentId} {

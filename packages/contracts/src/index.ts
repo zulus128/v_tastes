@@ -890,12 +890,26 @@ export interface TastesGroup {
   pendingMembers: GroupMember[];
   createdAt: string;
 }
+export interface RewardProgress {
+  id: string;
+  name: string;
+  description: string;
+  progress: number;
+  completed: boolean;
+  xp: number;
+}
 export interface ProfileConnection {
   userId: string;
   displayName: string;
   username: string | null;
   photoUrl: string | null;
   following: boolean;
+}
+export interface ProfileReviewHighlights {
+  topCuisine: string | null;
+  topCuisineCount: number;
+  topVibe: string | null;
+  topVibeCount: number;
 }
 export interface ProfileExtrasResult {
   blocked: boolean;
@@ -904,6 +918,9 @@ export interface ProfileExtrasResult {
   following: ProfileConnection[];
   level: number;
   xp: number;
+  /** @deprecated Kept for installed clients during the compatibility window. */
+  rewards?: RewardProgress[];
+  reviewHighlights?: ProfileReviewHighlights;
   notificationPreferences: NotificationPreferences;
 }
 
