@@ -1381,7 +1381,11 @@ export function PostSignupOnboardingFlow({
         accuracy: Location.Accuracy.Balanced,
       });
       const [address] = await Location.reverseGeocodeAsync(position.coords);
-      if (address?.city) setCity(address.city);
+      const resolvedCity = address?.city?.trim();
+      if (resolvedCity) {
+        setCity(resolvedCity);
+        await api.updateProfileSettings({ city: resolvedCity });
+      }
       if (address?.isoCountryCode) {
         const flag = countryFlags[address.isoCountryCode.toUpperCase()];
         if (flag) setCityFlag(flag);
