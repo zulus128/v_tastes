@@ -89,6 +89,15 @@ function useActivityChatDetails(
               (value): value is string => typeof value === 'string',
             )
           : [];
+        const invitationStatuses =
+          data.invitationStatuses && typeof data.invitationStatuses === 'object'
+            ? (data.invitationStatuses as Record<string, unknown>)
+            : {};
+        const organizerId =
+          typeof data.organizerId === 'string' ? data.organizerId : '';
+        const acceptedParticipantIds = participantIds.filter(
+          (id) => id === organizerId || invitationStatuses[id] === 'accepted',
+        );
         const venueId = typeof data.venueId === 'string' ? data.venueId : '';
         const startsAt =
           data.startsAt && typeof data.startsAt.toDate === 'function'
@@ -100,36 +109,55 @@ function useActivityChatDetails(
           venueId
             ? getDoc(doc(firestore, 'venues', venueId))
             : Promise.resolve(null),
-          ...participantIds.map((id) => getDoc(doc(firestore, 'users', id))),
-        ]).then(([venue, ...profiles]) => {
-          if (!active) return;
-          const venueData = venue?.data();
-          setDetails({
-            address:
-              typeof venueData?.address === 'string'
-                ? venueData.address
-                : typeof venueData?.city === 'string'
-                  ? venueData.city
-                  : '',
-            imageUrl:
-              typeof venueData?.imageUrl === 'string'
-                ? venueData.imageUrl
-                : typeof data.imageUrl === 'string'
-                  ? data.imageUrl
-                  : null,
-            members: new Map(
-              participantIds.map((id, index) => [
-                id,
-                memberFromProfile(id, profiles[index]?.data()),
-              ]),
-            ),
-            startsAt,
-            title:
-              typeof venueData?.name === 'string'
-                ? venueData.name
-                : String(data.venueName ?? 'Activity'),
+          ...acceptedParticipantIds.map((id) =>
+            getDoc(doc(firestore, 'users', id)),
+          ),
+        ])
+          .then(([venue, ...profiles]) => {
+            if (!active) return;
+            const venueData = venue?.data();
+            setDetails({
+              address:
+                typeof venueData?.address === 'string'
+                  ? venueData.address
+                  : typeof venueData?.city === 'string'
+                    ? venueData.city
+                    : '',
+              imageUrl:
+                typeof venueData?.imageUrl === 'string'
+                  ? venueData.imageUrl
+                  : typeof data.imageUrl === 'string'
+                    ? data.imageUrl
+                    : null,
+              members: new Map(
+                acceptedParticipantIds.map((id, index) => [
+                  id,
+                  memberFromProfile(id, profiles[index]?.data()),
+                ]),
+              ),
+              startsAt,
+              title:
+                typeof venueData?.name === 'string'
+                  ? venueData.name
+                  : String(data.venueName ?? 'Activity'),
+            });
+          })
+          .catch(() => {
+            if (!active) return;
+            setDetails({
+              address: '',
+              imageUrl:
+                typeof data.imageUrl === 'string' ? data.imageUrl : null,
+              members: new Map(
+                acceptedParticipantIds.map((id) => [
+                  id,
+                  memberFromProfile(id, undefined),
+                ]),
+              ),
+              startsAt,
+              title: String(data.venueName ?? 'Activity'),
+            });
           });
-        });
       },
     );
     return () => {
@@ -428,8 +456,8 @@ export function ChatScreen({
         Animated.timing(keyboardOffset, {
           duration: event.duration || 250,
           easing: keyboardEasing(event),
-          toValue: -overlap,
-          useNativeDriver: true,
+          toValue: overlap,
+          useNativeDriver: false,
         }).start();
         if (overlap > 0)
           requestAnimationFrame(() =>
@@ -732,9 +760,7 @@ export function ChatScreen({
       <Animated.View
         style={[
           styles.chatBody,
-          Platform.OS === 'ios' && {
-            transform: [{ translateY: keyboardOffset }],
-          },
+          Platform.OS === 'ios' && { paddingBottom: keyboardOffset },
         ]}
       >
         {activity && activityDetails ? (

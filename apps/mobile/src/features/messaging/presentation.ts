@@ -42,7 +42,7 @@ export function activitySchedule(startsAt: string | null): string | null {
     hour: 'numeric',
     minute: '2-digit',
   });
-  return `Dinner · ${weekday}, ${time}`;
+  return `${weekday}, ${time}`;
 }
 
 export function activitySubtitle(

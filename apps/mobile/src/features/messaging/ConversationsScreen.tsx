@@ -439,6 +439,11 @@ export function ConversationsScreen({
   const [pinnedOverrides, setPinnedOverrides] = useState<
     Record<string, boolean>
   >({});
+  const [sortNow, setSortNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setSortNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   // This only feeds the badge count next to the Requests button, and the
   // inbox stays mounted behind other screens (e.g. an open chat), so a
   // transient failure here must fail quietly rather than interrupt whatever
@@ -481,8 +486,8 @@ export function ConversationsScreen({
         ...conversation,
         pinned: pinnedOverrides[conversation.id] ?? conversation.pinned,
       }))
-      .sort((left, right) => compareConversations(left, right));
-  }, [conversationHistory.data?.pages, inbox.data, pinnedOverrides]);
+      .sort((left, right) => compareConversations(left, right, sortNow));
+  }, [conversationHistory.data?.pages, inbox.data, pinnedOverrides, sortNow]);
   const pendingInvitation = inboxItems.find(
     (conversation) =>
       conversation.kind === 'activity' &&
