@@ -899,6 +899,7 @@ export interface ProfileConnection {
 }
 export interface ProfileExtrasResult {
   blocked: boolean;
+  viewerFollowing: boolean;
   followers: ProfileConnection[];
   following: ProfileConnection[];
   level: number;

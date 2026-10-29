@@ -49,6 +49,7 @@ describe('notification catalog', () => {
     expect(allowsNotification(preferences, 'review-like', 'push')).toBe(false);
     expect(allowsNotification(preferences, 'review-like', 'inApp')).toBe(true);
     expect(allowsNotification(preferences, 'follow-new', 'push')).toBe(true);
+    expect(allowsNotification(preferences, 'level-up', 'push')).toBe(true);
   });
 
   it('always delivers moderation and account notifications', () => {

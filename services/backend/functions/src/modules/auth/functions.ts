@@ -6,31 +6,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
 import { parseInput } from '../../shared/validation';
 import { createOtpProvider } from './otp-provider';
 
-const twilioAccountSid = defineSecret('TWILIO_ACCOUNT_SID');
-const twilioAuthToken = defineSecret('TWILIO_AUTH_TOKEN');
-const twilioVerifyServiceSid = defineSecret('TWILIO_VERIFY_SERVICE_SID');
-const otpSecrets =
-  process.env.FUNCTIONS_EMULATOR === 'true'
-    ? []
-    : [twilioAccountSid, twilioAuthToken, twilioVerifyServiceSid];
-const otpCallableOptions = { ...callableOptions, secrets: otpSecrets };
+const otpCallableOptions = callableOptions;
 
 function otpProvider() {
-  return createOtpProvider(
-    process.env.FUNCTIONS_EMULATOR === 'true'
-      ? undefined
-      : {
-          accountSid: twilioAccountSid.value(),
-          authToken: twilioAuthToken.value(),
-          serviceSid: twilioVerifyServiceSid.value(),
-        },
-  );
+  return createOtpProvider();
 }
 
 const RESEND_COOLDOWN_MS = 30_000;

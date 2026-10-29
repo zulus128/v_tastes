@@ -10,6 +10,36 @@ import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 let testEnvironment: RulesTestEnvironment;
 const projectId = process.env.TEST_PROJECT_ID ?? 'demo-tastes';
 
+async function seedConversation(
+  conversationId: string,
+  participantIds: string[],
+) {
+  const host = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8181';
+  const response = await fetch(
+    `http://${host}/v1/projects/${projectId}/databases/tastes-eu/documents/conversations/${conversationId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        authorization: 'Bearer owner',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        fields: {
+          status: { stringValue: 'active' },
+          participantIds: {
+            arrayValue: {
+              values: participantIds.map((value) => ({ stringValue: value })),
+            },
+          },
+        },
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Could not seed conversation: ${await response.text()}`);
+  }
+}
+
 beforeAll(async () => {
   testEnvironment = await initializeTestEnvironment({
     projectId,
@@ -120,6 +150,33 @@ describe('Storage security rules', () => {
       ownerStorage
         .ref('review-images/user-a/review-command/oversized-image')
         .put(new Uint8Array(1536 * 1024), { contentType: 'image/jpeg' }),
+    );
+  });
+
+  it('limits chat images to active conversation participants and denies listing', async () => {
+    const conversationId = 'private-conversation';
+    const path = `chat-images/user-a/${conversationId}/photo.jpg`;
+    await seedConversation(conversationId, ['user-a', 'user-b']);
+
+    const ownerStorage = testEnvironment
+      .authenticatedContext('user-a')
+      .storage();
+    const participantStorage = testEnvironment
+      .authenticatedContext('user-b')
+      .storage();
+    const outsiderStorage = testEnvironment
+      .authenticatedContext('user-c')
+      .storage();
+
+    await assertSucceeds(
+      ownerStorage
+        .ref(path)
+        .put(new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
+    );
+    await assertSucceeds(participantStorage.ref(path).getDownloadURL());
+    await assertFails(outsiderStorage.ref(path).getDownloadURL());
+    await assertFails(
+      participantStorage.ref(`chat-images/user-a/${conversationId}`).listAll(),
     );
   });
 

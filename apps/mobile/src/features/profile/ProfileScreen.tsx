@@ -32,7 +32,6 @@ import Svg, { Path } from 'react-native-svg';
 import { FavouritesPane } from '../favourites/FavouritesPane';
 import { useToggleFollow } from '../discover/api';
 import { storage } from '../../infrastructure/firebase';
-import { isViewerFollowingProfile } from './profileRelationship';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { captureException } from '../../infrastructure/observability';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
@@ -368,9 +367,7 @@ export function ProfileScreen({
       .then((result) => {
         if (!active) return;
         setBlocked(result.data.blocked);
-        setFollowing(
-          isViewerFollowingProfile(result.data.followers, currentUserId),
-        );
+        setFollowing(result.data.viewerFollowing);
       })
       .catch(() => {
         if (active) setBlocked(false);

@@ -29,9 +29,11 @@ async function sendForUser(
   uid: string,
   kind: TransactionalEmailKind,
   eventId?: string,
-) {
+  allowMissingEmail = false,
+): Promise<boolean> {
   const user = await getAuth().getUser(uid);
   if (!user.email) {
+    if (allowMissingEmail) return false;
     throw new HttpsError(
       'failed-precondition',
       'An email address is required for this action.',
@@ -53,6 +55,7 @@ async function sendForUser(
     to: user.email,
     ...(eventId ? { eventId } : {}),
   });
+  return true;
 }
 
 export const requestAccountEmail = onCall(
@@ -91,11 +94,14 @@ export const sendWelcomeEmail = onDocumentCreated(
 
     const delivery = db.collection('_emailDeliveries').doc(event.id);
     if ((await delivery.get()).exists) return;
-    await sendForUser(event.params.uid, 'welcome', event.id);
+    const sent = await sendForUser(event.params.uid, 'welcome', event.id, true);
     await delivery.set({
       kind: 'welcome',
       uid: event.params.uid,
-      sentAt: FieldValue.serverTimestamp(),
+      status: sent ? 'sent' : 'skipped',
+      ...(sent
+        ? { sentAt: FieldValue.serverTimestamp() }
+        : { skippedReason: 'missing-email' }),
     });
   },
 );

@@ -34,7 +34,7 @@ describe('image upload variants', () => {
     );
   });
 
-  it('resizes, compresses, and uploads an immutable JPEG variant', async () => {
+  it('resizes, compresses, and uploads a revalidating JPEG variant', async () => {
     const actions = [{ resize: { width: 360, height: 360 } }];
 
     await expect(
@@ -55,7 +55,7 @@ describe('image upload variants', () => {
       { fullPath: 'images/thumbnail.jpg' },
       expect.any(Blob),
       {
-        cacheControl: 'public,max-age=31536000,immutable',
+        cacheControl: 'private,max-age=0,must-revalidate',
         contentType: 'image/jpeg',
       },
     );

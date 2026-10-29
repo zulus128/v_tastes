@@ -27,6 +27,15 @@ service firebase.storage {
         && request.auth.token.role == 'admin';
     }
 
+    function isConversationParticipant(conversationId) {
+      let conversation = firestore.get(
+        /databases/tastes-eu/documents/conversations/$(conversationId)
+      );
+      return signedIn()
+        && conversation.data.status == 'active'
+        && request.auth.uid in conversation.data.participantIds;
+    }
+
     match /profile-images/{uid}/{fileName} {
       allow read: if signedIn();
       allow create, update: if signedIn() && request.auth.uid == uid && validProfileImage();
@@ -40,8 +49,11 @@ service firebase.storage {
     }
 
     match /chat-images/{uid}/{conversationId}/{fileName} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && request.auth.uid == uid && validImage();
+      allow get: if isConversationParticipant(conversationId);
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && isConversationParticipant(conversationId)
+        && validImage();
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 

@@ -10,6 +10,14 @@ export const callableOptions = {
   maxInstances: 10,
 } as const;
 
+// This authenticated bootstrap endpoint must remain reachable by an older
+// native build so an OTA can learn that the App Store update is required.
+// Every state-changing mobile callable continues to enforce App Check.
+export const sessionCallableOptions = {
+  ...callableOptions,
+  enforceAppCheck: false,
+} as const;
+
 // The admin console is a separate web client protected by staff claims. It
 // does not yet ship a web App Check provider, so keep its endpoints explicit
 // rather than silently weakening the mobile callable policy.

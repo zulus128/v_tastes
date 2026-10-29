@@ -318,10 +318,10 @@ export function CreateReviewScreen({
   }, [initialVenueId, userId]);
 
   useEffect(() => {
-    if (!initialVenueId || selectedVenue) return;
+    if (!initialVenueId) return;
     setVenueId(initialVenueId);
     setSelectedVenue(null);
-  }, [initialVenueId, selectedVenue]);
+  }, [initialVenueId]);
 
   function reset() {
     setVenueId('');

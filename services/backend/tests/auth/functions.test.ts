@@ -109,7 +109,7 @@ async function expectReason(
     await promise;
   } catch (error) {
     const failure = error as CallableFailure;
-    expect(failure.details?.reason).toBe(reason);
+    expect(failure).toMatchObject({ details: { reason } });
     return failure;
   }
   throw new Error(`Expected callable to fail with reason ${reason}`);
@@ -417,7 +417,7 @@ describe('authenticated session and paginated reads', () => {
       profileExists: false,
       onboardingVersion: 0,
       onboardingComplete: false,
-      minimumSupportedIosBuild: 43,
+      minimumSupportedIosBuild: 49,
     });
     await callFunction(
       'createUserProfile',
@@ -1528,6 +1528,91 @@ describe('messaging callables', () => {
       ).size,
     ).toBe(0);
     expect((await db.collection('_pushTokens').get()).size).toBe(0);
+  }, 15_000);
+
+  it('enforces blocks for follows and direct messages and rejects external images', async () => {
+    const first = await authenticatedUser();
+    const second = await authenticatedUser();
+    const db = getFirestore();
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Blocking User',
+        username: 'blocking.user',
+        city: 'Istanbul',
+      },
+      first.token,
+    );
+    await callFunction(
+      'createUserProfile',
+      {
+        displayName: 'Blocked User',
+        username: 'blocked.user',
+        city: 'Istanbul',
+      },
+      second.token,
+    );
+    const profiles = await db
+      .collection('users')
+      .where('username', 'in', ['blocking.user', 'blocked.user'])
+      .get();
+    const ids = new Map(
+      profiles.docs.map((profile) => [profile.get('username'), profile.id]),
+    );
+    const firstUid = ids.get('blocking.user');
+    const secondUid = ids.get('blocked.user');
+    if (!firstUid || !secondUid) throw new Error('Expected blocking profiles.');
+
+    await callFunction('followUser', { targetUserId: secondUid }, first.token);
+    await callFunction('followUser', { targetUserId: firstUid }, second.token);
+    const conversation = await callFunction<{ id: string }>(
+      'createConversation',
+      { targetUserId: secondUid },
+      first.token,
+    );
+
+    await expectReason(
+      callFunction(
+        'sendMessage',
+        {
+          conversationId: conversation.id,
+          idempotencyKey: 'external-image-message',
+          imageUrl: 'https://tracker.example/pixel.jpg',
+        },
+        first.token,
+      ),
+      'invalid-chat-image',
+    );
+
+    await callFunction(
+      'setUserBlocked',
+      { targetUserId: secondUid, blocked: true },
+      first.token,
+    );
+    await expectReason(
+      callFunction('followUser', { targetUserId: firstUid }, second.token),
+      'user-blocked',
+    );
+    await expectReason(
+      callFunction(
+        'createConversation',
+        { targetUserId: firstUid },
+        second.token,
+      ),
+      'user-blocked',
+    );
+    await expectReason(
+      callFunction(
+        'sendMessage',
+        {
+          conversationId: conversation.id,
+          idempotencyKey: 'blocked-message-attempt',
+          text: 'This must not be delivered.',
+        },
+        second.token,
+      ),
+      'user-blocked',
+    );
   }, 15_000);
 
   it('returns sorted place reviews and geo-aware Tastes AI recommendations', async () => {

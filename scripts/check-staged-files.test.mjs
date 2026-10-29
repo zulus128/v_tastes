@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import { getBlockingReason, shouldSecretlint } from './check-staged-files.mjs';
 
 describe('sensitive-file policy', () => {
@@ -37,6 +38,12 @@ describe('sensitive-file policy', () => {
     );
     expect(getBlockingReason('apps/mobile/google-services.json')).toBeNull();
     expect(shouldSecretlint('apps/mobile/google-services.json')).toBe(false);
+    expect(
+      getBlockingReason(path.resolve('apps/mobile/GoogleService-Info.plist')),
+    ).toBeNull();
+    expect(
+      shouldSecretlint(path.resolve('apps/mobile/google-services.json')),
+    ).toBe(false);
   });
 
   it.each([

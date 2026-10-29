@@ -66,11 +66,14 @@ describe('TwilioVerifyOtpProvider', () => {
     ).resolves.toBe('approved');
   });
 
-  it('rejects production configuration without credentials', () => {
+  it('keeps the fake provider enabled in production until Twilio is activated', async () => {
     vi.stubEnv('FUNCTIONS_EMULATOR', 'false');
     vi.stubEnv('GCLOUD_PROJECT', 'tastes-934e6');
-    expect(() => createOtpProvider()).toThrow(
-      'Twilio Verify credentials are not configured.',
-    );
+    const provider = createOtpProvider();
+
+    await expect(provider.startVerification('+15551234567')).resolves.toEqual({
+      providerReference: 'fake:+15551234567',
+      localCode: '1332',
+    });
   });
 });

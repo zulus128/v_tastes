@@ -21,9 +21,7 @@ export function openingHoursForDate(
   return (
     hours.find(
       (entry) => entry.day.trim().toLowerCase() === today.toLowerCase(),
-    ) ??
-    hours.find((entry) => entry.day.trim().toLowerCase() === 'daily') ??
-    hours[0]
+    ) ?? hours.find((entry) => entry.day.trim().toLowerCase() === 'daily')
   );
 }
 

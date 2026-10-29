@@ -15,7 +15,7 @@ import { requireUserId } from '../../shared/auth';
 import { db } from '../../shared/firebase';
 import { sendNotifications } from '../../shared/notifications';
 import { contactInviteId } from '../social/functions';
-import { callableOptions } from '../../shared/options';
+import { callableOptions, sessionCallableOptions } from '../../shared/options';
 import { decodeCursor, encodeCursor } from '../../shared/pagination';
 import { parseInput } from '../../shared/validation';
 import {
@@ -28,7 +28,7 @@ import { userSearchTokens } from './search';
 const CURRENT_ONBOARDING_VERSION = 1;
 const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
 // Raise this alongside an iOS release when older builds need to be nudged to update.
-const MINIMUM_SUPPORTED_IOS_BUILD = 43;
+const MINIMUM_SUPPORTED_IOS_BUILD = 49;
 
 async function validatedProfileImageUrl(path: string, uid: string) {
   if (!path.startsWith(`profile-images/${uid}/`)) {
@@ -92,31 +92,34 @@ export const checkUsernameAvailability = onCall(
   },
 );
 
-export const getSessionStatus = onCall(callableOptions, async (request) => {
-  const uid = requireUserId(request);
-  const profile = await db.collection('users').doc(uid).get();
-  const onboardingVersion = profile.exists
-    ? Number(profile.get('onboardingVersion') ?? 0)
-    : 0;
-  if (profile.exists) {
-    // Keep DAU/MAU accurate without rewriting this hot profile document at every launch.
-    const lastSeenAt = profile.get('lastSeenAt');
-    if (
-      !(lastSeenAt instanceof Timestamp) ||
-      Date.now() - lastSeenAt.toMillis() >= 6 * 60 * 60_000
-    ) {
-      await profile.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
+export const getSessionStatus = onCall(
+  sessionCallableOptions,
+  async (request) => {
+    const uid = requireUserId(request);
+    const profile = await db.collection('users').doc(uid).get();
+    const onboardingVersion = profile.exists
+      ? Number(profile.get('onboardingVersion') ?? 0)
+      : 0;
+    if (profile.exists) {
+      // Keep DAU/MAU accurate without rewriting this hot profile document at every launch.
+      const lastSeenAt = profile.get('lastSeenAt');
+      if (
+        !(lastSeenAt instanceof Timestamp) ||
+        Date.now() - lastSeenAt.toMillis() >= 6 * 60 * 60_000
+      ) {
+        await profile.ref.update({ lastSeenAt: FieldValue.serverTimestamp() });
+      }
     }
-  }
 
-  return {
-    profileExists: profile.exists,
-    onboardingVersion,
-    onboardingComplete:
-      profile.exists && onboardingVersion >= CURRENT_ONBOARDING_VERSION,
-    minimumSupportedIosBuild: MINIMUM_SUPPORTED_IOS_BUILD,
-  };
-});
+    return {
+      profileExists: profile.exists,
+      onboardingVersion,
+      onboardingComplete:
+        profile.exists && onboardingVersion >= CURRENT_ONBOARDING_VERSION,
+      minimumSupportedIosBuild: MINIMUM_SUPPORTED_IOS_BUILD,
+    };
+  },
+);
 
 export const completeOnboarding = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);

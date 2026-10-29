@@ -50,6 +50,7 @@ jest.mock('../src/session/SessionProvider', () => {
     getProfileExtras: async () => ({
       data: {
         blocked: false,
+        viewerFollowing: false,
         followers: [],
         following: [
           {

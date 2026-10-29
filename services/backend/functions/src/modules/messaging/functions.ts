@@ -102,6 +102,38 @@ function hasTypingStatus(document: DocumentSnapshot, uid: string): boolean {
   );
 }
 
+function requireOwnedChatImageUrl(
+  imageUrl: string | undefined,
+  uid: string,
+  conversationId: string,
+): void {
+  if (!imageUrl) return;
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    throw new HttpsError('invalid-argument', 'The chat image URL is invalid.');
+  }
+  const pathMatch = url.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+  let objectPath = '';
+  try {
+    objectPath = pathMatch?.[1] ? decodeURIComponent(pathMatch[1]) : '';
+  } catch {
+    objectPath = '';
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname !== 'firebasestorage.googleapis.com' ||
+    !objectPath.startsWith(`chat-images/${uid}/${conversationId}/`)
+  ) {
+    throw new HttpsError(
+      'permission-denied',
+      'The chat image must be uploaded by the sender for this conversation.',
+      { reason: 'invalid-chat-image' },
+    );
+  }
+}
+
 async function requireActiveProfile(uid: string) {
   const profile = await db.collection('users').doc(uid).get();
   if (!profile.exists || profile.get('status') !== 'active') {
@@ -150,16 +182,29 @@ export const createConversation = onCall(callableOptions, async (request) => {
     .collection('following')
     .doc(input.targetUserId);
   const targetFollowsUser = targetRef.collection('following').doc(uid);
+  const userBlockedTarget = userRef
+    .collection('blocked')
+    .doc(input.targetUserId);
+  const targetBlockedUser = targetRef.collection('blocked').doc(uid);
 
   await db.runTransaction(async (transaction) => {
-    const [user, target, forwardEdge, reverseEdge, existingConversation] =
-      await Promise.all([
-        transaction.get(userRef),
-        transaction.get(targetRef),
-        transaction.get(userFollowsTarget),
-        transaction.get(targetFollowsUser),
-        transaction.get(conversationRef),
-      ]);
+    const [
+      user,
+      target,
+      forwardEdge,
+      reverseEdge,
+      existingConversation,
+      forwardBlock,
+      reverseBlock,
+    ] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(targetRef),
+      transaction.get(userFollowsTarget),
+      transaction.get(targetFollowsUser),
+      transaction.get(conversationRef),
+      transaction.get(userBlockedTarget),
+      transaction.get(targetBlockedUser),
+    ]);
     if (!user.exists || user.get('status') !== 'active') {
       throw new HttpsError(
         'failed-precondition',
@@ -168,6 +213,13 @@ export const createConversation = onCall(callableOptions, async (request) => {
     }
     if (!target.exists || target.get('status') !== 'active') {
       throw new HttpsError('not-found', 'The user was not found.');
+    }
+    if (forwardBlock.exists || reverseBlock.exists) {
+      throw new HttpsError(
+        'permission-denied',
+        'Conversations are unavailable for this user.',
+        { reason: 'user-blocked' },
+      );
     }
     if (!forwardEdge.exists || !reverseEdge.exists) {
       throw new HttpsError(
@@ -547,6 +599,7 @@ export const sendMessage = onCall(callableOptions, async (request) => {
       db.collection('users').doc(recipientId),
     );
     const directRecipientId = recipientIds[0] ?? '';
+    requireOwnedChatImageUrl(input.imageUrl, uid, input.conversationId);
     const [user, existingMessage, ...participantReads] = await Promise.all([
       transaction.get(userRef),
       transaction.get(messageRef),
@@ -561,6 +614,16 @@ export const sendMessage = onCall(callableOptions, async (request) => {
                 .collection('users')
                 .doc(directRecipientId)
                 .collection('following')
+                .doc(uid),
+            ),
+            transaction.get(
+              userRef.collection('blocked').doc(directRecipientId),
+            ),
+            transaction.get(
+              db
+                .collection('users')
+                .doc(directRecipientId)
+                .collection('blocked')
                 .doc(uid),
             ),
           ]
@@ -585,7 +648,16 @@ export const sendMessage = onCall(callableOptions, async (request) => {
         'One of the conversation participants was not found.',
       );
     }
-    const followReads = participantReads.slice(recipientIds.length);
+    const directRelationshipReads = participantReads.slice(recipientIds.length);
+    const followReads = directRelationshipReads.slice(0, 2);
+    const blockReads = directRelationshipReads.slice(2, 4);
+    if (kind === 'direct' && blockReads.some((block) => block?.exists)) {
+      throw new HttpsError(
+        'permission-denied',
+        'Messages are unavailable for this user.',
+        { reason: 'user-blocked' },
+      );
+    }
     if (
       kind === 'direct' &&
       (!followReads[0]?.exists || !followReads[1]?.exists)

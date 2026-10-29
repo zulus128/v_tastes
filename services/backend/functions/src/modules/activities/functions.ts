@@ -405,6 +405,12 @@ export const updateActivity = onCall(callableOptions, async (request) => {
   const venueRef = db.collection('venues').doc(input.venueId);
   const selectedIds = [...new Set(input.memberIds)].filter((id) => id !== uid);
   const startsAt = new Date(input.startsAt);
+  if (startsAt.getTime() < Date.now() + 5 * 60_000) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Choose a time at least five minutes from now.',
+    );
+  }
   await db.runTransaction(async (transaction) => {
     const [activity, conversation, organizer, venue] = await Promise.all([
       transaction.get(activityRef),
@@ -531,11 +537,17 @@ export const leaveActivity = onCall(callableOptions, async (request) => {
     const now = FieldValue.serverTimestamp();
     transaction.update(activityRef, {
       participantIds: FieldValue.arrayRemove(uid),
+      [`invitationStatuses.${uid}`]: FieldValue.delete(),
       updatedAt: now,
     });
     if (conversation.exists) {
       transaction.update(conversationRef, {
         participantIds: FieldValue.arrayRemove(uid),
+        [`invitationStatuses.${uid}`]: FieldValue.delete(),
+        [`unreadCounts.${uid}`]: FieldValue.delete(),
+        [`lastReadAt.${uid}`]: FieldValue.delete(),
+        [`lastReadMessageIds.${uid}`]: FieldValue.delete(),
+        [`typing.${uid}`]: FieldValue.delete(),
         updatedAt: now,
       });
     }

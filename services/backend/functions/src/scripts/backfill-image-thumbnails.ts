@@ -38,6 +38,7 @@ async function backfillVenues() {
   let updated = 0;
   for (const venue of snapshot.docs) {
     const imageUrl = venue.get('imageUrl');
+    const imageThumbnailUrl = venue.get('imageThumbnailUrl');
     const photoUrls = Array.isArray(venue.get('photoUrls'))
       ? (venue.get('photoUrls') as unknown[]).filter(
           (value): value is string => typeof value === 'string',
@@ -45,7 +46,7 @@ async function backfillVenues() {
       : [];
     const originalUrl =
       photoUrls[0] ?? (typeof imageUrl === 'string' ? imageUrl : null);
-    if (!originalUrl || String(imageUrl).includes('-thumbnail.')) continue;
+    if (!originalUrl || typeof imageThumbnailUrl === 'string') continue;
     candidates += 1;
     if (!apply) continue;
     const response = await fetch(originalUrl);
@@ -65,7 +66,7 @@ async function backfillVenues() {
       thumbnail,
     );
     await venue.ref.update({
-      imageUrl: thumbnailUrl,
+      imageThumbnailUrl: thumbnailUrl,
       photoUrls: photoUrls.length ? photoUrls : [originalUrl],
     });
     updated += 1;

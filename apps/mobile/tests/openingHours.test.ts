@@ -24,6 +24,14 @@ describe('opening hours', () => {
     ).toBe('open');
   });
 
+  it('does not reuse another weekday when today has no schedule', () => {
+    const rows = [{ day: 'Monday', hours: '9 AM – 5 PM' }];
+    const tuesday = new Date(2026, 8, 15, 12);
+
+    expect(openingHoursForDate(rows, tuesday)).toBeUndefined();
+    expect(openingStatus(rows, tuesday)).toBe('unknown');
+  });
+
   it('reports closed before opening and open during service', () => {
     const rows = [{ day: 'Daily', hours: '10 AM – 6 PM' }];
     expect(openingStatus(rows, new Date(2026, 8, 15, 9, 59))).toBe('closed');

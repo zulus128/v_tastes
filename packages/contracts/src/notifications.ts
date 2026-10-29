@@ -21,6 +21,7 @@ export const notificationCategories = [
   'likesComments',
   'friendReviews',
   'messages',
+  'rewards',
   'recap',
   'savedPlaces',
   'reminders',
@@ -42,6 +43,7 @@ export const notificationCategoryLabels: Record<NotificationCategory, string> =
     likesComments: 'Likes & comments',
     friendReviews: "Friends' new reviews",
     messages: 'Messages',
+    rewards: 'Levels & leaderboard',
     recap: 'Monthly recap',
     savedPlaces: 'Saved places',
     reminders: 'Reminders',
@@ -345,7 +347,7 @@ export const notificationCatalog: Record<
   'level-up': {
     type: 'level-up',
     group: 'rewards',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'reward',
     targetType: 'leaderboard',
@@ -355,7 +357,7 @@ export const notificationCatalog: Record<
   'leaderboard-overtaken': {
     type: 'leaderboard-overtaken',
     group: 'rewards',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'reward',
     targetType: 'leaderboard',
@@ -365,7 +367,7 @@ export const notificationCatalog: Record<
   'season-results': {
     type: 'season-results',
     group: 'rewards',
-    category: 'friendReviews',
+    category: 'rewards',
     channels: push,
     kind: 'reward',
     targetType: 'leaderboard',

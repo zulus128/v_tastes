@@ -525,9 +525,20 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
     const previousIds = Array.isArray(group.get('memberIds'))
       ? (group.get('memberIds') as string[])
       : [uid];
+    const previousInvitedIds = Array.isArray(group.get('invitedMemberIds'))
+      ? (group.get('invitedMemberIds') as string[])
+      : [];
     const selectedIds = [...new Set([uid, ...input.memberIds])];
     const retainedIds = selectedIds.filter((id) => previousIds.includes(id));
-    invitedIds = selectedIds.filter((id) => !previousIds.includes(id));
+    const pendingInvitedIds = selectedIds.filter(
+      (id) => !previousIds.includes(id),
+    );
+    invitedIds = pendingInvitedIds.filter(
+      (id) => !previousInvitedIds.includes(id),
+    );
+    const removedIds = [
+      ...new Set([...previousIds, ...previousInvitedIds]),
+    ].filter((id) => id !== uid && !selectedIds.includes(id));
     const memberData = await Promise.all(
       invitedIds.flatMap((memberId) => [
         transaction.get(db.collection('users').doc(memberId)),
@@ -570,9 +581,7 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
     const now = FieldValue.serverTimestamp();
     transaction.update(ref, {
       memberIds: retainedIds,
-      ...(invitedIds.length > 0
-        ? { invitedMemberIds: FieldValue.arrayUnion(...invitedIds) }
-        : {}),
+      invitedMemberIds: pendingInvitedIds,
       updatedAt: now,
     });
     const conversationRef = db.collection('conversations').doc(ref.id);
@@ -602,6 +611,28 @@ export const updateGroupMembers = onCall(callableOptions, async (request) => {
           status: 'pending',
           createdAt: now,
         },
+      );
+    }
+    for (const removedId of removedIds) {
+      transaction.update(
+        conversationRef,
+        new FieldPath('invitationStatuses', removedId),
+        FieldValue.delete(),
+        new FieldPath('unreadCounts', removedId),
+        FieldValue.delete(),
+        new FieldPath('lastReadAt', removedId),
+        FieldValue.delete(),
+        new FieldPath('lastReadMessageIds', removedId),
+        FieldValue.delete(),
+        new FieldPath('typing', removedId),
+        FieldValue.delete(),
+      );
+      transaction.delete(
+        db
+          .collection('users')
+          .doc(removedId)
+          .collection('requests')
+          .doc(`group-${ref.id}`),
       );
     }
   });
@@ -691,12 +722,13 @@ export const getProfileExtras = onCall(
     const input = parseInput(profileExtrasInputSchema, request.data ?? {});
     const profileId = input.targetUserId ?? viewerId;
     const userRef = db.collection('users').doc(profileId);
-    const [profile, followers, following, viewerFollowing, blocked] =
+    const viewerRef = db.collection('users').doc(viewerId);
+    const [profile, followers, following, viewerFollowingProfile, blocked] =
       await Promise.all([
         userRef.get(),
         userRef.collection('followers').limit(100).get(),
         userRef.collection('following').limit(100).get(),
-        db.collection('users').doc(viewerId).collection('following').get(),
+        viewerRef.collection('following').doc(profileId).get(),
         db
           .collection('users')
           .doc(viewerId)
@@ -724,13 +756,29 @@ export const getProfileExtras = onCall(
           ),
         )
       : [];
+    const connectionIds = [
+      ...new Set([
+        ...followers.docs.map((document) => document.id),
+        ...following.docs.map((document) => document.id),
+      ]),
+    ];
+    const viewerFollowing = connectionIds.length
+      ? await db.getAll(
+          ...connectionIds.map((userId) =>
+            viewerRef.collection('following').doc(userId),
+          ),
+        )
+      : [];
     const viewerFollowingIds = new Set(
-      viewerFollowing.docs.map((document) => document.id),
+      viewerFollowing
+        .filter((document) => document.exists)
+        .map((document) => document.id),
     );
 
     const xp = Math.max(0, Number(profile.get('xp') ?? 0));
     return {
       blocked: blocked.exists,
+      viewerFollowing: viewerFollowingProfile.exists,
       followers: followerProfiles.map((follower) => ({
         userId: follower.id,
         displayName: String(follower.get('displayName') ?? 'Tastes user'),
@@ -928,8 +976,9 @@ export const reportUser = onCall(callableOptions, async (request) => {
   const ref = db
     .collection('reports')
     .doc(`user-${uid}-${input.idempotencyKey}`);
-  await ref.set(
-    {
+  await db.runTransaction(async (transaction) => {
+    if ((await transaction.get(ref)).exists) return;
+    transaction.create(ref, {
       reporterId: uid,
       reporterName: String(profile.get('displayName') ?? 'Tastes user'),
       targetType: 'user',
@@ -944,9 +993,8 @@ export const reportUser = onCall(callableOptions, async (request) => {
       status: 'pending',
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: false },
-  );
+    });
+  });
   await sendNotification({
     recipientId: uid,
     type: 'report-received',

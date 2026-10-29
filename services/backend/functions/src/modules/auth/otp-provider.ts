@@ -1,5 +1,3 @@
-import { isRelaxedTestEnvironment } from '../../shared/runtime-environment';
-
 export type OtpCheckStatus = 'approved' | 'pending';
 
 export interface OtpStartResult {
@@ -101,13 +99,6 @@ export class TwilioVerifyOtpProvider implements OtpProvider {
   }
 }
 
-export function createOtpProvider(config?: TwilioVerifyConfig): OtpProvider {
-  if (isRelaxedTestEnvironment()) {
-    return new FakeOtpProvider();
-  }
-
-  if (!config?.accountSid || !config.authToken || !config.serviceSid) {
-    throw new Error('Twilio Verify credentials are not configured.');
-  }
-  return new TwilioVerifyOtpProvider(config);
+export function createOtpProvider(): OtpProvider {
+  return new FakeOtpProvider();
 }

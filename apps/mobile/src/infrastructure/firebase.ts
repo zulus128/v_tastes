@@ -2,18 +2,38 @@ import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import * as FirebaseAuth from 'firebase/auth';
 import {
+  connectAuthEmulator,
   getAuth,
   initializeAuth,
   type Auth,
   type Persistence,
 } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getFunctions, type Functions } from 'firebase/functions';
-import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  type Firestore,
+} from 'firebase/firestore';
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  type Functions,
+} from 'firebase/functions';
+import {
+  connectStorageEmulator,
+  getStorage,
+  type FirebaseStorage,
+} from 'firebase/storage';
+import { Platform } from 'react-native';
 
-const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'tastes-934e6';
+export const usingFirebaseEmulators =
+  process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS === 'true' ||
+  (__DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS !== 'false');
+const projectId =
+  process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ??
+  (usingFirebaseEmulators ? 'demo-tastes' : 'tastes-934e6');
 const firestoreDatabaseId =
-  process.env.EXPO_PUBLIC_FIRESTORE_DATABASE_ID ?? 'tastes-eu';
+  process.env.EXPO_PUBLIC_FIRESTORE_DATABASE_ID ??
+  (usingFirebaseEmulators ? '(default)' : 'tastes-eu');
 const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'demo-api-key';
 const authDomain =
   process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ??
@@ -63,3 +83,15 @@ export const auth: Auth = initializePersistentAuth();
 export const firestore: Firestore = getFirestore(app, firestoreDatabaseId);
 export const functions: Functions = getFunctions(app, 'europe-west1');
 export const storage: FirebaseStorage = getStorage(app);
+
+if (usingFirebaseEmulators) {
+  const emulatorHost =
+    process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST ??
+    (Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1');
+  connectAuthEmulator(auth, `http://${emulatorHost}:9099`, {
+    disableWarnings: true,
+  });
+  connectFirestoreEmulator(firestore, emulatorHost, 8180);
+  connectFunctionsEmulator(functions, emulatorHost, 5001);
+  connectStorageEmulator(storage, emulatorHost, 9199);
+}

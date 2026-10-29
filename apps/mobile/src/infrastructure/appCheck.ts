@@ -5,6 +5,7 @@ import {
   initializeAppCheck as initializeWebAppCheck,
 } from 'firebase/app-check';
 import * as Application from 'expo-application';
+import { usingFirebaseEmulators } from './firebase';
 import { captureException } from './observability';
 import { selectAppleAppCheckProvider } from './appCheckProvider';
 
@@ -13,8 +14,7 @@ let initializationPromise: Promise<void> | null = null;
 let refreshToken: (() => Promise<void>) | null = null;
 
 export function configureAppCheck(): Promise<void> {
-  if (initialized || process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS === 'true')
-    return Promise.resolve();
+  if (initialized || usingFirebaseEmulators) return Promise.resolve();
   if (initializationPromise) return initializationPromise;
 
   initializationPromise = Promise.all([

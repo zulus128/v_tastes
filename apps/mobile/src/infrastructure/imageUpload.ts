@@ -22,7 +22,9 @@ export async function uploadJpegImageVariant({
   const response = await fetch(optimized.uri);
   const blob = await response.blob();
   await uploadBytes(storageRef(storage, path), blob, {
-    cacheControl: 'public,max-age=31536000,immutable',
+    // Review/profile paths may be overwritten by an edit or an idempotent
+    // retry, so clients must be allowed to revalidate the object.
+    cacheControl: 'private,max-age=0,must-revalidate',
     contentType: 'image/jpeg',
   });
   return path;

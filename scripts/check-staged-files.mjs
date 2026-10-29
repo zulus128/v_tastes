@@ -89,6 +89,14 @@ const packageManagerAuthFiles = new Set([
   'bunfig.toml',
 ]);
 
+function repositoryPath(filePath) {
+  const absolutePath = path.resolve(filePath);
+  const relativePath = path.relative(process.cwd(), absolutePath);
+  return relativePath.startsWith('..') || path.isAbsolute(relativePath)
+    ? path.posix.normalize(filePath)
+    : relativePath.split(path.sep).join('/');
+}
+
 function isAllowedEnvironmentExample(fileName) {
   return (
     allowedEnvironmentFiles.has(fileName) ||
@@ -98,6 +106,7 @@ function isAllowedEnvironmentExample(fileName) {
 }
 
 export function getBlockingReason(filePath) {
+  filePath = repositoryPath(filePath);
   const fileName = path.posix.basename(filePath);
   const normalizedName = fileName.toLowerCase();
   const normalizedPath = path.posix.normalize(filePath).replace(/^\.\//, '');
@@ -134,6 +143,7 @@ export function getBlockingReason(filePath) {
 }
 
 export function shouldSecretlint(filePath) {
+  filePath = repositoryPath(filePath);
   if (
     allowedPublicFirebaseConfigPaths.has(
       path.posix.normalize(filePath).replace(/^\.\//, ''),
@@ -229,7 +239,7 @@ function materializeStagedTextFiles(filePaths, directory) {
   const materialized = [];
   let index = 0;
   for (const filePath of filePaths) {
-    if (!shouldSecretlint(filePath) || existsSync(filePath)) continue;
+    if (!shouldSecretlint(filePath)) continue;
     const target = path.join(
       directory,
       `${index++}-${path.posix.basename(filePath)}`,
@@ -297,9 +307,11 @@ function main() {
   }
 
   if (process.argv.includes('--secretlint')) {
-    const filesToLint = candidateFiles.filter(
-      (filePath) => shouldSecretlint(filePath) && existsSync(filePath),
-    );
+    const filesToLint = scanChangedFiles
+      ? candidateFiles.filter(
+          (filePath) => shouldSecretlint(filePath) && existsSync(filePath),
+        )
+      : [];
     let historicalDirectory;
     let stagedDirectory;
     try {
