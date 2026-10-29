@@ -369,7 +369,7 @@ export function ProfileScreen({
       .getProfileExtras(own ? {} : { targetUserId })
       .then((result) => {
         if (!active) return;
-        setReviewHighlights(result.data.reviewHighlights);
+        setReviewHighlights(result.data.reviewHighlights ?? null);
         if (own) {
           setBlocked(false);
           return;
