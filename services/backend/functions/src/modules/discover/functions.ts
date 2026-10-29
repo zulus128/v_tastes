@@ -231,7 +231,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
       .where('status', '==', 'published')
       .limit(100)
       .get(),
-    userRef.collection('savedVenues').limit(100).get(),
+    userRef.collection('savedVenues').limit(500).get(),
     userRef.collection('following').limit(50).get(),
   ]);
   const preferenceVenueIds = [
@@ -295,17 +295,19 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
       .filter((tag): tag is string => typeof tag === 'string')
       .forEach((tag) => moodWeights.set(tag, (moodWeights.get(tag) ?? 0) + 1));
   });
-  const friendTastes = followedProfiles.flatMap((profile) => {
-    const cuisines = Array.isArray(profile.get('favoriteCuisines'))
-      ? (profile.get('favoriteCuisines') as unknown[]).filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : [];
-    return cuisines.map((cuisine) => ({
-      cuisine: cuisine.toLocaleLowerCase(),
-      name: String(profile.get('displayName') ?? 'A friend'),
-    }));
-  });
+  const friendTastes = followedProfiles
+    .filter((profile) => profile.exists && profile.get('status') === 'active')
+    .flatMap((profile) => {
+      const cuisines = Array.isArray(profile.get('favoriteCuisines'))
+        ? (profile.get('favoriteCuisines') as unknown[]).filter(
+            (value): value is string => typeof value === 'string',
+          )
+        : [];
+      return cuisines.map((cuisine) => ({
+        cuisine: cuisine.toLocaleLowerCase(),
+        name: String(profile.get('displayName') ?? 'A friend'),
+      }));
+    });
   const rankedCuisines = [...cuisineWeights.entries()].sort(
     (a, b) => b[1] - a[1],
   );

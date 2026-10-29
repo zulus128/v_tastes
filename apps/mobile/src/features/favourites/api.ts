@@ -149,8 +149,14 @@ export function useSaveVenue(userId: string) {
       venueId: string;
       folderIds: string[];
     }) => (await api.saveVenue({ venueId, folderIds })).data,
-    onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
+        queryClient.invalidateQueries({
+          queryKey: ['discover', 'feed', userId],
+        }),
+      ]);
+    },
   });
 }
 
@@ -160,8 +166,14 @@ export function useUnsaveVenue(userId: string) {
   return useMutation({
     mutationFn: async (venueId: string) =>
       (await api.unsaveVenue({ venueId })).data,
-    onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
+        queryClient.invalidateQueries({
+          queryKey: ['discover', 'feed', userId],
+        }),
+      ]);
+    },
   });
 }
 

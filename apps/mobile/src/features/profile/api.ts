@@ -83,6 +83,8 @@ function reviewFromDocument(
     authorDisplayName: String(data.authorDisplayName ?? 'Tastes member'),
     venueId: String(data.venueId ?? ''),
     venueName: String(data.venueName ?? 'Place'),
+    venueCity: typeof data.venueCity === 'string' ? data.venueCity : undefined,
+    cuisine: typeof data.cuisine === 'string' ? data.cuisine : undefined,
     rating: Number(data.rating ?? 0),
     text: String(data.text ?? ''),
     tags: Array.isArray(data.tags) ? data.tags : [],
