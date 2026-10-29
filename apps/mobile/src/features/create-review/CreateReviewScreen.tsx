@@ -85,6 +85,7 @@ import {
   dishRatingArcHeight,
   dishRatingArcGeometry,
   ratingCurvePoint,
+  reviewHeroMinimumHeight,
   ratingForCurveDrag,
   ratingForCurveX,
   ratingForLinearPoint,
@@ -440,7 +441,17 @@ export function CreateReviewScreen({
                 width: nativeEvent.layout.width,
               })
             }
-            style={[styles.hero, { paddingTop: insets.top + 8 }]}
+            style={[
+              styles.hero,
+              {
+                minHeight: reviewHeroMinimumHeight(
+                  responsiveSize(438),
+                  venueCardBottom + responsiveSize(12),
+                  responsiveSize(198),
+                ),
+                paddingTop: insets.top + 8,
+              },
+            ]}
           >
             {heroSize.width > 0 ? (
               <HeroBackground

@@ -19,6 +19,14 @@ export interface ConcentricRatingLayout {
   straightBottom: number;
 }
 
+export function reviewHeroMinimumHeight(
+  baseHeight: number,
+  minimumStraightBottom: number,
+  ratingAreaHeight: number,
+) {
+  return Math.max(baseHeight, minimumStraightBottom + ratingAreaHeight);
+}
+
 const minimumRating = 1;
 const maximumRating = 5;
 const ratingStep = 0.5;
@@ -117,11 +125,17 @@ export function ratingForCurvePoint(
   y: number,
   geometry = defaultRatingArc,
 ) {
-  const angle = clamp(
-    Math.atan2(y - geometry.centerY, x - geometry.centerX),
-    geometry.rightAngle,
-    geometry.leftAngle,
-  );
+  const rawAngle = Math.atan2(y - geometry.centerY, x - geometry.centerX);
+  const angle = [rawAngle, rawAngle + 2 * Math.PI, rawAngle - 2 * Math.PI]
+    .map((candidate) => {
+      const projected = clamp(
+        candidate,
+        geometry.rightAngle,
+        geometry.leftAngle,
+      );
+      return { distance: Math.abs(candidate - projected), projected };
+    })
+    .sort((left, right) => left.distance - right.distance)[0].projected;
   const progress =
     (geometry.leftAngle - angle) / (geometry.leftAngle - geometry.rightAngle);
   return minimumRating + progress * (maximumRating - minimumRating);

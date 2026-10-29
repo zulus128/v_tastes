@@ -10,6 +10,7 @@ import {
   ratingForCurveX,
   ratingForLinearPoint,
   ratingCircle,
+  reviewHeroMinimumHeight,
   snapRating,
 } from '../src/features/create-review/ratingCurveGeometry';
 
@@ -133,5 +134,19 @@ describe('rating curve geometry', () => {
       layout.ratingArc.centerY + layout.ratingArc.radius,
       8,
     );
+  });
+
+  it('keeps a left-endpoint drag on the lower arc across the atan2 wrap', () => {
+    const layout = concentricRatingLayout(895, 1_044, 0, 31);
+    const left = ratingCurvePoint(1, layout.ratingArc);
+
+    expect(
+      ratingForCurvePoint(left.x, left.y - 1, layout.ratingArc),
+    ).toBeCloseTo(1, 1);
+  });
+
+  it('reserves rating space below a venue card and large safe area', () => {
+    expect(reviewHeroMinimumHeight(438, 310, 198)).toBe(508);
+    expect(reviewHeroMinimumHeight(438, 200, 198)).toBe(438);
   });
 });
