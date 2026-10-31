@@ -70,6 +70,7 @@ export function useSavedVenue(
 export function useCreateFolder(userId: string) {
   const api = useTastesApi();
   const queryClient = useQueryClient();
+  const queryKey = favouritesQueryKey(userId);
   return useMutation({
     mutationFn: async (name: string) =>
       (
@@ -78,20 +79,23 @@ export function useCreateFolder(userId: string) {
           name,
         })
       ).data,
-    onSuccess: async (result, name) => {
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<InfiniteData<FavouritesResult, string | null>>(
+          queryKey,
+        );
+      const optimisticId = createIdempotencyKey('pending-folder');
       const folder: FavouriteFolder = {
-        id: result.id,
+        id: optimisticId,
         name,
         placeCount: 0,
         createdAt: new Date().toISOString(),
       };
       queryClient.setQueryData<InfiniteData<FavouritesResult, string | null>>(
-        favouritesQueryKey(userId),
+        queryKey,
         (current) => {
           if (!current?.pages[0]) return current;
-          if (current.pages[0].folders.some((item) => item.id === folder.id)) {
-            return current;
-          }
           return {
             ...current,
             pages: [
@@ -104,9 +108,31 @@ export function useCreateFolder(userId: string) {
           };
         },
       );
-      await queryClient.invalidateQueries({
-        queryKey: favouritesQueryKey(userId),
-      });
+      return { optimisticId, previous };
+    },
+    onSuccess: (result, _name, context) => {
+      queryClient.setQueryData<InfiniteData<FavouritesResult, string | null>>(
+        queryKey,
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              folders: page.folders.map((folder) =>
+                folder.id === context.optimisticId
+                  ? { ...folder, id: result.id }
+                  : folder,
+              ),
+            })),
+          };
+        },
+      );
+      void queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (_error, _name, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(queryKey, context.previous);
     },
   });
 }

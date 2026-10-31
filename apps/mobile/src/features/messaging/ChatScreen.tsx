@@ -378,6 +378,7 @@ export function ChatScreen({
   const visualAudit = useIsVisualAudit();
   const { profile: currentUserProfile } = useProfile(userId, 'You');
   const realtimeMessages = useConversationMessages(conversationId, userId);
+  const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const messageHistory = useInfiniteQuery({
     queryKey: conversationMessagesQueryKey(conversationId),
     initialPageParam: null as string | null,
@@ -389,6 +390,7 @@ export function ChatScreen({
   });
   const messageItems = useMemo(() => {
     const byId = new Map<string, ChatMessage>();
+    pendingMessages.forEach((message) => byId.set(message.id, message));
     messageHistory.data?.pages
       .flatMap((page) => page.items)
       .forEach((message) => byId.set(message.id, message));
@@ -396,7 +398,7 @@ export function ChatScreen({
     return [...byId.values()].sort((left, right) =>
       right.createdAt.localeCompare(left.createdAt),
     );
-  }, [messageHistory.data?.pages, realtimeMessages.data]);
+  }, [messageHistory.data?.pages, pendingMessages, realtimeMessages.data]);
   const [participant, setParticipant] =
     useState<ConversationParticipant | null>(null);
   const [groupMembers, setGroupMembers] = useState<
@@ -443,6 +445,22 @@ export function ChatScreen({
   const chatMembers = activity
     ? (activityDetails?.members ?? new Map())
     : groupMembers;
+
+  useEffect(() => {
+    const deliveredIds = new Set([
+      ...realtimeMessages.data.map((message) => message.id),
+      ...(messageHistory.data?.pages.flatMap((page) =>
+        page.items.map((message) => message.id),
+      ) ?? []),
+    ]);
+    if (deliveredIds.size === 0) return;
+    setPendingMessages((current) => {
+      const pending = current.filter(
+        (message) => !deliveredIds.has(message.id),
+      );
+      return pending.length === current.length ? current : pending;
+    });
+  }, [messageHistory.data?.pages, realtimeMessages.data]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return undefined;
@@ -589,19 +607,43 @@ export function ChatScreen({
     const value = text.trim();
     if (!value || sending) return;
     const pendingKey = idempotencyKey;
+    const optimisticId = `pending-message-${pendingKey}`;
+    const optimisticMessage: ChatMessage = {
+      id: optimisticId,
+      conversationId,
+      senderId: userId,
+      senderDisplayName: currentUserProfile?.displayName ?? 'You',
+      senderPhotoUrl: currentUserProfile?.photoUrl ?? null,
+      recipientId: participant?.userId ?? '',
+      recipientIds: participant ? [participant.userId] : [],
+      text: value,
+      imageUrl: null,
+      createdAt: new Date().toISOString(),
+    };
     setText('');
+    setPendingMessages((current) => [optimisticMessage, ...current]);
     setSending(true);
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingActive.current = false;
     updateTypingStatus(false);
     setIdempotencyKey(createIdempotencyKey('message'));
     try {
-      await api.sendMessage({
+      const response = await api.sendMessage({
         conversationId,
         idempotencyKey: pendingKey,
         text: value,
       });
+      setPendingMessages((current) =>
+        current.map((message) =>
+          message.id === optimisticId
+            ? { ...message, id: response.data.id }
+            : message,
+        ),
+      );
     } catch (error) {
+      setPendingMessages((current) =>
+        current.filter((message) => message.id !== optimisticId),
+      );
       setText((current) => current || value);
       setIdempotencyKey(pendingKey);
       Alert.alert('Could not send message', apiErrorMessage(error));

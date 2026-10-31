@@ -4,7 +4,7 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { CommentsPage } from '@tastes/contracts';
+import type { Comment, CommentsPage } from '@tastes/contracts';
 import type { ReactionResult } from '@tastes/firebase-client';
 import {
   useAuthenticatedUserId,
@@ -142,16 +142,78 @@ export function useAddComment(reviewId: string) {
   const api = useTastesApi();
   const userId = useAuthenticatedUserId();
   const queryClient = useQueryClient();
+  const queryKey = commentsQueryKey(userId, reviewId);
   return useMutation({
     mutationFn: (command: AddCommentCommand) =>
       api.addComment({ reviewId, ...command }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: commentsQueryKey(userId, reviewId),
-        }),
-        queryClient.invalidateQueries({ queryKey: ['feed', userId] }),
-      ]);
+    onMutate: async (command) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<InfiniteData<CommentsPage>>(queryKey);
+      const optimisticId = `pending-comment-${command.idempotencyKey}`;
+      const optimisticComment: Comment = {
+        id: optimisticId,
+        reviewId,
+        authorId: userId,
+        authorDisplayName: 'You',
+        authorPhotoUrl: null,
+        parentCommentId: command.parentCommentId ?? null,
+        reactionCount: 0,
+        replyCount: 0,
+        reacted: false,
+        text: command.text,
+        createdAt: new Date().toISOString(),
+      };
+      queryClient.setQueryData<InfiniteData<CommentsPage>>(
+        queryKey,
+        (current) => {
+          if (!current?.pages[0]) return current;
+          return {
+            ...current,
+            pages: [
+              {
+                ...current.pages[0],
+                items: [
+                  ...(command.parentCommentId ? [] : [optimisticComment]),
+                  ...current.pages[0].items.map((comment) =>
+                    command.parentCommentId === comment.id
+                      ? { ...comment, replyCount: comment.replyCount + 1 }
+                      : comment,
+                  ),
+                  ...(command.parentCommentId ? [optimisticComment] : []),
+                ],
+              },
+              ...current.pages.slice(1),
+            ],
+          };
+        },
+      );
+      return { optimisticId, previous };
+    },
+    onSuccess: (response, _command, context) => {
+      queryClient.setQueryData<InfiniteData<CommentsPage>>(
+        queryKey,
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              items: page.items.map((comment) =>
+                comment.id === context.optimisticId
+                  ? { ...comment, id: response.data.id }
+                  : comment,
+              ),
+            })),
+          };
+        },
+      );
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: ['feed', userId] });
+    },
+    onError: (_error, _command, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(queryKey, context.previous);
     },
   });
 }

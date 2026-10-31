@@ -325,17 +325,17 @@ export function SaveToFolderSheet({
     }
   }, [savedVenue.folderIds, visible]);
 
-  async function createAndSelect() {
+  function createAndSelect() {
     const name = folderName.trim();
     if (!name) return;
-    try {
-      const folder = await createFolder.mutateAsync(name);
-      setSelected((current) => new Set(current).add(folder.id));
-      setCreating(false);
-      setFolderName('');
-    } catch (error) {
-      Alert.alert('Could not create folder', apiErrorMessage(error));
-    }
+    setCreating(false);
+    setFolderName('');
+    createFolder.mutate(name, {
+      onError: (error) =>
+        Alert.alert('Could not create folder', apiErrorMessage(error)),
+      onSuccess: (folder) =>
+        setSelected((current) => new Set(current).add(folder.id)),
+    });
   }
 
   async function save() {
@@ -446,11 +446,12 @@ export function SaveToFolderSheet({
             </Pressable>
           </ScrollView>
           <Pressable
-            disabled={!place || saveVenue.isPending}
+            disabled={!place || saveVenue.isPending || createFolder.isPending}
             onPress={() => void save()}
             style={({ pressed }) => [
               styles.doneButton,
-              (!place || saveVenue.isPending) && styles.saveButtonDisabled,
+              (!place || saveVenue.isPending || createFolder.isPending) &&
+                styles.saveButtonDisabled,
               pressed && styles.pressed,
             ]}
           >
@@ -747,7 +748,10 @@ function FolderNameSheet({
           name: value,
         });
       } else {
-        await createFolder.mutateAsync(value);
+        createFolder.mutate(value, {
+          onError: (error) =>
+            Alert.alert('Could not save folder', apiErrorMessage(error)),
+        });
       }
       onClose();
     } catch (error) {
