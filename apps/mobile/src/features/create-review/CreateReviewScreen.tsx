@@ -42,13 +42,6 @@ import PenIcon from '../../../assets/create-review/pen.svg';
 import AddDishIcon from '../../../assets/create-review/add-dish.svg';
 import CameraIcon from '../../../assets/create-review/camera.svg';
 import DeleteDishIcon from '../../../assets/create-review/delete-dish.svg';
-import PlaceFilterBarIcon from '../../../assets/create-review/place-filter-bar.svg';
-import PlaceFilterCafeCup from '../../../assets/create-review/place-filter-cafe-cup.svg';
-import PlaceFilterCafeSteamLeft from '../../../assets/create-review/place-filter-cafe-steam-left.svg';
-import PlaceFilterCafeSteamRight from '../../../assets/create-review/place-filter-cafe-steam-right.svg';
-import PlaceFilterMyListIcon from '../../../assets/create-review/place-filter-my-list.svg';
-import PlaceFilterRestaurantIcon from '../../../assets/create-review/place-filter-restaurant.svg';
-import PlaceFilterTrendingIcon from '../../../assets/create-review/place-filter-trending.svg';
 import PlaceRatingStarIcon from '../../../assets/create-review/place-rating-star.svg';
 import PlaceSelectorClearIcon from '../../../assets/create-review/place-selector-clear.svg';
 import PlaceSelectorCloseIcon from '../../../assets/create-review/place-selector-close.svg';
@@ -76,7 +69,6 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
-import { useFavourites } from '../favourites/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
 import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
@@ -127,44 +119,6 @@ const selectableReviewTags = new Set<ReviewTag>(
   tagOptions.map((tag) => tag.value),
 );
 
-function PlaceFilterCafeIcon({ color }: { color: string }) {
-  return (
-    <View style={placeFilterIconStyles.cafe}>
-      <PlaceFilterCafeSteamLeft
-        color={color}
-        style={placeFilterIconStyles.cafeSteamLeft}
-      />
-      <PlaceFilterCafeSteamRight
-        color={color}
-        style={placeFilterIconStyles.cafeSteamRight}
-      />
-      <PlaceFilterCafeCup color={color} style={placeFilterIconStyles.cafeCup} />
-    </View>
-  );
-}
-
-const placeFilterOptions = [
-  {
-    Icon: PlaceFilterTrendingIcon,
-    label: 'Trending',
-    value: 'trending',
-  },
-  {
-    Icon: PlaceFilterRestaurantIcon,
-    label: 'Restaurant',
-    value: 'restaurant',
-  },
-  { Icon: PlaceFilterCafeIcon, label: 'Cafe', value: 'cafe' },
-  { Icon: PlaceFilterBarIcon, label: 'Bar', value: 'bar' },
-  { Icon: PlaceFilterMyListIcon, label: 'My list', value: 'my-list' },
-] as const;
-
-const placeFilterIconStyles = StyleSheet.create({
-  cafe: { height: 14, position: 'relative', width: 14 },
-  cafeSteamLeft: { left: 3.8556, position: 'absolute', top: 0 },
-  cafeSteamRight: { left: 6.6766, position: 'absolute', top: 0 },
-  cafeCup: { left: 1.4364, position: 'absolute', top: 6.0452 },
-});
 const reviewDraftKey = (userId: string) => `@tastes/review-draft/${userId}`;
 
 interface StoredReviewDraft {
@@ -1663,35 +1617,14 @@ export function PlaceSelector({
   const reduceMotion = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<
-    'bar' | 'cafe' | 'my-list' | 'restaurant' | 'trending' | null
-  >(null);
   const [submittingVenueId, setSubmittingVenueId] = useState<string | null>(
     null,
   );
   const api = useTastesApi();
   const query = useDiscoverVenues(userId);
-  const favourites = useFavourites(userId);
   const searchQuery = useVenueSearch(search);
   const venues = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const favouriteVenues: Venue[] = (favourites.data?.places ?? []).map(
-    (place) => ({
-      address: place.address,
-      category: place.category,
-      city: place.city,
-      distanceKm: place.distanceKm,
-      id: place.venueId,
-      imageUrl: place.imageUrl ?? undefined,
-      name: place.name,
-      priceLevel: place.priceLevel,
-      rating: place.rating,
-      reviewCount: place.reviewCount,
-      status: 'active',
-    }),
-  );
-  const localFiltered = (
-    activeFilter === 'my-list' ? favouriteVenues : venues
-  ).filter((venue) => {
+  const localFiltered = venues.filter((venue) => {
     const needle = search.trim().toLowerCase();
     return (
       !needle ||
@@ -1701,32 +1634,12 @@ export function PlaceSelector({
     );
   });
   const searchResults =
-    search.trim().length >= 2 && activeFilter !== 'my-list'
+    search.trim().length >= 2
       ? (searchQuery.data?.items ?? localFiltered)
       : localFiltered;
-  const filtered = searchResults.filter((venue) => {
-    if (!activeFilter || activeFilter === 'my-list') return true;
-    const category = venue.category?.toLowerCase() ?? '';
-    if (activeFilter === 'restaurant') {
-      return !['cafe', 'club', 'bar'].some((nonRestaurant) =>
-        category.includes(nonRestaurant),
-      );
-    }
-    if (activeFilter === 'trending')
-      return venue.discoverTags?.includes('trending');
-    if (activeFilter === 'bar')
-      return category.includes('bar') || category.includes('club');
-    return category.includes(activeFilter);
-  });
-  const usingSearch = search.trim().length >= 2 && activeFilter !== 'my-list';
-  const isPending =
-    activeFilter === 'my-list'
-      ? favourites.isPending
-      : query.isPending || (usingSearch && searchQuery.isPending);
-  const isError =
-    activeFilter === 'my-list'
-      ? favourites.isError
-      : query.isError || (usingSearch && searchQuery.isError);
+  const usingSearch = search.trim().length >= 2;
+  const isPending = query.isPending || (usingSearch && searchQuery.isPending);
+  const isError = query.isError || (usingSearch && searchQuery.isError);
 
   const animateTo = useCallback(
     (toValue: number, onFinished?: () => void) => {
@@ -1975,41 +1888,12 @@ export function PlaceSelector({
               </Pressable>
             ) : null}
           </View>
-          <ScrollView
-            contentContainerStyle={styles.filters}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filtersScroll}
-          >
-            {placeFilterOptions.map((filter) => {
-              const active = activeFilter === filter.value;
-              const FilterIcon = filter.Icon;
-              return (
-                <Pressable
-                  key={filter.value}
-                  onPress={() => setActiveFilter(active ? null : filter.value)}
-                  style={[styles.filter, active && styles.filterActive]}
-                >
-                  <View style={styles.filterIcon}>
-                    <FilterIcon color={colors.textSecondary} />
-                  </View>
-                  <Text maxFontSizeMultiplier={1.3} style={styles.filterText}>
-                    {filter.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
           {isPending ? (
             <ActivityIndicator color={colors.primary} style={styles.loading} />
           ) : isError ? (
             <Pressable
               onPress={() =>
-                void (activeFilter === 'my-list'
-                  ? favourites.refetch()
-                  : usingSearch
-                    ? searchQuery.refetch()
-                    : query.refetch())
+                void (usingSearch ? searchQuery.refetch() : query.refetch())
               }
               style={styles.loading}
             >
@@ -2020,7 +1904,7 @@ export function PlaceSelector({
           ) : (
             <FlatList
               style={styles.placeList}
-              data={filtered}
+              data={searchResults}
               initialNumToRender={8}
               keyExtractor={(venue) => venue.id}
               keyboardShouldPersistTaps="handled"
@@ -2810,31 +2694,6 @@ const createSelectorStyles = (colors: ThemeColors) =>
       fontSize: 16,
     },
     placeList: { flex: 1 },
-    filtersScroll: { flexGrow: 0, flexShrink: 0, height: 54 },
-    filters: { gap: 7, paddingHorizontal: 16, paddingVertical: 10 },
-    filter: {
-      height: 34,
-      paddingHorizontal: 10,
-      flexDirection: 'row',
-      gap: 3,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-    },
-    filterIcon: {
-      width: 14,
-      height: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    filterActive: {
-      borderColor: colors.primary,
-      backgroundColor: colors.surfaceRaised,
-    },
-    filterText: { color: colors.text, fontSize: 12, lineHeight: 16 },
     loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center' },
     error: { color: colors.primary, textAlign: 'center' },
     row: {
