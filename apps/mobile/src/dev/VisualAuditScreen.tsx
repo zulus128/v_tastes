@@ -49,7 +49,6 @@ const postSignupScreens: PostSignupScreen[] = [
   'contactsPermission',
   'invite',
   'contacts',
-  'notifications',
   'ready',
 ];
 const recapSteps: RecapStep[] = [

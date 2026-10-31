@@ -23,6 +23,7 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 export const cities = [
   [flagMonaco, 'Monaco', 'Monaco'],
   [flagUk, 'London', 'United Kingdom'],
+  [flagSpain, 'Madrid', 'Spain'],
   [flagFrance, 'Paris', 'France'],
   [flagFrance, 'Nice', 'France'],
   [flagFrance, 'Cannes', 'France'],
@@ -32,6 +33,15 @@ export const cities = [
   [flagUae, 'Dubai', 'UAE'],
   [flagPortugal, 'Lisbon', 'Portugal'],
 ] as const;
+
+export function canonicalCityName(name: string): string {
+  const normalized = name.trim().toLocaleLowerCase('en-US');
+  return normalized === 'menton' ||
+    normalized === 'roquebrune-cap-martin' ||
+    normalized === 'roquebrune cap martin'
+    ? 'Monaco'
+    : name.trim();
+}
 
 export const countryFlags: Record<string, ImageSourcePropType> = {
   AE: flagUae,
@@ -91,7 +101,9 @@ export function CityPicker({
           <Pressable
             accessibilityLabel={`Use ${normalizedSearch} as city`}
             accessibilityRole="button"
-            onPress={() => onCustomSelect?.(normalizedSearch)}
+            onPress={() =>
+              onCustomSelect?.(canonicalCityName(normalizedSearch))
+            }
             style={[styles.cityRow, styles.customCityRow]}
             testID="use-custom-city"
           >

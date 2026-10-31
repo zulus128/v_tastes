@@ -867,8 +867,8 @@ function TrendingFeed({
       {topReviewer ? (
         <>
           <SectionLabel
-            title="Popular reviewer"
-            subtitle="Trusted voice in your neighborhood"
+            title="Tastemakers to follow"
+            subtitle="People worth following"
           />
           <TopReviewer
             onFollow={() => onToggleFollow(topReviewer)}
@@ -2140,8 +2140,8 @@ function PeopleFeed({
             <>
               <PeopleSectionHeader
                 onSeeMore={() => setSeeMore(true)}
-                subtitle="Gaining followers this week"
-                title="🔥 Trending tastemakers"
+                subtitle="People worth following"
+                title="Tastemakers to follow"
               />
               <ScrollView
                 contentContainerStyle={styles.peopleCarousel}
@@ -2240,7 +2240,7 @@ function PeopleFeed({
               <Text style={styles.back}>‹</Text>
             </Pressable>
             <Text style={[styles.stateTitle, { flex: 1 }]}>
-              Trending tastemakers
+              Tastemakers to follow
             </Text>
             <View style={styles.headerAction} />
           </View>
@@ -3063,9 +3063,6 @@ function TastemakerCard({
       <Text style={styles.tastemakerTastes}>
         {person.favoriteCuisines.join(' · ') ||
           (person.username ? `@${person.username}` : '')}
-      </Text>
-      <Text style={styles.tastemakerGrowth}>
-        +{person.weeklyFollowerGrowth} this week
       </Text>
       <FollowButton
         following={following}

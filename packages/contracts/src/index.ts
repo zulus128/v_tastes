@@ -14,6 +14,35 @@ export * from './notifications';
 const usernameCharactersError =
   'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
 
+const reservedUsernames = new Set([
+  'admin',
+  'help',
+  'official',
+  'support',
+  'tastes',
+]);
+
+const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, 'The username must be at least 3 characters long.')
+  .max(30, 'The username must be at most 30 characters long.')
+  .regex(/^[a-z0-9._]+$/, usernameCharactersError)
+  .regex(/[a-z]/, 'The username must contain at least one letter.')
+  .refine(
+    (username) => !username.startsWith('.') && !username.endsWith('.'),
+    'The username cannot start or end with a dot.',
+  )
+  .refine(
+    (username) => !username.includes('..'),
+    'The username cannot contain two dots in a row.',
+  )
+  .refine(
+    (username) => !reservedUsernames.has(username),
+    'This username is reserved.',
+  );
+
 export const userProfileSchema = z.object({
   uid: z.string().min(1),
   displayName: z.string().min(2).max(30),
@@ -30,13 +59,7 @@ export const createUserProfileInputSchema = z.object({
     .trim()
     .min(2, 'Your name must be at least 2 characters long.')
     .max(30, 'Your name must be at most 30 characters long.'),
-  username: z
-    .string()
-    .trim()
-    .min(2, 'The username must be at least 2 characters long.')
-    .max(30, 'The username must be at most 30 characters long.')
-    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError)
-    .optional(),
+  username: usernameSchema.optional(),
   city: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).optional(),
   birthDate: z
@@ -47,26 +70,21 @@ export const createUserProfileInputSchema = z.object({
       const birthDate = new Date(year!, month! - 1, day!);
       const cutoff = new Date();
       cutoff.setHours(23, 59, 59, 999);
-      cutoff.setFullYear(cutoff.getFullYear() - 15);
+      cutoff.setFullYear(cutoff.getFullYear() - 16);
       return (
         birthDate.getFullYear() === year &&
         birthDate.getMonth() === month! - 1 &&
         birthDate.getDate() === day &&
         birthDate <= cutoff
       );
-    }, 'You must be at least 15 years old.')
+    }, 'You must be at least 16 years old.')
     .optional(),
   photoPath: z.string().trim().min(1).max(512).optional(),
   photoThumbnailPath: z.string().trim().min(1).max(512).optional(),
 });
 
 export const checkUsernameAvailabilityInputSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(2)
-    .max(30)
-    .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
+  username: usernameSchema,
 });
 
 export const updateProfilePhotoInputSchema = z.object({
@@ -77,12 +95,7 @@ export const updateProfilePhotoInputSchema = z.object({
 export const updateProfileSettingsInputSchema = z
   .object({
     displayName: z.string().trim().min(2).max(30),
-    username: z
-      .string()
-      .trim()
-      .min(2)
-      .max(30)
-      .regex(/^[a-zA-Z0-9._]+$/, usernameCharactersError),
+    username: usernameSchema,
     city: z.string().trim().min(2).max(120),
     bio: z.string().trim().max(500),
     favoriteDish: z.string().trim().min(1).max(80),

@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { offerPushNotificationsAfterEngagement } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
 import {
   discoverFeedQueryKey,
@@ -179,7 +180,9 @@ export function useToggleFollow(userId: string) {
       for (const [queryKey, data] of context?.snapshots ?? [])
         queryClient.setQueryData(queryKey, data);
     },
-    onSuccess: async () => {
+    onSuccess: async (_result, variables) => {
+      if (!variables.following)
+        void offerPushNotificationsAfterEngagement(api, 'follow');
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: discoverFeedQueryKey(userId),

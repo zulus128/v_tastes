@@ -9,6 +9,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { offerPushNotificationsAfterEngagement } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
 import { favouritesQueryKey } from '../queryKeys';
 
@@ -176,6 +177,7 @@ export function useSaveVenue(userId: string) {
       folderIds: string[];
     }) => (await api.saveVenue({ venueId, folderIds })).data,
     onSuccess: async () => {
+      void offerPushNotificationsAfterEngagement(api, 'save');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: favouritesQueryKey(userId) }),
         queryClient.invalidateQueries({

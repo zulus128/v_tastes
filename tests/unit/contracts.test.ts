@@ -175,10 +175,36 @@ describe('public API contracts', () => {
     ).toBe(expectedMessage);
   });
 
-  it('requires profile birthdays to meet the rolling 15-year cutoff', () => {
+  it('enforces the approved username rules and lowercase normalization', () => {
+    expect(
+      createUserProfileInputSchema.parse({
+        displayName: 'Demo User',
+        username: 'Demo.User_2',
+      }).username,
+    ).toBe('demo.user_2');
+
+    for (const username of [
+      'ab',
+      '.demo',
+      'demo.',
+      'demo..user',
+      '123',
+      'admin',
+      'support',
+    ]) {
+      expect(
+        createUserProfileInputSchema.safeParse({
+          displayName: 'Demo User',
+          username,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('requires profile birthdays to meet the rolling 16-year cutoff', () => {
     const cutoff = new Date();
     cutoff.setHours(12, 0, 0, 0);
-    cutoff.setFullYear(cutoff.getFullYear() - 15);
+    cutoff.setFullYear(cutoff.getFullYear() - 16);
     const eligible = cutoff.toISOString().slice(0, 10);
     const tooYoung = new Date(cutoff);
     tooYoung.setDate(tooYoung.getDate() + 1);

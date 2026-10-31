@@ -4,12 +4,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import type * as ExpoNotificationsModule from 'expo-notifications';
 import type { NotificationResponse } from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 const STORED_TOKEN_KEY = 'tastes:expo-push-token';
+const CONTEXTUAL_PROMPT_KEY = 'tastes:notification-context-prompt-shown';
 
 function supportsRemotePushNotifications(): boolean {
-  return Platform.OS === 'android' || (Platform.OS === 'ios' && Constants.isDevice);
+  return (
+    Platform.OS === 'android' || (Platform.OS === 'ios' && Constants.isDevice)
+  );
 }
 
 type ExpoNotifications = typeof ExpoNotificationsModule;
@@ -36,16 +39,23 @@ function getNotifications(): ExpoNotifications | null {
 }
 
 /** Turns the catalog target of a push payload into an in-app route. */
-export function deepLinkForTarget(targetType: string, targetId: string): string {
+export function deepLinkForTarget(
+  targetType: string,
+  targetId: string,
+): string {
   const id = encodeURIComponent(targetId);
   switch (targetType) {
     case 'comments':
     case 'review':
-      return targetId ? `tastes://reviews/${id}/comments` : 'tastes://notifications';
+      return targetId
+        ? `tastes://reviews/${id}/comments`
+        : 'tastes://notifications';
     case 'place':
       return targetId ? `tastes://places/${id}` : 'tastes://notifications';
     case 'chat':
-      return targetId ? `tastes://conversations/${id}` : 'tastes://notifications';
+      return targetId
+        ? `tastes://conversations/${id}`
+        : 'tastes://notifications';
     case 'activity':
       return targetId ? `tastes://activities/${id}` : 'tastes://notifications';
     case 'profile':
@@ -62,14 +72,24 @@ export function deepLinkForTarget(targetType: string, targetId: string): string 
   }
 }
 
-function deepLinkFromResponse(response: NotificationResponse | null): string | null {
+function deepLinkFromResponse(
+  response: NotificationResponse | null,
+): string | null {
   const data = response?.notification.request.content.data;
   if (!data) return null;
-  if (data.type === 'message' && typeof data.conversationId === 'string' && data.conversationId.length > 0) {
+  if (
+    data.type === 'message' &&
+    typeof data.conversationId === 'string' &&
+    data.conversationId.length > 0
+  ) {
     return `tastes://conversations/${encodeURIComponent(data.conversationId)}`;
   }
-  if (typeof data.targetType !== 'string' || data.targetType.length === 0) return null;
-  return deepLinkForTarget(data.targetType, typeof data.targetId === 'string' ? data.targetId : '');
+  if (typeof data.targetType !== 'string' || data.targetType.length === 0)
+    return null;
+  return deepLinkForTarget(
+    data.targetType,
+    typeof data.targetId === 'string' ? data.targetId : '',
+  );
 }
 
 export function consumeInitialPushDeepLink(): string | null {
@@ -80,21 +100,28 @@ export function consumeInitialPushDeepLink(): string | null {
   return url;
 }
 
-export function subscribeToPushDeepLinks(listener: (url: string) => void): () => void {
+export function subscribeToPushDeepLinks(
+  listener: (url: string) => void,
+): () => void {
   const Notifications = getNotifications();
   if (!Notifications) return () => undefined;
-  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-    const url = deepLinkFromResponse(response);
-    if (url) listener(url);
-  });
+  const subscription = Notifications.addNotificationResponseReceivedListener(
+    (response) => {
+      const url = deepLinkFromResponse(response);
+      if (url) listener(url);
+    },
+  );
   return () => subscription.remove();
 }
 
 function easProjectId(): string {
-  const projectId = Constants.easConfig?.projectId
-    ?? Constants.expoConfig?.extra?.eas?.projectId;
+  const projectId =
+    Constants.easConfig?.projectId ??
+    Constants.expoConfig?.extra?.eas?.projectId;
   if (typeof projectId !== 'string' || projectId.length === 0) {
-    throw new Error('The EAS project ID is missing from the Expo configuration.');
+    throw new Error(
+      'The EAS project ID is missing from the Expo configuration.',
+    );
   }
   return projectId;
 }
@@ -137,7 +164,9 @@ export async function syncPushNotifications(
     return null;
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId: easProjectId() })).data;
+  const token = (
+    await Notifications.getExpoPushTokenAsync({ projectId: easProjectId() })
+  ).data;
   const previousToken = await AsyncStorage.getItem(STORED_TOKEN_KEY);
   await api.registerPushToken({ token, platform });
   await AsyncStorage.setItem(STORED_TOKEN_KEY, token);
@@ -148,7 +177,35 @@ export async function syncPushNotifications(
   return token;
 }
 
-export async function unregisterPushNotifications(api: TastesApi): Promise<void> {
+export async function offerPushNotificationsAfterEngagement(
+  api: TastesApi,
+  reason: 'follow' | 'save',
+): Promise<void> {
+  if (!supportsRemotePushNotifications()) return;
+  if (await AsyncStorage.getItem(CONTEXTUAL_PROMPT_KEY)) return;
+  await AsyncStorage.setItem(CONTEXTUAL_PROMPT_KEY, reason);
+  Alert.alert(
+    'Stay in the loop?',
+    reason === 'save'
+      ? "Want to know when friends review places you've saved?"
+      : 'Want to know when people you follow share new reviews?',
+    [
+      { text: 'Not now', style: 'cancel' },
+      {
+        text: 'Yes, notify me',
+        onPress: () => {
+          void syncPushNotifications(api, { requestPermission: true }).catch(
+            () => undefined,
+          );
+        },
+      },
+    ],
+  );
+}
+
+export async function unregisterPushNotifications(
+  api: TastesApi,
+): Promise<void> {
   await unregisterStoredToken(api);
 }
 
@@ -165,7 +222,9 @@ export async function scheduleDraftReminder(placeName: string): Promise<void> {
   await cancelDraftReminder();
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) return;
-  const copy = renderNotificationCopy('draft-reminder', { place: placeName || 'a place' });
+  const copy = renderNotificationCopy('draft-reminder', {
+    place: placeName || 'a place',
+  });
   const identifier = await Notifications.scheduleNotificationAsync({
     content: {
       title: copy.title,
@@ -185,6 +244,8 @@ export async function cancelDraftReminder(): Promise<void> {
   const identifier = await AsyncStorage.getItem(DRAFT_REMINDER_KEY);
   if (!identifier) return;
   const Notifications = getNotifications();
-  await Notifications?.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+  await Notifications?.cancelScheduledNotificationAsync(identifier).catch(
+    () => undefined,
+  );
   await AsyncStorage.removeItem(DRAFT_REMINDER_KEY);
 }

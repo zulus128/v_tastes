@@ -32,7 +32,6 @@ import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import BookmarkOutlineIcon from '../../../assets/activities/bookmark-body.svg';
 import ArrowUpRightIcon from '../../../assets/place/arrow-up-right.svg';
 import CalendarIcon from '../../../assets/place/calendar.svg';
-import MapPinIcon from '../../../assets/discover/map-rating-pin.svg';
 import PhoneIcon from '../../../assets/place/phone.svg';
 import PlanetIcon from '../../../assets/place/planet.svg';
 import SortIcon from '../../../assets/place/sort.svg';
@@ -66,6 +65,22 @@ import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { PlacePhotoPager } from './PlacePhotoPager';
 import { buildGalleryPhotos } from './galleryPhotos';
 import { openingHoursForDate, openingStatus } from './openingHours';
+import Svg, { Circle, Path } from 'react-native-svg';
+
+function AddressPinIcon({ color, size }: { color: string; size: number }) {
+  return (
+    <Svg fill="none" height={size} viewBox="0 0 24 24" width={size}>
+      <Path
+        d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.8}
+      />
+      <Circle cx={12} cy={10} r={2.5} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  );
+}
 
 const sorts: Record<PlaceReviewSort, string> = {
   highest: 'Highest rated',
@@ -648,13 +663,7 @@ function Overview({
         />
       ) : null}
       <DetailRow
-        icon={
-          <MapPinIcon
-            color={iconColor}
-            height={responsiveSize(20)}
-            width={responsiveSize(20)}
-          />
-        }
+        icon={<AddressPinIcon color={iconColor} size={responsiveSize(20)} />}
         label={details.venue.address ?? details.venue.city}
         onPress={() =>
           void Linking.openURL(

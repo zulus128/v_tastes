@@ -44,7 +44,7 @@ export function ProfileMapSheet({
   keyValue,
   mappedPlaces,
   onClose,
-  onOpenPlace,
+  onOpenReview,
   onRetry,
   placeCount,
   region,
@@ -57,7 +57,7 @@ export function ProfileMapSheet({
     venue: Venue & { latitude: number; longitude: number };
   }[];
   onClose: () => void;
-  onOpenPlace: (venueId: string) => void;
+  onOpenReview: (reviewId: string) => void;
   onRetry: () => void;
   placeCount: number;
   region: Region;
@@ -147,7 +147,7 @@ export function ProfileMapSheet({
                       longitude: venue.longitude,
                     }}
                     key={venue.id}
-                    onPress={() => onOpenPlace(venue.id)}
+                    onPress={() => onOpenReview(review.id)}
                   >
                     <View style={styles.marker}>
                       <Image

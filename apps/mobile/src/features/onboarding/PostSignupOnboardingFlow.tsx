@@ -49,7 +49,6 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import addPhoto from '../../../assets/onboarding/add-photo.png';
-import tastesAppIcon from '../../../assets/icon.png';
 import chevronRight from '../../../assets/onboarding/chevron-right.png';
 import dishBurgers from '../../../assets/onboarding/dish-burgers.png';
 import dishCurry from '../../../assets/onboarding/dish-curry.png';
@@ -81,7 +80,6 @@ import locationMapSakura from '../../../assets/onboarding/location-map-sakura.pn
 import locationMapVelvet from '../../../assets/onboarding/location-map-velvet.png';
 import permissionContacts from '../../../assets/onboarding/permission-contacts.png';
 import permissionLocation from '../../../assets/onboarding/permission-location.png';
-import permissionNotifications from '../../../assets/onboarding/permission-notifications.png';
 import placeGemini from '../../../assets/onboarding/place-gemini.png';
 import placeGeminiPopular from '../../../assets/onboarding/place-gemini-popular.png';
 import placeSelected from '../../../assets/onboarding/place-selected.png';
@@ -99,10 +97,9 @@ import searchClose from '../../../assets/onboarding/search-close.png';
 import startRating from '../../../assets/onboarding/start-rating.png';
 import readyPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import { auth } from '../../infrastructure/firebase';
-import { syncPushNotifications } from '../../infrastructure/pushNotifications';
 import { useTastesApi } from '../../session/SessionProvider';
 import { BackButton, PatternScreen, PrimaryButton } from './components';
-import { CityPicker, countryFlags } from './CityPicker';
+import { canonicalCityName, CityPicker, countryFlags } from './CityPicker';
 import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -127,7 +124,6 @@ export type PostSignupScreen =
   | 'contactsPermission'
   | 'invite'
   | 'contacts'
-  | 'notifications'
   | 'ready';
 
 const previousPostSignupScreen: Partial<
@@ -143,7 +139,7 @@ const previousPostSignupScreen: Partial<
   contactsPermission: 'style',
   contacts: 'contactsPermission',
   invite: 'contactsPermission',
-  notifications: 'invite',
+  ready: 'invite',
 };
 
 interface PostSignupOnboardingFlowProps {
@@ -425,7 +421,7 @@ function StepProgress({
   return (
     <View
       accessibilityLabel={
-        complete ? 'Onboarding complete' : `Step ${step} of 7`
+        complete ? 'Onboarding complete' : `Step ${step} of 6`
       }
       style={[styles.stepProgress, overlay && styles.stepProgressOverlay]}
     >
@@ -864,60 +860,6 @@ function InviteOption({
         width={responsiveSize(10)}
       />
     </Pressable>
-  );
-}
-
-function NotificationExamples({
-  styles,
-}: {
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <View style={styles.notificationExamples}>
-      <NotificationExample
-        detail="“The seabass. Go.”"
-        meta="now"
-        styles={styles}
-        title="Amara rated Sabor ★ 4.9"
-      />
-      <NotificationExample
-        detail="You have 2 mutual friends"
-        meta="2m ago"
-        styles={styles}
-        title="Marco started following you"
-      />
-    </View>
-  );
-}
-
-function NotificationExample({
-  detail,
-  meta,
-  styles,
-  title,
-}: {
-  detail: string;
-  meta: string;
-  styles: ReturnType<typeof createStyles>;
-  title: string;
-}) {
-  return (
-    <View
-      style={styles.notificationCard}
-      testID={`onboarding-notification-card-${meta}`}
-    >
-      <Image source={tastesAppIcon} style={styles.notificationIcon} />
-      <View style={styles.notificationCopy}>
-        <Text style={styles.notificationApp}>TASTES</Text>
-        <Text numberOfLines={1} style={styles.notificationTitle}>
-          {title}
-        </Text>
-        <Text numberOfLines={1} style={styles.notificationDetail}>
-          {detail}
-        </Text>
-      </View>
-      <Text style={styles.notificationMeta}>{meta}</Text>
-    </View>
   );
 }
 
@@ -1383,8 +1325,9 @@ export function PostSignupOnboardingFlow({
       const [address] = await Location.reverseGeocodeAsync(position.coords);
       const resolvedCity = address?.city?.trim();
       if (resolvedCity) {
-        setCity(resolvedCity);
-        await api.updateProfileSettings({ city: resolvedCity });
+        const canonicalCity = canonicalCityName(resolvedCity);
+        setCity(canonicalCity);
+        await api.updateProfileSettings({ city: canonicalCity });
       }
       if (address?.isoCountryCode) {
         const flag = countryFlags[address.isoCountryCode.toUpperCase()];
@@ -1461,20 +1404,6 @@ export function PostSignupOnboardingFlow({
       return;
     }
     navigate('invite');
-  }
-
-  async function requestNotifications() {
-    if (visualAudit) {
-      navigate('ready');
-      return;
-    }
-    try {
-      await syncPushNotifications(api, { requestPermission: true });
-    } catch (error) {
-      Alert.alert('Could not enable notifications', apiErrorMessage(error));
-    } finally {
-      navigate('ready');
-    }
   }
 
   async function shareInvite() {
@@ -1630,7 +1559,7 @@ export function PostSignupOnboardingFlow({
                     autoCapitalize="none"
                     maxLength={30}
                     onChangeText={(value) => {
-                      setUsername(value);
+                      setUsername(value.toLocaleLowerCase('en-US'));
                       setUsernameTouched(true);
                     }}
                     placeholder="@yourname"
@@ -1701,9 +1630,9 @@ export function PostSignupOnboardingFlow({
                   />
                   <View style={styles.bioSuggestions}>
                     {[
-                      'Ramen obsessive',
-                      'Natural wine person',
-                      'Will queue for a pastry',
+                      'Hunting hidden gems',
+                      'Will travel for dinner',
+                      'Ask me where to eat',
                     ].map((suggestion) => (
                       <Pressable
                         key={suggestion}
@@ -1799,13 +1728,13 @@ export function PostSignupOnboardingFlow({
     const currentYear = new Date().getFullYear();
     const years = Array.from(
       { length: 101 },
-      (_, index) => currentYear - 15 - index,
+      (_, index) => currentYear - 16 - index,
     ).reverse();
     const safeDay = Math.min(birthDay, maximumDay);
     const selectedBirthDate = new Date(birthYear, birthMonth, safeDay);
     const ageCutoff = new Date();
     ageCutoff.setHours(23, 59, 59, 999);
-    ageCutoff.setFullYear(ageCutoff.getFullYear() - 15);
+    ageCutoff.setFullYear(ageCutoff.getFullYear() - 16);
     const birthdayEligible = selectedBirthDate <= ageCutoff;
     return (
       <PatternScreen>
@@ -1854,7 +1783,7 @@ export function PostSignupOnboardingFlow({
           </View>
           {!birthdayEligible ? (
             <Text style={styles.birthdayError}>
-              You must be at least 15 years old.
+              You must be at least 16 years old.
             </Text>
           ) : null}
         </View>
@@ -2432,7 +2361,7 @@ export function PostSignupOnboardingFlow({
   if (screen === 'invite') {
     return (
       <PatternScreen>
-        <Header onBack={back} onSkip={() => navigate('notifications')} />
+        <Header onBack={back} onSkip={() => navigate('ready')} />
         <StepProgress overlay step={6} />
         <ScrollView
           contentContainerStyle={styles.invitePage}
@@ -2490,29 +2419,12 @@ export function PostSignupOnboardingFlow({
         </ScrollView>
         <PrimaryButton
           label="Continue"
-          onPress={() => navigate('notifications')}
+          onPress={() => navigate('ready')}
           style={styles.bottomButton}
         />
       </PatternScreen>
     );
   }
-
-  if (screen === 'notifications')
-    return (
-      <PermissionScreen
-        step={7}
-        icon={permissionNotifications}
-        title="Stay in the loop"
-        subtitle="Only the good stuff — when friends rate, follow, or reply."
-        button="Turn on Notifications"
-        footnote="Change these anytime in Settings."
-        onBack={back}
-        onSkip={() => navigate('ready')}
-        onPress={requestNotifications}
-      >
-        <NotificationExamples styles={styles} />
-      </PermissionScreen>
-    );
 
   // Reserve at least half the row for the copy and action, including in a
   // nearly square window. The whole page can scroll if its height is limited.

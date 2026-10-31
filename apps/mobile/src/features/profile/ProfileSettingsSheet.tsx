@@ -1394,7 +1394,13 @@ export function ProfileSettingsSheet({
                           : undefined
                     }
                     multiline={editing === 'bio'}
-                    onChangeText={setDraft}
+                    onChangeText={(value) =>
+                      setDraft(
+                        editing === 'username'
+                          ? value.toLocaleLowerCase('en-US')
+                          : value,
+                      )
+                    }
                     placeholderTextColor={colors.textMuted}
                     style={[styles.input, editing === 'bio' && styles.bioInput]}
                     textAlignVertical={editing === 'bio' ? 'top' : 'center'}

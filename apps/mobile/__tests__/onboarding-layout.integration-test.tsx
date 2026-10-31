@@ -92,7 +92,6 @@ const onboardingPatternCases = [
   ['postSignup', 'contactsPermission', 'shared'],
   ['postSignup', 'invite', 'shared'],
   ['postSignup', 'contacts', 'shared'],
-  ['postSignup', 'notifications', 'shared'],
   ['postSignup', 'ready', 'ready'],
 ] as const;
 
@@ -389,9 +388,11 @@ describe('onboarding in resizable windows', () => {
     expect(
       screen.getByPlaceholderText('What do you always order?').props.maxLength,
     ).toBe(80);
-    await fireEvent.press(screen.getByText('Natural wine person'));
-    expect(screen.getByDisplayValue('Natural wine person')).toBeOnTheScreen();
-    expect(screen.getByText('19/80')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Will travel for dinner'));
+    expect(
+      screen.getByDisplayValue('Will travel for dinner'),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('22/80')).toBeOnTheScreen();
   });
 
   it('keeps the place search container 16pt below the subtitle on iPhone 16 Pro Max', async () => {
@@ -456,7 +457,6 @@ describe('onboarding in resizable windows', () => {
   it.each([
     ['profile', 'onboarding-profile-fields-card'],
     ['contactsPermission', 'onboarding-people-teaser'],
-    ['notifications', 'onboarding-notification-card-now'],
   ] as const)(
     'uses a light surface for the %s card',
     async (initialScreen, testID) => {
@@ -835,7 +835,6 @@ describe('onboarding in resizable windows', () => {
     ['contactsPermission', 'Pick your look'],
     ['contacts', 'Find your people'],
     ['invite', 'Find your people'],
-    ['notifications', 'Invite your friends'],
   ] as const)(
     'navigates back from the directly opened %s post-signup screen',
     async (initialScreen, expectedTitle) => {
@@ -939,7 +938,7 @@ describe('onboarding in resizable windows', () => {
     expect(permissionBody).not.toContainElement(
       screen.getByRole('button', { name: 'Allow Contacts' }),
     );
-    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 6 of 6')).toBeOnTheScreen();
     expect(screen.getByText('People you know')).toBeOnTheScreen();
     expect(
       screen.getByText('3 of your contacts are on Tastes'),
@@ -963,18 +962,13 @@ describe('onboarding in resizable windows', () => {
     expect(invitations).not.toContainElement(
       screen.getByRole('button', { name: 'Continue' }),
     );
-    expect(screen.getByLabelText('Step 6 of 7')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 6 of 6')).toBeOnTheScreen();
     expect(screen.queryByText('1 of 3 friends invited')).not.toBeOnTheScreen();
     expect(screen.getByText('Invite from your contacts')).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Stay in the loop')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Step 7 of 7')).toBeOnTheScreen();
-    expect(screen.getByText('Amara rated Sabor ★ 4.9')).toBeOnTheScreen();
-    expect(screen.getByText('Marco started following you')).toBeOnTheScreen();
-    expect(
-      screen.getByText('Change these anytime in Settings.'),
-    ).toBeOnTheScreen();
+    expect(await screen.findByText('You’re ready!')).toBeOnTheScreen();
+    expect(screen.queryByText('Stay in the loop')).not.toBeOnTheScreen();
   });
 
   it('resizes the ready illustration without squeezing out the completion action', async () => {

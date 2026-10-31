@@ -1199,9 +1199,9 @@ export function ProfileScreen({
         keyValue={mapKey}
         mappedPlaces={mappedPlaces}
         onClose={() => setMapOpen(false)}
-        onOpenPlace={(venueId) => {
+        onOpenReview={(reviewId) => {
           setMapOpen(false);
-          onOpenPlace(venueId);
+          onOpenComments(reviewId);
         }}
         onRetry={() => setMapReload((value) => value + 1)}
         placeCount={mapPlaces.length}
