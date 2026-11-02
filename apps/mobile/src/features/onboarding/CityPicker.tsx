@@ -34,6 +34,11 @@ export const cities = [
   [flagPortugal, 'Lisbon', 'Portugal'],
 ] as const;
 
+const pinnedCityCount = 4;
+const citySearchAliases: Record<string, readonly string[]> = {
+  Monaco: ['Menton', 'Roquebrune-Cap-Martin', 'Roquebrune Cap Martin'],
+};
+
 export function canonicalCityName(name: string): string {
   const normalized = name.trim().toLocaleLowerCase('en-US');
   return normalized === 'menton' ||
@@ -41,6 +46,24 @@ export function canonicalCityName(name: string): string {
     normalized === 'roquebrune cap martin'
     ? 'Monaco'
     : name.trim();
+}
+
+export function cityMatchesSearch(name: string, search: string): boolean {
+  const normalizedSearch = search.trim().toLocaleLowerCase('en-US');
+  if (!normalizedSearch) return true;
+  return [name, ...(citySearchAliases[name] ?? [])].some((candidate) =>
+    candidate.toLocaleLowerCase('en-US').includes(normalizedSearch),
+  );
+}
+
+function cityAliasMatchesSearch(name: string, search: string): boolean {
+  const normalizedSearch = search.trim().toLocaleLowerCase('en-US');
+  return Boolean(
+    normalizedSearch &&
+    citySearchAliases[name]?.some((alias) =>
+      alias.toLocaleLowerCase('en-US').includes(normalizedSearch),
+    ),
+  );
 }
 
 export const countryFlags: Record<string, ImageSourcePropType> = {
@@ -74,11 +97,21 @@ export function CityPicker({
   const [search, setSearch] = useState(initialSearch);
   const normalizedSearch = search.trim();
   const filtered = cities.filter((item) =>
-    item[1].toLowerCase().includes(normalizedSearch.toLowerCase()),
+    cityMatchesSearch(item[1], normalizedSearch),
   );
+  const pinnedCities = filtered.filter((item) =>
+    cities.slice(0, pinnedCityCount).includes(item),
+  );
+  const otherCities = filtered.filter(
+    (item) => !cities.slice(0, pinnedCityCount).includes(item),
+  );
+  const isAliasSearch =
+    normalizedSearch.length >= 2 &&
+    filtered.some((item) => cityAliasMatchesSearch(item[1], normalizedSearch));
   const canUseCustomCity =
     Boolean(onCustomSelect) &&
     normalizedSearch.length >= 2 &&
+    !isAliasSearch &&
     !cities.some(
       (item) => item[1].toLowerCase() === normalizedSearch.toLowerCase(),
     );
@@ -97,6 +130,9 @@ export function CityPicker({
         value={search}
       />
       <ScrollView keyboardShouldPersistTaps="handled">
+        {!normalizedSearch && pinnedCities.length ? (
+          <Text style={styles.sectionTitle}>Pinned</Text>
+        ) : null}
         {canUseCustomCity ? (
           <Pressable
             accessibilityLabel={`Use ${normalizedSearch} as city`}
@@ -113,8 +149,13 @@ export function CityPicker({
             </Text>
           </Pressable>
         ) : null}
-        {filtered.map(([flag, name]) => (
+        {(normalizedSearch ? filtered : pinnedCities).map(([flag, name]) => (
           <Pressable
+            accessibilityLabel={
+              isAliasSearch && name === 'Monaco'
+                ? `${normalizedSearch}, Monaco area`
+                : name
+            }
             key={name}
             onPress={() => onSelect(name, flag)}
             style={styles.cityRow}
@@ -123,6 +164,22 @@ export function CityPicker({
             <Text style={styles.cityName}>{name}</Text>
           </Pressable>
         ))}
+        {!normalizedSearch && otherCities.length ? (
+          <Text style={styles.sectionTitle}>More cities</Text>
+        ) : null}
+        {!normalizedSearch
+          ? otherCities.map(([flag, name]) => (
+              <Pressable
+                accessibilityLabel={name}
+                key={name}
+                onPress={() => onSelect(name, flag)}
+                style={styles.cityRow}
+              >
+                <Image source={flag} style={styles.cityFlag} />
+                <Text style={styles.cityName}>{name}</Text>
+              </Pressable>
+            ))
+          : null}
       </ScrollView>
     </View>
   );
@@ -145,6 +202,15 @@ function createStyles(colors: ThemeColors) {
       color: colors.text,
       fontSize: 14,
       backgroundColor: colors.surfaceRaised,
+    },
+    sectionTitle: {
+      marginTop: 14,
+      marginBottom: 2,
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: '700',
+      textTransform: 'uppercase',
     },
     cityRow: {
       height: 49,
