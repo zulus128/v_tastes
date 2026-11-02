@@ -62,6 +62,7 @@ import {
   useDeleteComment,
   useReactToComment,
 } from './api';
+import { reviewTagLabels } from '../reviews/ReviewMetadata';
 import {
   useAuthenticatedUserId,
   useTastesApi,
@@ -76,16 +77,6 @@ const commentReportReasons: Array<{ label: string; value: ReportReason }> = [
   { label: 'False information', value: 'Misinformation' },
   { label: 'Something else', value: 'Something else' },
 ];
-
-const tagLabels: Record<string, string> = {
-  'quick-bites': '⚡ Quick bites',
-  casual: 'Casual',
-  fancy: '🥂 Fancy',
-  'night-out': '🌙 Night out',
-  'date-night': 'Date night',
-  birthday: 'Birthday',
-  children: 'With children',
-};
 
 const seededDishPhotos = [sushiPhoto, restaurantPhoto, loungePhoto];
 
@@ -313,7 +304,7 @@ function MainReview({
           </View>
           {review.tags[0] ? (
             <Text style={styles.reviewTag}>
-              {tagLabels[review.tags[0]] ?? review.tags[0]}
+              {reviewTagLabels[review.tags[0]] ?? review.tags[0]}
             </Text>
           ) : null}
         </View>

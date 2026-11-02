@@ -104,6 +104,7 @@ import { buildCompletionInput } from './completion-input';
 import { useAppTheme, type ThemeColors } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
+import { type FavoriteDish, favoriteDishes } from './favoriteDishes';
 import {
   DESIGN_VIEWPORT,
   responsiveSize,
@@ -329,18 +330,22 @@ function LazyVenueImage({
   );
 }
 
-const dishes = [
-  { label: 'Burgers', icon: dishBurgers },
-  { label: 'Pasta', icon: dishPasta },
-  { label: 'Pizza', icon: dishPizza },
-  { label: 'Sushi', icon: dishSushi },
-  { label: 'Tacos', icon: dishTacos },
-  { label: 'Salads', icon: dishSalads },
-  { label: 'Ramen', icon: dishRamen },
-  { label: 'Steak', icon: dishSteak },
-  { label: 'Fish', icon: dishFish },
-  { label: 'Curry', icon: dishCurry },
-] as const;
+const dishIcons: Record<FavoriteDish, ImageSourcePropType> = {
+  Burgers: dishBurgers,
+  Pasta: dishPasta,
+  Pizza: dishPizza,
+  Sushi: dishSushi,
+  Tacos: dishTacos,
+  Salads: dishSalads,
+  Ramen: dishRamen,
+  Steak: dishSteak,
+  Fish: dishFish,
+  Curry: dishCurry,
+};
+const dishes = favoriteDishes.map((label) => ({
+  label,
+  icon: dishIcons[label],
+}));
 type PlaceCandidate = {
   id: string;
   name: string;

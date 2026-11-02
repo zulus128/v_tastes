@@ -5,7 +5,9 @@ import NightTagIcon from '../../../assets/create-review/tag-night.svg';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
-const moodLabels: Record<string, string> = {
+// Shared with every surface that renders a review tag so the emoji labels
+// match what the author picked during review creation.
+export const reviewTagLabels: Record<string, string> = {
   casual: '🍽️ Casual',
   'date-night': 'Date night',
   birthday: 'Birthday',
@@ -37,7 +39,7 @@ export function ReviewMetaRow({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const moodLabel = mood ? (moodLabels[mood] ?? mood) : null;
+  const moodLabel = mood ? (reviewTagLabels[mood] ?? mood) : null;
   const MoodIcon =
     mood === 'birthday'
       ? BirthdayTagIcon

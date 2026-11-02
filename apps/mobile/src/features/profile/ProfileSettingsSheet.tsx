@@ -62,6 +62,7 @@ import {
 } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { CityPicker, cityFlag } from '../onboarding/CityPicker';
+import { favoriteDishes } from '../onboarding/favoriteDishes';
 import { useProfile } from './api';
 import { ProfileAvatar } from './avatar';
 
@@ -89,19 +90,6 @@ const appearanceOptions: readonly {
   { label: 'Light', description: 'Always use the light theme', value: 'light' },
   { label: 'Dark', description: 'Always use the dark theme', value: 'dark' },
 ];
-
-const favoriteDishOptions = [
-  'Burgers',
-  'Pasta',
-  'Pizza',
-  'Sushi',
-  'Tacos',
-  'Salads',
-  'Ramen',
-  'Steak',
-  'Fish',
-  'Curry',
-] as const;
 
 type PrivacyPreferences = {
   privateAccount: boolean;
@@ -1396,7 +1384,7 @@ export function ProfileSettingsSheet({
                       showsVerticalScrollIndicator={false}
                       style={styles.dishOptionsScroll}
                     >
-                      {favoriteDishOptions.map((dish) => (
+                      {favoriteDishes.map((dish) => (
                         <Pressable
                           accessibilityLabel={`Select ${dish}`}
                           accessibilityRole="radio"
