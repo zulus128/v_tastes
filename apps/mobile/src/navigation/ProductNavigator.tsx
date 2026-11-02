@@ -93,7 +93,9 @@ export type MainTabParamList = {
   Discover: undefined;
   Create: { venueId?: string } | undefined;
   Dialog: undefined;
-  Profile: { initialFollowing?: boolean; userId?: string } | undefined;
+  Profile:
+    | { initialFollowing?: boolean; returnToVenueId?: string; userId?: string }
+    | undefined;
 };
 
 export type ProductVisualAuditRoute = {
@@ -385,11 +387,15 @@ function MainTabs({
                 fallbackName={user.displayName ?? 'Your profile'}
                 initialFollowing={route.params?.initialFollowing}
                 onBack={() => {
+                  const returnToVenueId = route.params?.returnToVenueId;
                   navigation.setParams({
                     initialFollowing: undefined,
+                    returnToVenueId: undefined,
                     userId: undefined,
                   });
-                  navigation.navigate('Discover');
+                  // A profile opened from a venue review returns to that venue.
+                  if (returnToVenueId) openPlace(returnToVenueId);
+                  else navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
                 onClearFilters={onClearDiscoverFilters}
@@ -593,7 +599,10 @@ export function ProductNavigator({
               onOpenProfile={(profileUserId) =>
                 navigation.navigate('MainTabs', {
                   screen: 'Profile',
-                  params: { userId: profileUserId },
+                  params: {
+                    returnToVenueId: route.params.venueId,
+                    userId: profileUserId,
+                  },
                 })
               }
               onPrefetchComments={prefetchVisibleComments}
