@@ -44,6 +44,10 @@ import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import sharp from 'sharp';
 import { userSearchTokens } from '../modules/users/search';
+import {
+  applyUserReviewCounts,
+  findUserReviewCountMismatches,
+} from '../shared/review-counts';
 import { selectSeedDishPhotoUrl } from './seed-dish-photos';
 
 if (getApps().length === 0) {
@@ -2044,6 +2048,16 @@ async function main() {
         );
       }
     }),
+  );
+
+  // Seeded profiles carry demo counters; align them with the reviews that
+  // actually exist so profile headers match the visible review list.
+  await applyUserReviewCounts(
+    db,
+    await findUserReviewCountMismatches(
+      db,
+      users.map((user) => user.id),
+    ),
   );
 
   console.log(
