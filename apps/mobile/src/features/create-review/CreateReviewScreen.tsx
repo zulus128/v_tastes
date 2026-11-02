@@ -71,6 +71,7 @@ import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
 import { type DishReviewDraft, useCreateReview } from './api';
+import { updateDishReviewDraft } from './dishDraft';
 import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
   concentricRatingLayout,
@@ -2046,10 +2047,13 @@ function DishEditor({
           mediaTypes: ['images'],
           quality: 0.8,
         });
-    if (!result.canceled) {
+    const photoUri = result.canceled ? undefined : result.assets[0]?.uri;
+    if (photoUri) {
       // Normalize at the upload boundary so restored drafts and newly chosen
       // images take exactly one lossy resize/encode pass.
-      setDraft({ ...draft, photoUri: result.assets[0].uri });
+      setDraft((current) =>
+        current ? updateDishReviewDraft(current, { photoUri }) : current,
+      );
     }
   }
 
@@ -2152,7 +2156,13 @@ function DishEditor({
               )}
             </Pressable>
             <RatingCurve
-              onChange={(rating) => setDraft({ ...draft, rating })}
+              onChange={(rating) =>
+                setDraft((current) =>
+                  current
+                    ? updateDishReviewDraft(current, { rating })
+                    : current,
+                )
+              }
               onGestureActiveChange={setRatingGestureActive}
               standaloneArc
               value={draft.rating}
@@ -2161,7 +2171,13 @@ function DishEditor({
               <Text style={styles.fieldLabel}>TITLE</Text>
               <TextInput
                 maxLength={120}
-                onChangeText={(title) => setDraft({ ...draft, title })}
+                onChangeText={(title) =>
+                  setDraft((current) =>
+                    current
+                      ? updateDishReviewDraft(current, { title })
+                      : current,
+                  )
+                }
                 placeholder="Enter text"
                 placeholderTextColor={colors.placeholder}
                 style={styles.input}
