@@ -300,6 +300,7 @@ function MainTabs({
           {({ navigation }) => (
             <DiscoverScreen
               appliedFilters={discoverFilters}
+              onClearFilters={onClearDiscoverFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
               onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
               onOpenComments={openComments}

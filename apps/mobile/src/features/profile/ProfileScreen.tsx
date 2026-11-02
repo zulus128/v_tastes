@@ -1143,6 +1143,7 @@ export function ProfileScreen({
             <View style={styles.wishlistPane}>
               <FavouritesPane
                 appliedFilters={appliedFilters}
+                onClearFilters={onClearFilters}
                 onOpenFilters={onOpenFilters}
                 onOpenPlace={onOpenPlace}
                 onPrefetchPlaces={onPrefetchPlaces}

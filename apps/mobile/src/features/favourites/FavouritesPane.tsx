@@ -51,6 +51,7 @@ export type SaveablePlace = {
 export function FavouritesPane({
   appliedFilters = [],
   onBack,
+  onClearFilters,
   onOpenFilters,
   onOpenPlace,
   onPrefetchPlaces,
@@ -58,6 +59,7 @@ export function FavouritesPane({
 }: {
   appliedFilters?: string[];
   onBack?: () => void;
+  onClearFilters?: () => void;
   onOpenFilters?: () => void;
   onOpenPlace: (venueId: string) => void;
   onPrefetchPlaces?: (venueIds: string[]) => void;
@@ -148,7 +150,8 @@ export function FavouritesPane({
             value={query}
           />
           <Pressable
-            accessibilityLabel="Open filters"
+            accessibilityLabel="Filter saved places"
+            accessibilityRole="button"
             hitSlop={8}
             onPress={onOpenFilters}
           >
@@ -160,6 +163,25 @@ export function FavouritesPane({
           </Pressable>
         </View>
       </View>
+
+      {appliedFilters.length > 0 ? (
+        <View style={styles.filterSummary} testID="wishlist-filter-summary">
+          <Text style={styles.filterSummaryText}>
+            Filtering saved places · {appliedFilters.length}{' '}
+            {appliedFilters.length === 1 ? 'filter' : 'filters'}
+          </Text>
+          {onClearFilters ? (
+            <Pressable
+              accessibilityLabel="Reset saved place filters"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onClearFilters}
+            >
+              <Text style={styles.filterSummaryClear}>Reset</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <ScrollView
         contentContainerStyle={styles.folderChips}
@@ -908,6 +930,26 @@ function createStyles(colors: ThemeColors) {
       color: colors.text,
       fontSize: 16,
       paddingVertical: 0,
+    },
+    filterSummary: {
+      minHeight: 38,
+      marginHorizontal: 16,
+      marginTop: 10,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: isDark ? '#762827' : '#E7B3B1',
+      borderRadius: 8,
+      backgroundColor: isDark ? '#2B1111' : '#FFF1F0',
+    },
+    filterSummaryText: { flexShrink: 1, color: colors.text, fontSize: 13 },
+    filterSummaryClear: {
+      marginLeft: 12,
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '600',
     },
     folderChipsScroll: { flexGrow: 0, flexShrink: 0, height: 48 },
     folderChips: {

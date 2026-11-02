@@ -102,6 +102,7 @@ const props = {
   appliedFilters: [],
   userId: 'user',
   onOpenAI: jest.fn(),
+  onClearFilters: jest.fn(),
   onOpenFilters: jest.fn(),
   onOpenComments: jest.fn(),
   onOpenPlace: jest.fn(),
