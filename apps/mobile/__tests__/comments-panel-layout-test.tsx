@@ -257,6 +257,23 @@ it('matches the full-width review panel and shows the dish count tag', async () 
   expect(style.borderWidth).toBeUndefined();
 });
 
+it('opens the reviewed venue when its name is pressed', async () => {
+  const onOpenPlace = jest.fn();
+  await render(
+    <PaginatedCommentsScreen
+      onBack={jest.fn()}
+      onOpenPlace={onOpenPlace}
+      reviewId="review-1"
+    />,
+  );
+
+  await userEvent.press(
+    screen.getByRole('link', { name: 'Open Gemini750 Restaurant' }),
+  );
+
+  expect(onOpenPlace).toHaveBeenCalledWith('venue-1');
+});
+
 it('keeps the reply target and input in one gapless composer field', async () => {
   await render(
     <PaginatedCommentsScreen onBack={jest.fn()} reviewId="review-1" />,

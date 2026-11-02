@@ -530,6 +530,10 @@ export function ProductNavigator({
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.navigate('MainTabs', { screen: 'Home' });
               }}
+              onOpenPlace={(venueId) => {
+                warmPlace(venueId);
+                navigation.navigate('Place', { venueId });
+              }}
               reviewId={route.params.reviewId}
             />
           )}

@@ -232,10 +232,12 @@ function RatingStars({
 }
 
 function MainReview({
+  onOpenPlace,
   onReact,
   reacting,
   review,
 }: {
+  onOpenPlace: (venueId: string) => void;
   onReact: () => void;
   reacting: boolean;
   review: CommentReview;
@@ -292,7 +294,17 @@ function MainReview({
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>
-            <Text style={styles.reviewVenue}>{review.venueName}</Text>
+            <Pressable
+              accessibilityLabel={`Open ${review.venueName}`}
+              accessibilityRole="link"
+              onPress={() => onOpenPlace(review.venueId)}
+              style={({ pressed }) => [
+                styles.reviewVenueLink,
+                pressed && styles.reviewVenueLinkPressed,
+              ]}
+            >
+              <Text style={styles.reviewVenue}>{review.venueName}</Text>
+            </Pressable>
             <RatingStars
               color={colors.primary}
               rating={review.rating}
@@ -628,10 +640,12 @@ function CommentRow({
 
 export function PaginatedCommentsScreen({
   commentId,
+  onOpenPlace = () => undefined,
   reviewId,
   onBack,
 }: {
   commentId?: string;
+  onOpenPlace?: (venueId: string) => void;
   reviewId: string;
   onBack: () => void;
 }) {
@@ -960,6 +974,7 @@ export function PaginatedCommentsScreen({
               review ? (
                 <View>
                   <MainReview
+                    onOpenPlace={onOpenPlace}
                     onReact={() => void reactToMainReview()}
                     reacting={reviewReacting}
                     review={review}
@@ -1393,6 +1408,8 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
     },
     reviewVenueCopy: { flex: 1, gap: 4 },
+    reviewVenueLink: { alignSelf: 'flex-start' },
+    reviewVenueLinkPressed: { opacity: 0.65 },
     reviewVenue: { color: colors.text, fontSize: 16, fontWeight: '700' },
     ratingStars: { flexDirection: 'row', gap: 2 },
     ratingStarCell: {
