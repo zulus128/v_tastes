@@ -44,11 +44,22 @@ configuration tooling. It is not bundled into Firebase Functions or used to
 merge remote application data. Expo configuration is repository-controlled,
 so the current exposure is limited to trusted local/CI build configuration.
 
+GHSA-g3hv-75wg-m249 (`minimatch` 3.1.5 / 10.2.5) and GHSA-3g3m-2fjr-6pw4
+(`glob` 13.0.6) were reported on 2026-11-02. Both are reached only through
+Expo CLI config loading and Jest/Istanbul coverage tooling, which glob
+repository-controlled paths. The patched releases (`minimatch` 11.0.1,
+`glob` 14.0.2) are new majors with incompatible APIs for those callers, so
+forcing them would break builds. Neither package is bundled into the app or
+Firebase Functions. On the same date `node-forge` was pinned to 1.4.2 and
+`joi` to 17.13.9 through workspace overrides.
+
 ## Exit criteria
 
 - Remove the `image-size` exceptions and replace the transitive dependency with `image-size` 2.0.3 or
   a later compatible version as soon as it is published by updating Expo /
   React Native / Metro or adding a workspace override.
+- Remove the `minimatch` and `glob` exceptions once Expo CLI and Jest depend
+  on the patched majors.
 - Remove the `node-forge`, Expo CLI Zod, and `deepmerge` exceptions as soon as
   their upstream dependency chains publish compatible patched releases.
 - Re-run `pnpm audit --prod`, the complete test suite, and both native builds.
