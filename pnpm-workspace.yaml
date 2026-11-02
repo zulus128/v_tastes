@@ -24,6 +24,9 @@ audit:
     - GHSA-86w9-cpqp-85rv
     - GHSA-mrhx-c7xc-m3w5
     - GHSA-gcqx-w48m-w2h4
+    # Build-tooling only (Expo CLI / Jest); patched majors are API-incompatible. See ADR 0008.
+    - GHSA-g3hv-75wg-m249
+    - GHSA-3g3m-2fjr-6pw4
 
 overrides:
   'brace-expansion@<2': 1.1.21
@@ -31,8 +34,9 @@ overrides:
   '@fastify/busboy@<3.2.2': 3.2.2
   '@grpc/grpc-js@<1.14.5': 1.14.5
   'compression@<1.8.2': 1.8.2
-  'joi@<17.13.8': 17.13.8
+  'joi@<17.13.9': 17.13.9
   'nanoid@3': 3.3.18
+  'node-forge@<1.4.1': 1.4.2
   'js-yaml@3': 3.15.2
   'js-yaml@4': 4.3.2
   'launch-editor@<=2.14.1': 2.14.2
