@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import MapView, { Marker, UrlTile, type Region } from 'react-native-maps';
+import MapView, { Marker, type Region } from 'react-native-maps';
 import mapBarIcon from '../../../assets/profile/map-bar.png';
 import mapCafeIcon from '../../../assets/profile/map-cafe.png';
 import mapTrendingIcon from '../../../assets/profile/map-trending.png';
@@ -20,10 +20,6 @@ import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { responsiveStyleSheet } from '../../ui/responsive';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 
-const LIGHT_MAP_TILES =
-  'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-const DARK_MAP_TILES =
-  'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function mapVenueIcon(venue: Venue, active: boolean) {
@@ -128,18 +124,11 @@ export function ProfileMapSheet({
               <MapView
                 initialRegion={region}
                 key={keyValue}
-                mapType="none"
                 pitchEnabled={false}
                 rotateEnabled={false}
                 style={styles.map}
                 userInterfaceStyle={isDark ? 'dark' : 'light'}
               >
-                <UrlTile
-                  maximumZ={19}
-                  shouldReplaceMapContent
-                  tileSize={256}
-                  urlTemplate={isDark ? DARK_MAP_TILES : LIGHT_MAP_TILES}
-                />
                 {mappedPlaces.map(({ review, venue }, index) => (
                   <Marker
                     coordinate={{
