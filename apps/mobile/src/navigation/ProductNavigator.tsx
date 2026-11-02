@@ -589,6 +589,12 @@ export function ProductNavigator({
                 warmComments(reviewId);
                 navigation.navigate('Comments', { reviewId });
               }}
+              onOpenProfile={(profileUserId) =>
+                navigation.navigate('MainTabs', {
+                  screen: 'Profile',
+                  params: { userId: profileUserId },
+                })
+              }
               onPrefetchComments={prefetchVisibleComments}
               userId={user.uid}
               venueId={route.params.venueId}

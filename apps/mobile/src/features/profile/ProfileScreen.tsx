@@ -1204,6 +1204,7 @@ export function ProfileScreen({
           onOpenComments(reviewId);
         }}
         onRetry={() => setMapReload((value) => value + 1)}
+        own={own}
         placeCount={mapPlaces.length}
         region={mapRegion}
         visible={mapOpen && !blocked}

@@ -48,7 +48,7 @@ const item = {
   cuisine: 'Japanese',
   rating: 3.5,
   text: 'One answer is that Truth pertains to the possibility that an event will occur. If true, it must occur and if false, it cannot occur.',
-  tags: ['date-night'],
+  tags: ['quick-bites'],
   dishReviews: [
     {
       id: 'dish-1',
@@ -102,7 +102,7 @@ describe('profile review card', () => {
     expect(screen.getByText('Wasabi by Morimoto')).toBeOnTheScreen();
     expect(screen.getByLabelText('3.5 out of 5 stars')).toBeOnTheScreen();
     expect(screen.getByText('Madrid')).toBeOnTheScreen();
-    expect(screen.getByText('Date night')).toBeOnTheScreen();
+    expect(screen.getByText('⚡ Quick Bite')).toBeOnTheScreen();
     expect(screen.getByText('Japanese')).toBeOnTheScreen();
     expect(screen.getByText('Dishes (2)')).toBeOnTheScreen();
     expect(screen.getByTestId('profile-review-dishes')).toContainElement(

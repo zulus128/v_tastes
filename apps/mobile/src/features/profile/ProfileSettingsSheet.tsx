@@ -90,6 +90,19 @@ const appearanceOptions: readonly {
   { label: 'Dark', description: 'Always use the dark theme', value: 'dark' },
 ];
 
+const favoriteDishOptions = [
+  'Burgers',
+  'Pasta',
+  'Pizza',
+  'Sushi',
+  'Tacos',
+  'Salads',
+  'Ramen',
+  'Steak',
+  'Fish',
+  'Curry',
+] as const;
+
 type PrivacyPreferences = {
   privateAccount: boolean;
   showWishlist: boolean;
@@ -1118,7 +1131,6 @@ export function ProfileSettingsSheet({
               {cityOpen ? (
                 <CityPicker
                   initialSearch={profile?.city ?? ''}
-                  onCustomSelect={(name) => void save({ city: name })}
                   onSelect={(name) => void save({ city: name })}
                   topPadding={24}
                 />
@@ -1378,40 +1390,77 @@ export function ProfileSettingsSheet({
               >
                 <View style={styles.editor}>
                   <Text style={styles.editorTitle}>Edit {labels[editing]}</Text>
-                  <TextInput
-                    accessibilityLabel={
-                      editing === 'bio' ? 'Bio' : labels[editing]
-                    }
-                    autoCapitalize={
-                      editing === 'username' ? 'none' : 'sentences'
-                    }
-                    autoFocus
-                    maxLength={
-                      editing === 'bio'
-                        ? 80
-                        : editing === 'username' || editing === 'displayName'
-                          ? 30
-                          : undefined
-                    }
-                    multiline={editing === 'bio'}
-                    onChangeText={(value) =>
-                      setDraft(
-                        editing === 'username'
-                          ? value.toLocaleLowerCase('en-US')
-                          : value,
-                      )
-                    }
-                    placeholderTextColor={colors.textMuted}
-                    style={[styles.input, editing === 'bio' && styles.bioInput]}
-                    textAlignVertical={editing === 'bio' ? 'top' : 'center'}
-                    testID={editing === 'bio' ? 'profile-bio-input' : undefined}
-                    value={draft}
-                  />
+                  {editing === 'favoriteDish' ? (
+                    <ScrollView
+                      contentContainerStyle={styles.dishOptions}
+                      showsVerticalScrollIndicator={false}
+                      style={styles.dishOptionsScroll}
+                    >
+                      {favoriteDishOptions.map((dish) => (
+                        <Pressable
+                          accessibilityLabel={`Select ${dish}`}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: draft === dish }}
+                          key={dish}
+                          onPress={() => setDraft(dish)}
+                          style={[
+                            styles.dishOption,
+                            draft === dish && styles.dishOptionSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.dishOptionText,
+                              draft === dish && styles.dishOptionTextSelected,
+                            ]}
+                          >
+                            {dish}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <TextInput
+                      accessibilityLabel={
+                        editing === 'bio' ? 'Bio' : labels[editing]
+                      }
+                      autoCapitalize={
+                        editing === 'username' ? 'none' : 'sentences'
+                      }
+                      autoFocus
+                      maxLength={
+                        editing === 'bio'
+                          ? 80
+                          : editing === 'username' || editing === 'displayName'
+                            ? 30
+                            : undefined
+                      }
+                      multiline={editing === 'bio'}
+                      onChangeText={(value) =>
+                        setDraft(
+                          editing === 'username'
+                            ? value.toLocaleLowerCase('en-US')
+                            : value,
+                        )
+                      }
+                      placeholderTextColor={colors.textMuted}
+                      style={[
+                        styles.input,
+                        editing === 'bio' && styles.bioInput,
+                      ]}
+                      textAlignVertical={editing === 'bio' ? 'top' : 'center'}
+                      testID={
+                        editing === 'bio' ? 'profile-bio-input' : undefined
+                      }
+                      value={draft}
+                    />
+                  )}
                   {editing === 'bio' ? (
                     <Text style={styles.characterCount}>{draft.length}/80</Text>
                   ) : null}
                   <Pressable
                     accessibilityLabel={`Save ${labels[editing]}`}
+                    accessibilityRole="button"
                     disabled={saving}
                     onPress={saveField}
                     style={styles.saveButton}
@@ -1866,6 +1915,24 @@ function createStyles(
       backgroundColor: colors.canvas,
     },
     bioInput: { height: 112, paddingTop: 14, paddingBottom: 14 },
+    dishOptionsScroll: { maxHeight: 280, marginTop: 16 },
+    dishOptions: { gap: 8 },
+    dishOption: {
+      minHeight: 44,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.canvas,
+    },
+    dishOptionSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    dishOptionText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    dishOptionTextSelected: { color: '#FFFFFF' },
     characterCount: {
       marginTop: 6,
       marginRight: 4,

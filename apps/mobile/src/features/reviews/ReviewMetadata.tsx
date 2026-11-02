@@ -6,13 +6,13 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 
 const moodLabels: Record<string, string> = {
-  casual: 'Casual',
+  casual: '🍽️ Casual',
   'date-night': 'Date night',
   birthday: 'Birthday',
   children: 'With children',
-  'quick-bites': 'Quick bites',
-  fancy: 'Fancy',
-  'night-out': 'Night out',
+  'quick-bites': '⚡ Quick Bite',
+  fancy: '🥂 Fancy',
+  'night-out': '🌙 Night Out',
 };
 
 export function ReviewCityBadge({ city }: { city?: string | null }) {
@@ -41,7 +41,7 @@ export function ReviewMetaRow({
   const MoodIcon =
     mood === 'birthday'
       ? BirthdayTagIcon
-      : mood === 'date-night' || mood === 'night-out'
+      : mood === 'date-night'
         ? NightTagIcon
         : null;
   if (!moodLabel && !cuisine) return null;

@@ -97,6 +97,7 @@ function placeImage(url: string | null | undefined): ImageSourcePropType {
 export function PlaceScreen({
   onBack,
   onOpenComments,
+  onOpenProfile,
   onPrefetchComments,
   onWriteReview,
   userId,
@@ -104,6 +105,7 @@ export function PlaceScreen({
 }: {
   onBack: () => void;
   onOpenComments: (reviewId: string) => void;
+  onOpenProfile: (userId: string) => void;
   onPrefetchComments?: (reviewIds: string[]) => void;
   onWriteReview: () => void;
   userId: string;
@@ -443,6 +445,7 @@ export function PlaceScreen({
               fallbackPhotoUrls={photos}
               item={review}
               onComments={onOpenComments}
+              onOpenProfile={onOpenProfile}
               onReact={(reviewId) => void reactToReview(reviewId)}
               onShare={(item) =>
                 void Share.share({
@@ -974,6 +977,7 @@ export function ReviewCard({
   fallbackPhotoUrls,
   item: review,
   onComments,
+  onOpenProfile,
   onReact,
   onShare,
   reacted,
@@ -985,6 +989,7 @@ export function ReviewCard({
   fallbackPhotoUrls: string[];
   item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number];
   onComments: (reviewId: string) => void;
+  onOpenProfile: (userId: string) => void;
   onReact: (reviewId: string) => void;
   onShare: (
     review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number],
@@ -1002,7 +1007,12 @@ export function ReviewCard({
   }));
   return (
     <View style={[styles.review, styles.reviewListCard]}>
-      <View style={styles.reviewer}>
+      <Pressable
+        accessibilityLabel={`Open ${review.authorDisplayName} profile`}
+        accessibilityRole="button"
+        onPress={() => onOpenProfile(review.authorId)}
+        style={styles.reviewer}
+      >
         <UserAvatar
           displayName={review.authorDisplayName}
           photoUrl={review.authorPhotoUrl}
@@ -1017,7 +1027,7 @@ export function ReviewCard({
         <Text style={styles.reviewDate}>
           {formatDisplayDate(review.createdAt)}
         </Text>
-      </View>
+      </Pressable>
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>

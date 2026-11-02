@@ -42,6 +42,7 @@ export function ProfileMapSheet({
   onClose,
   onOpenReview,
   onRetry,
+  own,
   placeCount,
   region,
   visible,
@@ -55,6 +56,7 @@ export function ProfileMapSheet({
   onClose: () => void;
   onOpenReview: (reviewId: string) => void;
   onRetry: () => void;
+  own: boolean;
   placeCount: number;
   region: Region;
   visible: boolean;
@@ -99,7 +101,9 @@ export function ProfileMapSheet({
             <View style={styles.grabber} />
             <View style={styles.header}>
               <View>
-                <Text style={styles.title}>Places you reviewed</Text>
+                <Text style={styles.title}>
+                  {own ? 'Places you reviewed' : 'Places reviewed'}
+                </Text>
                 <Text style={styles.count}>
                   {placeCount === 0
                     ? 'No places yet'
@@ -166,12 +170,18 @@ export function ProfileMapSheet({
                 <Text style={styles.emptyTitle}>
                   {placeCount > 0
                     ? 'Locations unavailable'
-                    : 'No places on your map yet'}
+                    : own
+                      ? 'No places on your map yet'
+                      : 'No places on this map yet'}
                 </Text>
                 <Text style={styles.emptyCopy}>
                   {placeCount > 0
-                    ? 'Your reviews are available, but these places do not have map coordinates yet.'
-                    : 'Places you review or save show up here.'}
+                    ? own
+                      ? 'Your reviews are available, but these places do not have map coordinates yet.'
+                      : 'This profile has reviews, but these places do not have map coordinates yet.'
+                    : own
+                      ? 'Places you review or save show up here.'
+                      : 'Published reviews with map locations show up here.'}
                 </Text>
               </View>
             )}
