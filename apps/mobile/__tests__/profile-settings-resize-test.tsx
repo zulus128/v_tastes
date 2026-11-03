@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  userEvent,
   within,
 } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
@@ -315,7 +316,7 @@ it('suppresses the native iOS password accessory over change-password fields', a
   }
 });
 
-it('offers to save a city typed outside the suggested city list', async () => {
+it('does not offer to save a city typed outside the supported city list', async () => {
   await render(
     <ProfileSettingsSheet
       fallbackName="Test User"
@@ -328,10 +329,38 @@ it('offers to save a city typed outside the suggested city list', async () => {
   );
 
   await fireEvent.press(screen.getByLabelText('Edit City'));
-  await fireEvent.changeText(screen.getByPlaceholderText('Search'), 'Istanbul');
+  await fireEvent.changeText(
+    screen.getByPlaceholderText('Search'),
+    'Imaginary City',
+  );
 
-  expect(screen.getByLabelText('Use Istanbul as city')).toBeTruthy();
-  expect(screen.getByText('Use this city')).toBeTruthy();
+  expect(screen.queryByTestId('use-custom-city')).toBeNull();
+  expect(screen.queryByText('Use this city')).toBeNull();
+});
+
+it('limits favourite dish editing to the onboarding dish list', async () => {
+  const user = userEvent.setup();
+  await render(
+    <ProfileSettingsSheet
+      fallbackName="Test User"
+      onClose={jest.fn()}
+      onLogout={jest.fn()}
+      userId="tester"
+      visible
+    />,
+    { wrapper: Providers },
+  );
+
+  await fireEvent.press(screen.getByLabelText('Edit Favourite Dish'));
+  expect(screen.queryByLabelText('Favourite Dish')).toBeNull();
+  expect(screen.getByLabelText('Select Burgers')).toBeTruthy();
+  expect(screen.getByLabelText('Select Curry')).toBeTruthy();
+
+  await user.press(screen.getByLabelText('Select Sushi'));
+  expect(
+    screen.getByLabelText('Select Sushi').props.accessibilityState.selected,
+  ).toBe(true);
+  expect(screen.getByLabelText('Save Favourite Dish')).toBeTruthy();
 });
 
 it('does not mount the auto-focused city search when settings first opens', async () => {

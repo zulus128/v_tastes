@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 
 import type { PlaceReview } from '@tastes/contracts';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ReviewCard } from '../src/features/place/PlaceScreen';
 
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: String }));
@@ -58,6 +58,7 @@ it('shows the default profile avatar when a venue review author has no photo', a
       fallbackPhotoUrls={[]}
       item={review}
       onComments={jest.fn()}
+      onOpenProfile={jest.fn()}
       onReact={jest.fn()}
       onShare={jest.fn()}
       reacted={false}
@@ -70,4 +71,26 @@ it('shows the default profile avatar when a venue review author has no photo', a
 
   expect(screen.getByLabelText('Default profile avatar')).toBeOnTheScreen();
   expect(screen.queryByLabelText(/profile photo$/)).not.toBeOnTheScreen();
+});
+
+it('opens the review author profile from the venue review card', async () => {
+  const onOpenProfile = jest.fn();
+  await render(
+    <ReviewCard
+      fallbackPhotoUrls={[]}
+      item={review}
+      onComments={jest.fn()}
+      onOpenProfile={onOpenProfile}
+      onReact={jest.fn()}
+      onShare={jest.fn()}
+      reacted={false}
+      reactingId={null}
+      reviewIndex={0}
+      styles={{} as never}
+      venueName="Kadikoy Noodle House"
+    />,
+  );
+
+  fireEvent.press(screen.getByLabelText('Open Current User profile'));
+  expect(onOpenProfile).toHaveBeenCalledWith('current-user');
 });

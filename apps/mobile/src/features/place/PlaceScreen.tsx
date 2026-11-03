@@ -97,6 +97,7 @@ function placeImage(url: string | null | undefined): ImageSourcePropType {
 export function PlaceScreen({
   onBack,
   onOpenComments,
+  onOpenProfile,
   onPrefetchComments,
   onWriteReview,
   userId,
@@ -104,6 +105,7 @@ export function PlaceScreen({
 }: {
   onBack: () => void;
   onOpenComments: (reviewId: string) => void;
+  onOpenProfile: (userId: string) => void;
   onPrefetchComments?: (reviewIds: string[]) => void;
   onWriteReview: () => void;
   userId: string;
@@ -352,8 +354,17 @@ export function PlaceScreen({
       ) : (
         <>
           {dishFilter ? (
-            <Pressable onPress={() => setDishFilter(null)}>
-              <Text style={styles.primaryBadge}>Dish: {dishFilter} ×</Text>
+            <Pressable
+              accessibilityLabel={`Clear ${dishFilter} dish filter`}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setDishFilter(null)}
+              style={styles.dishFilterChip}
+            >
+              <Text numberOfLines={1} style={styles.dishFilterText}>
+                Dish: {dishFilter}
+              </Text>
+              <Text style={styles.dishFilterClear}>×</Text>
             </Pressable>
           ) : null}
           <ReviewsHeader
@@ -443,6 +454,7 @@ export function PlaceScreen({
               fallbackPhotoUrls={photos}
               item={review}
               onComments={onOpenComments}
+              onOpenProfile={onOpenProfile}
               onReact={(reviewId) => void reactToReview(reviewId)}
               onShare={(item) =>
                 void Share.share({
@@ -974,6 +986,7 @@ export function ReviewCard({
   fallbackPhotoUrls,
   item: review,
   onComments,
+  onOpenProfile,
   onReact,
   onShare,
   reacted,
@@ -985,6 +998,7 @@ export function ReviewCard({
   fallbackPhotoUrls: string[];
   item: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number];
   onComments: (reviewId: string) => void;
+  onOpenProfile: (userId: string) => void;
   onReact: (reviewId: string) => void;
   onShare: (
     review: NonNullable<ReturnType<typeof usePlaceReviews>['data']>[number],
@@ -1002,7 +1016,12 @@ export function ReviewCard({
   }));
   return (
     <View style={[styles.review, styles.reviewListCard]}>
-      <View style={styles.reviewer}>
+      <Pressable
+        accessibilityLabel={`Open ${review.authorDisplayName} profile`}
+        accessibilityRole="button"
+        onPress={() => onOpenProfile(review.authorId)}
+        style={styles.reviewer}
+      >
         <UserAvatar
           displayName={review.authorDisplayName}
           photoUrl={review.authorPhotoUrl}
@@ -1017,7 +1036,7 @@ export function ReviewCard({
         <Text style={styles.reviewDate}>
           {formatDisplayDate(review.createdAt)}
         </Text>
-      </View>
+      </Pressable>
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>
@@ -1493,6 +1512,26 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: 10,
       fontWeight: '700',
     },
+    dishFilterChip: {
+      marginTop: 14,
+      maxWidth: '100%',
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.primary,
+      borderRadius: 14,
+      paddingLeft: 12,
+      paddingRight: 10,
+      paddingVertical: 6,
+    },
+    dishFilterText: {
+      flexShrink: 1,
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    dishFilterClear: { color: '#fff', fontSize: 14, fontWeight: '700' },
     count: { color: colors.textMuted, fontSize: 11 },
     title: {
       marginTop: 7,

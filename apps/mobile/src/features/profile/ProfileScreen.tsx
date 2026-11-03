@@ -1143,6 +1143,7 @@ export function ProfileScreen({
             <View style={styles.wishlistPane}>
               <FavouritesPane
                 appliedFilters={appliedFilters}
+                onClearFilters={onClearFilters}
                 onOpenFilters={onOpenFilters}
                 onOpenPlace={onOpenPlace}
                 onPrefetchPlaces={onPrefetchPlaces}
@@ -1204,6 +1205,7 @@ export function ProfileScreen({
           onOpenComments(reviewId);
         }}
         onRetry={() => setMapReload((value) => value + 1)}
+        own={own}
         placeCount={mapPlaces.length}
         region={mapRegion}
         visible={mapOpen && !blocked}

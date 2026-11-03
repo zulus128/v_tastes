@@ -1,9 +1,12 @@
 /// <reference types="jest" />
 
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
-import { SaveToFolderSheet } from '../src/features/favourites/FavouritesPane';
+import {
+  FavouritesPane,
+  SaveToFolderSheet,
+} from '../src/features/favourites/FavouritesPane';
 
 const mockFolderIds: string[] = [];
 const mockLightColors = {
@@ -123,4 +126,36 @@ it('updates Save to sheet colors while the modal stays open', async () => {
   expect(StyleSheet.flatten(screen.getByText('×').props.style).color).toBe(
     '#FFFFFF',
   );
+});
+
+it('labels the wishlist filter and resets active saved-place filters', async () => {
+  mockResolvedTheme = 'light';
+  const onClearFilters = jest.fn();
+  await render(
+    <FavouritesPane
+      appliedFilters={['Open now', 'Italian']}
+      onClearFilters={onClearFilters}
+      onOpenFilters={jest.fn()}
+      onOpenPlace={jest.fn()}
+      userId="user-1"
+    />,
+  );
+
+  expect(screen.getByLabelText('Filter saved places')).toBeTruthy();
+  expect(screen.getByText(/2 filters/)).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Reset saved place filters'));
+  expect(onClearFilters).toHaveBeenCalledTimes(1);
+});
+
+it('hides the wishlist filter summary when no filters are active', async () => {
+  mockResolvedTheme = 'light';
+  await render(
+    <FavouritesPane
+      onOpenFilters={jest.fn()}
+      onOpenPlace={jest.fn()}
+      userId="user-1"
+    />,
+  );
+
+  expect(screen.queryByTestId('wishlist-filter-summary')).toBeNull();
 });

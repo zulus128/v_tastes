@@ -286,6 +286,7 @@ function venueToPlace(venue: Venue): Place {
 
 export function DiscoverScreen({
   appliedFilters,
+  onClearFilters,
   onOpenAI,
   onOpenFilters,
   onOpenComments,
@@ -296,6 +297,7 @@ export function DiscoverScreen({
   userId,
 }: {
   appliedFilters: string[];
+  onClearFilters: () => void;
   onOpenAI: () => void;
   onOpenFilters: () => void;
   onOpenComments: (reviewId: string) => void;
@@ -458,6 +460,7 @@ export function DiscoverScreen({
         <FavouritesPane
           appliedFilters={appliedFilters}
           onBack={() => setFavouritesOpen(false)}
+          onClearFilters={onClearFilters}
           onOpenFilters={onOpenFilters}
           onOpenPlace={onOpenPlace}
           onPrefetchPlaces={onPrefetchPlaces}
