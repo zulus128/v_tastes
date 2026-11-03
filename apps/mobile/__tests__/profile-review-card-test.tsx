@@ -9,6 +9,15 @@ import { ProfileReviewCard } from '../src/features/profile/ProfileReviewCard';
 import type { ProfileData } from '../src/features/profile/api';
 import { ThemeProvider } from '../src/ui/ThemeProvider';
 
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = jest.requireActual('react-native');
+  return {
+    SafeAreaProvider: View,
+    SafeAreaView: View,
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 21, left: 0 }),
+  };
+});
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual(
     '@react-native-async-storage/async-storage/jest/async-storage-mock',
@@ -116,6 +125,28 @@ describe('profile review card', () => {
     expect(onReact).toHaveBeenCalledTimes(1);
     expect(onComments).toHaveBeenCalledTimes(1);
     expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens dishes in the same Dish Review sheet as the feed', async () => {
+    await render(
+      <ProfileReviewCard
+        item={item}
+        onComments={jest.fn()}
+        onMore={jest.fn()}
+        onReact={jest.fn()}
+        onShare={jest.fn()}
+        profile={profile}
+      />,
+      { wrapper: Providers },
+    );
+
+    await fireEvent.press(
+      await screen.findByLabelText('Open dish review for Medium Rare Steak'),
+    );
+
+    expect(screen.getByTestId('dish-review-sheet')).toBeOnTheScreen();
+    expect(screen.getByText('Dish Review')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Next dish')).toBeOnTheScreen();
   });
 
   it('expands long review text from the two-line Figma preview', async () => {

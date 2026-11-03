@@ -62,7 +62,8 @@ import {
   useDeleteComment,
   useReactToComment,
 } from './api';
-import { reviewTagLabels } from '../reviews/ReviewMetadata';
+import { DishReviewSheet } from '../reviews/DishReviewSheet';
+import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import {
   useAuthenticatedUserId,
   useTastesApi,
@@ -235,24 +236,11 @@ function MainReview({
 }) {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { height: viewportHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const dishModalHeight = Math.max(
-    0,
-    Math.min(responsiveSize(550), viewportHeight - insets.top),
+  const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
+    null,
   );
-  const [selectedDish, setSelectedDish] = useState<
-    CommentReview['dishReviews'][number] | null
-  >(null);
-  const dishSheet = useBottomSheetMotion({
-    onClose: () => setSelectedDish(null),
-    visible: selectedDish !== null,
-  });
   const seededReview =
     review.id.startsWith('seed-own-') || review.id === 'visual-audit-review';
-  const selectedDishIndex = selectedDish
-    ? review.dishReviews.findIndex((dish) => dish.id === selectedDish.id)
-    : -1;
   return (
     <View style={styles.mainReview}>
       <View style={styles.reviewAuthorRow}>
@@ -302,11 +290,7 @@ function MainReview({
               styles={styles}
             />
           </View>
-          {review.tags[0] ? (
-            <Text style={styles.reviewTag}>
-              {reviewTagLabels[review.tags[0]] ?? review.tags[0]}
-            </Text>
-          ) : null}
+          <ReviewCityBadge city={review.venueCity} />
         </View>
         {review.dishReviews.length > 0 ? (
           <View>
@@ -317,7 +301,8 @@ function MainReview({
               keyExtractor={(dish) => dish.id}
               renderItem={({ index, item: dish }) => (
                 <Pressable
-                  onPress={() => setSelectedDish(dish)}
+                  accessibilityLabel={`Open dish review for ${dish.title}`}
+                  onPress={() => setSelectedDishIndex(index)}
                   style={styles.dishCard}
                 >
                   <DishPhoto
@@ -342,6 +327,9 @@ function MainReview({
           </View>
         ) : null}
         <Text style={styles.reviewText}>{review.text}</Text>
+        <View style={styles.reviewMeta}>
+          <ReviewMetaRow cuisine={review.cuisine} mood={review.tags[0]} />
+        </View>
         <View style={styles.reviewActions}>
           <Pressable
             disabled={reacting}
@@ -381,7 +369,7 @@ function MainReview({
           {review.dishReviews.length > 0 ? (
             <Pressable
               accessibilityLabel="Open dish reviews"
-              onPress={() => setSelectedDish(review.dishReviews[0] ?? null)}
+              onPress={() => setSelectedDishIndex(0)}
               style={styles.dishesButton}
             >
               <TopRatedDishesIcon
@@ -396,70 +384,20 @@ function MainReview({
           ) : null}
         </View>
       </View>
-      <Modal
-        animationType="none"
-        onRequestClose={dishSheet.close}
-        transparent
-        visible={selectedDish !== null}
-      >
-        <View style={styles.dishModalScrim}>
-          <Pressable
-            onPress={dishSheet.close}
-            style={StyleSheet.absoluteFill}
-          />
-          <Animated.View
-            style={[
-              styles.dishModal,
-              {
-                height: dishModalHeight,
-                paddingBottom: Math.max(responsiveSize(16), insets.bottom),
-                transform: [{ translateY: dishSheet.translateY }],
-              },
-            ]}
-          >
-            <View style={styles.sheetDragArea} {...dishSheet.panHandlers}>
-              <View style={styles.sheetHandle} />
-            </View>
-            <View style={styles.dishModalHeader}>
-              <Text style={styles.dishModalTitle}>Dish Review</Text>
-              <Pressable
-                accessibilityLabel="Close dish review"
-                onPress={dishSheet.close}
-                style={styles.dishModalClose}
-              >
-                <Text style={styles.dishModalCloseText}>×</Text>
-              </Pressable>
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.dishModalContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {selectedDish ? (
-                <>
-                  <View style={styles.dishModalImage}>
-                    <DishPhoto
-                      fallbackSource={
-                        seededReview && selectedDishIndex >= 0
-                          ? seededDishPhotos[
-                              selectedDishIndex % seededDishPhotos.length
-                            ]
-                          : undefined
-                      }
-                      path={selectedDish.photoPath}
-                      styles={styles}
-                      url={selectedDish.photoUrl}
-                    />
-                  </View>
-                  <Text style={styles.dishModalRating}>
-                    ★ {selectedDish.rating.toFixed(1)}
-                  </Text>
-                  <Text style={styles.dishModalName}>{selectedDish.title}</Text>
-                </>
-              ) : null}
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
+      <DishReviewSheet
+        dishes={review.dishReviews}
+        fallbackUri={
+          seededReview
+            ? (index) =>
+                Image.resolveAssetSource(
+                  seededDishPhotos[index % seededDishPhotos.length],
+                ).uri
+            : undefined
+        }
+        index={selectedDishIndex}
+        onClose={() => setSelectedDishIndex(null)}
+        onIndexChange={setSelectedDishIndex}
+      />
     </View>
   );
 }
@@ -1366,10 +1304,19 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
     },
     empty: { color: colors.textMuted, textAlign: 'center', padding: 32 },
+    // The review being discussed uses the same bordered card as the feed and
+    // profile instead of a full-bleed banner above the thread.
     mainReview: {
-      marginBottom: 8,
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 12,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 24,
       backgroundColor: colors.surface,
     },
+    reviewMeta: { paddingHorizontal: 16 },
     reviewAuthorRow: {
       minHeight: 72,
       paddingHorizontal: 16,
@@ -1392,7 +1339,7 @@ const createStyles = (colors: ThemeColors) =>
     reviewAuthor: { color: colors.text, fontSize: 15, fontWeight: '700' },
     reviewUsername: { color: colors.textMuted, fontSize: 13 },
     reviewDate: { color: colors.textMuted, fontSize: 13 },
-    reviewBody: { paddingTop: 14, gap: 16 },
+    reviewBody: { paddingTop: 14, paddingBottom: 16, gap: 16 },
     reviewVenueRow: {
       paddingHorizontal: 16,
       flexDirection: 'row',
@@ -1416,17 +1363,6 @@ const createStyles = (colors: ThemeColors) =>
       top: 0,
       bottom: 0,
       overflow: 'hidden',
-    },
-    reviewTag: {
-      overflow: 'hidden',
-      paddingHorizontal: 11,
-      paddingVertical: 5,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-      borderRadius: 20,
-      color: colors.text,
-      fontSize: 12,
-      backgroundColor: colors.canvas,
     },
     dishes: { gap: 9, paddingHorizontal: 16 },
     dishCard: {
@@ -1479,20 +1415,6 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '700',
       backgroundColor: 'rgba(0,0,0,0.55)',
     },
-    dishModalScrim: {
-      flex: 1,
-      justifyContent: 'flex-end',
-      backgroundColor: 'rgba(0,0,0,0.72)',
-    },
-    dishModal: {
-      padding: 16,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      borderWidth: 1,
-      borderBottomWidth: 0,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
     sheetDragArea: {
       height: 24,
       marginTop: -10,
@@ -1504,51 +1426,6 @@ const createStyles = (colors: ThemeColors) =>
       height: 4,
       borderRadius: 2,
       backgroundColor: colors.border,
-    },
-    dishModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center' },
-    dishModalContent: { paddingBottom: 8 },
-    dishModalTitle: {
-      flex: 1,
-      color: colors.text,
-      fontSize: 20,
-      fontWeight: '700',
-    },
-    dishModalClose: {
-      width: 28,
-      height: 28,
-      borderWidth: 2,
-      borderColor: colors.text,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dishModalCloseText: { color: colors.text, fontSize: 20, lineHeight: 21 },
-    dishModalImage: {
-      width: '100%',
-      aspectRatio: 1,
-      maxHeight: 380,
-      marginTop: 8,
-      overflow: 'hidden',
-      borderRadius: 16,
-      backgroundColor: colors.surfaceRaised,
-    },
-    dishModalRating: {
-      alignSelf: 'flex-start',
-      marginTop: 16,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-      borderRadius: 18,
-      overflow: 'hidden',
-      color: '#FFFFFF',
-      backgroundColor: colors.primary,
-      fontSize: 15,
-      fontWeight: '700',
-    },
-    dishModalName: {
-      marginTop: 10,
-      color: colors.text,
-      fontSize: 17,
-      fontWeight: '700',
     },
     reviewText: {
       paddingHorizontal: 16,

@@ -18,7 +18,6 @@ import {
   type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { captureException } from '../../infrastructure/observability';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,6 +32,7 @@ import RecommendationStar from '../../../assets/home/recommendation-star.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
+import { DishPhoto, DishReviewSheet } from '../reviews/DishReviewSheet';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
 import {
@@ -42,7 +42,6 @@ import {
 } from '../../ui/FigmaIcons';
 import { theme } from '../../ui/theme';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
-import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import {
   responsiveSize,
@@ -137,112 +136,6 @@ function RatingStars({
   );
 }
 
-function DishPhoto({
-  photoPath,
-  photoUrl,
-}: {
-  photoPath?: string;
-  photoUrl?: string;
-}) {
-  const { colors } = useAppTheme();
-  const directUrl = photoUrl?.trim();
-  const canLoadDirectly = Boolean(
-    directUrl && /^(?:https?:|file:|data:|blob:)/i.test(directUrl),
-  );
-  const normalizedPath = (
-    photoPath ?? (canLoadDirectly ? undefined : directUrl)
-  )
-    ?.trim()
-    .replace(/^\/+|\/+$/g, '');
-  const [uri, setUri] = useState<string | undefined>(
-    canLoadDirectly ? directUrl : undefined,
-  );
-
-  useEffect(() => {
-    let active = true;
-    if (canLoadDirectly && directUrl) {
-      setUri(directUrl);
-      return () => {
-        active = false;
-      };
-    }
-    if (!normalizedPath) {
-      setUri(undefined);
-      return () => {
-        active = false;
-      };
-    }
-
-    let download: Promise<string>;
-    try {
-      download = resolveStorageImageUrl(normalizedPath);
-    } catch (error) {
-      if (
-        (error as { code?: string }).code !== 'storage/invalid-root-operation'
-      )
-        captureException(error, {
-          operation: 'load-review-dish-photo',
-          photoPath: normalizedPath,
-        });
-      setUri(undefined);
-      return () => {
-        active = false;
-      };
-    }
-
-    void download
-      .then((nextUri) => {
-        if (active) setUri(nextUri);
-      })
-      .catch((error) => {
-        if (
-          (error as { code?: string }).code === 'storage/invalid-root-operation'
-        ) {
-          if (active) setUri(undefined);
-          return;
-        }
-        captureException(error, {
-          operation: 'load-review-dish-photo',
-          photoPath: normalizedPath,
-        });
-        if (active) setUri(undefined);
-      });
-    return () => {
-      active = false;
-    };
-  }, [canLoadDirectly, directUrl, normalizedPath]);
-
-  // Keep the full dish visible inside the fixed Figma tile. The default
-  // `cover` mode trims the photo edges when its aspect ratio differs from the
-  // tile, which is the slight side-cropping visible in the review carousel.
-  return uri ? (
-    <Image
-      onError={() => {
-        if (!normalizedPath || uri !== directUrl) {
-          setUri(undefined);
-          return;
-        }
-        void resolveStorageImageUrl(normalizedPath)
-          .then(setUri)
-          .catch(() => setUri(undefined));
-      }}
-      resizeMode="cover"
-      source={{ uri }}
-      style={[
-        stylesStatic.dishPhoto,
-        { backgroundColor: colors.surfaceRaised },
-      ]}
-    />
-  ) : (
-    <View
-      style={[
-        stylesStatic.dishPhotoPlaceholder,
-        { backgroundColor: colors.surfaceRaised },
-      ]}
-    />
-  );
-}
-
 function isOfflineError(error: Error) {
   const code = (error as Error & { code?: string }).code;
   return code === 'unavailable' || code === 'deadline-exceeded';
@@ -270,17 +163,11 @@ function FeedCard({
   onOpenMenu: () => void;
 }) {
   const { colors, isDark } = useAppTheme();
-  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
     null,
   );
-  const dishSwipeStartX = useRef<number | null>(null);
-  const dishReviewSheet = useBottomSheetMotion({
-    onClose: () => setSelectedDishIndex(null),
-    visible: selectedDishIndex !== null,
-  });
   const dishReviews = item.dishReviews ?? [];
   const tags = item.tags ?? [];
   const username = item.authorUsername
@@ -478,148 +365,12 @@ function FeedCard({
           </View>
         </View>
       </Pressable>
-      <Modal
-        animationType="none"
-        transparent
-        visible={selectedDishIndex !== null}
-        onRequestClose={dishReviewSheet.close}
-      >
-        <View style={overlayStyles.dishReviewScrim}>
-          <Pressable
-            accessibilityLabel="Close dish review"
-            onPress={dishReviewSheet.close}
-            style={StyleSheet.absoluteFill}
-          />
-          <Animated.View
-            style={[
-              overlayStyles.dishReviewSheet,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                paddingBottom: Math.max(30, insets.bottom),
-                transform: [{ translateY: dishReviewSheet.translateY }],
-              },
-            ]}
-          >
-            <View
-              style={overlayStyles.dragArea}
-              {...dishReviewSheet.panHandlers}
-            >
-              <View
-                style={[
-                  overlayStyles.sheetHandle,
-                  { backgroundColor: colors.border },
-                ]}
-              />
-            </View>
-            <View style={overlayStyles.dishReviewHeader}>
-              <Text
-                style={[overlayStyles.dishReviewTitle, { color: colors.text }]}
-              >
-                Dish Review
-              </Text>
-              <Pressable
-                accessibilityLabel="Close dish review"
-                hitSlop={10}
-                onPress={dishReviewSheet.close}
-                style={overlayStyles.dishReviewClose}
-              >
-                <Text
-                  style={[
-                    overlayStyles.dishReviewCloseText,
-                    { color: colors.text },
-                  ]}
-                >
-                  ×
-                </Text>
-              </Pressable>
-            </View>
-            {selectedDishIndex !== null && dishReviews[selectedDishIndex] ? (
-              <ScrollView
-                bounces={false}
-                contentContainerStyle={overlayStyles.dishReviewContent}
-                showsVerticalScrollIndicator={false}
-                style={overlayStyles.dishReviewScroll}
-              >
-                <View
-                  onTouchEnd={(event) => {
-                    if (
-                      dishSwipeStartX.current == null ||
-                      dishReviews.length < 2
-                    )
-                      return;
-                    const delta =
-                      event.nativeEvent.pageX - dishSwipeStartX.current;
-                    dishSwipeStartX.current = null;
-                    if (Math.abs(delta) < 40) return;
-                    setSelectedDishIndex(
-                      delta < 0
-                        ? (selectedDishIndex + 1) % dishReviews.length
-                        : (selectedDishIndex - 1 + dishReviews.length) %
-                            dishReviews.length,
-                    );
-                  }}
-                  onTouchStart={(event) => {
-                    dishSwipeStartX.current = event.nativeEvent.pageX;
-                  }}
-                  style={overlayStyles.dishReviewPhoto}
-                >
-                  <DishPhoto
-                    photoPath={dishReviews[selectedDishIndex].photoPath}
-                    photoUrl={dishReviews[selectedDishIndex].photoUrl}
-                  />
-                  {dishReviews.length > 1 ? (
-                    <View
-                      style={overlayStyles.dishReviewArrows}
-                      pointerEvents="box-none"
-                    >
-                      <Pressable
-                        accessibilityLabel="Previous dish"
-                        onPress={() =>
-                          setSelectedDishIndex(
-                            (selectedDishIndex - 1 + dishReviews.length) %
-                              dishReviews.length,
-                          )
-                        }
-                        style={overlayStyles.dishReviewArrow}
-                      >
-                        <Text style={overlayStyles.dishReviewArrowText}>‹</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityLabel="Next dish"
-                        onPress={() =>
-                          setSelectedDishIndex(
-                            (selectedDishIndex + 1) % dishReviews.length,
-                          )
-                        }
-                        style={overlayStyles.dishReviewArrow}
-                      >
-                        <Text style={overlayStyles.dishReviewArrowText}>›</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
-                </View>
-                <View style={overlayStyles.dishReviewDescription}>
-                  <View style={overlayStyles.dishReviewRating}>
-                    <Text style={overlayStyles.dishReviewRatingStar}>★</Text>
-                    <Text style={overlayStyles.dishReviewRatingValue}>
-                      {dishReviews[selectedDishIndex].rating.toFixed(1)}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      overlayStyles.dishReviewName,
-                      { color: colors.text },
-                    ]}
-                  >
-                    {dishReviews[selectedDishIndex].title}
-                  </Text>
-                </View>
-              </ScrollView>
-            ) : null}
-          </Animated.View>
-        </View>
-      </Modal>
+      <DishReviewSheet
+        dishes={dishReviews}
+        index={selectedDishIndex}
+        onClose={() => setSelectedDishIndex(null)}
+        onIndexChange={setSelectedDishIndex}
+      />
     </>
   );
 }
@@ -1808,15 +1559,6 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
   });
 
-const stylesStatic = responsiveStyleSheet({
-  dishPhoto: { width: '100%', height: '100%', backgroundColor: '#2C2C2E' },
-  dishPhotoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#2C2C2E',
-  },
-});
-
 const overlayStyles = responsiveStyleSheet({
   scrim: {
     position: 'absolute',
@@ -1975,101 +1717,4 @@ const overlayStyles = responsiveStyleSheet({
     backgroundColor: '#B82F29',
   },
   sentDoneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  dishReviewScrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.64)',
-  },
-  dishReviewSheet: {
-    maxHeight: '100%',
-    borderTopWidth: 1,
-    borderColor: '#45474B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#161616',
-  },
-  dishReviewScroll: { flexShrink: 1 },
-  dishReviewContent: { flexGrow: 1 },
-  dishReviewHeader: {
-    height: 64,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dishReviewTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: -0.45,
-  },
-  dishReviewClose: {
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dishReviewCloseText: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontWeight: '300',
-    lineHeight: 30,
-  },
-  // The review photo is a square and should use the full sheet width. A fixed
-  // maxHeight made React Native constrain the width as well on Mac/iPad,
-  // leaving a large empty column beside the image.
-  dishReviewPhoto: {
-    width: '100%',
-    aspectRatio: 1,
-    paddingHorizontal: 16,
-    position: 'relative',
-  },
-  dishReviewArrows: {
-    position: 'absolute',
-    top: '50%',
-    left: 21,
-    right: 21,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dishReviewArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(22,22,22,0.45)',
-  },
-  dishReviewArrowText: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '300',
-    lineHeight: 30,
-  },
-  dishReviewDescription: {
-    width: '100%',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 7,
-  },
-  dishReviewRating: {
-    height: 28,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 3,
-    borderRadius: 100,
-    backgroundColor: '#B82F29',
-  },
-  dishReviewRatingStar: { color: '#FFFFFF', fontSize: 14 },
-  dishReviewRatingValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  dishReviewName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 20,
-    letterSpacing: -0.24,
-  },
 });
