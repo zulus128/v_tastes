@@ -35,6 +35,7 @@ import {
   calculateRecommendationMatch,
   isRecommendation,
 } from './recommendations';
+import { rankMostReviewed } from './mostReviewed';
 import { userSearchCandidateTokens, userSearchScore } from '../users/search';
 
 function toVenue(
@@ -132,6 +133,17 @@ async function fetchTaggedVenues(
   return snapshot.docs.map(toVenue);
 }
 
+// Candidate pool for T-012; ranking and city scoping happen in memory.
+async function fetchMostReviewedCandidates(): Promise<Venue[]> {
+  const snapshot = await db
+    .collection('venues')
+    .where('status', '==', 'active')
+    .orderBy('reviewCount', 'desc')
+    .limit(200)
+    .get();
+  return snapshot.docs.map((document) => toVenue(document));
+}
+
 interface RecommendationCandidate {
   searchableText: string;
   venue: Venue;
@@ -199,7 +211,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const [
     trending,
     newSpots,
-    mostReviewed,
+    mostReviewedCandidates,
     forYouCandidates,
     hiddenGems,
     reviewsSnapshot,
@@ -210,7 +222,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   ] = await Promise.all([
     fetchTaggedVenues('trending', 'rating', 'desc', 3),
     fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
-    fetchTaggedVenues('most-reviewed', 'reviewCount', 'desc', 6),
+    fetchMostReviewedCandidates(),
     fetchRecommendationCandidates(12),
     fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
     db
@@ -234,6 +246,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     userRef.collection('savedVenues').limit(500).get(),
     userRef.collection('following').limit(50).get(),
   ]);
+  const mostReviewed = rankMostReviewed(mostReviewedCandidates, userCity, 6);
   const preferenceVenueIds = [
     ...new Set(
       [
