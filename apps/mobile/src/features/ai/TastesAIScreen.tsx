@@ -396,9 +396,7 @@ export function TastesAIScreen({
               />
             </View>
             <Text style={styles.heroCopy}>
-              {
-                'Find the best restaurants near you\nwith AI recommendations based on\n'
-              }
+              {'Automated place suggestions using\ncommunity ratings and\n'}
               <Text style={styles.accent}>your taste</Text>
             </Text>
           </View>

@@ -2,6 +2,7 @@ import {
   completeOnboardingInputSchema,
   checkUsernameAvailabilityInputSchema,
   createUserProfileInputSchema,
+  resolveCityCountryCode,
   getLeaderboardInputSchema,
   updateProfilePhotoInputSchema,
   updateProfileSettingsInputSchema,
@@ -409,6 +410,9 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         username: nextUsername,
         searchTokens: userSearchTokens(input.displayName, nextUsername),
         city: input.city ?? existing.get('city') ?? null,
+        countryCode: input.city
+          ? resolveCityCountryCode(input.city, input.countryCode)
+          : (existing.get('countryCode') ?? null),
         bio: input.bio ?? '',
         photoPath: input.photoPath ?? existing.get('photoPath') ?? null,
         photoThumbnailPath:
@@ -625,7 +629,15 @@ export const updateProfileSettings = onCall(
               ),
             }
           : {}),
-        ...(input.city ? { city: input.city } : {}),
+        ...(input.city
+          ? {
+              city: input.city,
+              countryCode: resolveCityCountryCode(
+                input.city,
+                input.countryCode,
+              ),
+            }
+          : {}),
         ...(input.bio !== undefined ? { bio: input.bio } : {}),
         ...(input.favoriteDish
           ? { 'tastePreferences.favoriteDish': input.favoriteDish }

@@ -25,6 +25,34 @@ Subcollections:
 - `comments/{commentId}` — published comments with author snapshot.
 - `reactions/{uid}` — at most one reaction per user.
 
+### Review visits and dish identity
+
+`reviewOwnership/{hashedAuthorVenue}` reserves one published review for each
+author–venue pair in the same transaction as review creation. Returning to a
+venue appends a visit to the existing review; likes and comments stay on that
+review. A deleted review releases its claim so a fresh review can be created.
+
+The review contains the current `dishReviews` list and visit snapshots. Each dish
+has a stable ID within that review, its latest rating, its first/latest visit IDs,
+and a history of ratings and photo references. Adding a visit matches an existing
+dish by its ID or by its trimmed, NFKC-normalized, case-insensitive title. It
+updates that dish rather than adding another row. Visit snapshots retain what
+was rated on that visit.
+
+Dish identity is currently scoped to a review. Two authors writing “Tuna Tartare”
+do not establish a shared canonical dish record. Venue `popularDishes` metadata
+is also separate from these user-authored dish histories; no Maps photo import
+creates or replaces a user's dish record.
+
+A future canonical dish catalog should use venue-scoped dish IDs, preserve the
+original author titles and visit histories, and keep proposed matches reviewable
+before merging aliases. Name similarity alone should not silently merge dishes
+from different venues or different menu items. This catalog is not implemented.
+
+Historical duplicate reviews approved for consolidation retain archived source
+documents with `mergedIntoReviewId`. Callable review operations resolve those
+aliases to the canonical review so older links and engagement remain usable.
+
 ### `_otpChallenges/{challengeId}`
 
 Private, short-lived backend state for phone verification with a random document ID. It contains the normalized phone number, provider reference, expiry timestamp, status, and failed-attempt count. Successful challenges are deleted before token issuance; expired documents are removed by the `expiresAt` Firestore TTL policy. Clients have no direct access.

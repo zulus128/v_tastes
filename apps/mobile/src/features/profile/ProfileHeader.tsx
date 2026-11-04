@@ -1,3 +1,4 @@
+import { countryFlagEmoji } from '@tastes/contracts';
 import { useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -101,7 +102,13 @@ export function ProfileHeader({
       {profile.city ? (
         <View style={styles.cityPill}>
           <Text style={styles.cityText}>{profile.city}</Text>
-          <Image source={cityFlag(profile.city)} style={styles.cityFlag} />
+          {cityFlag(profile.city) ? (
+            <Image source={cityFlag(profile.city)} style={styles.cityFlag} />
+          ) : countryFlagEmoji(profile.countryCode) ? (
+            <Text style={styles.cityFlagEmoji}>
+              {countryFlagEmoji(profile.countryCode)}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {!blocked ? (
@@ -364,6 +371,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     cityText: { color: colors.text, fontSize: 13, lineHeight: 18 },
     cityFlag: { width: 16, height: 16 },
+    cityFlagEmoji: { fontSize: 16, lineHeight: 20 },
     bio: {
       width: '100%',
       marginTop: 8,

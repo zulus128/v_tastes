@@ -425,6 +425,7 @@ describe('authenticated session and paginated reads', () => {
         displayName: 'Demo User',
         username: 'demo.user',
         city: 'Istanbul',
+        countryCode: 'TR',
       },
       token,
     );
@@ -459,6 +460,15 @@ describe('authenticated session and paginated reads', () => {
       .get();
     expect(profile.docs[0]?.get('email')).toBeUndefined();
     expect(profile.docs[0]?.get('phoneNumber')).toBeUndefined();
+    expect(profile.docs[0]?.get('countryCode')).toBe('TR');
+    await callFunction('updateProfileSettings', { city: 'Paris' }, token);
+    expect((await profile.docs[0]!.ref.get()).get('countryCode')).toBe('FR');
+    await callFunction(
+      'updateProfileSettings',
+      { city: 'Unknown city' },
+      token,
+    );
+    expect((await profile.docs[0]!.ref.get()).get('countryCode')).toBeNull();
     expect(profile.docs[0]?.get('bio')).toBe(
       'Natural wine and handmade pasta.',
     );
@@ -1778,6 +1788,29 @@ describe('messaging callables', () => {
       'friend-place-review',
     ]);
 
+    // Local candidates must survive a larger, alphabetically earlier foreign catalog.
+    const catalogBatch = db.batch();
+    for (let index = 0; index < 51; index += 1) {
+      catalogBatch.set(db.collection('venues').doc(`aaa-foreign-${index}`), {
+        name: 'Foreign Sushi',
+        city: 'Ankara',
+        category: 'Japanese',
+        status: 'active',
+        latitude: 39.93,
+        longitude: 32.86,
+        rating: 5,
+      });
+    }
+    catalogBatch.set(db.collection('venues').doc('unknown-coordinates'), {
+      name: 'Nearby Romantic Japanese Sushi',
+      city: 'Istanbul',
+      category: 'Japanese',
+      status: 'active',
+      rating: 5,
+      latitude: null,
+      longitude: null,
+    });
+    await catalogBatch.commit();
     const answer = await callFunction<{
       places: Array<{ id: string; distanceKm: number | null }>;
     }>(
@@ -1792,7 +1825,26 @@ describe('messaging callables', () => {
     );
     expect(answer.places[0]).toMatchObject({ id: 'nearby-sushi' });
     expect(answer.places.some((place) => place.id === 'far-sushi')).toBe(false);
+    expect(
+      answer.places.some((place) => place.id === 'unknown-coordinates'),
+    ).toBe(false);
     expect(answer.places[0]?.distanceKm).toBeTypeOf('number');
+    const profileCityAnswer = await callFunction<{
+      places: Array<{ id: string }>;
+    }>('askTastesAi', { prompt: 'Japanese dinner' }, user.token);
+    expect(profileCityAnswer.places.length).toBeGreaterThan(0);
+    expect(
+      profileCityAnswer.places.every(
+        (place) =>
+          !place.id.startsWith('aaa-foreign-') && place.id !== 'far-sushi',
+      ),
+    ).toBe(true);
+    const nullIsland = await callFunction<{ places: Array<{ id: string }> }>(
+      'askTastesAi',
+      { prompt: 'Japanese dinner', latitude: 0, longitude: 0 },
+      user.token,
+    );
+    expect(nullIsland.places).toEqual([]);
   }, 15_000);
 });
 

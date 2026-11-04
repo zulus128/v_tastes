@@ -10,6 +10,7 @@ import {
 } from './notifications';
 
 export * from './notifications';
+export * from './location';
 
 const usernameCharactersError =
   'The username cannot contain spaces. Use only Latin letters, numbers, dots, and underscores.';
@@ -61,6 +62,11 @@ export const createUserProfileInputSchema = z.object({
     .max(30, 'Your name must be at most 30 characters long.'),
   username: usernameSchema.optional(),
   city: z.string().trim().min(2).max(120).optional(),
+  countryCode: z
+    .string()
+    .regex(/^[A-Z]{2}$/)
+    .nullable()
+    .optional(),
   bio: z.string().trim().max(500).optional(),
   birthDate: z
     .string()
@@ -97,6 +103,10 @@ export const updateProfileSettingsInputSchema = z
     displayName: z.string().trim().min(2).max(30),
     username: usernameSchema,
     city: z.string().trim().min(2).max(120),
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/)
+      .nullable(),
     bio: z.string().trim().max(500),
     favoriteDish: z.string().trim().min(1).max(80),
     favoriteVenueId: z.string().trim().min(1).max(128),
@@ -105,6 +115,10 @@ export const updateProfileSettingsInputSchema = z
   .refine(
     (input) => Object.keys(input).length > 0,
     'Provide at least one profile field.',
+  )
+  .refine(
+    (input) => input.countryCode === undefined || input.city !== undefined,
+    'Provide the city when changing its country.',
   );
 
 export const searchPeopleInputSchema = z.object({
