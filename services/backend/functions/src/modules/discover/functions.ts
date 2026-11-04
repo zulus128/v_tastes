@@ -1,5 +1,6 @@
 import {
   getPlaceInputSchema,
+  getDiscoverFeedInputSchema,
   getPlaceReviewsInputSchema,
   getVenuesInputSchema,
   searchPeopleInputSchema,
@@ -36,6 +37,12 @@ import {
   isRecommendation,
 } from './recommendations';
 import { rankMostReviewed } from './mostReviewed';
+import {
+  DISCOVERY_SIGNAL_VERSION,
+  classifyNewSpot,
+  distanceKm,
+  selectLocalVenues,
+} from './signals';
 import { userSearchCandidateTokens, userSearchScore } from '../users/search';
 
 function toVenue(
@@ -117,48 +124,15 @@ function toDiscoverPerson(
   };
 }
 
-async function fetchTaggedVenues(
-  tag: DiscoverTag,
-  orderField: 'rating' | 'reviewCount',
-  direction: FirebaseFirestore.OrderByDirection,
-  take: number,
-): Promise<Venue[]> {
-  const snapshot = await db
-    .collection('venues')
-    .where('status', '==', 'active')
-    .where('discoverTags', 'array-contains', tag)
-    .orderBy(orderField, direction)
-    .limit(take)
-    .get();
-  return snapshot.docs.map(toVenue);
-}
-
-// Candidate pool for T-012; ranking and city scoping happen in memory.
-async function fetchMostReviewedCandidates(): Promise<Venue[]> {
-  const snapshot = await db
-    .collection('venues')
-    .where('status', '==', 'active')
-    .get();
-  return snapshot.docs.map((document) => toVenue(document));
-}
-
 interface RecommendationCandidate {
   searchableText: string;
   venue: Venue;
 }
 
-async function fetchRecommendationCandidates(
-  take: number,
-): Promise<RecommendationCandidate[]> {
-  const snapshot = await db
-    .collection('venues')
-    .where('status', '==', 'active')
-    .where('discoverTags', 'array-contains', 'for-you')
-    .orderBy('rating', 'desc')
-    .limit(take)
-    .get();
-
-  return snapshot.docs.map((document) => {
+function recommendationCandidates(
+  documents: QueryDocumentSnapshot[],
+): RecommendationCandidate[] {
+  return documents.map((document) => {
     const placeTags = Array.isArray(document.get('placeTags'))
       ? (document.get('placeTags') as unknown[]).filter(
           (value): value is string => typeof value === 'string',
@@ -188,6 +162,7 @@ async function fetchRecommendationCandidates(
 
 export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
+  const input = parseInput(getDiscoverFeedInputSchema, request.data ?? {});
   const userProfile = await db.collection('users').doc(uid).get();
   const userCity = String(userProfile.get('city') ?? '')
     .trim()
@@ -207,22 +182,16 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     .toLocaleLowerCase();
   const userRef = db.collection('users').doc(uid);
   const [
-    trending,
-    newSpots,
-    mostReviewedCandidates,
-    forYouCandidates,
-    hiddenGems,
+    activeVenueSnapshot,
     reviewsSnapshot,
     topReviewerSnapshot,
     ownReviews,
     savedVenues,
     following,
+    signalSnapshot,
+    discoveryConfig,
   ] = await Promise.all([
-    fetchTaggedVenues('trending', 'rating', 'desc', 3),
-    fetchTaggedVenues('new', 'reviewCount', 'asc', 3),
-    fetchMostReviewedCandidates(),
-    fetchRecommendationCandidates(12),
-    fetchTaggedVenues('hidden-gem', 'reviewCount', 'asc', 2),
+    db.collection('venues').where('status', '==', 'active').get(),
     db
       .collection('reviews')
       .where('status', '==', 'published')
@@ -243,8 +212,170 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
       .get(),
     userRef.collection('savedVenues').limit(500).get(),
     userRef.collection('following').limit(50).get(),
+    db.collection('_discoverySignals').get(),
+    db.collection('configuration').doc('discovery').get(),
   ]);
+  const mostReviewedCandidates = activeVenueSnapshot.docs.map((document) => {
+    const venue = toVenue(document);
+    delete venue.distanceKm;
+    return venue;
+  });
+  const forYouCandidates = recommendationCandidates(
+    activeVenueSnapshot.docs.filter((document) =>
+      (document.get('discoverTags') ?? []).includes('for-you'),
+    ),
+  ).map((candidate) => {
+    delete candidate.venue.distanceKm;
+    return candidate;
+  });
   const mostReviewed = rankMostReviewed(mostReviewedCandidates, userCity, 6);
+  const now = Date.now();
+  const location =
+    input.latitude !== undefined && input.longitude !== undefined
+      ? { latitude: input.latitude, longitude: input.longitude }
+      : undefined;
+  const local = selectLocalVenues(mostReviewedCandidates, userCity, location);
+  const localVenues = local.venues.map((venue) =>
+    location && venue.latitude !== undefined && venue.longitude !== undefined
+      ? {
+          ...venue,
+          distanceKm: distanceKm(location, {
+            latitude: venue.latitude,
+            longitude: venue.longitude,
+          }),
+        }
+      : venue,
+  );
+  const areaLabel = local.radiusKm
+    ? `Within ${local.radiusKm} km of your location`
+    : 'In your city';
+  const automaticEnabled =
+    discoveryConfig.get('mode') === 'enabled' &&
+    discoveryConfig.get('validatedAlgorithmVersion') ===
+      DISCOVERY_SIGNAL_VERSION &&
+    discoveryConfig.get('validatedAt');
+  const venueDocs = new Map(
+    activeVenueSnapshot.docs.map((document) => [document.id, document]),
+  );
+  const scores = new Map(
+    signalSnapshot.docs.map((document) => [document.id, document]),
+  );
+  const toMillis = (value: unknown): number =>
+    value instanceof Timestamp
+      ? value.toMillis()
+      : typeof value === 'string'
+        ? Date.parse(value) || 0
+        : 0;
+  const signalEligible = (venue: Venue, signal: 'hot' | 'trending') => {
+    const score = scores.get(venue.id);
+    const overrides = venueDocs.get(venue.id)?.get('discoverOverrides') as
+      { hot?: string; trending?: string } | undefined;
+    return (
+      !!automaticEnabled &&
+      overrides?.[signal] !== 'exclude' &&
+      score?.get('mode') === 'enabled' &&
+      score.get('algorithmVersion') === DISCOVERY_SIGNAL_VERSION &&
+      toMillis(score.get('calculatedAt')) >= now - 2 * 60 * 60_000 &&
+      toMillis(score.get(`${signal}EnabledUntil`)) > now
+    );
+  };
+  const byRating = (a: Venue, b: Venue) =>
+    (b.rating ?? 0) - (a.rating ?? 0) || a.id.localeCompare(b.id);
+  const automaticTrending = localVenues
+    .filter((venue) => signalEligible(venue, 'trending'))
+    .sort(
+      (a, b) =>
+        Number(scores.get(b.id)?.get('trendingScore')) -
+          Number(scores.get(a.id)?.get('trendingScore')) || byRating(a, b),
+    );
+  const curatedTrending = localVenues
+    .filter(
+      (venue) =>
+        venue.discoverTags?.includes('trending') &&
+        (
+          venueDocs.get(venue.id)?.get('discoverOverrides') as
+            { trending?: string } | undefined
+        )?.trending !== 'exclude',
+    )
+    .sort(byRating);
+  const trending = [
+    ...new Map(
+      [...automaticTrending, ...curatedTrending].map((venue) => [
+        venue.id,
+        venue,
+      ]),
+    ).values(),
+  ].slice(0, 3);
+  const hot = localVenues
+    .filter((venue) => signalEligible(venue, 'hot'))
+    .sort(
+      (a, b) =>
+        Number(scores.get(b.id)?.get('hotScore')) -
+          Number(scores.get(a.id)?.get('hotScore')) ||
+        (a.distanceKm ?? 0) - (b.distanceKm ?? 0) ||
+        byRating(a, b),
+    );
+  const editorialHero = localVenues
+    .filter((venue) => venueDocs.get(venue.id)?.get('hotSpot') === true)
+    .sort(byRating)[0];
+  const hero =
+    editorialHero ??
+    hot[0] ??
+    trending[0] ??
+    [...localVenues].sort(byRating)[0] ??
+    null;
+  const hiddenGems = localVenues
+    .filter((venue) => venue.discoverTags?.includes('hidden-gem'))
+    .sort(
+      (a, b) => (a.reviewCount ?? 0) - (b.reviewCount ?? 0) || byRating(a, b),
+    )
+    .slice(0, 2);
+  const newSpotLabels: NonNullable<DiscoverFeed['newSpotLabels']> = {};
+  const datedSpots = localVenues
+    .flatMap((venue) => {
+      const document = venueDocs.get(venue.id)!;
+      if (!venue.name || !venue.address) return [];
+      const openingDate =
+        toMillis(document.get('verifiedOpeningDate')) || undefined;
+      const publishedDate =
+        toMillis(document.get('firstPublishedAt')) || undefined;
+      const kind = classifyNewSpot({
+        now,
+        ...(openingDate ? { verifiedOpeningDate: openingDate } : {}),
+        ...(publishedDate ? { firstPublishedAt: publishedDate } : {}),
+      });
+      if (!kind) return [];
+      newSpotLabels[venue.id] =
+        kind === 'just-opened' ? 'Just opened' : 'New on Tastes';
+      return [
+        { venue, date: kind === 'just-opened' ? openingDate! : publishedDate! },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        b.date - a.date ||
+        (a.venue.distanceKm ?? 0) - (b.venue.distanceKm ?? 0) ||
+        byRating(a.venue, b.venue),
+    );
+  const curatedNew = localVenues
+    .filter((venue) => {
+      const document = venueDocs.get(venue.id)!;
+      return (
+        venue.discoverTags?.includes('new') &&
+        !toMillis(document.get('verifiedOpeningDate')) &&
+        !toMillis(document.get('firstPublishedAt'))
+      );
+    })
+    .sort(byRating);
+  for (const venue of curatedNew) newSpotLabels[venue.id] = 'Editor’s pick';
+  const newSpots = [
+    ...new Map(
+      [...datedSpots.map((spot) => spot.venue), ...curatedNew].map((venue) => [
+        venue.id,
+        venue,
+      ]),
+    ).values(),
+  ].slice(0, 3);
   const preferenceVenueIds = [
     ...new Set(
       [
@@ -483,7 +614,15 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   }
 
   const feed: DiscoverFeed = {
-    hero: trending[0] ?? mostReviewed[0] ?? null,
+    hero,
+    heroIsHot: hero ? signalEligible(hero, 'hot') : false,
+    areaLabel,
+    trendingSubtitle: trending.every((venue) =>
+      signalEligible(venue, 'trending'),
+    )
+      ? `Recent positive activity · ${areaLabel}`
+      : `Editor’s picks · ${areaLabel}`,
+    newSpotLabels,
     trending,
     newSpots,
     mostReviewed,

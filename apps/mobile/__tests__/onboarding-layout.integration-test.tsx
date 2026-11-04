@@ -941,7 +941,7 @@ describe('onboarding in resizable windows', () => {
     expect(screen.getByLabelText('Step 6 of 6')).toBeOnTheScreen();
     expect(screen.getByText('People you know')).toBeOnTheScreen();
     expect(
-      screen.getByText('3 of your contacts are on Tastes'),
+      screen.getByText('See which of your contacts are on Tastes'),
     ).toBeOnTheScreen();
     expect(
       screen.getByTestId('onboarding-people-teaser-list', {

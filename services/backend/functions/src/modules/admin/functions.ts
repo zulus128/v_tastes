@@ -146,6 +146,14 @@ const venueInputObjectSchema = z.object({
     .default([]),
   featured: z.boolean().default(false),
   hotSpot: z.boolean().default(false),
+  verifiedOpeningDate: z.iso.date().nullable().optional(),
+  firstPublishedAt: z.iso.date().nullable().optional(),
+  discoverOverrides: z
+    .object({
+      hot: z.enum(['auto', 'exclude']).default('auto'),
+      trending: z.enum(['auto', 'exclude']).default('auto'),
+    })
+    .optional(),
 });
 const coordinatePairOptions = {
   message: 'Latitude and longitude must be provided together.',
@@ -869,6 +877,16 @@ export const searchAdminVenues = onCall(
         status: String(venue.get('status') ?? 'pending'),
         featured: Boolean(venue.get('featured')),
         hotSpot: Boolean(venue.get('hotSpot')),
+        verifiedOpeningDate: venue.get('verifiedOpeningDate')
+          ? timestampToIso(venue.get('verifiedOpeningDate')).slice(0, 10)
+          : null,
+        firstPublishedAt: venue.get('firstPublishedAt')
+          ? timestampToIso(venue.get('firstPublishedAt')).slice(0, 10)
+          : null,
+        discoverOverrides: venue.get('discoverOverrides') ?? {
+          hot: 'auto',
+          trending: 'auto',
+        },
         reviewCount: Number(venue.get('reviewCount') ?? 0),
         imageUrl: venue.get('imageUrl') ? String(venue.get('imageUrl')) : null,
         photoUrls: Array.isArray(venue.get('photoUrls'))
@@ -937,6 +955,12 @@ export const upsertVenue = onCall(adminCallableOptions, async (request) => {
   await reference.set(
     {
       ...venueData,
+      ...(!input.firstPublishedAt &&
+      !existing.get('firstPublishedAt') &&
+      input.status === 'active' &&
+      (!existing.exists || existing.get('status') === 'pending')
+        ? { firstPublishedAt: FieldValue.serverTimestamp() }
+        : {}),
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: actorId,
       ...(existing.exists
@@ -964,6 +988,9 @@ export const createVenue = onCall(adminCallableOptions, async (request) => {
   const reference = db.collection('venues').doc();
   await reference.create({
     ...input,
+    ...(input.status === 'active' && !input.firstPublishedAt
+      ? { firstPublishedAt: FieldValue.serverTimestamp() }
+      : {}),
     source: 'admin',
     rating: 0,
     reviewCount: 0,
@@ -985,6 +1012,12 @@ export const updateVenue = onCall(adminCallableOptions, async (request) => {
     throw new HttpsError('not-found', 'The venue was not found.');
   await reference.update({
     ...venueData,
+    ...(venue.get('status') === 'pending' &&
+    input.status === 'active' &&
+    !venue.get('firstPublishedAt') &&
+    !input.firstPublishedAt
+      ? { firstPublishedAt: FieldValue.serverTimestamp() }
+      : {}),
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: actorId,
   });
@@ -995,10 +1028,21 @@ export const updateVenue = onCall(adminCallableOptions, async (request) => {
 export const setVenueStatus = onCall(adminCallableOptions, async (request) => {
   const actorId = requireAdmin(request);
   const input = parseInput(venueStatusInputSchema, request.data);
-  await db.collection('venues').doc(input.venueId).update({
-    status: input.status,
-    updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: actorId,
+  const venueRef = db.collection('venues').doc(input.venueId);
+  await db.runTransaction(async (transaction) => {
+    const venue = await transaction.get(venueRef);
+    if (!venue.exists)
+      throw new HttpsError('not-found', 'The venue was not found.');
+    transaction.update(venueRef, {
+      status: input.status,
+      ...(venue.get('status') === 'pending' &&
+      input.status === 'active' &&
+      !venue.get('firstPublishedAt')
+        ? { firstPublishedAt: FieldValue.serverTimestamp() }
+        : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: actorId,
+    });
   });
   await audit(actorId, 'set-venue-status', input.venueId, {
     status: input.status,

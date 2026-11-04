@@ -1075,6 +1075,7 @@ export const addReviewVisit = onCall(callableOptions, async (request) => {
       visits: merged.visits,
       visitCount: merged.visits.length,
       latestVisitAt: visit.createdAt,
+      latestVisitSource: 'user',
       previousRating: Number(review.get('rating')),
       rating: input.rating,
       text: input.text,

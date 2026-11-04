@@ -278,7 +278,8 @@ function venueToPlace(venue: Venue): Place {
     address: venue.address ?? venue.city,
     category: venue.category ?? '',
     price: '$'.repeat(venue.priceLevel ?? 1),
-    distance: formatDistance(venue.distanceKm),
+    distance:
+      venue.distanceKm != null ? formatDistance(venue.distanceKm) : venue.city,
     rating: (venue.rating ?? 0).toFixed(1),
     reviews: `${venue.reviewCount ?? 0} reviews`,
     image: venueImage(venue.imageUrl),
@@ -338,7 +339,45 @@ export function DiscoverScreen({
   const savedVenueIds = new Set(
     favourites.data?.places.map((place) => place.venueId) ?? [],
   );
-  const feedQuery = useDiscoverFeed(userId);
+  const [discoveryLocation, setDiscoveryLocation] = useState<
+    { latitude: number; longitude: number } | undefined
+  >();
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void (async () => {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== 'granted') {
+          if (active) setDiscoveryLocation(undefined);
+          return;
+        }
+        if (!active) return;
+        const position =
+          (await Location.getLastKnownPositionAsync({
+            maxAge: 120_000,
+            requiredAccuracy: 1000,
+          })) ??
+          (await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }));
+        if (active)
+          setDiscoveryLocation(
+            position
+              ? {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                }
+              : undefined,
+          );
+      })().catch(() => {
+        if (active) setDiscoveryLocation(undefined);
+      });
+      return () => {
+        active = false;
+      };
+    }, [userId]),
+  );
+  const feedQuery = useDiscoverFeed(userId, undefined, discoveryLocation);
   const toggleFollow = useToggleFollow(userId);
   const [followPendingId, setFollowPendingId] = useState<string | null>(null);
   const [seeAllPlaces, setSeeAllPlaces] = useState<Venue[] | null>(null);
@@ -701,12 +740,17 @@ function TrendingFeed({
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.hotChip}>
-            <Text style={styles.hotChipText}>🔥 Hot in your area</Text>
+            <Text style={styles.hotChipText}>
+              {feed.heroIsHot ? '🔥 Hot in your area' : 'Featured in your area'}
+            </Text>
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.heroTitle}>{hero.name}</Text>
             <Text style={styles.heroMeta}>
-              {hero.category} · {formatDistance(hero.distanceKm)}
+              {hero.category} ·{' '}
+              {hero.distanceKm != null
+                ? formatDistance(hero.distanceKm)
+                : hero.city}
             </Text>
             <View style={styles.inlineMeta}>
               <RatingPill value={(hero.rating ?? 0).toFixed(1)} />
@@ -722,7 +766,7 @@ function TrendingFeed({
         <>
           <SectionLabel
             title="Trending near you"
-            subtitle="Highly rated within 1 mi"
+            subtitle={feed.trendingSubtitle ?? 'Editor’s picks in your city'}
             onSeeAll={() => onSeeAll(feed.trending)}
           />
           <ScrollView
@@ -774,11 +818,15 @@ function TrendingFeed({
 
       {feed.newSpots.length > 0 ? (
         <>
-          <SectionLabel title="New spots" subtitle="Just opened in your area" />
+          <SectionLabel
+            title="New spots"
+            subtitle="New openings and local picks"
+          />
           <View style={styles.placeRows}>
             {feed.newSpots.map((venue) => (
               <PlaceRow
                 key={venue.id}
+                badge={feed.newSpotLabels?.[venue.id] ?? 'Editor’s pick'}
                 onOpen={() => onOpenPlace(venue.id)}
                 onSave={() => onSave({ venueId: venue.id, name: venue.name })}
                 place={venueToPlace(venue)}
@@ -2475,12 +2523,14 @@ function TrendingTile({
 }
 
 function PlaceRow({
+  badge = 'Popular',
   onOpen,
   onSave,
   place,
   saved,
   width,
 }: {
+  badge?: string;
   onOpen: () => void;
   onSave: () => void;
   place: Place;
@@ -2493,9 +2543,14 @@ function PlaceRow({
     <View style={[styles.placeRow, { width: width ?? '100%' }]}>
       <Pressable onPress={onOpen}>
         <Image source={place.image} style={styles.placeImage} />
-        <View style={styles.newChip}>
-          <Text style={[styles.newChipText, { letterSpacing: -0.24 }]}>
-            Popular
+        <View style={[styles.newChip, { maxWidth: '90%' }]}>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={[styles.newChipText, { letterSpacing: -0.24 }]}
+          >
+            {badge}
           </Text>
         </View>
       </Pressable>

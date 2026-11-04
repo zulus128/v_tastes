@@ -18,7 +18,8 @@
     "images:backfill": "node lib/scripts/backfill-image-thumbnails.js",
     "users:migrate-private": "node lib/scripts/migrate-private-users.js",
     "staff:set-role": "node lib/scripts/set-staff-role.js",
-    "reviews:merge-history": "node lib/scripts/merge-historical-review-visits.js"
+    "reviews:merge-history": "node lib/scripts/merge-historical-review-visits.js",
+    "discover:shadow": "node lib/scripts/calculate-discovery-shadow.js"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",

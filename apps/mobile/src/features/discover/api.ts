@@ -1,4 +1,8 @@
-import type { DiscoverFeed, DiscoverTag } from '@tastes/contracts';
+import type {
+  DiscoverFeed,
+  DiscoverTag,
+  GetDiscoverFeedInput,
+} from '@tastes/contracts';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -45,11 +49,23 @@ export function normalizeDiscoverFeed(feed: DiscoverFeed): DiscoverFeed {
   };
 }
 
-export function useDiscoverFeed(userId: string, profileSignature?: string) {
+export function useDiscoverFeed(
+  userId: string,
+  profileSignature?: string,
+  location?: GetDiscoverFeedInput,
+) {
   const api = useTastesApi();
   return useQuery({
-    queryKey: discoverFeedQueryKey(userId, profileSignature),
-    queryFn: async () => (await api.getDiscoverFeed()).data,
+    queryKey:
+      location?.latitude !== undefined && location.longitude !== undefined
+        ? [
+            ...discoverFeedQueryKey(userId, profileSignature),
+            'location',
+            location.latitude.toFixed(3),
+            location.longitude.toFixed(3),
+          ]
+        : discoverFeedQueryKey(userId, profileSignature),
+    queryFn: async () => (await api.getDiscoverFeed(location ?? {})).data,
     select: normalizeDiscoverFeed,
   });
 }

@@ -545,7 +545,7 @@ function PeopleYouKnowTeaser({
     <View style={styles.peopleTeaser} testID="onboarding-people-teaser">
       <Text style={styles.peopleTeaserTitle}>People you know</Text>
       <Text style={styles.peopleTeaserCount}>
-        3 of your contacts are on Tastes
+        See which of your contacts are on Tastes
       </Text>
       <Svg
         accessibilityElementsHidden

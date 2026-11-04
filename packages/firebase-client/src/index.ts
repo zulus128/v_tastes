@@ -21,6 +21,7 @@ import type {
   DeleteCommentInput,
   DeleteReviewInput,
   DiscoverFeed,
+  GetDiscoverFeedInput,
   DiscoverPerson,
   DiscoverPeopleResult,
   FeedItem,
@@ -489,8 +490,8 @@ export function createTastesApi(
         'getLeaderboard',
         input,
       ),
-    getDiscoverFeed: () =>
-      invoke<Record<string, never>, DiscoverFeed>('getDiscoverFeed', {}),
+    getDiscoverFeed: (input: GetDiscoverFeedInput = {}) =>
+      invoke<GetDiscoverFeedInput, DiscoverFeed>('getDiscoverFeed', input),
     getDiscoverPeople: () =>
       invoke<Record<string, never>, DiscoverPeopleResult>(
         'getDiscoverPeople',
