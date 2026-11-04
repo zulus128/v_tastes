@@ -4,6 +4,10 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { TasteRecommendationsResult } from '@tastes/contracts';
+import {
+  rebuildTasteEvidence,
+  maintainTasteEvidenceIfNeeded,
+} from '../../functions/src/modules/taste-match/maintenance';
 import { refreshTasteReviewProjection } from '../../functions/src/modules/taste-match/projection';
 
 const PROJECT_ID = process.env.TEST_PROJECT_ID ?? 'demo-tastes';
@@ -3995,3 +3999,83 @@ it('restricts canonical approvals to admins, rejects alias conflicts and makes a
   ).rejects.toMatchObject({ status: 'INVALID_ARGUMENT' });
   expect((await db.collection('_tasteCatalogAudit').get()).size).toBe(1);
 }, 25_000);
+
+describe('taste catalogue index maintenance', () => {
+  it('reindexes existing names after approval, skips redundant scans and preserves source reviews', async () => {
+    const db = getFirestore();
+    const source = db.doc('reviews/catalogue-repair');
+    const payload = {
+      authorId: 'catalogue-user',
+      venueId: 'catalogue-place',
+      venueCity: 'Rome',
+      status: 'published',
+      createdAt: Timestamp.fromMillis(Date.now() - 60_000),
+      dishReviews: [{ id: 'dish', title: 'Exact new dish', rating: 4.5 }],
+    };
+    await source.set(payload);
+    await maintainTasteEvidenceIfNeeded(db);
+    const evidence = db.doc('_tasteReviewEvidence/catalogue-repair');
+    expect((await evidence.get()).exists).toBe(false);
+    await db
+      .doc('_canonicalDishes/exact-new-dish')
+      .set({ name: 'Exact new dish', aliases: [], status: 'active' });
+    await db.doc('_tasteMaintenance/catalog').set({ revision: 1 });
+    await maintainTasteEvidenceIfNeeded(db);
+    expect((await evidence.get()).get('canonicalDishIds')).toEqual([
+      'exact-new-dish',
+    ]);
+    const completed = (await db.doc('_tasteMaintenance/backfill').get()).get(
+      'lastCompleteAt',
+    );
+    expect(await maintainTasteEvidenceIfNeeded(db)).toEqual({
+      processed: 0,
+      complete: true,
+    });
+    expect(
+      (await db.doc('_tasteMaintenance/backfill').get()).get('lastCompleteAt'),
+    ).toEqual(completed);
+    expect((await source.get()).data()).toEqual(payload);
+    await db.doc('_tasteMaintenance/backfill').set(
+      {
+        lastCompleteAt: Timestamp.fromMillis(Date.now() - 25 * 60 * 60 * 1000),
+      },
+      { merge: true },
+    );
+    expect((await maintainTasteEvidenceIfNeeded(db)).processed).toBeGreaterThan(
+      0,
+    );
+  });
+  it('revisits earlier pages when a dish is approved during a paginated rebuild', async () => {
+    const db = getFirestore();
+    const payload = {
+      authorId: 'catalogue-user',
+      venueId: 'catalogue-place',
+      venueCity: 'Rome',
+      status: 'published',
+      createdAt: Timestamp.fromMillis(Date.now() - 60_000),
+      dishReviews: [{ id: 'dish', title: 'Later approved dish', rating: 4.5 }],
+    };
+    await db.doc('reviews/a-before-approval').set(payload);
+    await db.doc('reviews/z-after-approval').set(payload);
+    expect((await rebuildTasteEvidence(db, 1)).complete).toBe(false);
+    await db
+      .doc('_canonicalDishes/later-approved-dish')
+      .set({ name: 'Later approved dish', aliases: [], status: 'active' });
+    await db.doc('_tasteMaintenance/catalog').set({ revision: 1 });
+    await rebuildTasteEvidence(db, 1);
+    await rebuildTasteEvidence(db, 1);
+    const earlier = db.doc('_tasteReviewEvidence/a-before-approval');
+    // A delayed review trigger may already have refreshed this row. Remove the
+    // derived index only; catalogue revision must still force a complete pass.
+    await earlier.delete();
+    expect(
+      (await db.doc('_tasteMaintenance/backfill').get()).get(
+        'completedCatalogRevision',
+      ),
+    ).toBe(0);
+    expect((await maintainTasteEvidenceIfNeeded(db)).processed).toBe(2);
+    expect((await earlier.get()).get('canonicalDishIds')).toEqual([
+      'later-approved-dish',
+    ]);
+  });
+});
