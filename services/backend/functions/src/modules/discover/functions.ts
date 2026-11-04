@@ -1,3 +1,4 @@
+import { signalTime } from './community-policy';
 import { communitySelection } from './community-selection';
 import { resolveVenue } from '../../shared/venue-alias';
 import {
@@ -732,6 +733,12 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
   );
   const select = (field: 'followerCount' | 'createdAt') =>
     [...candidates]
+      .filter(
+        (doc) =>
+          field !== 'createdAt' ||
+          (signalTime(doc.get('createdAt')) >= Date.now() - 30 * 86_400_000 &&
+            signalTime(doc.get('createdAt')) <= Date.now()),
+      )
       .sort((a, b) => {
         const local = (document: QueryDocumentSnapshot) =>
           !!viewerCity && cityKey(document.get('city')) === viewerCity;

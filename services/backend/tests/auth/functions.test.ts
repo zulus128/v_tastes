@@ -3644,6 +3644,17 @@ it('gates weekly ranking activation by admin role/history, applies exclusions an
   }>('getDiscoverPeople', {}, first.token);
   expect(people.trendingIsAutomatic).toBe(true);
   expect(people.trending[0]?.userId).toBe('weekly-winner');
+  const newlyJoined = await callFunction<{ new: { userId: string }[] }>(
+    'getDiscoverPeople',
+    {},
+    first.token,
+  );
+  expect(
+    newlyJoined.new.some((person) =>
+      ['weekly-winner', 'lifetime-winner'].includes(person.userId),
+    ),
+  ).toBe(false);
+
   const feed = await callFunction<{
     popularReviewsAreAutomatic: boolean;
     popularReviews: { id: string }[];
