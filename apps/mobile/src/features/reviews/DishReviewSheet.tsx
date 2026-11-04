@@ -221,6 +221,12 @@ export function DishReviewSheet({
               dishes={dishes}
               visits={visits}
               onOpen={onIndexChange}
+              renderPhoto={(item) => (
+                <DishPhoto
+                  photoPath={item.thumbnailPath ?? item.photoPath}
+                  photoUrl={item.thumbnailUrl ?? item.photoUrl}
+                />
+              )}
             />
           ) : null}
           {dish ? (

@@ -20,6 +20,8 @@ import { adminCallableOptions } from '../../shared/options';
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { privateUserReference } from '../../shared/user-data';
+import { addXp } from '../../shared/mutations';
+import { recordActivityEvent } from '../../shared/activity-events';
 
 type StaffRole = 'admin' | 'moderator';
 
@@ -298,7 +300,7 @@ async function getReviewCities() {
 async function notifyReportResolved(
   report: FirebaseFirestore.DocumentSnapshot,
 ): Promise<void> {
-  if (!report.exists) return;
+  if (!report.exists || report.get('source') === 'risk-monitor') return;
   await sendNotification({
     recipientId: String(report.get('reporterId') ?? ''),
     type: 'report-resolved',
@@ -533,6 +535,63 @@ export const deleteContent = onCall(adminCallableOptions, async (request) => {
     ]);
     if (!content.exists)
       throw new HttpsError('not-found', 'The reported content was not found.');
+    if (
+      input.targetType === 'review' &&
+      content.get('status') === 'published'
+    ) {
+      const authorRef = db
+        .collection('users')
+        .doc(String(content.get('authorId')));
+      const venueRef = db
+        .collection('venues')
+        .doc(String(content.get('venueId')));
+      const [author, venue, venueReviews, authorReviews] = await Promise.all([
+        transaction.get(authorRef),
+        transaction.get(venueRef),
+        transaction.get(
+          db
+            .collection('reviews')
+            .where('venueId', '==', content.get('venueId'))
+            .where('status', '==', 'published'),
+        ),
+        transaction.get(
+          db
+            .collection('reviews')
+            .where('authorId', '==', content.get('authorId'))
+            .where('status', '==', 'published'),
+        ),
+      ]);
+      const remaining = venueReviews.docs.filter(
+        (review) => review.id !== content.id,
+      );
+      if (venue.exists)
+        transaction.update(venueRef, {
+          reviewCount: remaining.length,
+          rating: remaining.length
+            ? remaining.reduce(
+                (total, review) => total + Number(review.get('rating')),
+                0,
+              ) / remaining.length
+            : 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      if (author.exists) {
+        transaction.update(authorRef, {
+          reviewCount: authorReviews.docs.filter(
+            (review) => review.id !== content.id,
+          ).length,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        addXp(transaction, authorRef, -50, {
+          xp: Number(author.get('xp') ?? 0),
+          monthlyXp: Number(author.get('monthlyXp') ?? 0),
+        });
+      }
+      recordActivityEvent(transaction, 'review-deleted', actorId, content.id, {
+        moderated: true,
+        authorId: content.get('authorId'),
+      });
+    }
     transaction.update(reference, {
       status: 'deleted',
       moderatedAt: FieldValue.serverTimestamp(),

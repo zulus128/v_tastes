@@ -443,7 +443,7 @@ export function PaginatedLeaderboardScreen({
       ? [podiumByRank[1], podiumByRank[0], podiumByRank[2]].filter(
           (item): item is LeaderboardEntry => Boolean(item),
         )
-      : [];
+      : podiumByRank;
   const current = items.find((item) => item.userId === currentUserId);
   const preceding = current
     ? items.find((item) => item.rank === current.rank - 1)

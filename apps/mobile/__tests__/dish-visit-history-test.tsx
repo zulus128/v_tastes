@@ -82,3 +82,18 @@ it('filters by dish name and opens the original dish index', async () => {
   );
   expect(open).toHaveBeenCalledWith(0);
 });
+
+it('lets users distinguish and select separate visits on the same day', async () => {
+  const sameDay = visits.map((visit, index) => ({
+    ...visit,
+    createdAt: `2026-10-01T${index ? '15' : '12'}:00:00Z`,
+  }));
+  await render(
+    <DishListContent dishes={dishes} visits={sameDay} onOpen={jest.fn()} />,
+  );
+  await fireEvent.press(screen.getByRole('button', { name: /Visit 1$/ }));
+  expect(screen.getByText('★ 4.5')).toBeTruthy();
+  expect(screen.queryByText('Dessert')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: /Visit 2$/ }));
+  expect(screen.getByText('Dessert')).toBeTruthy();
+});

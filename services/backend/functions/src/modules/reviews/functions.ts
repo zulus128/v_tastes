@@ -32,6 +32,7 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { requireUserId } from '../../shared/auth';
+import { recordActivityEvent } from '../../shared/activity-events';
 import { db, firestoreDatabaseId } from '../../shared/firebase';
 import {
   addXp,
@@ -1070,6 +1071,10 @@ export const addReviewVisit = onCall(callableOptions, async (request) => {
         'This review has reached its history limit.',
       );
     await enforceRateLimit(transaction, uid, 'review-visit', 10, 60 * 60_000);
+    recordActivityEvent(transaction, 'review-visited', uid, reviewRef.id, {
+      venueId: review.get('venueId'),
+      visitId: visitRef.id,
+    });
     transaction.create(visitRef, visit);
     transaction.update(reviewRef, {
       visits: merged.visits,
@@ -1195,6 +1200,9 @@ export const createReview = onCall(callableOptions, async (request) => {
         },
       );
     await enforceRateLimit(transaction, uid, 'create-review', 10, 60 * 60_000);
+    recordActivityEvent(transaction, 'review-created', uid, reviewRef.id, {
+      venueId: venue.id,
+    });
     const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
     const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
     const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
@@ -1316,6 +1324,7 @@ export const editReview = onCall(callableOptions, async (request) => {
         ? { thumbnailUrl: thumbnailUrlByPath.get(dish.thumbnailPath) }
         : {}),
     }));
+    recordActivityEvent(transaction, 'review-edited', uid, reviewRef.id);
     transaction.update(reviewRef, {
       rating: input.rating,
       text: input.text,
@@ -1372,6 +1381,7 @@ export const deleteReview = onCall(callableOptions, async (request) => {
       deletedAt: now,
       updatedAt: now,
     });
+    recordActivityEvent(transaction, 'review-deleted', uid, reviewRef.id);
     if (venue.exists) {
       const count = Math.max(0, Number(venue.get('reviewCount') ?? 0));
       const nextCount = Math.max(0, count - 1);
@@ -1494,6 +1504,27 @@ export const reactToContent = onCall(callableOptions, async (request) => {
     const currentCount = Math.max(0, Number(content.get('reactionCount') ?? 0));
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
+    if (input.targetType === 'review')
+      recordActivityEvent(
+        transaction,
+        active ? 'reaction-added' : 'reaction-removed',
+        uid,
+        input.reviewId,
+        {
+          originalCreatedAt: reaction.get('createdAt') ?? null,
+        },
+      );
+    else
+      recordActivityEvent(
+        transaction,
+        active ? 'comment-reaction-added' : 'comment-reaction-removed',
+        uid,
+        input.reviewId,
+        {
+          commentId: input.commentId,
+          originalCreatedAt: reaction.get('createdAt') ?? null,
+        },
+      );
     if (active)
       transaction.create(reactionRef, {
         userId: uid,
@@ -1673,6 +1704,9 @@ export const addComment = onCall(callableOptions, async (request) => {
     }
 
     await enforceRateLimit(transaction, uid, 'add-comment', 30, 60_000);
+    recordActivityEvent(transaction, 'comment-added', uid, input.reviewId, {
+      commentId: commentRef.id,
+    });
     transaction.create(commentRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
@@ -1798,6 +1832,16 @@ export const reactToComment = onCall(callableOptions, async (request) => {
     if (!comment.exists || comment.get('status') !== 'published')
       throw new HttpsError('not-found', 'The comment was not found.');
     await enforceRateLimit(transaction, uid, 'react-comment', 120, 60_000);
+    recordActivityEvent(
+      transaction,
+      reaction.exists ? 'comment-reaction-removed' : 'comment-reaction-added',
+      uid,
+      input.reviewId,
+      {
+        commentId: input.commentId,
+        originalCreatedAt: reaction.get('createdAt') ?? null,
+      },
+    );
     const currentCount = Number(comment.get('reactionCount') ?? 0);
     const active = !reaction.exists;
     const reactionCount = Math.max(0, currentCount + (active ? 1 : -1));
@@ -1862,6 +1906,10 @@ export const deleteComment = onCall(callableOptions, async (request) => {
       : null;
     const deferredReplyDeletion = (replies?.size ?? 0) > 450;
     const repliesToDelete = deferredReplyDeletion ? [] : (replies?.docs ?? []);
+    recordActivityEvent(transaction, 'comment-removed', uid, input.reviewId, {
+      commentId: commentRef.id,
+      deletedReplyCount: repliesToDelete.length,
+    });
     transaction.update(commentRef, {
       status: 'deleted',
       ...(deferredReplyDeletion ? { replyDeletionPending: true } : {}),
@@ -2020,6 +2068,15 @@ export const reactToReview = onCall(callableOptions, async (request) => {
 
     if (reaction.exists) {
       const reactionCount = Math.max(0, currentCount - 1);
+      recordActivityEvent(
+        transaction,
+        'reaction-removed',
+        uid,
+        input.reviewId,
+        {
+          originalCreatedAt: reaction.get('createdAt') ?? null,
+        },
+      );
       transaction.delete(reactionRef);
       transaction.update(reviewRef, {
         reactionCount,
@@ -2044,6 +2101,7 @@ export const reactToReview = onCall(callableOptions, async (request) => {
       reaction: input.reaction,
       createdAt: FieldValue.serverTimestamp(),
     });
+    recordActivityEvent(transaction, 'reaction-added', uid, input.reviewId);
     transaction.update(reviewRef, {
       reactionCount: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),

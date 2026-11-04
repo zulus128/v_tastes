@@ -1,10 +1,17 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { db } from '../../shared/firebase';
+import { getStorage } from 'firebase-admin/storage';
+import {
+  calculateCommunitySignals,
+  type CommunityEngagement,
+} from './community';
+import { queueReviewRisks } from '../reviews/risk-monitor';
 import {
   DISCOVERY_SIGNAL_VERSION,
   calculateVenueSignals,
   stableBadge,
+  validSignalUser,
   type SignalReview,
   type SignalUser,
 } from './signals';
@@ -56,10 +63,186 @@ export async function calculateDiscoveryShadow(now = Date.now()) {
         !!(dish.photoPath || dish.photoUrl),
     ),
   }));
+  const [followDocs, reactionDocs, commentDocs, eventDocs] = await Promise.all([
+    db.collectionGroup('followers').get(),
+    db.collectionGroup('reactions').get(),
+    db.collectionGroup('comments').get(),
+    db.collection('_activityEvents').get(),
+  ]);
+  const riskAudit = await queueReviewRisks(now);
+  const riskReviewIds = new Set(riskAudit.riskReviewIds);
+  const validPhotoAuthors = new Set(
+    signalUsers
+      .filter((user) => validSignalUser(user, now))
+      .map((user) => user.id),
+  );
+  const photoPaths = [
+    ...new Set(
+      reviews.docs
+        .filter(
+          (review) =>
+            validPhotoAuthors.has(String(review.get('authorId'))) &&
+            (!['seed', 'test', 'stress-image-scroll'].includes(
+              String(review.get('source') ?? ''),
+            ) ||
+              review.get('latestVisitSource') === 'user'),
+        )
+        .flatMap((review) =>
+          (Array.isArray(review.get('dishReviews'))
+            ? review.get('dishReviews')
+            : []
+          ).flatMap((dish: { photoPath?: unknown }) =>
+            typeof dish.photoPath === 'string' &&
+            dish.photoPath.startsWith(
+              `review-images/${review.get('authorId')}/`,
+            )
+              ? [dish.photoPath]
+              : [],
+          ),
+        ),
+    ),
+  ];
+  const existingPhotos = new Set<string>();
+  for (let offset = 0; offset < photoPaths.length; offset += 20) {
+    await Promise.all(
+      photoPaths.slice(offset, offset + 20).map(async (path) => {
+        try {
+          if ((await getStorage().bucket().file(path).exists())[0])
+            existingPhotos.add(path);
+        } catch {
+          /* Unverified photos do not make a review eligible. */
+        }
+      }),
+    );
+  }
+  const commentByPath = new Map(
+    commentDocs.docs.map((comment) => [comment.ref.path, comment]),
+  );
+  const engagement: CommunityEngagement[] = [
+    ...reactionDocs.docs
+      .filter((doc) => /^reviews\/[^/]+\/reactions\/[^/]+$/.test(doc.ref.path))
+      .map((doc) => ({
+        reviewId: doc.ref.parent.parent!.id,
+        actorId: doc.id,
+        kind: 'like' as const,
+        createdAt: millis(doc.get('createdAt')),
+      })),
+    ...commentDocs.docs
+      .filter(
+        (doc) =>
+          /^reviews\/[^/]+\/comments\/[^/]+$/.test(doc.ref.path) &&
+          doc.get('status') === 'published' &&
+          (!doc.get('parentCommentId') ||
+            commentByPath
+              .get(`${doc.ref.parent.path}/${doc.get('parentCommentId')}`)
+              ?.get('status') === 'published'),
+      )
+      .map((doc) => ({
+        reviewId: doc.ref.parent.parent!.id,
+        actorId: String(doc.get('authorId')),
+        kind: 'comment' as const,
+        text: String(doc.get('text') ?? ''),
+        createdAt: millis(doc.get('createdAt')),
+      })),
+  ];
+  const community = calculateCommunitySignals({
+    now,
+    users: users.docs.map((user) => ({
+      ...signalUsers.find((item) => item.id === user.id)!,
+      displayName: String(user.get('displayName') ?? ''),
+      username: String(user.get('username') ?? ''),
+      city: String(user.get('city') ?? ''),
+      followerCount: Number(user.get('followerCount') ?? 0),
+    })),
+    reviews: reviews.docs
+      .filter((review) => !riskReviewIds.has(review.id))
+      .map((review) => ({
+        id: review.id,
+        authorId: String(review.get('authorId')),
+        city: String(review.get('venueCity') ?? ''),
+        createdAt:
+          millis(review.get('latestVisitAt')) ||
+          millis(review.get('createdAt')),
+        status: 'published',
+        source:
+          review.get('latestVisitSource') === 'user'
+            ? undefined
+            : review.get('source'),
+        text: String(review.get('text') ?? ''),
+        hasPhoto: (review.get('dishReviews') ?? []).some(
+          (dish: { photoPath?: string }) =>
+            !!dish.photoPath && existingPhotos.has(dish.photoPath),
+        ),
+      })),
+    follows: followDocs.docs
+      .filter((doc) => /^users\/[^/]+\/followers\/[^/]+$/.test(doc.ref.path))
+      .map((doc) => ({
+        targetId: doc.ref.parent.parent!.id,
+        actorId: doc.id,
+        createdAt:
+          millis(doc.get('createdAt')) || millis(doc.get('followedAt')),
+      })),
+    engagement,
+    events: eventDocs.docs.map((doc) => ({
+      kind: String(doc.get('kind')),
+      actorId: String(doc.get('actorId')),
+      targetId: String(doc.get('targetId')),
+      createdAt: millis(doc.get('createdAt')),
+      originalCreatedAt: millis(doc.get('originalCreatedAt')),
+    })),
+  });
+  // Never publish unvalidated community rankings into the live feed.
+  const firstEventTime = eventDocs.docs.reduce((earliest, doc) => {
+    const at = millis(doc.get('createdAt'));
+    return at > 0 ? Math.min(earliest, at) : earliest;
+  }, Number.POSITIVE_INFINITY);
+  const communityAudit = {
+    mode: 'shadow',
+    algorithmVersion: 1,
+    calculatedAt: Timestamp.fromMillis(now),
+    eventCount: eventDocs.size,
+    reviewCount: community.reviewScores.length,
+    userCount: community.peopleScores.length,
+    firstObservedEventAt: Number.isFinite(firstEventTime)
+      ? Timestamp.fromMillis(firstEventTime)
+      : null,
+    thresholds: {
+      windowDays: 7,
+      minimumAccountAgeDays: 7,
+      minimumReviewTextLength: 40,
+      minimumCommentLetters: 20,
+      commentWeight: 2,
+      maximumPairAdds7d: 1,
+    },
+  };
+  for (const [collection, rows] of [
+    [
+      '_communityReviewSignals',
+      community.reviewScores.map((row) => ({ id: row.reviewId, ...row })),
+    ],
+    [
+      '_communityPeopleSignals',
+      community.peopleScores.map((row) => ({ id: row.userId, ...row })),
+    ],
+  ] as const) {
+    for (let offset = 0; offset < rows.length; offset += 400) {
+      const batch = db.batch();
+      for (const row of rows.slice(offset, offset + 400))
+        batch.set(db.collection(collection).doc(row.id), {
+          ...row,
+          ...communityAudit,
+        });
+      await batch.commit();
+    }
+  }
+  await db
+    .collection('_communitySignalRuns')
+    .doc(new Date(now).toISOString().slice(0, 13))
+    .set(communityAudit);
   const scores = calculateVenueSignals({
     now,
     users: signalUsers,
-    reviews: signalReviews,
+    reviews: signalReviews.filter((review) => !riskReviewIds.has(review.id)),
     venues: venues.docs.map((venue) => ({
       id: venue.id,
       city: String(venue.get('city') ?? ''),
@@ -141,6 +324,14 @@ export async function calculateDiscoveryShadow(now = Date.now()) {
     });
   return {
     mode,
+    communityMode: 'shadow',
+    communityReviewCandidates: community.reviewScores.filter(
+      (score) => score.score > 0,
+    ).length,
+    communityPeopleCandidates: community.peopleScores.filter(
+      (score) => score.uniqueFollowers7d > 0,
+    ).length,
+    riskQueued: riskAudit.queued,
     venues: output.length,
     hotCandidates: scores.filter((score) => score.hotCandidate).length,
     trendingCandidates: scores.filter((score) => score.trendingCandidate)
@@ -155,6 +346,7 @@ export const refreshDiscoverySignals = onSchedule(
     timeZone: 'UTC',
     maxInstances: 1,
     retryCount: 3,
+    timeoutSeconds: 300,
   },
   async () => {
     await calculateDiscoveryShadow();

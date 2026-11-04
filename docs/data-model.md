@@ -53,6 +53,35 @@ Historical duplicate reviews approved for consolidation retain archived source
 documents with `mergedIntoReviewId`. Callable review operations resolve those
 aliases to the canonical review so older links and engagement remain usable.
 
+### Private activity and discovery audits
+
+`_activityEvents` records timestamped follow/unfollow, review/visit, reaction and
+comment mutations inside their existing transactions, after state and idempotency
+checks. These events contain entity IDs and operation metadata, not copies of
+review/comment text or raw network addresses. Removing a relationship or reaction
+retains its original creation time in the event so re-adding it does not manufacture
+new growth. Events are not reconstructed for activity that was never recorded.
+
+`_communityPeopleSignals`, `_communityReviewSignals`, and `_communitySignalRuns`
+store hourly shadow calculations and their timestamps/thresholds. They do not
+replace the live discovery rankings. Calculations count unique eligible actors,
+exclude self activity and fixture/suspicious accounts, use recent engagement with
+decay, and do not use lifetime counters as recent activity. A complete week of
+observed events and a production comparison are still needed before activation.
+
+`_userPrivate/{uid}.signupNetworkHash` is recorded only when a new profile is
+created. It uses an HMAC with a private random key in `_riskConfig/network`; no raw
+IP is stored and no country/GPS history is inferred. Existing accounts are not
+given invented historical fingerprints.
+
+The hourly review risk check adds `source: "risk-monitor"` reports for human
+moderators when long cross-account text duplicates, review velocity, or coordinated
+new-account/network activity crosses a conservative threshold. These reports do
+not hide content or ban accounts. A dismissed report stays dismissed for that
+content version; a later text change can be reviewed separately. Resolving a system
+report does not send a notification to a fictitious reporter. Pending high-risk
+reviews are excluded from shadow discovery scores.
+
 ### `_otpChallenges/{challengeId}`
 
 Private, short-lived backend state for phone verification with a random document ID. It contains the normalized phone number, provider reference, expiry timestamp, status, and failed-attempt count. Successful challenges are deleted before token issuance; expired documents are removed by the `expiresAt` Firestore TTL policy. Clients have no direct access.

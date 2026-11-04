@@ -13,6 +13,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { createHash } from 'node:crypto';
 import { requireUserId } from '../../shared/auth';
+import { recordActivityEvent } from '../../shared/activity-events';
 import { db } from '../../shared/firebase';
 import { enforceRateLimit } from '../../shared/mutations';
 import { queueNotification } from '../../shared/notifications';
@@ -201,6 +202,7 @@ export const followUser = onCall(callableOptions, async (request) => {
       createdAt: now,
     });
     transaction.create(followerRef, { userId: uid, createdAt: now });
+    recordActivityEvent(transaction, 'follow-created', uid, input.targetUserId);
     transaction.update(userRef, {
       followingCount: FieldValue.increment(1),
       updatedAt: now,
@@ -242,6 +244,16 @@ export const unfollowUser = onCall(callableOptions, async (request) => {
     await enforceRateLimit(transaction, uid, 'follow', 60, 60_000);
     transaction.delete(followingRef);
     transaction.delete(followerRef);
+    recordActivityEvent(
+      transaction,
+      'follow-removed',
+      uid,
+      input.targetUserId,
+      {
+        originalCreatedAt:
+          following.get('createdAt') ?? following.get('followedAt') ?? null,
+      },
+    );
     if (user.exists) {
       transaction.update(userRef, {
         followingCount: Math.max(
@@ -283,6 +295,17 @@ export const removeFollower = onCall(callableOptions, async (request) => {
     await enforceRateLimit(transaction, uid, 'remove-follower', 60, 60_000);
     transaction.delete(incomingRef);
     transaction.delete(outgoingRef);
+    recordActivityEvent(
+      transaction,
+      'follow-removed',
+      input.followerUserId,
+      uid,
+      {
+        removedBy: uid,
+        originalCreatedAt:
+          incoming.get('createdAt') ?? incoming.get('followedAt') ?? null,
+      },
+    );
     if (user.exists) {
       transaction.update(userRef, {
         followerCount: Math.max(0, Number(user.get('followerCount') ?? 0) - 1),

@@ -634,29 +634,53 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
   return feed;
 });
 
-async function fetchPeople(
-  orderField: 'weeklyFollowerGrowth' | 'createdAt' | 'followerCount',
-  take: number,
-  excludeUserId: string,
-): Promise<QueryDocumentSnapshot[]> {
-  const snapshot = await db
-    .collection('users')
-    .where('status', '==', 'active')
-    .orderBy(orderField, 'desc')
-    .limit(take + 1)
-    .get();
-  return snapshot.docs
-    .filter((document) => document.id !== excludeUserId)
-    .slice(0, take);
-}
-
 export const getDiscoverPeople = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
-  const [trendingDocs, freshDocs, suggestedDocs] = await Promise.all([
-    fetchPeople('weeklyFollowerGrowth', 6, uid),
-    fetchPeople('createdAt', 6, uid),
-    fetchPeople('followerCount', 6, uid),
+  const [users, viewer] = await Promise.all([
+    db.collection('users').where('status', '==', 'active').get(),
+    db.collection('users').doc(uid).get(),
   ]);
+  const cityKey = (value: unknown) =>
+    String(value ?? '')
+      .trim()
+      .normalize('NFKC')
+      .toLocaleLowerCase('en-US');
+  const viewerCity = cityKey(viewer.get('city'));
+  const candidates = users.docs.filter(
+    (document) =>
+      document.id !== uid &&
+      document.get('isTestAccount') !== true &&
+      document.get('suspicious') !== true &&
+      !['seed', 'test', 'stress-image-scroll'].includes(
+        String(document.get('source') ?? ''),
+      ),
+  );
+  const select = (field: 'followerCount' | 'createdAt') =>
+    [...candidates]
+      .sort((a, b) => {
+        const local = (document: QueryDocumentSnapshot) =>
+          !!viewerCity && cityKey(document.get('city')) === viewerCity;
+        const value = (document: QueryDocumentSnapshot) => {
+          const stored: unknown = document.get(field);
+          return field === 'createdAt'
+            ? stored instanceof Timestamp
+              ? stored.toMillis()
+              : typeof stored === 'string'
+                ? Date.parse(stored) || 0
+                : 0
+            : Number(stored ?? 0);
+        };
+        return (
+          Number(local(b)) - Number(local(a)) ||
+          value(b) - value(a) ||
+          a.id.localeCompare(b.id)
+        );
+      })
+      .slice(0, 6);
+  // Until shadow results are validated, these are follow suggestions, not seeded weekly growth.
+  const trendingDocs = select('followerCount');
+  const freshDocs = select('createdAt');
+  const suggestedDocs = select('followerCount');
   const candidateIds = [
     ...new Set(
       [...trendingDocs, ...freshDocs, ...suggestedDocs].map(
