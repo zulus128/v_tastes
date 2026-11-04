@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -460,6 +461,26 @@ describe('authenticated session and paginated reads', () => {
       .get();
     expect(profile.docs[0]?.get('email')).toBeUndefined();
     expect(profile.docs[0]?.get('phoneNumber')).toBeUndefined();
+    expect(profile.docs[0]?.get('signupNetworkHash')).toBeUndefined();
+    const storedNetwork = (
+      await getFirestore()
+        .collection('_userPrivate')
+        .doc(profile.docs[0]!.id)
+        .get()
+    ).get('signupNetworkHash');
+    // The emulator may omit the source address; absence must remain unknown.
+    expect(
+      storedNetwork === null ||
+        (typeof storedNetwork === 'string' &&
+          /^[a-f0-9]{64}$/.test(storedNetwork)),
+    ).toBe(true);
+    const { networkFingerprint } =
+      await import('../../functions/src/shared/network-fingerprint');
+    const network = await networkFingerprint('198.51.100.4');
+    expect(network).toMatch(/^[a-f0-9]{64}$/);
+    expect(await networkFingerprint('198.51.100.4')).toBe(network);
+    expect(await networkFingerprint('198.51.100.5')).not.toBe(network);
+    expect(await networkFingerprint(undefined)).toBeNull();
     expect(profile.docs[0]?.get('countryCode')).toBe('TR');
     await callFunction('updateProfileSettings', { city: 'Paris' }, token);
     expect((await profile.docs[0]!.ref.get()).get('countryCode')).toBe('FR');
@@ -619,7 +640,7 @@ describe('authenticated session and paginated reads', () => {
   }, 15_000);
 
   it('writes and removes mirrored social edges', async () => {
-    const { first, second, author, reader } = await createSocialFixture();
+    const { first, second, author, reader, db } = await createSocialFixture();
     expect(
       await callFunction(
         'followUser',
@@ -635,6 +656,18 @@ describe('authenticated session and paginated reads', () => {
     expect(
       (await author.ref.collection('followers').doc(reader.id).get()).exists,
     ).toBe(true);
+    await callFunction('followUser', { targetUserId: author.id }, second.token);
+    const follows = await db
+      .collection('_activityEvents')
+      .where('kind', '==', 'follow-created')
+      .get();
+    expect(
+      follows.docs.filter(
+        (event) =>
+          event.get('actorId') === reader.id &&
+          event.get('targetId') === author.id,
+      ),
+    ).toHaveLength(1);
     expect(
       await callFunction(
         'removeFollower',
@@ -674,6 +707,15 @@ describe('authenticated session and paginated reads', () => {
       first.token,
     );
     expect(replayedReview.id).toBe(firstReview.id);
+    const createEvents = await db
+      .collection('_activityEvents')
+      .where('kind', '==', 'review-created')
+      .get();
+    expect(
+      createEvents.docs.filter(
+        (event) => event.get('targetId') === firstReview.id,
+      ),
+    ).toHaveLength(1);
     expect((await author.ref.get()).get('xp')).toBe(50);
     const reviewDocument = await db
       .collection('reviews')
@@ -717,6 +759,15 @@ describe('authenticated session and paginated reads', () => {
       second.token,
     );
     await callFunction('addComment', commentCommand, second.token);
+    const commentEvents = await db
+      .collection('_activityEvents')
+      .where('kind', '==', 'comment-added')
+      .get();
+    expect(
+      commentEvents.docs.filter(
+        (event) => event.get('commentId') === firstComment.id,
+      ),
+    ).toHaveLength(1);
     expect(
       (await db.collection('reviews').doc(firstReview.id).get()).get(
         'commentCount',
@@ -897,7 +948,8 @@ describe('authenticated session and paginated reads', () => {
   }, 15_000);
 
   it('applies review XP and reactions exactly once', async () => {
-    const { first, second, author, firstReview } = await createReviewFixture();
+    const { first, second, author, firstReview, db } =
+      await createReviewFixture();
     const profileExtras = await callFunction<{ xp: number }>(
       'getProfileExtras',
       {},
@@ -923,6 +975,15 @@ describe('authenticated session and paginated reads', () => {
       reactionCount: 1,
     });
     expect((await author.ref.get()).get('xp')).toBe(55);
+    const likeEvents = await db
+      .collection('_activityEvents')
+      .where('kind', '==', 'reaction-added')
+      .get();
+    expect(
+      likeEvents.docs.filter(
+        (event) => event.get('targetId') === firstReview.id,
+      ),
+    ).toHaveLength(1);
     expect(
       await callFunction(
         'reactToContent',
@@ -1860,6 +1921,97 @@ describe('messaging callables', () => {
 });
 
 describe('Milestone 2 completion callables', () => {
+  it('queues duplicate reviews for manual review and preserves staff dismissals', async () => {
+    const { db, author, reader } = await createSocialFixture();
+    const text =
+      'The grilled fish was excellent with fresh herbs, tender vegetables, a rich sauce and warm bread. The service was attentive throughout our meal.';
+    await Promise.all(
+      [author, reader].map((user) =>
+        db.collection('reviews').doc(`risk-${user.id}`).set({
+          authorId: user.id,
+          venueId: 'risk-venue',
+          status: 'published',
+          text,
+          rating: 4,
+          createdAt: Timestamp.now(),
+        }),
+      ),
+    );
+    const { queueReviewRisks } =
+      await import('../../functions/src/modules/reviews/risk-monitor');
+    expect(await queueReviewRisks()).toMatchObject({ queued: 2 });
+    expect(await queueReviewRisks()).toMatchObject({ queued: 0 });
+    const reports = await db
+      .collection('reports')
+      .where('source', '==', 'risk-monitor')
+      .get();
+    expect(reports.size).toBe(2);
+    expect(reports.docs.every((report) => report.id.length <= 128)).toBe(true);
+    await reports.docs[0]!.ref.update({ status: 'dismissed' });
+    expect(await queueReviewRisks()).toMatchObject({ queued: 0 });
+    expect((await reports.docs[0]!.ref.get()).get('status')).toBe('dismissed');
+    expect(
+      (await db.collection('reviews').where('status', '==', 'published').get())
+        .size,
+    ).toBe(2);
+  }, 15_000);
+
+  it('resolves system reports without a fake recipient and keeps moderated review totals correct', async () => {
+    const { db, author, firstReview } = await createReviewFixture();
+    const custom = await getAuth().createCustomToken(
+      'qa-system-report-moderator',
+      {
+        role: 'moderator',
+      },
+    );
+    const auth = (await fetch(
+      `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: custom, returnSecureToken: true }),
+      },
+    ).then((response) => response.json())) as { idToken: string };
+    const report = {
+      source: 'risk-monitor',
+      reporterId: '',
+      reporterName: 'Spam risk check',
+      targetType: 'review',
+      targetId: firstReview.id,
+      status: 'pending',
+      createdAt: Timestamp.now(),
+    };
+    await db.collection('reports').doc('risk-dismiss').set(report);
+    await callFunction(
+      'dismissReport',
+      { reportId: 'risk-dismiss' },
+      auth.idToken,
+    );
+    expect(
+      (await db.collection('reports').doc('risk-dismiss').get()).get('status'),
+    ).toBe('dismissed');
+    await db.collection('reports').doc('risk-delete').set(report);
+    const action = {
+      targetType: 'review',
+      targetId: firstReview.id,
+      reportId: 'risk-delete',
+    };
+    await callFunction('deleteContent', action, auth.idToken);
+    await callFunction('deleteContent', action, auth.idToken);
+    expect((await author.ref.get()).get('reviewCount')).toBe(0);
+    expect((await author.ref.get()).get('xp')).toBe(0);
+    expect(
+      (await db.collection('venues').doc('demo-cafe').get()).data(),
+    ).toMatchObject({ reviewCount: 0, rating: 0 });
+    const deleted = await db
+      .collection('_activityEvents')
+      .where('kind', '==', 'review-deleted')
+      .get();
+    expect(
+      deleted.docs.filter((event) => event.get('targetId') === firstReview.id),
+    ).toHaveLength(1);
+  }, 15_000);
+
   it('supports venue submission/search and review edit/delete/content actions', async () => {
     const author = await authenticatedUser();
     const reader = await authenticatedUser();

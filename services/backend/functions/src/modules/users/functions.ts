@@ -18,6 +18,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
+import { networkFingerprint } from '../../shared/network-fingerprint';
 import { db } from '../../shared/firebase';
 import { sendNotifications } from '../../shared/notifications';
 import { contactInviteId } from '../social/functions';
@@ -326,6 +327,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   const input = parseInput(createUserProfileInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
   const authUser = await getAuth().getUser(uid);
+  const signupNetworkHash = await networkFingerprint(request.rawRequest.ip);
   const [originalPhotoUrl, thumbnailPhotoUrl] = await Promise.all([
     input.photoPath
       ? validatedProfileImageUrl(input.photoPath, uid)
@@ -446,7 +448,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         phoneNumber: authUser.phoneNumber ?? null,
         ...(input.birthDate ? { birthDate: input.birthDate } : {}),
         updatedAt: now,
-        ...(!existing.exists ? { createdAt: now } : {}),
+        ...(!existing.exists ? { createdAt: now, signupNetworkHash } : {}),
       },
       { merge: true },
     );

@@ -860,8 +860,8 @@ function TrendingFeed({
       {feed.popularReviews.length > 0 ? (
         <>
           <SectionLabel
-            title="Popular reviews"
-            subtitle="What people are saying right now"
+            title="Most liked reviews"
+            subtitle="Community favourites"
           />
           <View style={styles.reviewList}>
             {feed.popularReviews.map((review) => (

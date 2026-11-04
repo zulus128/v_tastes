@@ -23,6 +23,7 @@ import {
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { requireUserId } from '../../shared/auth';
+import { recordActivityEvent } from '../../shared/activity-events';
 import { db } from '../../shared/firebase';
 import { callableOptions } from '../../shared/options';
 import {
@@ -947,6 +948,19 @@ export const setUserBlocked = onCall(callableOptions, async (request) => {
     }
     transaction.set(blockedRef, { userId: input.targetUserId, createdAt: now });
     if (userFollowsTarget.exists) {
+      recordActivityEvent(
+        transaction,
+        'follow-removed',
+        uid,
+        input.targetUserId,
+        {
+          originalCreatedAt:
+            userFollowsTarget.get('createdAt') ??
+            userFollowsTarget.get('followedAt') ??
+            null,
+          removedBy: uid,
+        },
+      );
       transaction.delete(userFollowsTarget.ref);
       transaction.delete(targetRef.collection('followers').doc(uid));
       transaction.update(userRef, {
@@ -959,6 +973,19 @@ export const setUserBlocked = onCall(callableOptions, async (request) => {
       });
     }
     if (targetFollowsUser.exists) {
+      recordActivityEvent(
+        transaction,
+        'follow-removed',
+        input.targetUserId,
+        uid,
+        {
+          originalCreatedAt:
+            targetFollowsUser.get('createdAt') ??
+            targetFollowsUser.get('followedAt') ??
+            null,
+          removedBy: uid,
+        },
+      );
       transaction.delete(targetFollowsUser.ref);
       transaction.delete(
         userRef.collection('followers').doc(input.targetUserId),
