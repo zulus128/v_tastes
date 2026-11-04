@@ -3004,3 +3004,61 @@ it(
     ).toBeNull();
   },
 );
+
+it(
+  'persists half-star minimum scores and normalizes older client decimals',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await createSocialFixture();
+    await fixture.db.collection('venues').doc('half-star-venue').set({
+      name: 'Half-star venue',
+      city: 'Istanbul',
+      status: 'active',
+      rating: 0,
+      reviewCount: 0,
+    });
+    const created = await callFunction<{ id: string }>(
+      'createReview',
+      {
+        idempotencyKey: 'half-star-create-0001',
+        venueId: 'half-star-venue',
+        rating: 0.5,
+        text: 'A half-star review',
+        dishReviews: [{ id: 'soup', title: 'Soup', rating: 4.3 }],
+      },
+      fixture.first.token,
+    );
+    const reference = fixture.db.collection('reviews').doc(created.id);
+    expect((await reference.get()).get('rating')).toBe(0.5);
+    expect((await reference.get()).get('dishReviews')[0].rating).toBe(4.5);
+    await callFunction(
+      'editReview',
+      {
+        reviewId: created.id,
+        rating: 4.7,
+        text: 'Updated from an older client',
+        dishReviews: [{ id: 'soup', title: 'Soup', rating: 0.5 }],
+      },
+      fixture.first.token,
+    );
+    expect((await reference.get()).get('rating')).toBe(4.5);
+    expect((await reference.get()).get('dishReviews')[0].rating).toBe(0.5);
+    await callFunction(
+      'addReviewVisit',
+      {
+        reviewId: created.id,
+        idempotencyKey: 'half-star-visit-0001',
+        rating: 0.5,
+        text: 'Another visit',
+        dishReviews: [{ id: 'soup', title: 'Soup', rating: 0.5 }],
+      },
+      fixture.first.token,
+    );
+    const result = await reference.get();
+    expect(result.get('rating')).toBe(0.5);
+    expect(result.get('previousRating')).toBe(4.5);
+    expect(
+      result.get('visits').map((visit: { rating: number }) => visit.rating),
+    ).toEqual([4.5, 0.5]);
+  },
+);

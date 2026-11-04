@@ -15,7 +15,7 @@ import {
 } from '../src/features/create-review/ratingCurveGeometry';
 
 describe('rating curve geometry', () => {
-  it.each([1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5])(
+  it.each([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5])(
     'round-trips rating %s through the curve',
     (rating) => {
       const point = ratingCurvePoint(rating);
@@ -24,7 +24,7 @@ describe('rating curve geometry', () => {
   );
 
   it('clamps touches beyond both ends of the arc', () => {
-    expect(ratingForCurvePoint(-100, 0)).toBe(1);
+    expect(ratingForCurvePoint(-100, 0)).toBe(0.5);
     expect(ratingForCurvePoint(500, 0)).toBe(5);
   });
 
@@ -64,7 +64,7 @@ describe('rating curve geometry', () => {
 
   it('keeps the standalone dish arc aligned to the Figma canvas', () => {
     const geometry = dishRatingArcGeometry(402);
-    const left = ratingCurvePoint(1, geometry);
+    const left = ratingCurvePoint(0.5, geometry);
     const middle = ratingCurvePoint(3, geometry);
     const right = ratingCurvePoint(5, geometry);
 
@@ -123,7 +123,7 @@ describe('rating curve geometry', () => {
   it('keeps intermediate markers on the lower arc at the semicircle breakpoint', () => {
     const width = 895;
     const layout = concentricRatingLayout(width, 1_044, 0, 31);
-    const left = ratingCurvePoint(1, layout.ratingArc);
+    const left = ratingCurvePoint(0.5, layout.ratingArc);
     const middle = ratingCurvePoint(3, layout.ratingArc);
     const right = ratingCurvePoint(5, layout.ratingArc);
 
@@ -138,11 +138,11 @@ describe('rating curve geometry', () => {
 
   it('keeps a left-endpoint drag on the lower arc across the atan2 wrap', () => {
     const layout = concentricRatingLayout(895, 1_044, 0, 31);
-    const left = ratingCurvePoint(1, layout.ratingArc);
+    const left = ratingCurvePoint(0.5, layout.ratingArc);
 
     expect(
       ratingForCurvePoint(left.x, left.y - 1, layout.ratingArc),
-    ).toBeCloseTo(1, 1);
+    ).toBeCloseTo(0.5, 1);
   });
 
   it('reserves rating space below a venue card and large safe area', () => {

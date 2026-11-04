@@ -101,7 +101,7 @@ import {
 // deepest point; this just makes that clearance uniform instead of only happening at center).
 const heroCurveGap = 31;
 const reviewRatingMarkers = [
-  { kind: 'dot', value: 1 },
+  { kind: 'dot', value: 0.5 },
   { kind: 'tick', rotation: -30, value: 1.5 },
   { kind: 'dot', value: 2 },
   { kind: 'tick', rotation: -70, value: 2.5 },
@@ -187,7 +187,7 @@ export function CreateReviewScreen({
   const [submitError, setSubmitError] = useState<'failed' | 'offline' | null>(
     null,
   );
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<'review' | 'visit' | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(() =>
     createIdempotencyKey('review'),
   );
@@ -208,7 +208,7 @@ export function CreateReviewScreen({
     !existingReview.isFetching &&
     !existingReview.isError &&
     text.trim() &&
-    rating >= 1 &&
+    rating >= 0.5 &&
     dishes.every((dish) => dish.title.trim() && dish.rating >= 0.5),
   );
   const hasDraftChanges = Boolean(
@@ -303,7 +303,7 @@ export function CreateReviewScreen({
     setTags([]);
     setDishes([]);
     setIdempotencyKey(createIdempotencyKey('review'));
-    setSuccess(false);
+    setSuccess(null);
     setSubmitError(null);
     void AsyncStorage.removeItem(reviewDraftKey(userId));
     void cancelDraftReminder();
@@ -383,7 +383,7 @@ export function CreateReviewScreen({
           );
           void persistDraft();
         },
-        onSuccess: () => setSuccess(true),
+        onSuccess: () => setSuccess(reviewId ? 'visit' : 'review'),
       },
     );
   }
@@ -443,7 +443,7 @@ export function CreateReviewScreen({
   }
 
   if (success)
-    return <ReviewAdded onDone={finish} revised={Boolean(reviewId)} />;
+    return <ReviewAdded onDone={finish} revised={success === 'visit'} />;
 
   // The ScrollView below already handles iOS keyboard insets itself
   // (automaticallyAdjustKeyboardInsets); adding KeyboardAvoidingView's own
@@ -1104,7 +1104,7 @@ function RatingCurve({
   const [scaleWidth, setScaleWidth] = useState(0);
   const [standaloneWidth, setStandaloneWidth] = useState(0);
   const [visualRating, setVisualRating] = useState(value);
-  const minimumRating = linear ? 0.5 : 1;
+  const minimumRating = 0.5;
   const reduceMotion = useRef(false);
   const markerScale = scaleWidth / 359.903;
   const curvedLayout =
@@ -1122,8 +1122,8 @@ function RatingCurve({
       : curvedLayout?.ratingArc;
   const standaloneHeight = dishRatingArcHeight(standaloneWidth);
   const selectedPoint =
-    visualRating >= 1 ? ratingCurvePoint(visualRating, arcGeometry) : null;
-  const initialPinPoint = ratingCurvePoint(Math.max(1, value), arcGeometry);
+    visualRating >= 0.5 ? ratingCurvePoint(visualRating, arcGeometry) : null;
+  const initialPinPoint = ratingCurvePoint(Math.max(0.5, value), arcGeometry);
   const pinPosition = useRef(
     new Animated.ValueXY({
       x: initialPinPoint.x - responsiveSize(22),
@@ -1221,7 +1221,7 @@ function RatingCurve({
       setVisualRating(value);
     }
     if (
-      value >= 1 &&
+      value >= 0.5 &&
       (!dragging.current || geometryChanged) &&
       !settling.current
     ) {
@@ -1599,7 +1599,7 @@ function RatingCurve({
               </ClipPath>
             </Defs>
             <Path
-              d={`M${ratingCurvePoint(1, arcGeometry).x} ${ratingCurvePoint(1, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
+              d={`M${ratingCurvePoint(0.5, arcGeometry).x} ${ratingCurvePoint(0.5, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom}`}
               fill="none"
               stroke={curveBase}
               strokeLinecap="round"
@@ -1615,7 +1615,7 @@ function RatingCurve({
             {selectedPoint ? (
               <Path
                 clipPath="url(#review-rating-progress)"
-                d={`M${ratingCurvePoint(1, arcGeometry).x} ${ratingCurvePoint(1, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} ${ratingCurvePoint(5, arcGeometry).y}`}
+                d={`M${ratingCurvePoint(0.5, arcGeometry).x} ${ratingCurvePoint(0.5, arcGeometry).y} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${arcGeometry.centerX} ${innerBottom} A${arcGeometry.radius} ${arcGeometry.radius} 0 0 0 ${ratingCurvePoint(5, arcGeometry).x} ${ratingCurvePoint(5, arcGeometry).y}`}
                 fill="none"
                 stroke={accent}
                 strokeLinecap="round"
@@ -1662,7 +1662,7 @@ function RatingCurve({
               </Pressable>
             );
           })}
-          {visualRating >= 1 ? (
+          {visualRating >= 0.5 ? (
             <Animated.View
               accessibilityActions={[
                 { name: 'increment' },
@@ -2241,7 +2241,7 @@ function DishEditor({
   }
 
   if (!draft) return null;
-  const valid = Boolean(draft.title.trim() && draft.rating >= 1);
+  const valid = Boolean(draft.title.trim() && draft.rating >= 0.5);
   return (
     <Modal
       animationType="none"
