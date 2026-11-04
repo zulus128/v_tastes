@@ -18,6 +18,13 @@ let mockVenues: Array<Record<string, unknown>> = [];
 let mockIsDark = true;
 const mockAnimateToRegion = jest.fn();
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (effect: () => void) => {
+    const React = jest.requireActual('react');
+    React.useEffect(effect, [effect]);
+  },
+}));
+
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
   return {
@@ -256,21 +263,40 @@ describe('Discover responsive content', () => {
     );
   });
 
-  it('changes the map region when zoom controls are pressed', async () => {
+  it('shows a venue preview after a pin tap and opens Place only from the preview', async () => {
+    mockVenues = [
+      {
+        id: 'pin-place',
+        name: 'Pin test restaurant',
+        city: 'Istanbul',
+        status: 'active',
+        latitude: 41.01,
+        longitude: 28.97,
+        rating: 4,
+      },
+    ];
+    props.onOpenPlace.mockClear();
+    resize(402, 874);
+    await render(<DiscoverScreen {...props} />);
+    await fireEvent.press(screen.getByTestId('discover-pin-pin-place'));
+    expect(props.onOpenPlace).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Pin test restaurant')).toHaveLength(1);
+    await fireEvent.press(screen.getByText('Pin test restaurant'));
+    expect(props.onOpenPlace).toHaveBeenCalledWith('pin-place');
+  });
+
+  it('keeps native map gestures without separate zoom buttons', async () => {
     resize(402, 874);
     await render(<DiscoverScreen {...props} />);
     await fireEvent.press(screen.getByRole('tab', { name: 'Places' }));
 
-    await fireEvent.press(screen.getByLabelText('Zoom in'));
-    expect(mockAnimateToRegion).toHaveBeenLastCalledWith(
-      expect.objectContaining({ latitudeDelta: 0.065, longitudeDelta: 0.06 }),
-      220,
+    expect(screen.queryByLabelText('Zoom in')).toBeNull();
+    expect(screen.queryByLabelText('Zoom out')).toBeNull();
+    expect(screen.getByTestId('discover-map').props.zoomEnabled).not.toBe(
+      false,
     );
-
-    await fireEvent.press(screen.getByLabelText('Zoom out'));
-    expect(mockAnimateToRegion).toHaveBeenLastCalledWith(
-      expect.objectContaining({ latitudeDelta: 0.13, longitudeDelta: 0.12 }),
-      220,
+    expect(screen.getByTestId('discover-map').props.scrollEnabled).not.toBe(
+      false,
     );
   });
 

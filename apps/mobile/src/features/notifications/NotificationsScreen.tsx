@@ -95,9 +95,11 @@ function dateLabel(iso: string) {
 
 export function NotificationsScreen({
   onBack,
+  onOpenProfile,
   onOpenTarget,
 }: {
   onBack: () => void;
+  onOpenProfile?: (userId: string) => void;
   onOpenTarget: (item: AppNotification) => void;
 }) {
   const api = useTastesApi();
@@ -124,7 +126,6 @@ export function NotificationsScreen({
   const [loadingMore, setLoadingMore] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'activity' | 'badges'>('activity');
   const [nextCursor, setNextCursor] = useState<string | null>(
     () => cachedNotifications?.pages.at(-1)?.nextCursor ?? null,
   );
@@ -148,14 +149,12 @@ export function NotificationsScreen({
   }, [items, requests]);
   const visibleFeed = useMemo(
     () =>
-      feed.filter((entry) =>
-        tab === 'badges'
-          ? entry.type === 'notification' &&
-            (entry.item.kind === 'reward' || entry.item.group === 'recap')
-          : entry.type === 'request' ||
-            (entry.item.kind !== 'reward' && entry.item.group !== 'recap'),
+      feed.filter(
+        (entry) =>
+          entry.type === 'request' ||
+          (entry.item.kind !== 'reward' && entry.item.group !== 'recap'),
       ),
-    [feed, tab],
+    [feed],
   );
 
   useEffect(() => {
@@ -276,11 +275,30 @@ export function NotificationsScreen({
     const busy = respondingId === item.id;
     return (
       <View style={styles.requestRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarInitials}>{initials(item.senderName)}</Text>
-        </View>
+        <Pressable
+          accessibilityLabel={`Open ${item.senderName} profile`}
+          disabled={!item.senderId}
+          onPress={() => item.senderId && onOpenProfile?.(item.senderId)}
+          style={styles.avatar}
+        >
+          {item.senderPhotoUrl ? (
+            <Image
+              source={{ uri: item.senderPhotoUrl }}
+              style={styles.avatar}
+            />
+          ) : (
+            <Text style={styles.avatarInitials}>
+              {initials(item.senderName)}
+            </Text>
+          )}
+        </Pressable>
         <View style={styles.requestCopy}>
-          <Text numberOfLines={1} style={styles.rowTitle}>
+          <Text
+            accessibilityRole="link"
+            onPress={() => item.senderId && onOpenProfile?.(item.senderId)}
+            numberOfLines={1}
+            style={styles.rowTitle}
+          >
             {item.senderName}
           </Text>
           <Text numberOfLines={1} style={styles.body}>
@@ -335,25 +353,38 @@ export function NotificationsScreen({
           pressed && styles.pressed,
         ]}
       >
-        {item.actorPhotoUrl ? (
-          <Image source={{ uri: item.actorPhotoUrl }} style={styles.avatar} />
-        ) : (
-          <View
-            style={[
-              styles.avatar,
-              promotional && styles.promotionAvatar,
-              item.unread && !promotional && styles.avatarUnread,
-            ]}
-          >
-            <Text
-              style={[styles.avatarGlyph, promotional && styles.promotionGlyph]}
+        <Pressable
+          accessibilityLabel={`Open ${item.actorName ?? 'user'} profile`}
+          disabled={!item.actorId}
+          onPress={() => item.actorId && onOpenProfile?.(item.actorId)}
+        >
+          {item.actorPhotoUrl ? (
+            <Image source={{ uri: item.actorPhotoUrl }} style={styles.avatar} />
+          ) : (
+            <View
+              style={[
+                styles.avatar,
+                promotional && styles.promotionAvatar,
+                item.unread && !promotional && styles.avatarUnread,
+              ]}
             >
-              {emblem}
-            </Text>
-          </View>
-        )}
+              <Text
+                style={[
+                  styles.avatarGlyph,
+                  promotional && styles.promotionGlyph,
+                ]}
+              >
+                {emblem}
+              </Text>
+            </View>
+          )}
+        </Pressable>
         <View style={styles.copy}>
           <Text
+            accessibilityRole={item.actorId ? 'link' : undefined}
+            onPress={
+              item.actorId ? () => onOpenProfile?.(item.actorId!) : undefined
+            }
             numberOfLines={1}
             style={[styles.rowTitle, item.unread && styles.rowTitleUnread]}
           >
@@ -397,26 +428,6 @@ export function NotificationsScreen({
               {clearing ? 'Clearing…' : '✓ Clear all'}
             </Text>
           </Pressable>
-        </View>
-        <View style={styles.tabs}>
-          {(['activity', 'badges'] as const).map((value) => (
-            <Pressable
-              key={value}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === value }}
-              onPress={() => setTab(value)}
-              style={[styles.tab, tab === value && styles.tabSelected]}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  tab === value && styles.tabTextSelected,
-                ]}
-              >
-                {value === 'activity' ? 'Activity' : 'Badges'}
-              </Text>
-            </Pressable>
-          ))}
         </View>
       </View>
 

@@ -89,6 +89,12 @@ function reviewFromDocument(
     text: String(data.text ?? ''),
     tags: Array.isArray(data.tags) ? data.tags : [],
     dishReviews: Array.isArray(data.dishReviews) ? data.dishReviews : [],
+    visitCount: Number(data.visitCount ?? 1),
+    previousRating:
+      typeof data.previousRating === 'number' ? data.previousRating : undefined,
+    latestVisitAt:
+      typeof data.latestVisitAt === 'string' ? data.latestVisitAt : undefined,
+    visits: Array.isArray(data.visits) ? data.visits : [],
     status: 'published',
     commentCount: Number(data.commentCount ?? 0),
     reactionCount: Number(data.reactionCount ?? 0),

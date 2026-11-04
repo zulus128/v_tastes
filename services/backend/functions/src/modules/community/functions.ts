@@ -194,6 +194,22 @@ export const listRequests = onCall(
     const activityRequests = snapshot.docs.filter(
       (doc) => doc.get('kind') === 'activity',
     );
+    const senderIds = [
+      ...new Set(
+        snapshot.docs.flatMap((doc) => {
+          const id = doc.get('senderId');
+          return typeof id === 'string' && id ? [id] : [];
+        }),
+      ),
+    ];
+    const senders = senderIds.length
+      ? await db.getAll(
+          ...senderIds.map((id) => db.collection('users').doc(id)),
+        )
+      : [];
+    const senderPhotos = new Map(
+      senders.map((sender) => [sender.id, sender.get('photoUrl') ?? null]),
+    );
     const activities =
       activityRequests.length > 0
         ? await db.getAll(
@@ -227,6 +243,8 @@ export const listRequests = onCall(
             title: doc.get('title'),
             body: doc.get('body'),
             senderName: doc.get('senderName'),
+            senderId: doc.get('senderId') ?? null,
+            senderPhotoUrl: senderPhotos.get(doc.get('senderId')) ?? null,
             targetId: doc.get('targetId'),
             createdAt: timestampToIso(doc.get('createdAt')),
           }) as AppRequest,

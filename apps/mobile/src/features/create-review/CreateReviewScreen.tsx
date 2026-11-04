@@ -1,3 +1,4 @@
+import { DishPhoto } from '../reviews/DishReviewSheet';
 import type { ReviewTag, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,7 +71,11 @@ import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
 import { useTastesApi } from '../../session/SessionProvider';
-import { type DishReviewDraft, useCreateReview } from './api';
+import {
+  type DishReviewDraft,
+  useCreateReview,
+  useOwnVenueReview,
+} from './api';
 import { updateDishReviewDraft } from './dishDraft';
 import { placeSheetHeights, resolvePlaceSheetSnap } from './placeSheetMotion';
 import {
@@ -188,9 +193,20 @@ export function CreateReviewScreen({
   );
   const place = usePlace(venueId);
   const createReview = useCreateReview(userId);
+  const existingReview = useOwnVenueReview(userId, venueId);
+  const [reviewId, setReviewId] = useState<string | undefined>();
+  const previousReview = existingReview.data;
+  useEffect(() => {
+    setReviewId(previousReview?.id);
+    if (previousReview)
+      setRating((current) => current || previousReview.rating);
+  }, [previousReview?.id, previousReview?.rating]);
   const venue = selectedVenue ?? place.data?.venue ?? null;
   const valid = Boolean(
     venueId &&
+    !existingReview.isPending &&
+    !existingReview.isFetching &&
+    !existingReview.isError &&
     text.trim() &&
     rating >= 1 &&
     dishes.every((dish) => dish.title.trim() && dish.rating >= 0.5),
@@ -332,6 +348,7 @@ export function CreateReviewScreen({
     setSubmitError(null);
     createReview.mutate(
       {
+        reviewId,
         dishReviews: dishes,
         idempotencyKey,
         rating,
@@ -341,6 +358,23 @@ export function CreateReviewScreen({
       },
       {
         onError: (error) => {
+          const details = (
+            error as {
+              details?: { reason?: string; existingReviewId?: string };
+            }
+          ).details;
+          if (
+            details?.reason === 'ALREADY_REVIEWED' &&
+            details.existingReviewId
+          ) {
+            setReviewId(details.existingReviewId);
+            void existingReview.refetch();
+            Alert.alert(
+              'Update your review',
+              'You already reviewed this place. Your draft is ready to add as a new visit.',
+            );
+            return;
+          }
           const message = apiErrorMessage(error);
           setSubmitError(
             /network|offline|unavailable|deadline/i.test(message)
@@ -354,7 +388,62 @@ export function CreateReviewScreen({
     );
   }
 
-  if (success) return <ReviewAdded onDone={finish} />;
+  if (previousReview?.status === 'hidden') {
+    return (
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top + responsiveSize(20),
+            paddingHorizontal: responsiveSize(20),
+            gap: responsiveSize(20),
+          },
+        ]}
+      >
+        <Pressable accessibilityLabel="Close review" onPress={onClose}>
+          <Text style={styles.back}>‹</Text>
+        </Pressable>
+        <Text style={styles.venueName}>Your review is under moderation</Text>
+        <Text style={styles.venueAddress}>
+          You can update it once the moderation review is complete.
+        </Text>
+      </View>
+    );
+  }
+
+  if (venueId && (existingReview.isPending || existingReview.isError)) {
+    return (
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top + responsiveSize(20),
+            paddingHorizontal: responsiveSize(20),
+            gap: responsiveSize(20),
+          },
+        ]}
+      >
+        <Pressable accessibilityLabel="Close review" onPress={onClose}>
+          <Text style={styles.back}>‹</Text>
+        </Pressable>
+        {existingReview.isError ? (
+          <Pressable onPress={() => void existingReview.refetch()}>
+            <Text style={styles.venueName}>
+              Could not check your previous review. Tap to retry.
+            </Text>
+          </Pressable>
+        ) : (
+          <>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.venueName}>Checking your review…</Text>
+          </>
+        )}
+      </View>
+    );
+  }
+
+  if (success)
+    return <ReviewAdded onDone={finish} revised={Boolean(reviewId)} />;
 
   // The ScrollView below already handles iOS keyboard insets itself
   // (automaticallyAdjustKeyboardInsets); adding KeyboardAvoidingView's own
@@ -431,10 +520,72 @@ export function CreateReviewScreen({
                 <Text style={styles.back}>‹</Text>
               </Pressable>
               <Text maxFontSizeMultiplier={1.3} style={styles.title}>
-                Write a Review
+                {reviewId ? 'Update your review' : 'Write a Review'}
               </Text>
               <View style={styles.navigationSpacer} />
             </View>
+            {venueId && existingReview.isPending ? (
+              <ActivityIndicator
+                accessibilityLabel="Checking previous review"
+                color={colors.primary}
+              />
+            ) : null}
+            {existingReview.isError ? (
+              <Pressable onPress={() => void existingReview.refetch()}>
+                <Text style={styles.venueAddress}>
+                  Could not check your previous review. Tap to retry.
+                </Text>
+              </Pressable>
+            ) : null}
+            {previousReview ? (
+              <View
+                style={{
+                  paddingHorizontal: responsiveSize(20),
+                  gap: responsiveSize(8),
+                  paddingBottom: responsiveSize(16),
+                }}
+              >
+                <Text style={styles.venueName}>
+                  You reviewed {previousReview.venueName} in{' '}
+                  {new Date(
+                    previousReview.latestVisitAt ?? previousReview.createdAt,
+                  ).toLocaleDateString('en-US', {
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                  . Add to your review?
+                </Text>
+                <Text style={styles.venueAddress}>
+                  Previous rating: {previousReview.rating.toFixed(1)}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: responsiveSize(12) }}
+                >
+                  {previousReview.dishReviews.map((dish) => (
+                    <Pressable
+                      key={dish.id}
+                      onPress={() =>
+                        setDishEditor({
+                          id: dish.id,
+                          title: dish.title,
+                          rating: dish.rating,
+                          photoUri: '',
+                          previousPhotoUri: dish.photoUrl ?? dish.thumbnailUrl,
+                          previousPhotoPath:
+                            dish.photoPath ?? dish.thumbnailPath,
+                        })
+                      }
+                    >
+                      <Text style={styles.venueAddress}>
+                        {dish.title} · {dish.rating.toFixed(1)} · Re-rate
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
             {venue ? (
               <>
                 <Pressable
@@ -521,6 +672,30 @@ export function CreateReviewScreen({
             )}
           </View>
 
+          <SectionLabel label="Tag" />
+          <ScrollView
+            contentContainerStyle={styles.tags}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tagsScroll}
+          >
+            {tagOptions.map((tag) => (
+              <ReviewTagPill
+                emoji={tag.emoji}
+                key={tag.value}
+                label={tag.label}
+                onPress={() =>
+                  setTags((items) =>
+                    items[0] === tag.value ? [] : [tag.value],
+                  )
+                }
+                reduceMotion={reduceMotion}
+                selected={tags[0] === tag.value}
+                styles={styles}
+              />
+            ))}
+          </ScrollView>
+
           <SectionLabel
             label="Your review"
             onDone={
@@ -592,11 +767,15 @@ export function CreateReviewScreen({
                   onPress={() => setDishEditor(dish)}
                   style={styles.dishCard}
                 >
-                  {dish.photoUri ? (
+                  {dish.photoUri || dish.previousPhotoUri ? (
                     <Image
-                      source={{ uri: dish.photoUri }}
+                      source={{ uri: dish.photoUri || dish.previousPhotoUri }}
                       style={styles.dishImage}
                     />
+                  ) : dish.previousPhotoPath ? (
+                    <View style={styles.dishImage}>
+                      <DishPhoto photoPath={dish.previousPhotoPath} />
+                    </View>
                   ) : (
                     <View style={[styles.dishImage, styles.emptyDishPhoto]}>
                       <Text style={styles.addPhotoText}>+ Add photo</Text>
@@ -644,30 +823,6 @@ export function CreateReviewScreen({
               </Text>
             </Pressable>
           ) : null}
-
-          <SectionLabel label="Tag" />
-          <ScrollView
-            contentContainerStyle={styles.tags}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tagsScroll}
-          >
-            {tagOptions.map((tag) => (
-              <ReviewTagPill
-                emoji={tag.emoji}
-                key={tag.value}
-                label={tag.label}
-                onPress={() =>
-                  setTags((items) =>
-                    items[0] === tag.value ? [] : [tag.value],
-                  )
-                }
-                reduceMotion={reduceMotion}
-                selected={tags[0] === tag.value}
-                styles={styles}
-              />
-            ))}
-          </ScrollView>
         </ScrollView>
 
         {/* Height is measured (see footerHeight/onLayout above), so a taller button here at
@@ -700,7 +855,7 @@ export function CreateReviewScreen({
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text maxFontSizeMultiplier={1.3} style={styles.postText}>
-                  Post Review
+                  {reviewId ? 'Add visit' : 'Post Review'}
                 </Text>
               )}
             </Pressable>
@@ -711,6 +866,12 @@ export function CreateReviewScreen({
           <PlaceSelector
             onClose={() => setPlaceSelectorOpen(false)}
             onSelect={(next) => {
+              if (next.id !== venueId) {
+                setReviewId(undefined);
+                setRating(0);
+                setDishes([]);
+                setText('');
+              }
               setVenueId(next.id);
               setSelectedVenue(next);
               setPlaceSelectorOpen(false);
@@ -722,11 +883,25 @@ export function CreateReviewScreen({
         <DishEditor
           onClose={() => setDishEditor(null)}
           onSave={(dish) => {
-            setDishes((items) =>
-              items.some((item) => item.id === dish.id)
-                ? items.map((item) => (item.id === dish.id ? dish : item))
-                : [...items, dish],
-            );
+            setDishes((items) => {
+              const existing = items.find(
+                (item) =>
+                  item.id === dish.id ||
+                  item.title.trim().normalize('NFKC').toLowerCase() ===
+                    dish.title.trim().normalize('NFKC').toLowerCase(),
+              );
+              if (!existing) return [...items, dish];
+              return items.map((item) =>
+                item.id === existing.id
+                  ? {
+                      ...existing,
+                      ...dish,
+                      id: existing.id,
+                      photoUri: dish.photoUri || existing.photoUri,
+                    }
+                  : item,
+              );
+            });
             setDishEditor(null);
           }}
           value={dishEditor}
@@ -998,7 +1173,7 @@ function RatingCurve({
   const setVisualPosition = (rating: number) => {
     currentDragRating.current = rating;
     setPinPosition(rating);
-    setVisualRating(rating);
+    setVisualRating(snapRating(rating));
   };
 
   useEffect(() => {
@@ -2138,13 +2313,23 @@ function DishEditor({
           >
             <Pressable
               onPress={pickSource}
-              style={[styles.photo, draft.photoUri && styles.photoSelected]}
+              style={[
+                styles.photo,
+                (draft.photoUri ||
+                  draft.previousPhotoUri ||
+                  draft.previousPhotoPath) &&
+                  styles.photoSelected,
+              ]}
             >
-              {draft.photoUri ? (
+              {draft.photoUri || draft.previousPhotoUri ? (
                 <Image
-                  source={{ uri: draft.photoUri }}
+                  source={{ uri: draft.photoUri || draft.previousPhotoUri }}
                   style={styles.photoImage}
                 />
+              ) : draft.previousPhotoPath ? (
+                <View style={styles.photoImage}>
+                  <DishPhoto photoPath={draft.previousPhotoPath} />
+                </View>
               ) : (
                 <View style={styles.photoEmpty}>
                   <CameraIcon
@@ -2290,7 +2475,13 @@ function ReviewConfirmationSheet({
   );
 }
 
-function ReviewAdded({ onDone }: { onDone: () => void }) {
+function ReviewAdded({
+  onDone,
+  revised = false,
+}: {
+  onDone: () => void;
+  revised?: boolean;
+}) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(
     () => createSuccessStyles(colors, isDark),
@@ -2314,7 +2505,9 @@ function ReviewAdded({ onDone }: { onDone: () => void }) {
             width={responsiveSize(105)}
           />
         </View>
-        <Text style={styles.copy}>Your review has been added</Text>
+        <Text style={styles.copy}>
+          {revised ? 'Your visit has been added' : 'Your review has been added'}
+        </Text>
       </View>
       <Pressable
         accessibilityRole="button"

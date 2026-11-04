@@ -73,7 +73,9 @@ import type {
   SessionStatus,
   SaveVenueInput,
   SaveVenueResult,
+  AddReviewVisitInput,
   SendMessageInput,
+  UploadChatPhotoInput,
   ChatMessage,
   PushTokenResult,
   UnsaveVenueInput,
@@ -129,6 +131,7 @@ export const callableOperationNames = [
   'listConversations',
   'getMessages',
   'sendMessage',
+  'uploadChatPhoto',
   'markConversationRead',
   'hideConversation',
   'setConversationPinned',
@@ -143,6 +146,8 @@ export const callableOperationNames = [
   'unsaveVenue',
   'getFeed',
   'createReview',
+  'getOwnVenueReview',
+  'addReviewVisit',
   'editReview',
   'deleteReview',
   'setReviewPinned',
@@ -391,6 +396,11 @@ export function createTastesApi(
       ),
     getMessages: (input: GetMessagesInput) =>
       invoke<GetMessagesInput, Page<ChatMessage>>('getMessages', input),
+    uploadChatPhoto: (input: UploadChatPhotoInput) =>
+      invoke<UploadChatPhotoInput, { imageUrl: string }>(
+        'uploadChatPhoto',
+        input,
+      ),
     sendMessage: (input: SendMessageInput) =>
       invoke<SendMessageInput, IdResult>('sendMessage', input),
     markConversationRead: (input: MarkConversationReadInput) =>
@@ -434,6 +444,13 @@ export function createTastesApi(
       invoke<UnsaveVenueInput, SaveVenueResult>('unsaveVenue', input),
     getFeed: (input: GetFeedInput) =>
       invoke<GetFeedInput, Page<FeedItem>>('getFeed', input),
+    getOwnVenueReview: (input: { venueId: string }) =>
+      invoke<{ venueId: string }, { review: FeedItem | null }>(
+        'getOwnVenueReview',
+        input,
+      ),
+    addReviewVisit: (input: AddReviewVisitInput) =>
+      invoke<AddReviewVisitInput, IdResult>('addReviewVisit', input),
     createReview: (input: CreateReviewInput) =>
       invoke<CreateReviewInput, IdResult>('createReview', input),
     editReview: (input: EditReviewInput) =>

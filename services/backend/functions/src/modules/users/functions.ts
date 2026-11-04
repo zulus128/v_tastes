@@ -7,7 +7,12 @@ import {
   updateProfileSettingsInputSchema,
   type MonthlyRecapResult,
 } from '@tastes/contracts';
-import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  Timestamp,
+  type DocumentSnapshot,
+} from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -232,23 +237,53 @@ export const getLeaderboard = onCall(callableOptions, async (request) => {
     .trim()
     .toLocaleLowerCase();
 
-  const leaderboardQuery = db
-    .collection('users')
-    .where('status', '==', 'active')
-    .orderBy(input.period === 'month' ? 'monthlyXp' : 'xp', 'desc')
-    .orderBy(FieldPath.documentId(), 'asc');
-
-  const snapshot = await leaderboardQuery.limit(250).get();
-  const eligibleDocs = snapshot.docs.filter(
-    (document) =>
-      input.audience === 'all' ||
-      (input.audience === 'friends'
-        ? visibleIds.has(document.id)
-        : Boolean(city) &&
-          String(document.get('city') ?? '')
-            .trim()
-            .toLocaleLowerCase() === city),
-  );
+  const xpField = input.period === 'month' ? 'monthlyXp' : 'xp';
+  let candidates: DocumentSnapshot[];
+  if (input.audience === 'friends') {
+    // Select the audience before ranking: friends below the global top 250
+    // must still appear in the viewer's leaderboard.
+    const ids = [...visibleIds];
+    const batches = await Promise.all(
+      Array.from({ length: Math.ceil(ids.length / 100) }, (_, index) =>
+        db.getAll(
+          ...ids
+            .slice(index * 100, (index + 1) * 100)
+            .map((id) => db.collection('users').doc(id)),
+        ),
+      ),
+    );
+    candidates = batches.flat();
+  } else if (input.audience === 'local') {
+    // City values are canonicalized by profile creation/settings. A single
+    // city equality query needs no new composite index.
+    candidates = city
+      ? (
+          await db
+            .collection('users')
+            .where('city', '==', currentProfile.get('city'))
+            .get()
+        ).docs
+      : [];
+  } else {
+    candidates = (
+      await db
+        .collection('users')
+        .where('status', '==', 'active')
+        .orderBy(xpField, 'desc')
+        .orderBy(FieldPath.documentId(), 'asc')
+        .limit(250)
+        .get()
+    ).docs;
+  }
+  const eligibleDocs = candidates
+    .filter(
+      (document) => document.exists && document.get('status') === 'active',
+    )
+    .sort(
+      (left, right) =>
+        Number(right.get(xpField) ?? 0) - Number(left.get(xpField) ?? 0) ||
+        left.id.localeCompare(right.id),
+    );
   const startIndex = cursor
     ? eligibleDocs.findIndex((document) => document.id === cursor.id) + 1
     : 0;
@@ -259,7 +294,6 @@ export const getLeaderboard = onCall(callableOptions, async (request) => {
     );
   const pageDocs = eligibleDocs.slice(startIndex, startIndex + input.limit);
   const startPosition = startIndex;
-  const xpField = input.period === 'month' ? 'monthlyXp' : 'xp';
   const last = pageDocs.at(-1);
 
   return {

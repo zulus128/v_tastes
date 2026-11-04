@@ -79,6 +79,7 @@ function AppGate() {
 
   useEffect(() => {
     if (
+      __DEV__ ||
       Platform.OS !== 'ios' ||
       state.status === 'booting' ||
       minimumSupportedIosBuild <= 0
@@ -201,6 +202,10 @@ function UpdatePrompt({
   visible: boolean;
 }) {
   const { colors } = useAppTheme();
+
+  // Unmount the native presentation after dismissal so it cannot retain
+  // accessibility or touch focus above the product navigator on iOS.
+  if (!visible) return null;
 
   return (
     <Modal

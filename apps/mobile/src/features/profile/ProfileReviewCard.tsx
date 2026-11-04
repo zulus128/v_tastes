@@ -1,6 +1,9 @@
+import { ReviewTextPreview } from '../reviews/ReviewTextPreview';
+import { reviewDishLabel } from '../reviews/DishListContent';
+import { RevisedReviewSummary } from '../reviews/RevisedReviewSummary';
 import type { FeedItem } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { formatDisplayDate } from '../../infrastructure/date';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -60,11 +63,10 @@ function RatingStars({
 }
 
 export function ProfileReviewCard({
-  fallbackImageUrl,
   item,
   onComments,
+  onOpenPlace,
   onMore,
-  onNeedFallbackImage,
   onReact,
   reacted = false,
   onShare,
@@ -73,6 +75,7 @@ export function ProfileReviewCard({
   fallbackImageUrl?: string;
   item: FeedItem;
   onComments: () => void;
+  onOpenPlace?: (venueId: string) => void;
   onMore: () => void;
   onNeedFallbackImage?: () => void;
   onReact: () => void;
@@ -84,29 +87,13 @@ export function ProfileReviewCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const dishes = item.dishReviews ?? [];
   const tags = item.tags ?? [];
-  const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
     null,
   );
-  const isLongText = item.text.length > 120;
-
-  useEffect(() => {
-    if (
-      !fallbackImageUrl &&
-      dishes.some(
-        (dish) =>
-          !dish.thumbnailPath &&
-          !dish.photoPath &&
-          !dish.thumbnailUrl &&
-          !dish.photoUrl,
-      )
-    ) {
-      onNeedFallbackImage?.();
-    }
-  }, [dishes, fallbackImageUrl, onNeedFallbackImage]);
 
   return (
     <View style={styles.reviewCard} testID="profile-review-card">
+      <RevisedReviewSummary review={item} />
       <View style={styles.reviewHeader}>
         <ProfileAvatar profile={profile} style={styles.reviewAvatar} />
         <View style={styles.reviewAuthorCopy}>
@@ -124,7 +111,7 @@ export function ProfileReviewCard({
           </View>
         ) : null}
         <Text style={styles.reviewDate}>
-          {formatDisplayDate(item.createdAt)}
+          {formatDisplayDate(item.latestVisitAt ?? item.createdAt)}
         </Text>
         <Pressable
           accessibilityLabel="Review actions"
@@ -140,7 +127,12 @@ export function ProfileReviewCard({
       <View style={styles.reviewBody}>
         <View style={styles.reviewVenueRow}>
           <View style={styles.reviewVenueCopy}>
-            <Text numberOfLines={1} style={styles.reviewVenue}>
+            <Text
+              accessibilityRole="link"
+              onPress={() => onOpenPlace?.(item.venueId)}
+              numberOfLines={1}
+              style={styles.reviewVenue}
+            >
               {item.venueName}
             </Text>
             <RatingStars rating={item.rating} styles={styles} />
@@ -162,7 +154,6 @@ export function ProfileReviewCard({
                 style={styles.dishCard}
               >
                 <DishPhoto
-                  fallbackUri={fallbackImageUrl}
                   photoPath={dish.thumbnailPath ?? dish.photoPath}
                   photoUrl={dish.thumbnailUrl ?? dish.photoUrl}
                 />
@@ -183,6 +174,10 @@ export function ProfileReviewCard({
                   />
                   <Text style={styles.dishRatingValue}>
                     {dish.rating.toFixed(1)}
+                    {(item.visitCount ?? 1) > 1 &&
+                    dish.firstVisitId === item.visits?.at(-1)?.id
+                      ? ' · NEW'
+                      : ''}
                   </Text>
                 </View>
               </Pressable>
@@ -190,28 +185,16 @@ export function ProfileReviewCard({
           </ScrollView>
         ) : null}
         {item.text ? (
-          <Pressable
-            onPress={() => setExpanded((value) => !value)}
+          <ReviewTextPreview
+            text={item.text}
             style={styles.reviewPressable}
-          >
-            <Text
-              numberOfLines={expanded ? undefined : 2}
-              style={styles.reviewText}
-            >
-              {item.text}
-            </Text>
-            {!expanded && isLongText ? (
-              <LinearGradient
-                colors={['rgba(22,22,22,0)', colors.surface, colors.surface]}
-                locations={[0, 0.37, 1]}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.seeMoreFade}
-              >
-                <Text style={styles.seeMore}>See more</Text>
-              </LinearGradient>
-            ) : null}
-          </Pressable>
+            textStyle={styles.reviewText}
+            fadeStyle={styles.seeMoreFade}
+            moreStyle={styles.seeMore}
+            onOpenFullReview={
+              (item.visitCount ?? 1) > 1 ? onComments : undefined
+            }
+          />
         ) : null}
         <ReviewMetaRow cuisine={item.cuisine} mood={tags[0]} />
         <View style={styles.metrics}>
@@ -255,20 +238,24 @@ export function ProfileReviewCard({
             </Pressable>
           </View>
           {dishes.length > 0 ? (
-            <View style={styles.dishCountTag}>
+            <Pressable
+              accessibilityLabel="Open dish reviews"
+              onPress={() => setSelectedDishIndex(-1)}
+              style={styles.dishCountTag}
+            >
               <TopRatedDishesIcon
                 color={colors.primary}
                 height={responsiveSize(14)}
                 width={responsiveSize(14)}
               />
-              <Text style={styles.dishCountText}>Dishes ({dishes.length})</Text>
-            </View>
+              <Text style={styles.dishCountText}>{reviewDishLabel(item)}</Text>
+            </Pressable>
           ) : null}
         </View>
       </View>
       <DishReviewSheet
         dishes={dishes}
-        fallbackUri={fallbackImageUrl}
+        visits={item.visits}
         index={selectedDishIndex}
         onClose={() => setSelectedDishIndex(null)}
         onIndexChange={setSelectedDishIndex}

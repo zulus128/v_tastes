@@ -7,7 +7,7 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=lib/index.js --sourcemap --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --external:zod",
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=lib/index.js --sourcemap --external:firebase-admin --external:firebase-admin/* --external:firebase-functions --external:firebase-functions/* --external:zod --external:sharp",
     "build:watch": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "node lib/scripts/seed.js",
@@ -17,7 +17,8 @@
     "search:backfill": "node lib/scripts/backfill-user-search.js",
     "images:backfill": "node lib/scripts/backfill-image-thumbnails.js",
     "users:migrate-private": "node lib/scripts/migrate-private-users.js",
-    "staff:set-role": "node lib/scripts/set-staff-role.js"
+    "staff:set-role": "node lib/scripts/set-staff-role.js",
+    "reviews:merge-history": "node lib/scripts/merge-historical-review-visits.js"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",

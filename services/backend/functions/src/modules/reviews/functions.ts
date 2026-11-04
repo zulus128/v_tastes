@@ -1,6 +1,9 @@
 import {
   addCommentInputSchema,
   createReviewInputSchema,
+  addReviewVisitInputSchema,
+  getOwnVenueReviewInputSchema,
+  type Review,
   deleteReviewInputSchema,
   deleteCommentInputSchema,
   editReviewInputSchema,
@@ -16,7 +19,13 @@ import {
   reportContentInputSchema,
   reportReviewInputSchema,
 } from '@tastes/contracts';
-import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  Timestamp,
+  type DocumentSnapshot,
+} from 'firebase-admin/firestore';
+import { appendReviewVisit } from './visits';
 import type { Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getDownloadURL, getStorage } from 'firebase-admin/storage';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
@@ -47,6 +56,21 @@ import {
 import { timestampToIso } from '../../shared/serialization';
 import { parseInput } from '../../shared/validation';
 import { normalizeUsername, usernameReference } from '../../shared/user-data';
+
+/** Keep notification and shared links valid after historical reviews are merged. */
+async function resolveMergedReviewId(reviewId: string): Promise<string> {
+  const visited = new Set<string>();
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (visited.has(reviewId))
+      throw new HttpsError('internal', 'Invalid review redirect.');
+    visited.add(reviewId);
+    const review = await db.collection('reviews').doc(reviewId).get();
+    const target = review.get('mergedIntoReviewId');
+    if (typeof target !== 'string' || !target) return reviewId;
+    reviewId = target;
+  }
+  throw new HttpsError('internal', 'Invalid review redirect.');
+}
 
 export const getFeed = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
@@ -167,6 +191,7 @@ export const getFeed = onCall(callableOptions, async (request) => {
     items: pageDocs.map((document) => {
       const author = authorsById.get(String(document.get('authorId')));
       return {
+        ...visitPresentation(document),
         id: document.id,
         authorId: String(document.get('authorId')),
         authorDisplayName:
@@ -215,6 +240,7 @@ export const getFeed = onCall(callableOptions, async (request) => {
 export const getComments = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getCommentsInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const cursor = decodeCursor(input.cursor);
   const review = await db.collection('reviews').doc(input.reviewId).get();
   if (!review.exists || review.get('status') !== 'published') {
@@ -312,6 +338,7 @@ export const getComments = onCall(callableOptions, async (request) => {
 
   return {
     review: {
+      ...visitPresentation(review),
       id: review.id,
       authorId: String(review.get('authorId')),
       authorDisplayName: String(review.get('authorDisplayName')),
@@ -363,6 +390,7 @@ export const getComments = onCall(callableOptions, async (request) => {
 export const getCommentReplies = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getCommentRepliesInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const cursor = decodeCursor(input.cursor);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const [review, parent] = await Promise.all([
@@ -451,6 +479,7 @@ export const getCommentReplies = onCall(callableOptions, async (request) => {
 export const getCommentContext = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getCommentContextInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const targetRef = reviewRef.collection('comments').doc(input.commentId);
   const [review, target] = await Promise.all([
@@ -906,14 +935,199 @@ export const processReviewEffects = onDocumentCreated(
   },
 );
 
+function visitPresentation(review: DocumentSnapshot) {
+  return {
+    visitCount: Number(review.get('visitCount') ?? 1),
+    ...(typeof review.get('previousRating') === 'number'
+      ? { previousRating: review.get('previousRating') }
+      : {}),
+    latestVisitAt:
+      review.get('latestVisitAt') ?? timestampToIso(review.get('createdAt')),
+    visits: Array.isArray(review.get('visits')) ? review.get('visits') : [],
+  };
+}
+
+export const getOwnVenueReview = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(getOwnVenueReviewInputSchema, request.data);
+  const snapshot = await db
+    .collection('reviews')
+    .where('authorId', '==', uid)
+    .where('venueId', '==', input.venueId)
+    .where('status', 'in', ['published', 'hidden'])
+    .orderBy('createdAt', 'desc')
+    .limit(1)
+    .get();
+  const review = snapshot.docs[0];
+  if (!review) return { review: null };
+  return {
+    review: {
+      ...review.data(),
+      id: review.id,
+      ...visitPresentation(review),
+      createdAt: timestampToIso(review.get('createdAt')),
+      updatedAt: timestampToIso(review.get('updatedAt')),
+    },
+  };
+});
+
+export const addReviewVisit = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(addReviewVisitInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
+  const reviewRef = db.collection('reviews').doc(input.reviewId);
+  const visitId = idempotentDocumentId(
+    uid,
+    'review-visit',
+    input.idempotencyKey,
+  );
+  const visitRef = reviewRef.collection('visits').doc(visitId);
+  const prefix = `review-images/${uid}/${input.idempotencyKey}/`;
+  if (
+    input.dishReviews.some(
+      (dish) =>
+        (dish.photoPath && !dish.photoPath.startsWith(prefix)) ||
+        (dish.thumbnailPath && !dish.thumbnailPath.startsWith(prefix)),
+    )
+  ) {
+    throw new HttpsError(
+      'permission-denied',
+      'Review photos must belong to the authenticated user and visit.',
+    );
+  }
+  await db.runTransaction(async (transaction) => {
+    const [review, existingVisit, user] = await Promise.all([
+      transaction.get(reviewRef),
+      transaction.get(visitRef),
+      transaction.get(db.collection('users').doc(uid)),
+    ]);
+    if (!review.exists || review.get('status') !== 'published')
+      throw new HttpsError('not-found', 'The review was not found.');
+    if (review.get('authorId') !== uid)
+      throw new HttpsError(
+        'permission-denied',
+        'Only the review author can add a visit.',
+      );
+    if (user.get('status') !== 'active')
+      throw new HttpsError(
+        'failed-precondition',
+        'An active user profile is required.',
+      );
+    if (existingVisit.exists) return;
+    const venueRef = db.collection('venues').doc(String(review.get('venueId')));
+    const venue = await transaction.get(venueRef);
+    if (!venue.exists || venue.get('status') !== 'active')
+      throw new HttpsError('not-found', 'The venue was not found.');
+    const firstVisitId = `${review.id}:first`;
+    const firstDate = timestampToIso(review.get('createdAt'));
+    const previousDishes = (
+      Array.isArray(review.get('dishReviews')) ? review.get('dishReviews') : []
+    ) as Review['dishReviews'];
+    const legacyDishes = previousDishes.map((dish) => ({
+      ...dish,
+      firstVisitId: dish.firstVisitId ?? firstVisitId,
+      latestVisitId: dish.latestVisitId ?? firstVisitId,
+      history: dish.history ?? [
+        {
+          visitId: firstVisitId,
+          createdAt: firstDate,
+          rating: dish.rating,
+          ...(dish.photoPath ? { photoPath: dish.photoPath } : {}),
+          ...(dish.photoUrl ? { photoUrl: dish.photoUrl } : {}),
+          ...(dish.thumbnailPath ? { thumbnailPath: dish.thumbnailPath } : {}),
+          ...(dish.thumbnailUrl ? { thumbnailUrl: dish.thumbnailUrl } : {}),
+        },
+      ],
+    }));
+    const visits =
+      Array.isArray(review.get('visits')) && review.get('visits').length
+        ? (review.get('visits') as NonNullable<Review['visits']>)
+        : [
+            {
+              id: firstVisitId,
+              createdAt: firstDate,
+              rating: Number(review.get('rating')),
+              text: String(review.get('text')),
+            },
+          ];
+    const visit = {
+      id: visitId,
+      createdAt: new Date().toISOString(),
+      rating: input.rating,
+      text: input.text,
+    };
+    const merged = appendReviewVisit({
+      dishes: legacyDishes,
+      visits,
+      changes: input.dishReviews,
+      visit,
+    });
+    // Keep enough headroom for photo metadata, counters and future edits below
+    // Firestore's document limit; never silently drop older visits.
+    if (Buffer.byteLength(JSON.stringify(merged)) > 700_000)
+      throw new HttpsError(
+        'resource-exhausted',
+        'This review has reached its history limit.',
+      );
+    await enforceRateLimit(transaction, uid, 'review-visit', 10, 60 * 60_000);
+    transaction.create(visitRef, visit);
+    transaction.update(reviewRef, {
+      visits: merged.visits,
+      visitCount: merged.visits.length,
+      latestVisitAt: visit.createdAt,
+      previousRating: Number(review.get('rating')),
+      rating: input.rating,
+      text: input.text,
+      tags: input.tags,
+      tag: input.tags[0] ?? null,
+      dishReviews: merged.dishes,
+      dishNames: merged.dishes.map((dish) => dish.title),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    const count = Math.max(1, Number(venue.get('reviewCount') ?? 1));
+    transaction.update(venueRef, {
+      rating: Math.max(
+        0,
+        Math.min(
+          5,
+          (Number(venue.get('rating') ?? 0) * count -
+            Number(review.get('rating')) +
+            input.rating) /
+            count,
+        ),
+      ),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    // A visit changes the existing review; no extra review count or XP.
+  });
+  // Storage paths are resolved on demand by the client, including new visits.
+  return { id: reviewRef.id };
+});
+
 export const createReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createReviewInputSchema, request.data);
+  const dishTitles = input.dishReviews.map((dish) =>
+    dish.title.trim().normalize('NFKC').toLowerCase(),
+  );
+  if (
+    new Set(dishTitles).size !== dishTitles.length ||
+    new Set(input.dishReviews.map((dish) => dish.id)).size !==
+      input.dishReviews.length
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Choose each dish only once per review.',
+    );
+  }
   const userRef = db.collection('users').doc(uid);
   const venueRef = db.collection('venues').doc(input.venueId);
   const reviewRef = db
     .collection('reviews')
     .doc(idempotentDocumentId(uid, 'create-review', input.idempotencyKey));
+  const ownershipRef = db
+    .collection('reviewOwnership')
+    .doc(idempotentDocumentId(uid, 'review-owner', input.venueId));
   const expectedPhotoPrefix = `review-images/${uid}/${input.idempotencyKey}/`;
   if (
     input.dishReviews.some(
@@ -949,11 +1163,46 @@ export const createReview = onCall(callableOptions, async (request) => {
       throw new HttpsError('not-found', 'The venue was not found.');
     }
 
+    // The claim serializes concurrent create attempts even when their
+    // idempotency keys differ. Query legacy reviews inside the same transaction.
+    const ownership = await transaction.get(ownershipRef);
+    const claimedId = ownership.get('reviewId');
+    const claimed =
+      typeof claimedId === 'string'
+        ? await transaction.get(db.collection('reviews').doc(claimedId))
+        : null;
+    const legacy = await transaction.get(
+      db
+        .collection('reviews')
+        .where('authorId', '==', uid)
+        .where('venueId', '==', input.venueId)
+        .where('status', 'in', ['published', 'hidden'])
+        .orderBy('createdAt', 'desc')
+        .limit(1),
+    );
+    const previous =
+      claimed?.exists && claimed.get('status') !== 'deleted'
+        ? claimed
+        : legacy.docs[0];
+    if (previous)
+      throw new HttpsError(
+        'already-exists',
+        'You have already reviewed this place.',
+        {
+          reason: 'ALREADY_REVIEWED',
+          existingReviewId: previous.id,
+        },
+      );
     await enforceRateLimit(transaction, uid, 'create-review', 10, 60 * 60_000);
     const reviewCount = Math.max(0, Number(venue.get('reviewCount') ?? 0));
     const averageRating = Math.max(0, Number(venue.get('rating') ?? 0));
     const xpBefore = Math.max(0, Number(user.get('xp') ?? 0));
     const cuisine = venue.get('category');
+    transaction.set(ownershipRef, {
+      authorId: uid,
+      venueId: input.venueId,
+      reviewId: reviewRef.id,
+    });
     transaction.create(reviewRef, {
       authorId: uid,
       authorDisplayName: user.get('displayName'),
@@ -994,6 +1243,7 @@ export const createReview = onCall(callableOptions, async (request) => {
 export const editReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(editReviewInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   if (
     input.dishReviews.some(
@@ -1019,6 +1269,13 @@ export const editReview = onCall(callableOptions, async (request) => {
       throw new HttpsError(
         'permission-denied',
         'Only the review author can edit this review.',
+      );
+    }
+    if (Number(review.get('visitCount') ?? 1) > 1) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Add a visit to update a revised review.',
+        { reason: 'review-visit-required' },
       );
     }
     const venueRef = db.collection('venues').doc(String(review.get('venueId')));
@@ -1090,6 +1347,7 @@ export const editReview = onCall(callableOptions, async (request) => {
 export const deleteReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(deleteReviewInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const userRef = db.collection('users').doc(uid);
 
@@ -1144,6 +1402,7 @@ export const deleteReview = onCall(callableOptions, async (request) => {
 export const setReviewPinned = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(setReviewPinnedInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const review = await reviewRef.get();
   if (!review.exists || review.get('status') !== 'published') {
@@ -1165,6 +1424,7 @@ export const setReviewPinned = onCall(callableOptions, async (request) => {
 export const reactToContent = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reactToContentInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const contentRef =
     input.targetType === 'review'
@@ -1294,6 +1554,7 @@ export const reactToContent = onCall(callableOptions, async (request) => {
 export const reportContent = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reportContentInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const profileRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const contentRef =
@@ -1356,6 +1617,7 @@ export const reportContent = onCall(callableOptions, async (request) => {
 export const addComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(addCommentInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const userRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const commentRef = reviewRef
@@ -1498,6 +1760,7 @@ export const addComment = onCall(callableOptions, async (request) => {
 export const reactToComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reactToCommentInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const commentRef = db
     .collection('reviews')
     .doc(input.reviewId)
@@ -1561,6 +1824,7 @@ export const reactToComment = onCall(callableOptions, async (request) => {
 export const deleteComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(deleteCommentInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const commentRef = reviewRef.collection('comments').doc(input.commentId);
   await db.runTransaction(async (transaction) => {
@@ -1702,6 +1966,7 @@ export const cleanupDeletedCommentReplies = onSchedule(
 export const reactToReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reactToReviewInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const userRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const reactionRef = reviewRef.collection('reactions').doc(uid);
@@ -1830,6 +2095,7 @@ export const reactToReview = onCall(callableOptions, async (request) => {
 export const hideReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(hideReviewInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const hiddenReviewRef = db
     .collection('users')
@@ -1866,6 +2132,7 @@ export const hideReview = onCall(callableOptions, async (request) => {
 export const reportReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(reportReviewInputSchema, request.data);
+  input.reviewId = await resolveMergedReviewId(input.reviewId);
   const idempotencyRef = db
     .collection('_idempotency')
     .doc(

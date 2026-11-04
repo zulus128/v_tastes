@@ -2473,3 +2473,441 @@ describe('activity callables', () => {
     ).rejects.toMatchObject({ status: 'NOT_FOUND' });
   }, 30_000);
 });
+
+describe('client feedback regressions', () => {
+  it('serializes concurrent reviews and appends retry-safe visits without extra XP', async () => {
+    const { first, second, db, author, firstReview, reviewCommand } =
+      await createReviewFixture();
+    const duplicate = await expectReason(
+      callFunction(
+        'createReview',
+        {
+          ...reviewCommand,
+          dishReviews: [],
+          idempotencyKey: 'different-review-key-0001',
+        },
+        first.token,
+      ),
+      'ALREADY_REVIEWED',
+    );
+    expect(duplicate.details?.existingReviewId).toBe(firstReview.id);
+    const found = await callFunction<{ review: { id: string } }>(
+      'getOwnVenueReview',
+      { venueId: 'demo-cafe' },
+      first.token,
+    );
+    expect(found.review.id).toBe(firstReview.id);
+    const before = await db.collection('users').doc(author.id).get();
+    const reviewRef = db.collection('reviews').doc(firstReview.id);
+    await reviewRef.update({ reactionCount: 8, commentCount: 3 });
+    const visit = {
+      reviewId: firstReview.id,
+      idempotencyKey: 'return-visit-command-0001',
+      rating: 4,
+      text: 'Returned for another visit',
+      tags: ['casual'],
+      dishReviews: [
+        { id: 'another-draft-id', title: 'Soup dumplings', rating: 4 },
+        { id: 'new-dessert', title: 'Dessert', rating: 5 },
+      ],
+    };
+    await expect(
+      callFunction('addReviewVisit', visit, second.token),
+    ).rejects.toMatchObject({ status: 'PERMISSION_DENIED' });
+    await Promise.all([
+      callFunction('addReviewVisit', visit, first.token),
+      callFunction('addReviewVisit', visit, first.token),
+    ]);
+    const review = await reviewRef.get();
+    const after = await db.collection('users').doc(author.id).get();
+    expect(review.get('visitCount')).toBe(2);
+    expect(review.get('previousRating')).toBe(5);
+    expect(review.get('reactionCount')).toBe(8);
+    expect(review.get('commentCount')).toBe(3);
+    expect(review.get('dishReviews')).toHaveLength(2);
+    expect(
+      review
+        .get('dishReviews')[1]
+        .history.map((entry: { rating: number }) => entry.rating),
+    ).toEqual([4.5, 4]);
+    expect(after.get('xp')).toBe(before.get('xp'));
+    expect(after.get('reviewCount')).toBe(before.get('reviewCount'));
+    expect(
+      (await db.collection('venues').doc('demo-cafe').get()).get('reviewCount'),
+    ).toBe(1);
+    await callFunction(
+      'deleteReview',
+      { reviewId: firstReview.id },
+      first.token,
+    );
+    const fresh = await Promise.allSettled([
+      callFunction<{ id: string }>(
+        'createReview',
+        { ...reviewCommand, idempotencyKey: 'new-after-delete-0001' },
+        first.token,
+      ),
+      callFunction<{ id: string }>(
+        'createReview',
+        { ...reviewCommand, idempotencyKey: 'new-after-delete-0002' },
+        first.token,
+      ),
+    ]);
+    // Photo paths must match each new draft key.
+    expect(fresh.every((item) => item.status === 'rejected')).toBe(true);
+    const concurrent = await Promise.allSettled([
+      callFunction<{ id: string }>(
+        'createReview',
+        {
+          ...reviewCommand,
+          dishReviews: [],
+          idempotencyKey: 'new-after-delete-0003',
+        },
+        first.token,
+      ),
+      callFunction<{ id: string }>(
+        'createReview',
+        {
+          ...reviewCommand,
+          dishReviews: [],
+          idempotencyKey: 'new-after-delete-0004',
+        },
+        first.token,
+      ),
+    ]);
+    expect(
+      concurrent.filter((item) => item.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      (await db.collection('venues').doc('demo-cafe').get()).get('reviewCount'),
+    ).toBe(1);
+  }, 30_000);
+
+  it('includes friends and local users below the global top 250', async () => {
+    const { first, second, db, author, reader } = await createSocialFixture();
+    const batch = db.batch();
+    for (let index = 0; index < 260; index += 1)
+      batch.set(db.collection('users').doc(`global-${index}`), {
+        status: 'active',
+        displayName: `Global ${index}`,
+        city: 'Paris',
+        xp: 100_000 + index,
+        monthlyXp: 100_000 + index,
+      });
+    batch.update(author.ref, { xp: 10, monthlyXp: 10 });
+    batch.update(reader.ref, { xp: 20, monthlyXp: 20 });
+    await batch.commit();
+    await callFunction('followUser', { targetUserId: reader.id }, first.token);
+    const friends = await callFunction<{ items: { userId: string }[] }>(
+      'getLeaderboard',
+      { audience: 'friends', period: 'month' },
+      first.token,
+    );
+    const local = await callFunction<{ items: { userId: string }[] }>(
+      'getLeaderboard',
+      { audience: 'local', period: 'month' },
+      first.token,
+    );
+    expect(friends.items.map((item) => item.userId)).toEqual([
+      reader.id,
+      author.id,
+    ]);
+    expect(local.items.map((item) => item.userId)).toEqual([
+      reader.id,
+      author.id,
+    ]);
+    const otherFriends = await callFunction<{ items: { userId: string }[] }>(
+      'getLeaderboard',
+      { audience: 'friends', period: 'month' },
+      second.token,
+    );
+    expect(otherFriends.items.map((item) => item.userId)).toEqual([reader.id]);
+  }, 30_000);
+
+  it('uploads chat photos only for active accepted participants and reuses retries', async () => {
+    const { first, second, db, author } = await createSocialFixture();
+    await db
+      .collection('conversations')
+      .doc('photo-regression')
+      .set({
+        kind: 'group',
+        status: 'active',
+        participantIds: [author.id],
+        invitationStatuses: { [author.id]: 'accepted' },
+      });
+    const command = {
+      conversationId: 'photo-regression',
+      idempotencyKey: 'chat-photo-regression-0001',
+      photoBase64:
+        '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB1FFFd55Z//9k=',
+    };
+    await expect(
+      callFunction('uploadChatPhoto', command, second.token),
+    ).rejects.toMatchObject({ status: 'NOT_FOUND' });
+    const image = await callFunction<{ imageUrl: string }>(
+      'uploadChatPhoto',
+      command,
+      first.token,
+    );
+    const retry = await callFunction<{ imageUrl: string }>(
+      'uploadChatPhoto',
+      command,
+      first.token,
+    );
+    expect(retry.imageUrl).toBe(image.imageUrl);
+    const media = await fetch(image.imageUrl);
+    expect(media.ok).toBe(true);
+    expect(media.headers.get('content-type')).toBe('image/jpeg');
+    await callFunction(
+      'sendMessage',
+      {
+        conversationId: command.conversationId,
+        idempotencyKey: 'chat-image-message-0001',
+        imageUrl: image.imageUrl,
+      },
+      first.token,
+    );
+    await db
+      .collection('conversations')
+      .doc('photo-regression')
+      .update({ [`invitationStatuses.${author.id}`]: 'pending' });
+    await expect(
+      callFunction(
+        'uploadChatPhoto',
+        { ...command, idempotencyKey: 'chat-photo-regression-0002' },
+        first.token,
+      ),
+    ).rejects.toMatchObject({ status: 'PERMISSION_DENIED' });
+  }, 30_000);
+});
+
+it(
+  'opens historical review links and preserves engagement after consolidation',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await createReviewFixture();
+    const canonicalId = fixture.firstReview.id;
+    const aliasId = 'historical-review-before-consolidation';
+    await fixture.db.collection('reviews').doc(aliasId).set({
+      authorId: fixture.author.id,
+      venueId: 'demo-cafe',
+      status: 'deleted',
+      mergedIntoReviewId: canonicalId,
+    });
+    await fixture.db
+      .collection('reviews')
+      .doc(canonicalId)
+      .collection('comments')
+      .doc('historical-comment')
+      .set({
+        authorId: fixture.reader.id,
+        authorDisplayName: 'Reader',
+        text: 'Preserved comment',
+        parentCommentId: null,
+        status: 'published',
+        reactionCount: 0,
+        replyCount: 0,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+    await fixture.db
+      .collection('reviews')
+      .doc(canonicalId)
+      .update({ commentCount: 1 });
+    const result = await callFunction<{
+      review: { id: string };
+      items: Array<{ id: string; text: string }>;
+    }>('getComments', { reviewId: aliasId, limit: 20 }, fixture.second.token);
+    expect(result.review.id).toBe(canonicalId);
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'historical-comment',
+          text: 'Preserved comment',
+        }),
+      ]),
+    );
+    await callFunction(
+      'reactToComment',
+      {
+        reviewId: aliasId,
+        commentId: 'historical-comment',
+        idempotencyKey: 'historical-comment-like',
+        reaction: 'like',
+      },
+      fixture.first.token,
+    );
+    expect(
+      (
+        await fixture.db
+          .collection('reviews')
+          .doc(canonicalId)
+          .collection('comments')
+          .doc('historical-comment')
+          .get()
+      ).get('reactionCount'),
+    ).toBe(1);
+    const reaction = await callFunction<{ active: boolean }>(
+      'reactToReview',
+      {
+        reviewId: aliasId,
+        idempotencyKey: 'historical-review-like',
+        reaction: 'like',
+      },
+      fixture.second.token,
+    );
+    expect(reaction.active).toBe(true);
+    expect(
+      (
+        await fixture.db
+          .collection('reviews')
+          .doc(canonicalId)
+          .collection('reactions')
+          .doc(fixture.reader.id)
+          .get()
+      ).exists,
+    ).toBe(true);
+    expect(
+      (await fixture.db.collection('reviews').doc(aliasId).get()).get('status'),
+    ).toBe('deleted');
+  },
+);
+
+it(
+  'consolidates legacy reviews transactionally without losing comments, photos or likes',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await createReviewFixture();
+    const canonical = fixture.db
+      .collection('reviews')
+      .doc(fixture.firstReview.id);
+    const original = (await canonical.get()).data()!;
+    const duplicate = fixture.db
+      .collection('reviews')
+      .doc('legacy-return-visit');
+    // Create an archived record first so the publication side-effect trigger does
+    // not award XP for migration fixtures, then expose the legacy published state.
+    await duplicate.set({
+      ...original,
+      status: 'deleted',
+      text: 'Returned later',
+      createdAt: Timestamp.fromMillis(Date.now() + 1000),
+      rating: 4,
+      dishReviews: [{ id: 'new-id', title: 'Soup dumplings', rating: 4 }],
+    });
+    await duplicate.update({ status: 'published' });
+    await canonical.update({ reactionCount: 1 });
+    await canonical
+      .collection('reactions')
+      .doc(fixture.reader.id)
+      .set({ userId: fixture.reader.id, createdAt: Timestamp.now() });
+    await duplicate
+      .collection('reactions')
+      .doc(fixture.reader.id)
+      .set({ userId: fixture.reader.id, createdAt: Timestamp.now() });
+    await duplicate
+      .collection('reactions')
+      .doc('another-reader')
+      .set({ userId: 'another-reader', createdAt: Timestamp.now() });
+    await duplicate.update({ reactionCount: 2, commentCount: 2 });
+    const comment = duplicate.collection('comments').doc('preserved-root');
+    await comment.set({
+      authorId: fixture.reader.id,
+      text: 'Original discussion',
+      status: 'published',
+      parentCommentId: null,
+      reactionCount: 1,
+      replyCount: 1,
+      createdAt: Timestamp.now(),
+    });
+    await comment
+      .collection('reactions')
+      .doc(fixture.author.id)
+      .set({ userId: fixture.author.id });
+    await duplicate.collection('comments').doc('preserved-reply').set({
+      authorId: fixture.author.id,
+      text: 'Reply',
+      status: 'published',
+      parentCommentId: comment.id,
+      createdAt: Timestamp.now(),
+    });
+    await fixture.author.ref.update({ reviewCount: 2 });
+    await fixture.db
+      .collection('venues')
+      .doc('demo-cafe')
+      .update({ reviewCount: 2, rating: 4.5 });
+    const beforeXp = (await fixture.author.ref.get()).get('xp');
+    const { mkdtemp, readFile, readdir, rm } = await import('node:fs/promises');
+    const backupDirectory = await mkdtemp(
+      '/private/tmp/tastes-migration-test-',
+    );
+    process.env.GCLOUD_PROJECT = PROJECT_ID;
+    const { mergeHistoricalReviewVisits } =
+      await import('../../functions/src/scripts/merge-historical-review-visits');
+    try {
+      await mergeHistoricalReviewVisits({
+        apply: true,
+        backupDirectory,
+        allowTestEmulator: true,
+      });
+      const merged = await canonical.get();
+      expect(merged.get('visitCount')).toBe(2);
+      expect(merged.get('rating')).toBe(4);
+      expect(
+        merged.get('visits').map((visit: { text: string }) => visit.text),
+      ).toEqual(['Exactly once', 'Returned later']);
+      expect(merged.get('dishReviews')[0].photoPath).toBe(
+        fixture.reviewCommand.dishReviews[0]!.photoPath,
+      );
+      expect(merged.get('reactionCount')).toBe(2);
+      expect(merged.get('commentCount')).toBe(2);
+      expect(
+        (
+          await canonical
+            .collection('comments')
+            .doc('preserved-root')
+            .collection('reactions')
+            .doc(fixture.author.id)
+            .get()
+        ).exists,
+      ).toBe(true);
+      expect(
+        (
+          await canonical.collection('comments').doc('preserved-reply').get()
+        ).get('parentCommentId'),
+      ).toBe('preserved-root');
+      expect((await duplicate.get()).get('mergedIntoReviewId')).toBe(
+        canonical.id,
+      );
+      expect((await duplicate.collection('comments').get()).size).toBe(2);
+      const author = await fixture.author.ref.get();
+      expect(author.get('reviewCount')).toBe(1);
+      expect(author.get('xp')).toBe(beforeXp);
+      expect(
+        (await fixture.db.collection('venues').doc('demo-cafe').get()).get(
+          'rating',
+        ),
+      ).toBe(4);
+      const backup = JSON.parse(
+        await readFile(
+          `${backupDirectory}/${(await readdir(backupDirectory))[0]}`,
+          'utf8',
+        ),
+      );
+      expect(
+        backup.documents.some(
+          (doc: { path: string }) =>
+            doc.path ===
+            `${duplicate.path}/comments/preserved-root/reactions/${fixture.author.id}`,
+        ),
+      ).toBe(true);
+      await mergeHistoricalReviewVisits({
+        apply: true,
+        backupDirectory,
+        allowTestEmulator: true,
+      });
+      expect((await canonical.get()).get('visitCount')).toBe(2);
+    } finally {
+      await rm(backupDirectory, { recursive: true, force: true });
+    }
+  },
+);

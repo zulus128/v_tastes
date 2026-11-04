@@ -1,4 +1,4 @@
-import type { FeedItem } from '@tastes/contracts';
+import type { FeedItem, Review } from '@tastes/contracts';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DishListContent } from './DishListContent';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import { captureException } from '../../infrastructure/observability';
 import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
@@ -21,7 +22,6 @@ import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 type DishReview = NonNullable<FeedItem['dishReviews']>[number];
 
 export function DishPhoto({
-  fallbackUri,
   photoPath,
   photoUrl,
 }: {
@@ -30,6 +30,9 @@ export function DishPhoto({
   photoUrl?: string;
 }) {
   const { colors } = useAppTheme();
+  // A venue picture is not a picture of this dish. Missing or failed dish
+  // images must keep the neutral placeholder on every review surface.
+  const fallbackUri = undefined;
   const directUrl = photoUrl?.trim();
   const canLoadDirectly = Boolean(
     directUrl && /^(?:https?:|file:|data:|blob:)/i.test(directUrl),
@@ -58,6 +61,7 @@ export function DishPhoto({
       };
     }
 
+    setUri(undefined);
     let download: Promise<string>;
     try {
       download = resolveStorageImageUrl(normalizedPath);
@@ -136,11 +140,13 @@ export function DishPhoto({
 export function DishReviewSheet({
   dishes,
   fallbackUri,
+  visits,
   index,
   onClose,
   onIndexChange,
 }: {
   dishes: DishReview[];
+  visits?: Review['visits'];
   fallbackUri?: string | ((index: number) => string | undefined);
   index: number | null;
   onClose: () => void;
@@ -152,7 +158,7 @@ export function DishReviewSheet({
   const sheet = useBottomSheetMotion({ onClose, visible: index !== null });
   const dish = index !== null ? dishes[index] : undefined;
   const step = (delta: number) => {
-    if (index === null) return;
+    if (index === null || index < 0) return;
     onIndexChange((index + delta + dishes.length) % dishes.length);
   };
 
@@ -188,7 +194,7 @@ export function DishReviewSheet({
           </View>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Dish Review
+              {index === -1 ? `Dishes (${dishes.length})` : 'Dish Review'}
             </Text>
             <Pressable
               accessibilityLabel="Close dish review"
@@ -199,6 +205,24 @@ export function DishReviewSheet({
               <Text style={[styles.closeText, { color: colors.text }]}>×</Text>
             </Pressable>
           </View>
+          {index !== null && index >= 0 ? (
+            <Pressable
+              onPress={() => onIndexChange(-1)}
+              style={{
+                paddingHorizontal: responsiveSize(16),
+                paddingBottom: responsiveSize(12),
+              }}
+            >
+              <Text style={{ color: colors.primary }}>‹ All dishes</Text>
+            </Pressable>
+          ) : null}
+          {index === -1 ? (
+            <DishListContent
+              dishes={dishes}
+              visits={visits}
+              onOpen={onIndexChange}
+            />
+          ) : null}
           {dish ? (
             <ScrollView
               bounces={false}
@@ -257,6 +281,31 @@ export function DishReviewSheet({
                 <Text style={[styles.name, { color: colors.text }]}>
                   {dish.title}
                 </Text>
+                {(dish.history?.length ?? 0) > 1 ? (
+                  <View
+                    style={{
+                      gap: responsiveSize(8),
+                      paddingVertical: responsiveSize(12),
+                    }}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>
+                      Rating history
+                    </Text>
+                    {[...(dish.history ?? [])].reverse().map((entry) => (
+                      <Text
+                        key={entry.visitId}
+                        style={{ color: colors.textSecondary }}
+                      >
+                        ★ {entry.rating.toFixed(1)} ·{' '}
+                        {new Date(entry.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </ScrollView>
           ) : null}

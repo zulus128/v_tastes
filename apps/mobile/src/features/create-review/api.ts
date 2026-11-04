@@ -1,5 +1,5 @@
 import type { ReviewTag } from '@tastes/contracts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
 import { useTastesApi } from '../../session/SessionProvider';
 import { dishReviewPayload } from './reviewPayload';
@@ -7,11 +7,14 @@ import { dishReviewPayload } from './reviewPayload';
 export interface DishReviewDraft {
   id: string;
   photoUri: string;
+  previousPhotoUri?: string;
+  previousPhotoPath?: string;
   rating: number;
   title: string;
 }
 
 export interface CreateReviewDraft {
+  reviewId?: string;
   dishReviews: DishReviewDraft[];
   idempotencyKey: string;
   rating: number;
@@ -54,6 +57,16 @@ async function uploadDishPhoto(
   };
 }
 
+export function useOwnVenueReview(userId: string, venueId: string) {
+  const api = useTastesApi();
+  return useQuery({
+    queryKey: ['own-venue-review', userId, venueId],
+    enabled: Boolean(venueId),
+    queryFn: async () => (await api.getOwnVenueReview({ venueId })).data.review,
+    staleTime: 0,
+  });
+}
+
 export function useCreateReview(userId: string) {
   const api = useTastesApi();
   const queryClient = useQueryClient();
@@ -64,14 +77,16 @@ export function useCreateReview(userId: string) {
           uploadDishPhoto(userId, draft.idempotencyKey, dish),
         ),
       );
-      const response = await api.createReview({
+      const payload = {
         dishReviews,
         idempotencyKey: draft.idempotencyKey,
         rating: draft.rating,
         tags: draft.tags,
         text: draft.text.trim(),
-        venueId: draft.venueId,
-      });
+      };
+      const response = draft.reviewId
+        ? await api.addReviewVisit({ ...payload, reviewId: draft.reviewId })
+        : await api.createReview({ ...payload, venueId: draft.venueId });
       return response.data;
     },
     onSuccess: async (_, draft) => {
@@ -80,6 +95,10 @@ export function useCreateReview(userId: string) {
         queryClient.invalidateQueries({ queryKey: ['leaderboard', userId] }),
         queryClient.invalidateQueries({ queryKey: ['place', draft.venueId] }),
         queryClient.invalidateQueries({ queryKey: ['discover'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['own-venue-review', userId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['comments'] }),
         queryClient.invalidateQueries({ queryKey: ['favourites', userId] }),
       ]);
     },

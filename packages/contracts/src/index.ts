@@ -139,6 +139,22 @@ export const venueSchema = z.object({
   discoverTags: z.array(discoverTagSchema).optional(),
 });
 
+export const reviewVisitSchema = z.object({
+  id: z.string(),
+  createdAt: z.string(),
+  rating: z.number().min(1).max(5),
+  text: z.string(),
+});
+const dishRatingHistorySchema = z.object({
+  visitId: z.string(),
+  createdAt: z.string(),
+  rating: z.number().min(0.5).max(5),
+  photoPath: z.string().optional(),
+  photoUrl: z.string().optional(),
+  thumbnailPath: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+});
+
 export const reviewSchema = z.object({
   id: z.string().min(1),
   authorId: z.string().min(1),
@@ -163,6 +179,10 @@ export const reviewSchema = z.object({
     )
     .max(4)
     .default([]),
+  visitCount: z.number().int().positive().optional(),
+  previousRating: z.number().optional(),
+  latestVisitAt: z.string().optional(),
+  visits: z.array(reviewVisitSchema).optional(),
   dishReviews: z
     .array(
       z.object({
@@ -178,9 +198,12 @@ export const reviewSchema = z.object({
         photoUrl: z.string().url().optional(),
         thumbnailPath: z.string().trim().min(1).max(512).optional(),
         thumbnailUrl: z.string().url().optional(),
+        firstVisitId: z.string().optional(),
+        latestVisitId: z.string().optional(),
+        history: z.array(dishRatingHistorySchema).optional(),
       }),
     )
-    .max(5)
+    .max(500)
     .default([]),
   status: z.enum(['published', 'hidden', 'deleted']),
   commentCount: z.number().int().nonnegative(),
@@ -247,6 +270,29 @@ export const createReviewInputSchema = z.object({
   tags: z.array(reviewTagSchema).max(4).default([]),
   dishReviews: z.array(dishReviewInputSchema).max(5).default([]),
 });
+
+export const getOwnVenueReviewInputSchema = z.object({
+  venueId: z.string().min(1).max(128),
+});
+export const addReviewVisitInputSchema = createReviewInputSchema
+  .omit({ venueId: true })
+  .extend({ reviewId: z.string().min(1).max(128) })
+  .refine(
+    (input) =>
+      new Set(
+        input.dishReviews.map((dish) =>
+          dish.title.trim().normalize('NFKC').toLowerCase(),
+        ),
+      ).size === input.dishReviews.length,
+    { message: 'Choose each dish only once per visit.', path: ['dishReviews'] },
+  )
+  .refine(
+    (input) =>
+      new Set(input.dishReviews.map((dish) => dish.id)).size ===
+      input.dishReviews.length,
+    { message: 'Choose each dish only once per visit.', path: ['dishReviews'] },
+  );
+export type AddReviewVisitInput = z.infer<typeof addReviewVisitInputSchema>;
 
 export const editReviewInputSchema = createReviewInputSchema
   .omit({
@@ -403,6 +449,18 @@ export const sendMessageInputSchema = z
   .refine((input) => Boolean(input.text || input.imageUrl), {
     message: 'Enter a message or attach a photo.',
   });
+
+export const uploadChatPhotoInputSchema = z.object({
+  conversationId: z.string().min(1).max(128),
+  idempotencyKey: idempotencyKeySchema,
+  // Encoded JPEG, at most 1.5 MiB before server-side recompression.
+  photoBase64: z
+    .string()
+    .min(4)
+    .max(2_097_152)
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+});
+export type UploadChatPhotoInput = z.infer<typeof uploadChatPhotoInputSchema>;
 
 export const conversationInputSchema = z.object({
   conversationId: z.string().min(1).max(128),
@@ -857,6 +915,8 @@ export interface AppRequest {
   title: string;
   body: string;
   senderName: string;
+  senderId?: string | null;
+  senderPhotoUrl?: string | null;
   targetId: string;
   createdAt: string;
 }

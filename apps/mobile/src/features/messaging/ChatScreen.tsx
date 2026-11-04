@@ -2,9 +2,9 @@ import type { ChatMessage, ConversationParticipant } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc, onSnapshot, type DocumentData } from 'firebase/firestore';
-import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import {
   ActivityIndicator,
   Alert,
@@ -29,8 +29,7 @@ import SendIcon from '../../../assets/ai/send.svg';
 import lightDialogPattern from '../../../assets/figma-backgrounds/home-feed-pattern.png';
 import dialogPattern from '../../../assets/onboarding/pattern-screen.png';
 import { imageSourceForUrl } from '../../dev/visualAuditMedia';
-import { firestore, storage } from '../../infrastructure/firebase';
-import { uploadJpegImageVariant } from '../../infrastructure/imageUpload';
+import { firestore } from '../../infrastructure/firebase';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { useIsVisualAudit, useTastesApi } from '../../session/SessionProvider';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
@@ -668,16 +667,28 @@ export function ChatScreen({
     });
     if (result.canceled || !result.assets[0]) return;
     const pendingKey = createIdempotencyKey('message-photo');
-    const path = `chat-images/${userId}/${conversationId}/${pendingKey}.jpg`;
     setSending(true);
     try {
-      await uploadJpegImageVariant({
-        actions: [{ resize: { width: 1440 } }],
-        compress: 0.76,
-        path,
-        uri: result.assets[0].uri,
+      const photo = await manipulateAsync(
+        result.assets[0].uri,
+        [
+          {
+            resize:
+              result.assets[0].width >= result.assets[0].height
+                ? { width: 1440 }
+                : { height: 1440 },
+          },
+        ],
+        { compress: 0.76, format: SaveFormat.JPEG, base64: true },
+      );
+      if (!photo.base64)
+        throw new Error('The selected photo could not be prepared.');
+      const uploaded = await api.uploadChatPhoto({
+        conversationId,
+        idempotencyKey: pendingKey,
+        photoBase64: photo.base64,
       });
-      const imageUrl = await getDownloadURL(storageRef(storage, path));
+      const imageUrl = uploaded.data.imageUrl;
       await api.sendMessage({
         conversationId,
         idempotencyKey: pendingKey,
@@ -843,7 +854,7 @@ export function ChatScreen({
         ) : null}
 
         <ImageBackground
-          imageStyle={{ opacity: isDark ? 1 : 0.08 }}
+          imageStyle={{ opacity: isDark ? 1 : 0.08, height: windowHeight }}
           resizeMode="stretch"
           source={isDark ? dialogPattern : lightDialogPattern}
           style={[styles.patternBody, { backgroundColor: colors.canvas }]}
@@ -1013,7 +1024,7 @@ function createStyles(colors: ThemeColors) {
   return responsiveStyleSheet({
     screen: { flex: 1 },
     chatBody: { flex: 1 },
-    patternBody: { flex: 1 },
+    patternBody: { flex: 1, overflow: 'hidden' },
     header: {
       minHeight: 64,
       paddingTop: 8,

@@ -2054,10 +2054,12 @@ async function main() {
   // actually exist so profile headers match the visible review list.
   await applyUserReviewCounts(
     db,
-    await findUserReviewCountMismatches(
-      db,
-      users.map((user) => user.id),
-    ),
+    await findUserReviewCountMismatches(db, [
+      ...new Set([
+        ...users.map((user) => user.id),
+        ...hydratedProfiles.map((profile) => profile.id),
+      ]),
+    ]),
   );
 
   console.log(

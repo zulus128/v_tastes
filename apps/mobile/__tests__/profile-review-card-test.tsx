@@ -162,13 +162,50 @@ describe('profile review card', () => {
       { wrapper: Providers },
     );
 
-    expect(await screen.findByText('See more')).toBeOnTheScreen();
+    await fireEvent(
+      screen.getByTestId('review-text-measurement', {
+        includeHiddenElements: true,
+      }),
+      'textLayout',
+      {
+        nativeEvent: {
+          lines: [
+            { text: 'First line' },
+            { text: 'Second line' },
+            { text: 'Third line' },
+          ],
+        },
+      },
+    );
+    expect(screen.getByText('See more')).toBeOnTheScreen();
     const reviewText = screen.getByText(item.text);
     expect(reviewText.props.numberOfLines).toBe(2);
 
     await fireEvent.press(reviewText.parent!);
     expect(screen.queryByText('See more')).not.toBeOnTheScreen();
     expect(screen.getByText(item.text).props.numberOfLines).toBeUndefined();
+  });
+
+  it('does not truncate a long review that fits within two rendered lines', async () => {
+    await render(
+      <ProfileReviewCard
+        item={item}
+        onComments={jest.fn()}
+        onMore={jest.fn()}
+        onReact={jest.fn()}
+        onShare={jest.fn()}
+        profile={profile}
+      />,
+      { wrapper: Providers },
+    );
+    await fireEvent(
+      screen.getByTestId('review-text-measurement', {
+        includeHiddenElements: true,
+      }),
+      'textLayout',
+      { nativeEvent: { lines: [{ text: item.text }] } },
+    );
+    expect(screen.queryByText('See more')).not.toBeOnTheScreen();
   });
 
   it('uses the Draft badge instead of a city in the draft variant', async () => {

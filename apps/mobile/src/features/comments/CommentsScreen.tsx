@@ -1,3 +1,5 @@
+import { reviewDishLabel } from '../reviews/DishListContent';
+import { RevisedReviewSummary } from '../reviews/RevisedReviewSummary';
 import type { Comment, CommentReview, ReportReason } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import * as Clipboard from 'expo-clipboard';
@@ -8,7 +10,6 @@ import {
   Animated,
   FlatList,
   Image,
-  type ImageSourcePropType,
   KeyboardAvoidingView,
   type LayoutChangeEvent,
   Platform,
@@ -37,10 +38,6 @@ import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
 import SendIcon from '../../../assets/comments/send.svg';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
-import avatarKristin from '../../../assets/discover/avatar-kristin.png';
-import loungePhoto from '../../../assets/discover/lounge.png';
-import restaurantPhoto from '../../../assets/discover/restaurant.png';
-import sushiPhoto from '../../../assets/discover/sushi.jpg';
 import {
   ErrorState,
   ListFooter,
@@ -79,19 +76,15 @@ const commentReportReasons: Array<{ label: string; value: ReportReason }> = [
   { label: 'Something else', value: 'Something else' },
 ];
 
-const seededDishPhotos = [sushiPhoto, restaurantPhoto, loungePhoto];
-
 function commentShareUrl(reviewId: string, commentId: string) {
   return `https://tastesapp.com/reviews/${encodeURIComponent(reviewId)}/comments?commentId=${encodeURIComponent(commentId)}`;
 }
 
 function DishPhoto({
-  fallbackSource,
   path,
   styles,
   url,
 }: {
-  fallbackSource?: ImageSourcePropType;
   path?: string;
   styles: ReturnType<typeof createStyles>;
   url?: string;
@@ -161,14 +154,6 @@ function DishPhoto({
         style={styles.dishImage}
       />
     );
-  if (fallbackSource && (!normalizedPath || state.failed))
-    return (
-      <Image
-        resizeMode="cover"
-        source={fallbackSource}
-        style={styles.dishImage}
-      />
-    );
   return (
     <View style={styles.dishImageFallback}>
       {state.failed ? (
@@ -225,11 +210,13 @@ function RatingStars({
 
 function MainReview({
   onOpenPlace,
+  onOpenProfile,
   onReact,
   reacting,
   review,
 }: {
   onOpenPlace: (venueId: string) => void;
+  onOpenProfile: (userId: string) => void;
   onReact: () => void;
   reacting: boolean;
   review: CommentReview;
@@ -239,18 +226,15 @@ function MainReview({
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
     null,
   );
-  const seededReview =
-    review.id.startsWith('seed-own-') || review.id === 'visual-audit-review';
   return (
     <View style={styles.mainReview}>
+      <RevisedReviewSummary review={review} />
       <View style={styles.reviewAuthorRow}>
         {review.authorPhotoUrl ? (
           <Image
             source={{ uri: review.authorPhotoUrl }}
             style={styles.reviewAvatar}
           />
-        ) : seededReview ? (
-          <Image source={avatarKristin} style={styles.reviewAvatar} />
         ) : (
           <View style={styles.reviewAvatarFallback}>
             <Text style={styles.reviewAvatarInitial}>
@@ -259,15 +243,25 @@ function MainReview({
           </View>
         )}
         <View style={styles.reviewAuthorCopy}>
-          <Text style={styles.reviewAuthor}>{review.authorDisplayName}</Text>
-          <Text style={styles.reviewUsername}>
+          <Text
+            accessibilityRole="link"
+            onPress={() => onOpenProfile(review.authorId)}
+            style={styles.reviewAuthor}
+          >
+            {review.authorDisplayName}
+          </Text>
+          <Text
+            accessibilityRole="link"
+            onPress={() => onOpenProfile(review.authorId)}
+            style={styles.reviewUsername}
+          >
             {review.authorUsername
               ? `@${review.authorUsername}`
               : 'Tastes member'}
           </Text>
         </View>
         <Text style={styles.reviewDate}>
-          {formatDisplayDate(review.createdAt)}
+          {formatDisplayDate(review.latestVisitAt ?? review.createdAt)}
         </Text>
       </View>
       <View style={styles.reviewBody}>
@@ -306,9 +300,6 @@ function MainReview({
                   style={styles.dishCard}
                 >
                   <DishPhoto
-                    fallbackSource={
-                      seededDishPhotos[index % seededDishPhotos.length]
-                    }
                     path={dish.thumbnailPath ?? dish.photoPath}
                     styles={styles}
                     url={dish.thumbnailUrl ?? dish.photoUrl}
@@ -319,6 +310,10 @@ function MainReview({
                   </Text>
                   <Text style={styles.dishRating}>
                     ★ {dish.rating.toFixed(1)}
+                    {(review.visitCount ?? 1) > 1 &&
+                    dish.firstVisitId === review.visits?.at(-1)?.id
+                      ? ' · NEW'
+                      : ''}
                   </Text>
                 </Pressable>
               )}
@@ -369,7 +364,7 @@ function MainReview({
           {review.dishReviews.length > 0 ? (
             <Pressable
               accessibilityLabel="Open dish reviews"
-              onPress={() => setSelectedDishIndex(0)}
+              onPress={() => setSelectedDishIndex(-1)}
               style={styles.dishesButton}
             >
               <TopRatedDishesIcon
@@ -378,7 +373,7 @@ function MainReview({
                 width={responsiveSize(14)}
               />
               <Text style={styles.dishesButtonText}>
-                Dishes ({review.dishReviews.length})
+                {reviewDishLabel(review)}
               </Text>
             </Pressable>
           ) : null}
@@ -386,14 +381,7 @@ function MainReview({
       </View>
       <DishReviewSheet
         dishes={review.dishReviews}
-        fallbackUri={
-          seededReview
-            ? (index) =>
-                Image.resolveAssetSource(
-                  seededDishPhotos[index % seededDishPhotos.length],
-                ).uri
-            : undefined
-        }
+        visits={review.visits}
         index={selectedDishIndex}
         onClose={() => setSelectedDishIndex(null)}
         onIndexChange={setSelectedDishIndex}
@@ -404,6 +392,7 @@ function MainReview({
 
 function CommentRow({
   item,
+  onOpenProfile,
   nested = false,
   highlighted = false,
   onDelete,
@@ -415,6 +404,7 @@ function CommentRow({
   reacting = false,
 }: {
   item: Comment;
+  onOpenProfile: (userId: string) => void;
   nested?: boolean;
   highlighted?: boolean;
   onDelete?: () => void;
@@ -436,6 +426,7 @@ function CommentRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Pressable
+      accessible={false}
       onLongPress={() =>
         Alert.alert(item.authorDisplayName, 'Comment options', [
           {
@@ -483,7 +474,13 @@ function CommentRow({
       )}
       <View style={styles.copy}>
         <View style={styles.meta}>
-          <Text style={styles.author}>{item.authorDisplayName}</Text>
+          <Text
+            accessibilityRole="link"
+            onPress={() => onOpenProfile(item.authorId)}
+            style={styles.author}
+          >
+            {item.authorDisplayName}
+          </Text>
           <Text style={styles.date}>{formatDisplayDate(item.createdAt)}</Text>
         </View>
         <Text style={styles.text}>{item.text}</Text>
@@ -570,11 +567,13 @@ function CommentRow({
 export function PaginatedCommentsScreen({
   commentId,
   onOpenPlace = () => undefined,
+  onOpenProfile = () => undefined,
   reviewId,
   onBack,
 }: {
   commentId?: string;
   onOpenPlace?: (venueId: string) => void;
+  onOpenProfile?: (userId: string) => void;
   reviewId: string;
   onBack: () => void;
 }) {
@@ -903,6 +902,7 @@ export function PaginatedCommentsScreen({
               review ? (
                 <View>
                   <MainReview
+                    onOpenProfile={onOpenProfile}
                     onOpenPlace={onOpenPlace}
                     onReact={() => void reactToMainReview()}
                     reacting={reviewReacting}
@@ -976,6 +976,7 @@ export function PaginatedCommentsScreen({
                   ]}
                 >
                   <CommentRow
+                    onOpenProfile={onOpenProfile}
                     highlighted={commentId === item.id}
                     item={displayedItem}
                     onDelete={
@@ -1013,6 +1014,7 @@ export function PaginatedCommentsScreen({
                         const displayedReply = commentWithReaction(reply);
                         return (
                           <CommentRow
+                            onOpenProfile={onOpenProfile}
                             highlighted={commentId === reply.id}
                             key={reply.id}
                             item={displayedReply}

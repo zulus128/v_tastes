@@ -1088,6 +1088,7 @@ export function ProfileScreen({
                 item={review}
                 onNeedFallbackImage={() => loadVenueImage(review.venueId)}
                 onComments={() => onOpenComments(review.id)}
+                onOpenPlace={onOpenPlace}
                 onMore={() =>
                   own
                     ? setSelectedReview(review)

@@ -1,3 +1,4 @@
+import { ReviewTextPreview } from '../reviews/ReviewTextPreview';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -32,6 +33,8 @@ import RecommendationStar from '../../../assets/home/recommendation-star.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
+import { reviewDishLabel } from '../reviews/DishListContent';
+import { RevisedReviewSummary } from '../reviews/RevisedReviewSummary';
 import { DishPhoto, DishReviewSheet } from '../reviews/DishReviewSheet';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { ErrorState, ListFooter, Screen } from '../../ui/components';
@@ -164,7 +167,6 @@ function FeedCard({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  const [expanded, setExpanded] = useState(false);
   const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
     null,
   );
@@ -173,15 +175,16 @@ function FeedCard({
   const username = item.authorUsername
     ? `@${item.authorUsername}`
     : `@${item.authorDisplayName.toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
-  const isLongText = (item.text?.length ?? 0) > 120;
 
   return (
     <>
       <Pressable
+        accessible={false}
         onLongPress={onOpenMenu}
         delayLongPress={350}
         style={styles.card}
       >
+        <RevisedReviewSummary review={item} />
         <View style={styles.authorRow}>
           <Pressable
             accessibilityLabel={`Open ${item.authorDisplayName} profile`}
@@ -202,7 +205,7 @@ function FeedCard({
             </Text>
           </Pressable>
           <Text numberOfLines={1} style={styles.date}>
-            {formatDisplayDate(item.createdAt)}
+            {formatDisplayDate(item.latestVisitAt ?? item.createdAt)}
           </Text>
         </View>
 
@@ -260,6 +263,10 @@ function FeedCard({
                   />
                   <Text style={styles.dishRatingValue}>
                     {dish.rating.toFixed(1)}
+                    {(item.visitCount ?? 1) > 1 &&
+                    dish.firstVisitId === item.visits?.at(-1)?.id
+                      ? ' · NEW'
+                      : ''}
                   </Text>
                 </View>
               </Pressable>
@@ -269,28 +276,16 @@ function FeedCard({
 
         <View style={styles.reviewAndMetrics}>
           {item.text ? (
-            <Pressable
-              onPress={() => setExpanded((v) => !v)}
+            <ReviewTextPreview
+              text={item.text}
               style={styles.reviewPressable}
-            >
-              <Text
-                numberOfLines={expanded ? undefined : 2}
-                style={styles.review}
-              >
-                {item.text}
-              </Text>
-              {!expanded && isLongText ? (
-                <LinearGradient
-                  colors={['rgba(22,22,22,0)', colors.surface, colors.surface]}
-                  locations={[0, 0.37, 1]}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={styles.seeMoreFade}
-                >
-                  <Text style={styles.seeMore}>See more</Text>
-                </LinearGradient>
-              ) : null}
-            </Pressable>
+              textStyle={styles.review}
+              fadeStyle={styles.seeMoreFade}
+              moreStyle={styles.seeMore}
+              onOpenFullReview={
+                (item.visitCount ?? 1) > 1 ? onComments : undefined
+              }
+            />
           ) : null}
           <ReviewMetaRow cuisine={item.cuisine} mood={tags[0]} />
 
@@ -348,7 +343,7 @@ function FeedCard({
                 accessibilityLabel="Open dish reviews"
                 onPress={(event) => {
                   event.stopPropagation();
-                  setSelectedDishIndex(0);
+                  setSelectedDishIndex(-1);
                 }}
                 style={styles.dishesButton}
               >
@@ -358,7 +353,7 @@ function FeedCard({
                   width={responsiveSize(14)}
                 />
                 <Text style={styles.dishesButtonText}>
-                  Dishes ({dishReviews.length})
+                  {reviewDishLabel(item)}
                 </Text>
               </Pressable>
             ) : null}
@@ -367,6 +362,7 @@ function FeedCard({
       </Pressable>
       <DishReviewSheet
         dishes={dishReviews}
+        visits={item.visits}
         index={selectedDishIndex}
         onClose={() => setSelectedDishIndex(null)}
         onIndexChange={setSelectedDishIndex}
