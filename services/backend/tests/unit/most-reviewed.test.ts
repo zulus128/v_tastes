@@ -35,9 +35,9 @@ describe('most reviewed ranking (T-012)', () => {
     ).toEqual(['c', 'a', 'b']);
   });
 
-  it('falls back to the global ranking for a city without reviews', () => {
+  it('does not substitute foreign venues for a city without reviews', () => {
     expect(rankMostReviewed(venues, 'Paris', 2).map((item) => item.id)).toEqual(
-      ['d', 'c'],
+      [],
     );
   });
 

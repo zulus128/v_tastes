@@ -1,4 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { getStorage } from 'firebase-admin/storage';
+import sharp from 'sharp';
 import {
   allowsNotification,
   createConversationInputSchema,
@@ -9,6 +11,7 @@ import {
   registerPushTokenInputSchema,
   renderNotificationCopy,
   sendMessageInputSchema,
+  uploadChatPhotoInputSchema,
   setConversationPinnedInputSchema,
   setTypingStatusInputSchema,
   unregisterPushTokenInputSchema,
@@ -25,6 +28,7 @@ import {
   sendNotification,
 } from '../../shared/notifications';
 import { callableOptions } from '../../shared/options';
+import { isFirebaseEmulator } from '../../shared/runtime-environment';
 import {
   cursorDate,
   decodeCursor,
@@ -114,16 +118,26 @@ function requireOwnedChatImageUrl(
   } catch {
     throw new HttpsError('invalid-argument', 'The chat image URL is invalid.');
   }
-  const pathMatch = url.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+  const pathMatch = url.pathname.match(/^\/v0\/b\/([^/]+)\/o\/(.+)$/);
   let objectPath = '';
   try {
-    objectPath = pathMatch?.[1] ? decodeURIComponent(pathMatch[1]) : '';
+    objectPath = pathMatch?.[2] ? decodeURIComponent(pathMatch[2]) : '';
   } catch {
     objectPath = '';
   }
+  const emulatorHost =
+    process.env.STORAGE_EMULATOR_HOST ??
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+  const isEmulator = Boolean(
+    emulatorHost &&
+    url.host === emulatorHost.replace(/^https?:\/\//, '') &&
+    url.protocol === 'http:',
+  );
   if (
-    url.protocol !== 'https:' ||
-    url.hostname !== 'firebasestorage.googleapis.com' ||
+    (!isEmulator &&
+      (url.protocol !== 'https:' ||
+        url.hostname !== 'firebasestorage.googleapis.com')) ||
+    pathMatch?.[1] !== getStorage().bucket().name ||
     !objectPath.startsWith(`chat-images/${uid}/${conversationId}/`)
   ) {
     throw new HttpsError(
@@ -545,6 +559,155 @@ export const getMessages = onCall(callableOptions, async (request) => {
             value: timestampToIso(last.get('createdAt')),
           })
         : null,
+  };
+});
+
+// Storage Rules cannot read membership from the named Firestore database.
+// Upload through an App-Check protected callable using the same database and
+// membership policy as messaging, without opening Storage to other users.
+export const uploadChatPhoto = onCall(callableOptions, async (request) => {
+  const uid = requireUserId(request);
+  const input = parseInput(uploadChatPhotoInputSchema, request.data);
+  if (
+    isFirebaseEmulator() &&
+    !process.env.FIREBASE_STORAGE_EMULATOR_HOST &&
+    !process.env.STORAGE_EMULATOR_HOST
+  ) {
+    throw new HttpsError(
+      'unavailable',
+      'Start the Storage emulator before testing chat photos.',
+    );
+  }
+  const conversationRef = db
+    .collection('conversations')
+    .doc(input.conversationId);
+  await db.runTransaction(async (transaction) => {
+    const [conversation, profile] = await Promise.all([
+      transaction.get(conversationRef),
+      transaction.get(db.collection('users').doc(uid)),
+    ]);
+    const participants = requireParticipant(conversation, uid);
+    if (
+      conversation.get('status') !== 'active' ||
+      !profile.exists ||
+      profile.get('status') !== 'active'
+    ) {
+      throw new HttpsError(
+        'failed-precondition',
+        'An active profile and conversation are required.',
+      );
+    }
+    const kind = conversation.get('kind');
+    if (
+      (kind === 'group' || kind === 'activity') &&
+      invitationStatus(conversation, uid) !== 'accepted'
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Accept the invitation before sharing photos.',
+      );
+    }
+    if (kind !== 'group' && kind !== 'activity') {
+      const otherId = participants.find((id) => id !== uid);
+      if (!otherId)
+        throw new HttpsError(
+          'failed-precondition',
+          'The conversation has no recipient.',
+        );
+      const own = db.collection('users').doc(uid);
+      const other = db.collection('users').doc(otherId);
+      const [forward, reverse, blocked, blockedBy, recipient] =
+        await Promise.all([
+          transaction.get(own.collection('following').doc(otherId)),
+          transaction.get(other.collection('following').doc(uid)),
+          transaction.get(own.collection('blocked').doc(otherId)),
+          transaction.get(other.collection('blocked').doc(uid)),
+          transaction.get(other),
+        ]);
+      if (blocked.exists || blockedBy.exists) {
+        throw new HttpsError(
+          'permission-denied',
+          'Messages are unavailable for this user.',
+          { reason: 'user-blocked' },
+        );
+      }
+      if (
+        !forward.exists ||
+        !reverse.exists ||
+        recipient.get('status') !== 'active'
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'Conversations require a mutual follow.',
+          { reason: 'mutual-follow-required' },
+        );
+      }
+    }
+    await enforceRateLimit(
+      transaction,
+      uid,
+      'upload-chat-photo',
+      30,
+      60 * 60_000,
+    );
+  });
+  const bytes = Buffer.from(input.photoBase64, 'base64');
+  if (bytes.length > 1_572_864) {
+    throw new HttpsError('invalid-argument', 'The chat photo is too large.');
+  }
+  let jpeg: Buffer;
+  try {
+    jpeg = await sharp(bytes, { limitInputPixels: 20_000_000 })
+      .rotate()
+      .resize({
+        width: 1440,
+        height: 1440,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 76 })
+      .toBuffer();
+  } catch {
+    throw new HttpsError('invalid-argument', 'Choose a valid photo.');
+  }
+  const key = idempotentDocumentId(uid, 'chat-photo', input.idempotencyKey);
+  const file = getStorage()
+    .bucket()
+    .file(`chat-images/${uid}/${input.conversationId}/${key}.jpg`);
+  const [exists] = await file.exists();
+  if (!exists) {
+    try {
+      await file.save(jpeg, {
+        resumable: false,
+        preconditionOpts: { ifGenerationMatch: 0 },
+        metadata: {
+          contentType: 'image/jpeg',
+          metadata: { firebaseStorageDownloadTokens: randomUUID() },
+        },
+      });
+    } catch (error) {
+      // A retry must reuse the original object rather than replace an image
+      // that may already be attached to a delivered message.
+      if ((error as { code?: number }).code !== 412) throw error;
+    }
+  }
+  const [metadata] = await file.getMetadata();
+  const token = String(
+    metadata.metadata?.firebaseStorageDownloadTokens ?? '',
+  ).split(',')[0];
+  if (!token)
+    throw new HttpsError(
+      'internal',
+      'The uploaded photo has no download token.',
+    );
+  const emulator =
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST ??
+    process.env.STORAGE_EMULATOR_HOST;
+  const origin = emulator
+    ? `http://${emulator.replace(/^https?:\/\//, '')}`
+    : 'https://firebasestorage.googleapis.com';
+  return {
+    imageUrl: `${origin}/v0/b/${encodeURIComponent(file.bucket.name)}/o/${encodeURIComponent(file.name)}?alt=media&token=${encodeURIComponent(token)}`,
   };
 });
 

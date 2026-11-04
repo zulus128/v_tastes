@@ -18,7 +18,8 @@ function normalizeCity(city: string | null | undefined): string {
 }
 
 // Per-city ranking: venues from the viewer's city only. When the viewer has
-// no city, or the city has no reviewed venues yet, the global ranking is used.
+// no city, the global ranking is used. An empty city stays empty rather than
+// presenting venues from another country as local.
 export function rankMostReviewed(
   venues: readonly Venue[],
   userCity: string | null | undefined,
@@ -31,5 +32,5 @@ export function rankMostReviewed(
   const local = city
     ? reviewed.filter((venue) => normalizeCity(venue.city) === city)
     : [];
-  return (local.length > 0 ? local : reviewed).slice(0, take);
+  return (city ? local : reviewed).slice(0, take);
 }

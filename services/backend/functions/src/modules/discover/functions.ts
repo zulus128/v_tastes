@@ -138,8 +138,6 @@ async function fetchMostReviewedCandidates(): Promise<Venue[]> {
   const snapshot = await db
     .collection('venues')
     .where('status', '==', 'active')
-    .orderBy('reviewCount', 'desc')
-    .limit(200)
     .get();
   return snapshot.docs.map((document) => toVenue(document));
 }

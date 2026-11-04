@@ -94,7 +94,13 @@ export type MainTabParamList = {
   Create: { venueId?: string } | undefined;
   Dialog: undefined;
   Profile:
-    | { initialFollowing?: boolean; returnToVenueId?: string; userId?: string }
+    | {
+        initialFollowing?: boolean;
+        returnToVenueId?: string;
+        returnToComments?: { reviewId: string; commentId?: string };
+        returnToNotifications?: boolean;
+        userId?: string;
+      }
     | undefined;
 };
 
@@ -388,13 +394,22 @@ function MainTabs({
                 initialFollowing={route.params?.initialFollowing}
                 onBack={() => {
                   const returnToVenueId = route.params?.returnToVenueId;
+                  const returnToComments = route.params?.returnToComments;
+                  const returnToNotifications =
+                    route.params?.returnToNotifications;
                   navigation.setParams({
                     initialFollowing: undefined,
                     returnToVenueId: undefined,
+                    returnToComments: undefined,
+                    returnToNotifications: undefined,
                     userId: undefined,
                   });
                   // A profile opened from a venue review returns to that venue.
-                  if (returnToVenueId) openPlace(returnToVenueId);
+                  if (returnToComments)
+                    rootNavigation.navigate('Comments', returnToComments);
+                  else if (returnToNotifications)
+                    rootNavigation.navigate('Notifications');
+                  else if (returnToVenueId) openPlace(returnToVenueId);
                   else navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
@@ -532,6 +547,12 @@ export function ProductNavigator({
         >
           {({ navigation, route }) => (
             <PaginatedCommentsScreen
+              onOpenProfile={(userId) =>
+                navigation.navigate('MainTabs', {
+                  screen: 'Profile',
+                  params: { userId, returnToComments: route.params },
+                })
+              }
               commentId={route.params.commentId}
               onBack={() => {
                 if (navigation.canGoBack()) navigation.goBack();
@@ -673,6 +694,12 @@ export function ProductNavigator({
         <RootStack.Screen name="Notifications">
           {({ navigation }) => (
             <NotificationsScreen
+              onOpenProfile={(userId) =>
+                navigation.navigate('MainTabs', {
+                  screen: 'Profile',
+                  params: { userId, returnToNotifications: true },
+                })
+              }
               onBack={navigation.goBack}
               onOpenTarget={(item) => {
                 const targetId = item.targetId ?? '';
@@ -688,7 +715,10 @@ export function ProductNavigator({
                     if (targetId)
                       navigation.navigate('MainTabs', {
                         screen: 'Profile',
-                        params: { userId: targetId },
+                        params: {
+                          userId: targetId,
+                          returnToNotifications: true,
+                        },
                       });
                     break;
                   case 'activity':

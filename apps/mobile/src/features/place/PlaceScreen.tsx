@@ -50,7 +50,6 @@ import {
 } from '../favourites/FavouritesPane';
 import { useSavedVenue, useUnsaveVenue } from '../favourites/api';
 import { usePlace, usePlaceReviews } from '../discover/api';
-import { fallbackReviewPhoto } from '../discover/reviewNormalization';
 import { cuisineFlag } from '../discover/cuisineFlags';
 import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { ResponsiveModal as Modal } from '../../ui/ResponsiveModal';
@@ -872,18 +871,19 @@ function RatingStars({
 }
 
 function ReviewPhoto({
-  fallbackUri,
+  photoUrl,
   path,
   rating,
   styles,
   title,
 }: {
-  fallbackUri?: string;
+  photoUrl?: string;
   path?: string | null;
   rating: number;
   styles: ReturnType<typeof createStyles>;
   title: string;
 }) {
+  const fallbackUri = photoUrl;
   const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
   const [uri, setUri] = useState<string | null>(fallbackUri ?? null);
   const [failed, setFailed] = useState(false);
@@ -892,6 +892,7 @@ function ReviewPhoto({
   useEffect(() => {
     let active = true;
     setFailed(false);
+    setUri(fallbackUri ?? null);
     if (!normalizedPath) {
       setUri(fallbackUri ?? null);
       setFailed(!fallbackUri);
@@ -983,7 +984,6 @@ function ReviewPhoto({
 }
 
 export function ReviewCard({
-  fallbackPhotoUrls,
   item: review,
   onComments,
   onOpenProfile,
@@ -991,7 +991,6 @@ export function ReviewCard({
   onShare,
   reacted,
   reactingId,
-  reviewIndex,
   styles,
   venueName,
 }: {
@@ -1010,10 +1009,7 @@ export function ReviewCard({
   venueName: string;
 }) {
   const { colors } = useAppTheme();
-  const displayDishes = review.dishReviews.map((dish, dishIndex) => ({
-    ...dish,
-    fallbackUri: fallbackReviewPhoto(fallbackPhotoUrls, reviewIndex, dishIndex),
-  }));
+  const displayDishes = review.dishReviews;
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <Pressable
@@ -1056,7 +1052,7 @@ export function ReviewCard({
           >
             {displayDishes.map((dish) => (
               <ReviewPhoto
-                fallbackUri={dish.fallbackUri}
+                photoUrl={dish.photoUrl}
                 key={dish.id}
                 path={dish.photoPath}
                 rating={dish.rating}

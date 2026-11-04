@@ -1,5 +1,6 @@
 import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -326,6 +327,12 @@ export function DiscoverScreen({
   };
   const [tab, setTab] = useState<DiscoverTab>('places');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setTab('places');
+      setFavouritesOpen(false);
+    }, []),
+  );
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(
@@ -962,6 +969,7 @@ function PlacesMap({
   );
   const sheetDetentRef = useRef<'peek' | 'half' | 'full'>('half');
   const [sheetDismissed, setSheetDismissed] = useState(false);
+  const [selectedMapVenue, setSelectedMapVenue] = useState<Venue | null>(null);
   const [sort, setSort] = useState<PlaceSort>('best-match');
   const [sortOpen, setSortOpen] = useState(false);
   const sortSheet = useBottomSheetMotion({
@@ -1223,48 +1231,56 @@ function PlacesMap({
     }).start();
   }
 
-  const sheetPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
-      onPanResponderGrant: () => {
-        sheetHeight.stopAnimation();
-        dragStartHeight.current = currentSheetHeight.current;
-      },
-      onPanResponderMove: (_, gesture) => {
-        const next = dragStartHeight.current - gesture.dy;
-        sheetHeight.setValue(
-          Math.max(0, Math.min(sheetBounds.current.full, next)),
-        );
-      },
-      onPanResponderRelease: (_, gesture) => {
-        const projected =
-          currentSheetHeight.current - gesture.vy * responsiveSize(140);
-        if (projected < sheetBounds.current.peek * 0.55) {
-          settleSheet('dismissed');
-          return;
-        }
-        const detents = (['peek', 'half', 'full'] as const).map((target) => ({
-          target,
-          distance: Math.abs(sheetBounds.current[target] - projected),
-        }));
-        detents.sort((left, right) => left.distance - right.distance);
-        settleSheet(detents[0].target);
-      },
-      onPanResponderTerminate: () => {
-        const detents = (['peek', 'half', 'full'] as const).map((target) => ({
-          target,
-          distance: Math.abs(
-            sheetBounds.current[target] - currentSheetHeight.current,
-          ),
-        }));
-        detents.sort((left, right) => left.distance - right.distance);
-        settleSheet(detents[0].target);
-      },
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-    }),
-  ).current;
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          Math.abs(gesture.dy) > 3,
+        onPanResponderGrant: () => {
+          sheetHeight.stopAnimation();
+          dragStartHeight.current = currentSheetHeight.current;
+        },
+        onPanResponderMove: (_, gesture) => {
+          const next = dragStartHeight.current - gesture.dy;
+          sheetHeight.setValue(
+            Math.max(0, Math.min(sheetBounds.current.full, next)),
+          );
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dy) < 6 && Math.abs(gesture.dx) < 6) {
+            settleSheet(sheetDetentRef.current === 'full' ? 'half' : 'full');
+            return;
+          }
+          const projected =
+            currentSheetHeight.current - gesture.vy * responsiveSize(140);
+          if (projected < sheetBounds.current.peek * 0.55) {
+            settleSheet('dismissed');
+            return;
+          }
+          const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+            target,
+            distance: Math.abs(sheetBounds.current[target] - projected),
+          }));
+          detents.sort((left, right) => left.distance - right.distance);
+          settleSheet(detents[0].target);
+        },
+        onPanResponderTerminate: () => {
+          const detents = (['peek', 'half', 'full'] as const).map((target) => ({
+            target,
+            distance: Math.abs(
+              sheetBounds.current[target] - currentSheetHeight.current,
+            ),
+          }));
+          detents.sort((left, right) => left.distance - right.distance);
+          settleSheet(detents[0].target);
+        },
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+      }),
+    [sheetHeight],
+  );
 
   useEffect(() => {
     if (mapHeight <= 0 || keyboardAvoidanceActive) return;
@@ -1328,23 +1344,6 @@ function PlacesMap({
     mapRef.current?.animateToRegion(next, 450);
   }
 
-  function zoomMap(delta: number) {
-    const scale = delta > 0 ? 0.5 : 2;
-    const next = {
-      ...region,
-      latitudeDelta: Math.max(
-        0.002,
-        Math.min(120, region.latitudeDelta * scale),
-      ),
-      longitudeDelta: Math.max(
-        0.002,
-        Math.min(120, region.longitudeDelta * scale),
-      ),
-    };
-    setRegion(next);
-    mapRef.current?.animateToRegion(next, 220);
-  }
-
   function focusFirstSearchResult() {
     const venue = filtered.find(
       (item) => item.latitude != null && item.longitude != null,
@@ -1396,7 +1395,12 @@ function PlacesMap({
                 longitude: venue.longitude!,
               }}
               key={venue.id}
-              onPress={() => onOpenPlace(venue.id)}
+              testID={`discover-pin-${venue.id}`}
+              accessibilityLabel={`Show preview for ${venue.name}`}
+              onPress={() => {
+                setSelectedMapVenue(venue);
+                settleSheet('half');
+              }}
             >
               <MapVenueMarker
                 highlighted={!mapLayers.saved || saved}
@@ -1415,7 +1419,12 @@ function PlacesMap({
               longitude: venue.longitude!,
             }}
             key={`friend-${review.id}`}
-            onPress={() => onOpenPlace(venue.id)}
+            testID={`discover-friend-pin-${review.id}`}
+            accessibilityLabel={`Show preview for ${venue.name}`}
+            onPress={() => {
+              setSelectedMapVenue(venue);
+              settleSheet('half');
+            }}
           >
             <View style={styles.mapFriendMarker}>
               <View style={styles.mapFriendAvatarWrap}>
@@ -1457,34 +1466,6 @@ function PlacesMap({
             : { bottom: Animated.add(sheetHeight, responsiveSize(16)) },
         ]}
       >
-        <Pressable
-          accessibilityLabel="Zoom in"
-          onPress={() => zoomMap(1)}
-          style={[
-            styles.mapControlButton,
-            !isDark && styles.mapControlButtonLight,
-          ]}
-        >
-          <Text
-            style={[styles.mapZoomGlyph, !isDark && styles.mapControlIconLight]}
-          >
-            +
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Zoom out"
-          onPress={() => zoomMap(-1)}
-          style={[
-            styles.mapControlButton,
-            !isDark && styles.mapControlButtonLight,
-          ]}
-        >
-          <Text
-            style={[styles.mapZoomGlyph, !isDark && styles.mapControlIconLight]}
-          >
-            −
-          </Text>
-        </Pressable>
         <Pressable
           accessibilityLabel="My location"
           accessibilityState={{ selected: locationEnabled }}
@@ -1589,13 +1570,15 @@ function PlacesMap({
         ]}
       >
         {sidePanelLayout ? null : (
-          <Pressable
+          <View
             accessibilityLabel={
               sheetDetent === 'full'
                 ? 'Collapse place list'
                 : 'Expand place list'
             }
-            onPress={() =>
+            accessible
+            accessibilityRole="button"
+            onAccessibilityTap={() =>
               settleSheet(
                 sheetDetent === 'full'
                   ? 'half'
@@ -1608,7 +1591,7 @@ function PlacesMap({
             {...sheetPanResponder.panHandlers}
           >
             <View style={styles.sheetHandle} />
-          </Pressable>
+          </View>
         )}
         <View ref={searchRowRef} style={styles.mapSearchRow}>
           <View style={styles.mapSearch}>
@@ -1718,6 +1701,19 @@ function PlacesMap({
             </Pressable>
           </View>
         ) : null}
+        {selectedMapVenue ? (
+          <PlaceRow
+            onOpen={() => onOpenPlace(selectedMapVenue.id)}
+            onSave={() =>
+              onSave({
+                venueId: selectedMapVenue.id,
+                name: selectedMapVenue.name,
+              })
+            }
+            place={venueToPlace(selectedMapVenue)}
+            saved={savedVenueIds.has(selectedMapVenue.id)}
+          />
+        ) : null}
         {venuesQuery.isPending ? (
           <View style={styles.placesStatus}>
             <ActivityIndicator color={colors.primary} />
@@ -1747,7 +1743,9 @@ function PlacesMap({
         ) : (
           <FlatList
             contentContainerStyle={styles.placesListContent}
-            data={visibleVenues}
+            data={visibleVenues.filter(
+              (venue) => venue.id !== selectedMapVenue?.id,
+            )}
             initialNumToRender={6}
             keyExtractor={(venue) => venue.id}
             ListFooterComponent={

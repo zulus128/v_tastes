@@ -1323,6 +1323,9 @@ export function PostSignupOnboardingFlow({
       );
       return;
     }
+    // Permission is enough to advance. GPS and reverse geocoding may take
+    // several seconds indoors and must not leave the Allow Location screen stuck.
+    enterPlaces();
     try {
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -1341,7 +1344,6 @@ export function PostSignupOnboardingFlow({
     } catch {
       // Permission is enough to continue; city can still be selected manually.
     }
-    enterPlaces();
   }
 
   function enterPlaces() {

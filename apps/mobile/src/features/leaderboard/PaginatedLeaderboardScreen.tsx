@@ -18,8 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import backIcon from '../../../assets/leaderboard/back.png';
 import emptyFriendsIcon from '../../../assets/leaderboard/empty-friends.png';
 import infoIcon from '../../../assets/leaderboard/info.png';
-import inviteIcon from '../../../assets/leaderboard/xp-invite.png';
-import photoIcon from '../../../assets/leaderboard/xp-photo.png';
 import reviewIcon from '../../../assets/leaderboard/xp-review.png';
 import pattern from '../../../assets/onboarding/pattern-screen.png';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
@@ -275,9 +273,7 @@ function HowXpSheet({
 }) {
   const actions = [
     { icon: reviewIcon, label: 'Write a review', xp: '+50 XP' },
-    { icon: photoIcon, label: 'Add dish photos', xp: '+15 XP' },
     { icon: reviewIcon, label: 'Get a like on your review', xp: '+5 XP' },
-    { icon: inviteIcon, label: 'Invite a friend', xp: '+100 XP' },
   ];
   const sheet = useBottomSheetMotion({ onClose, visible });
 
@@ -489,10 +485,7 @@ export function PaginatedLeaderboardScreen({
             />
           </View>
           <Text style={styles.periodNudge}>
-            🏅{' '}
-            {period === 'month'
-              ? 'Month ends in 12 days · Top 3 earn a badge'
-              : 'All-time ranking'}
+            {period === 'month' ? 'Monthly ranking' : 'All-time ranking'}
           </Text>
         </View>
       ) : null}
