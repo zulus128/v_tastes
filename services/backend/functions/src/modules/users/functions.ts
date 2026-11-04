@@ -551,17 +551,18 @@ export const updateProfileSettings = onCall(
     const uid = requireUserId(request);
     const input = parseInput(updateProfileSettingsInputSchema, request.data);
     const userRef = db.collection('users').doc(uid);
-    const venue = input.favoriteVenueId
-      ? await db.collection('venues').doc(input.favoriteVenueId).get()
-      : null;
-    if (venue && (!venue.exists || venue.get('status') !== 'active')) {
-      throw new HttpsError(
-        'not-found',
-        'The selected favourite place was not found.',
-      );
-    }
     await db.runTransaction(async (transaction) => {
-      const user = await transaction.get(userRef);
+      const [user, venue] = await Promise.all([
+        transaction.get(userRef),
+        input.favoriteVenueId
+          ? transaction.get(db.collection('venues').doc(input.favoriteVenueId))
+          : Promise.resolve(null),
+      ]);
+      if (venue && (!venue.exists || venue.get('status') !== 'active'))
+        throw new HttpsError(
+          'not-found',
+          'The selected favourite place was not found.',
+        );
       if (!user.exists || user.get('status') !== 'active') {
         throw new HttpsError(
           'failed-precondition',

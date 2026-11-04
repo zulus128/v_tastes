@@ -1649,6 +1649,7 @@ export const reportContent = onCall(callableOptions, async (request) => {
 export const addComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(addCommentInputSchema, request.data);
+  const requestedReviewId = input.reviewId;
   input.reviewId = await resolveMergedReviewId(input.reviewId);
   const userRef = db.collection('users').doc(uid);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
@@ -1657,7 +1658,7 @@ export const addComment = onCall(callableOptions, async (request) => {
     .doc(
       idempotentDocumentId(
         uid,
-        `comment:${input.reviewId}`,
+        `comment:${requestedReviewId}`,
         input.idempotencyKey,
       ),
     );
@@ -1812,12 +1813,15 @@ export const reactToComment = onCall(callableOptions, async (request) => {
       ),
     );
   return db.runTransaction(async (transaction) => {
-    const [profile, comment, reaction, idempotency] = await Promise.all([
-      transaction.get(db.collection('users').doc(uid)),
-      transaction.get(commentRef),
-      transaction.get(reactionRef),
-      transaction.get(idempotencyRef),
-    ]);
+    const [profile, comment, reaction, idempotency, review] = await Promise.all(
+      [
+        transaction.get(db.collection('users').doc(uid)),
+        transaction.get(commentRef),
+        transaction.get(reactionRef),
+        transaction.get(idempotencyRef),
+        transaction.get(commentRef.parent.parent!),
+      ],
+    );
     if (!profile.exists || profile.get('status') !== 'active') {
       throw new HttpsError(
         'failed-precondition',
@@ -1829,6 +1833,11 @@ export const reactToComment = onCall(callableOptions, async (request) => {
         active: Boolean(idempotency.get('active')),
         reactionCount: Number(idempotency.get('reactionCount')),
       };
+    if (!review.exists || review.get('status') !== 'published')
+      throw new HttpsError(
+        'failed-precondition',
+        'Reopen the review and try again.',
+      );
     if (!comment.exists || comment.get('status') !== 'published')
       throw new HttpsError('not-found', 'The comment was not found.');
     await enforceRateLimit(transaction, uid, 'react-comment', 120, 60_000);

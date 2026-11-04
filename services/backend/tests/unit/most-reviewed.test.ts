@@ -47,3 +47,13 @@ describe('most reviewed ranking (T-012)', () => {
     ).toBe(false);
   });
 });
+
+it('shrinks sparse venue ratings toward a neutral prior', async () => {
+  const { ratingConfidence } =
+    await import('../../functions/src/modules/discover/mostReviewed');
+  expect(ratingConfidence({ rating: 5, reviewCount: 1 })).toBeLessThan(
+    ratingConfidence({ rating: 4.5, reviewCount: 100 }),
+  );
+  expect(ratingConfidence({ rating: 5, reviewCount: 0 })).toBe(0);
+  expect(ratingConfidence({ rating: 4.5, reviewCount: 10 })).toBe(3.75);
+});

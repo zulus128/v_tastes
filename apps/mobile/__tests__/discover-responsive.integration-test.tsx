@@ -16,6 +16,7 @@ let mockFavouritePlaces: Array<Record<string, unknown>> = [];
 let mockPopularReviews: Array<Record<string, unknown>> = [];
 let mockVenues: Array<Record<string, unknown>> = [];
 let mockIsDark = true;
+let mockAutomaticReviews = false;
 const mockAnimateToRegion = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
@@ -90,6 +91,7 @@ jest.mock('../src/features/discover/api', () => ({
       newSpots: [],
       hiddenGems: [],
       popularReviews: mockPopularReviews,
+      popularReviewsAreAutomatic: mockAutomaticReviews,
       mostReviewed: Array.from({ length: 5 }, (_, index) => ({
         id: `venue-${index}`,
         name: `Place ${index}`,
@@ -130,6 +132,7 @@ describe('Discover responsive content', () => {
     mockPopularReviews = [];
     mockVenues = [];
     mockIsDark = true;
+    mockAutomaticReviews = false;
     mockAnimateToRegion.mockReset();
     jest.restoreAllMocks();
   });
@@ -365,30 +368,42 @@ describe('Discover responsive content', () => {
     ).toBe(responsiveSize(240));
   });
 
-  it('renders legacy reviews that do not have tags', async () => {
-    mockPopularReviews = [
-      {
-        id: 'legacy-review',
-        authorDisplayName: 'Legacy reviewer',
-        authorPhotoUrl: null,
-        venueCity: 'Istanbul',
-        cuisine: 'Turkish',
-        venueImageUrl: null,
-        venueName: 'Legacy Place',
-        rating: 4.5,
-        reactionCount: 0,
-        commentCount: 0,
-        text: 'Still a valid review',
-        createdAt: new Date().toISOString(),
-      },
-    ];
+  it.each([false, true])(
+    'labels review selection honestly when automatic=%s',
+    async (automatic) => {
+      mockAutomaticReviews = automatic;
+      mockPopularReviews = [
+        {
+          id: 'legacy-review',
+          authorDisplayName: 'Legacy reviewer',
+          authorPhotoUrl: null,
+          venueCity: 'Istanbul',
+          cuisine: 'Turkish',
+          venueImageUrl: null,
+          venueName: 'Legacy Place',
+          rating: 4.5,
+          reactionCount: 0,
+          commentCount: 0,
+          text: 'Still a valid review',
+          createdAt: new Date().toISOString(),
+        },
+      ];
 
-    await render(<DiscoverScreen {...props} />);
-    await openTrending();
+      await render(<DiscoverScreen {...props} />);
+      await openTrending();
 
-    expect(screen.getByText('Legacy reviewer')).toBeOnTheScreen();
-    expect(screen.getByText('Still a valid review')).toBeOnTheScreen();
-  });
+      expect(
+        screen.getByText(automatic ? 'Popular reviews' : 'Most liked reviews'),
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByText(
+          automatic ? 'Recent likes and comments' : 'Community favourites',
+        ),
+      ).toBeOnTheScreen();
+      expect(screen.getByText('Legacy reviewer')).toBeOnTheScreen();
+      expect(screen.getByText('Still a valid review')).toBeOnTheScreen();
+    },
+  );
 
   it.each([
     [667, 375],

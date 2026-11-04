@@ -1,3 +1,7 @@
+import {
+  COMMUNITY_SIGNAL_VERSION,
+  communityObservationReady,
+} from '../discover/community-policy';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
@@ -22,6 +26,7 @@ import { parseInput } from '../../shared/validation';
 import { privateUserReference } from '../../shared/user-data';
 import { addXp } from '../../shared/mutations';
 import { recordActivityEvent } from '../../shared/activity-events';
+import { mergeVenueRecords } from './merge-venues';
 
 type StaffRole = 'admin' | 'moderator';
 
@@ -1135,58 +1140,29 @@ export const setVenueFlags = onCall(adminCallableOptions, async (request) => {
   return { id: input.venueId };
 });
 
-export const mergeVenues = onCall(adminCallableOptions, async (request) => {
-  const actorId = requireAdmin(request);
-  const input = parseInput(mergeVenuesInputSchema, request.data);
-  const source = db.collection('venues').doc(input.sourceVenueId);
-  const target = db.collection('venues').doc(input.targetVenueId);
-  const [sourceVenue, targetVenue] = await Promise.all([
-    source.get(),
-    target.get(),
-  ]);
-  if (!sourceVenue.exists || !targetVenue.exists) {
-    throw new HttpsError('not-found', 'Both venues must exist before merging.');
-  }
-  let movedReviews = 0;
-  while (true) {
-    const reviews = await db
-      .collection('reviews')
-      .where('venueId', '==', source.id)
-      .limit(400)
-      .get();
-    if (reviews.empty) break;
-    const batch = db.batch();
-    for (const review of reviews.docs) {
-      batch.update(review.ref, {
-        venueId: target.id,
-        venueName: targetVenue.get('name'),
-        updatedAt: FieldValue.serverTimestamp(),
+export const mergeVenues = onCall(
+  { ...adminCallableOptions, timeoutSeconds: 300 },
+  async (request) => {
+    const actorId = requireAdmin(request);
+    const input = parseInput(mergeVenuesInputSchema, request.data);
+    const result = await mergeVenueRecords(
+      db,
+      input.sourceVenueId,
+      input.targetVenueId,
+      actorId,
+    );
+    if (!result.alreadyMerged)
+      await audit(actorId, 'merge-venues', input.sourceVenueId, {
+        targetVenueId: input.targetVenueId,
+        ...result,
       });
-    }
-    await batch.commit();
-    movedReviews += reviews.size;
-  }
-  await Promise.all([
-    source.update({
-      status: 'merged',
-      mergedInto: target.id,
-      reviewCount: 0,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: actorId,
-    }),
-    movedReviews > 0
-      ? target.update({
-          reviewCount: FieldValue.increment(movedReviews),
-          updatedAt: FieldValue.serverTimestamp(),
-        })
-      : Promise.resolve(),
-  ]);
-  await audit(actorId, 'merge-venues', source.id, {
-    targetVenueId: target.id,
-    movedReviews,
-  });
-  return { id: source.id, targetVenueId: target.id, movedReviews };
-});
+    return {
+      id: input.sourceVenueId,
+      targetVenueId: input.targetVenueId,
+      ...result,
+    };
+  },
+);
 
 /**
  * Sends one of the promotional catalog entries to an audience: a whole city, or everyone when no
@@ -1230,5 +1206,123 @@ export const sendCampaignNotification = onCall(
       recipients: sent,
     });
     return { type: input.type, recipients: sent };
+  },
+);
+
+export const setCommunityDiscoveryMode = onCall(
+  adminCallableOptions,
+  async (request) => {
+    const actorId = requireAdmin(request);
+    const input = parseInput(
+      z.object({
+        mode: z.enum(['shadow', 'enabled']),
+        reason: z.string().trim().min(3).max(500),
+      }),
+      request.data,
+    );
+    await db.runTransaction(async (transaction) => {
+      const latest = await transaction.get(
+        db
+          .collection('_communitySignalRuns')
+          .orderBy('calculatedAt', 'desc')
+          .limit(1),
+      );
+      if (
+        input.mode === 'enabled' &&
+        !communityObservationReady(latest.docs[0]?.data(), Date.now())
+      )
+        throw new HttpsError(
+          'failed-precondition',
+          'At least seven days of observed events and a fresh calculation are required before activation.',
+        );
+      transaction.set(
+        db.collection('configuration').doc('communityDiscovery'),
+        {
+          mode: input.mode,
+          validatedAlgorithmVersion: COMMUNITY_SIGNAL_VERSION,
+          validatedAt:
+            input.mode === 'enabled' ? FieldValue.serverTimestamp() : null,
+          updatedBy: actorId,
+          updatedAt: FieldValue.serverTimestamp(),
+          reason: input.reason,
+        },
+      );
+    });
+    await audit(actorId, 'community-discovery-mode', input.mode, {
+      reason: input.reason,
+    });
+    return { mode: input.mode };
+  },
+);
+
+export const setCommunityDiscoveryOverride = onCall(
+  adminCallableOptions,
+  async (request) => {
+    const actorId = requireAdmin(request);
+    const input = parseInput(
+      z.object({
+        targetType: z.enum(['user', 'review']),
+        targetId: idSchema,
+        excluded: z.boolean(),
+        reason: z.string().trim().min(3).max(500),
+      }),
+      request.data,
+    );
+    await db.runTransaction(async (transaction) => {
+      const target = await transaction.get(
+        db
+          .collection(input.targetType === 'user' ? 'users' : 'reviews')
+          .doc(input.targetId),
+      );
+      if (!target.exists)
+        throw new HttpsError(
+          'not-found',
+          'The profile or review was not found.',
+        );
+      transaction.set(
+        db
+          .collection('_communityOverrides')
+          .doc(`${input.targetType}:${input.targetId}`),
+        {
+          ...input,
+          updatedBy: actorId,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+      );
+    });
+    await audit(actorId, 'community-discovery-override', input.targetId, input);
+    return { id: input.targetId, excluded: input.excluded };
+  },
+);
+
+export const getCommunityDiscoverySettings = onCall(
+  adminCallableOptions,
+  async (request) => {
+    requireAdmin(request);
+    const [settings, latest, overrides] = await Promise.all([
+      db.collection('configuration').doc('communityDiscovery').get(),
+      db
+        .collection('_communitySignalRuns')
+        .orderBy('calculatedAt', 'desc')
+        .limit(1)
+        .get(),
+      db.collection('_communityOverrides').where('excluded', '==', true).get(),
+    ]);
+    const audit = latest.docs[0]?.data();
+    return {
+      mode: settings.get('mode') === 'enabled' ? 'enabled' : 'shadow',
+      ready: communityObservationReady(audit, Date.now()),
+      firstObservedAt: audit?.firstObservedEventAt
+        ? timestampToIso(audit.firstObservedEventAt)
+        : null,
+      calculatedAt: audit?.calculatedAt
+        ? timestampToIso(audit.calculatedAt)
+        : null,
+      overrides: overrides.docs.map((doc) => ({
+        targetType: String(doc.get('targetType')),
+        targetId: String(doc.get('targetId')),
+        reason: String(doc.get('reason') ?? ''),
+      })),
+    };
   },
 );

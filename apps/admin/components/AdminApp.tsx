@@ -1,5 +1,7 @@
 'use client';
 
+import { CommunityControls } from './CommunityControls';
+
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -2382,7 +2384,12 @@ export function AdminApp() {
           </button>
         )}
         <div className={busy ? 'view busy' : 'view'}>
-          {view === 'overview' && <OverviewView data={overview} />}
+          {view === 'overview' && (
+            <>
+              <OverviewView data={overview} />
+              {role === 'admin' && <CommunityControls />}
+            </>
+          )}
           {view === 'reports' && (
             <ReportsView reports={reports} query={query} run={run} />
           )}

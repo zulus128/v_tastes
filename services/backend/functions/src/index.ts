@@ -122,6 +122,9 @@ export {
   getReportedContent,
   getUserHistory,
   mergeVenues,
+  getCommunityDiscoverySettings,
+  setCommunityDiscoveryMode,
+  setCommunityDiscoveryOverride,
   reinstateUser,
   reinstateExpiredSuspensions,
   searchAdminVenues,
@@ -137,3 +140,5 @@ export {
 } from './modules/admin/functions';
 
 export { refreshDiscoverySignals } from './modules/discover/schedules';
+
+export { reconcileReviewCounters } from './modules/reviews/aggregate-schedules';

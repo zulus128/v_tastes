@@ -1259,6 +1259,7 @@ export interface DiscoverFeed {
   mostReviewed: Venue[];
   forYou: Venue[];
   hiddenGems: Venue[];
+  popularReviewsAreAutomatic?: boolean;
   popularReviews: DiscoverReview[];
   topReviewer: DiscoverPerson | null;
 }
@@ -1299,6 +1300,7 @@ export interface PlaceReview {
 }
 
 export interface DiscoverPeopleResult {
+  trendingIsAutomatic?: boolean;
   trending: DiscoverPerson[];
   new: DiscoverPerson[];
   suggested: DiscoverPerson[];

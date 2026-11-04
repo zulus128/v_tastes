@@ -45,6 +45,7 @@ vi.mock('../infrastructure/firebase', () => ({
 }));
 
 import { AdminApp } from '../components/AdminApp';
+import { CommunityControls } from '../components/CommunityControls';
 
 const overview = {
   totalUsers: 12,
@@ -200,6 +201,48 @@ describe('AdminApp authentication boundary', () => {
           firstPublishedAt: '2026-11-02',
           discoverOverrides: { hot: 'exclude', trending: 'auto' },
         }),
+      ),
+    );
+  });
+
+  it('keeps weekly ranking activation disabled before enough observations and submits explicit exclusions', async () => {
+    mocks.callAdmin.mockImplementation(async (name) =>
+      name === 'getCommunityDiscoverySettings'
+        ? {
+            mode: 'shadow',
+            ready: false,
+            firstObservedAt: null,
+            calculatedAt: null,
+            overrides: [],
+          }
+        : {},
+    );
+    render(<CommunityControls />);
+    const activate = await screen.findByRole('button', {
+      name: 'Use weekly rankings',
+    });
+    fireEvent.change(screen.getByLabelText('Reason for change'), {
+      target: { value: 'Editorial review' },
+    });
+    expect((activate as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Profile or review ID'), {
+      target: { value: 'review-id' },
+    });
+    fireEvent.change(screen.getByLabelText('Content type'), {
+      target: { value: 'review' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Exclude from recommendations' }),
+    );
+    await waitFor(() =>
+      expect(mocks.callAdmin).toHaveBeenCalledWith(
+        'setCommunityDiscoveryOverride',
+        {
+          targetType: 'review',
+          targetId: 'review-id',
+          excluded: true,
+          reason: 'Editorial review',
+        },
       ),
     );
   });
