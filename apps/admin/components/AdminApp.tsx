@@ -1,6 +1,7 @@
 'use client';
 
 import { CommunityControls } from './CommunityControls';
+import { DishCatalogControls } from './DishCatalogControls';
 
 import {
   onAuthStateChanged,
@@ -2387,7 +2388,12 @@ export function AdminApp() {
           {view === 'overview' && (
             <>
               <OverviewView data={overview} />
-              {role === 'admin' && <CommunityControls />}
+              {role === 'admin' && (
+                <>
+                  <CommunityControls />
+                  <DishCatalogControls />
+                </>
+              )}
             </>
           )}
           {view === 'reports' && (

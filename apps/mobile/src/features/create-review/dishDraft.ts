@@ -4,5 +4,10 @@ export function updateDishReviewDraft(
   current: DishReviewDraft,
   patch: Partial<Omit<DishReviewDraft, 'id'>>,
 ): DishReviewDraft {
-  return { ...current, ...patch };
+  const next = { ...current, ...patch };
+  if (patch.title !== undefined && patch.title !== current.title) {
+    delete next.canonicalDishId;
+    delete next.canonicalDishConfirmed;
+  }
+  return next;
 }

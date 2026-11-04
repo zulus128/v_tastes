@@ -1,7 +1,9 @@
-type FilterablePlace = {
+export type FilterablePlace = {
   category?: string | null;
   distanceKm?: number | null;
   isOpen?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
   priceLevel?: number | null;
   rating?: number | null;
 };

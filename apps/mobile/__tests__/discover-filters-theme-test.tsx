@@ -75,6 +75,35 @@ it('uses the active theme on the filters screen', async () => {
   );
 });
 
+it('counts only saved places when filtering the wishlist', async () => {
+  await render(
+    <DiscoverFiltersScreen
+      initialValues={['$$ 🍝']}
+      onApply={jest.fn()}
+      onBack={jest.fn()}
+      previewPlaces={[{ priceLevel: 2 }, { priceLevel: 3 }]}
+      scope="saved"
+    />,
+  );
+
+  expect(screen.getByText('Filter saved places')).toBeTruthy();
+  expect(screen.getByText('Show 1 place')).toBeTruthy();
+});
+
+it('does not promise a place count when filtering reviews', async () => {
+  await render(
+    <DiscoverFiltersScreen
+      initialValues={[]}
+      onApply={jest.fn()}
+      onBack={jest.fn()}
+      scope="reviews"
+    />,
+  );
+
+  expect(screen.getByText('Filter reviews')).toBeTruthy();
+  expect(screen.getByText('Show reviews')).toBeTruthy();
+});
+
 it('dismisses an existing keyboard when the filter screen opens', async () => {
   const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
 

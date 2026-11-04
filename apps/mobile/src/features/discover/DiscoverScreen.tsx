@@ -1,3 +1,5 @@
+import { useTasteRecommendations } from '../taste-match/api';
+import { TasteForYou } from '../taste-match/TasteForYou';
 import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useFocusEffect } from '@react-navigation/native';
@@ -94,7 +96,13 @@ import {
 } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { readDeviceLocation } from './deviceLocation';
 import { matchesPlaceFilters } from './placeFilters';
+import {
+  formatDistanceKm,
+  withDeviceDistance,
+  type Coordinates,
+} from './venueDistance';
 import { UserAvatar } from '../profile/avatar';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
@@ -235,7 +243,7 @@ function venueImage(imageUrl?: string | null): ImageSourcePropType {
 }
 
 function formatDistance(km?: number): string {
-  return `${(km ?? 0).toFixed(1).replace('.', ',')} km`;
+  return formatDistanceKm(km ?? 0);
 }
 
 function formatCount(value: number): string {
@@ -263,14 +271,6 @@ function joinedLabel(iso: string): string {
   return `joined ${days}d ago`;
 }
 
-function forYouReason(venue: Venue, index: number): string {
-  if (venue.recommendationReason) return venue.recommendationReason;
-  if (!venue.category) return 'Popular near you';
-  return index % 2 === 0
-    ? `Because you ❤️ ${venue.category}`
-    : `Popular ${venue.category} pick`;
-}
-
 function venueToPlace(venue: Venue): Place {
   return {
     venueId: venue.id,
@@ -288,7 +288,10 @@ function venueToPlace(venue: Venue): Place {
 
 export function DiscoverScreen({
   appliedFilters,
-  onClearFilters,
+  entrySignal = 0,
+  onClearSavedFilters,
+  onOpenSavedFilters,
+  savedFilters = [],
   onOpenAI,
   onOpenFilters,
   onOpenComments,
@@ -299,7 +302,11 @@ export function DiscoverScreen({
   userId,
 }: {
   appliedFilters: string[];
-  onClearFilters: () => void;
+  /** Changes each time the user enters Discover from the tab bar. */
+  entrySignal?: number;
+  onClearSavedFilters?: () => void;
+  onOpenSavedFilters?: () => void;
+  savedFilters?: string[];
   onOpenAI: () => void;
   onOpenFilters: () => void;
   onOpenComments: (reviewId: string) => void;
@@ -328,12 +335,13 @@ export function DiscoverScreen({
   };
   const [tab, setTab] = useState<DiscoverTab>('places');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
-  useFocusEffect(
-    useCallback(() => {
-      setTab('places');
-      setFavouritesOpen(false);
-    }, []),
-  );
+  // Entering from the tab bar starts on Places; returning from a place, review
+  // or profile keeps the section the user was browsing.
+  useEffect(() => {
+    if (entrySignal === 0) return;
+    setTab('places');
+    setFavouritesOpen(false);
+  }, [entrySignal]);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(
@@ -346,29 +354,8 @@ export function DiscoverScreen({
     useCallback(() => {
       let active = true;
       void (async () => {
-        const permission = await Location.getForegroundPermissionsAsync();
-        if (permission.status !== 'granted') {
-          if (active) setDiscoveryLocation(undefined);
-          return;
-        }
-        if (!active) return;
-        const position =
-          (await Location.getLastKnownPositionAsync({
-            maxAge: 120_000,
-            requiredAccuracy: 1000,
-          })) ??
-          (await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          }));
-        if (active)
-          setDiscoveryLocation(
-            position
-              ? {
-                  latitude: position.coords.latitude,
-                  longitude: position.coords.longitude,
-                }
-              : undefined,
-          );
+        const position = await readDeviceLocation();
+        if (active) setDiscoveryLocation(position);
       })().catch(() => {
         if (active) setDiscoveryLocation(undefined);
       });
@@ -488,6 +475,7 @@ export function DiscoverScreen({
         ) : (
           <TrendingFeed
             feed={feedQuery.data}
+            location={discoveryLocation}
             followPending={toggleFollow.isPending}
             followPendingId={followPendingId}
             onSave={setSaveTarget}
@@ -504,10 +492,10 @@ export function DiscoverScreen({
       ) : null}
       {tab === 'places' && favouritesOpen ? (
         <FavouritesPane
-          appliedFilters={appliedFilters}
+          appliedFilters={savedFilters}
           onBack={() => setFavouritesOpen(false)}
-          onClearFilters={onClearFilters}
-          onOpenFilters={onOpenFilters}
+          onClearFilters={onClearSavedFilters}
+          onOpenFilters={onOpenSavedFilters}
           onOpenPlace={onOpenPlace}
           onPrefetchPlaces={onPrefetchPlaces}
           userId={userId}
@@ -516,6 +504,7 @@ export function DiscoverScreen({
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
+          deviceLocation={discoveryLocation}
           headerHeight={headerHeight}
           onOpenFavourites={() => setFavouritesOpen(true)}
           onOpenFilters={onOpenFilters}
@@ -623,6 +612,7 @@ function carouselCardWidth(
 
 function TrendingFeed({
   feed,
+  location,
   followPending,
   followPendingId,
   onSave,
@@ -636,6 +626,7 @@ function TrendingFeed({
   savedVenueIds,
 }: {
   feed: DiscoverFeed;
+  location?: { latitude: number; longitude: number };
   followPending: boolean;
   followPendingId: string | null;
   onSave: (place: SaveablePlace) => void;
@@ -649,6 +640,8 @@ function TrendingFeed({
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
+  const tasteQuery = useTasteRecommendations(location);
+  const tasteCardCount = tasteQuery.data?.recommendations.length ?? 0;
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: viewportWidth } = useWindowDimensions();
@@ -677,7 +670,7 @@ function TrendingFeed({
         contentWidth,
         layoutScale,
         240,
-        feed.forYou.length,
+        tasteCardCount,
       ),
       gemCardWidth: wrapWidth(280, 2),
       gridCardWidth: wrapWidth(179, 4),
@@ -690,7 +683,7 @@ function TrendingFeed({
         feed.trending.length,
       ),
     };
-  }, [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
+  }, [contentWidth, tasteCardCount, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
     {},
@@ -724,7 +717,10 @@ function TrendingFeed({
       refreshControl={
         <RefreshControl
           colors={[colors.primary]}
-          onRefresh={onRefresh}
+          onRefresh={() => {
+            onRefresh();
+            void tasteQuery.refetch();
+          }}
           refreshing={refreshing}
           tintColor={colors.primary}
         />
@@ -791,30 +787,12 @@ function TrendingFeed({
         </>
       ) : null}
 
-      {feed.forYou.length > 0 ? (
-        <>
-          <SectionLabel
-            title="For you"
-            subtitle="Picked from your tastes & saves"
-          />
-          <ScrollView
-            contentContainerStyle={styles.horizontalContent}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {feed.forYou.map((venue, index) => (
-              <ForYouCard
-                image={venueImage(venue.imageUrl)}
-                key={venue.id}
-                onOpen={() => onOpenPlace(venue.id)}
-                place={venueToPlace(venue)}
-                reason={forYouReason(venue, index)}
-                width={forYouCardWidth}
-              />
-            ))}
-          </ScrollView>
-        </>
-      ) : null}
+      <TasteForYou
+        onOpenPlace={onOpenPlace}
+        onOpenReview={onOpenComments}
+        width={forYouCardWidth}
+        data={tasteQuery.data}
+      />
 
       {feed.newSpots.length > 0 ? (
         <>
@@ -969,6 +947,7 @@ function TrendingFeed({
 
 function PlacesMap({
   appliedFilters,
+  deviceLocation,
   headerHeight,
   onOpenFavourites,
   onOpenFilters,
@@ -979,6 +958,7 @@ function PlacesMap({
   userId,
 }: {
   appliedFilters: string[];
+  deviceLocation?: Coordinates;
   headerHeight: number;
   onOpenFavourites: () => void;
   onOpenFilters: () => void;
@@ -1053,9 +1033,15 @@ function PlacesMap({
   const venueSearchQuery = useVenueSearch(search);
   const peopleQuery = useDiscoverPeople(userId);
   const mapFeedQuery = useDiscoverFeed(userId);
-  const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const venues = (
+    venuesQuery.data?.pages.flatMap((page) => page.items) ?? []
+  ).map((venue) => withDeviceDistance(venue, deviceLocation));
   const searchResults =
-    search.trim().length >= 2 ? (venueSearchQuery.data?.items ?? []) : [];
+    search.trim().length >= 2
+      ? (venueSearchQuery.data?.items ?? []).map((venue) =>
+          withDeviceDistance(venue, deviceLocation),
+        )
+      : [];
   const searchableVenues =
     searchResults.length > 0
       ? [
@@ -1709,7 +1695,8 @@ function PlacesMap({
               style={[styles.filterChip, styles.filterChipActive]}
             >
               <Text style={[styles.filterText, styles.filterTextActive]}>
-                {appliedFilters.length} filters
+                {appliedFilters.length}{' '}
+                {appliedFilters.length === 1 ? 'filter' : 'filters'}
               </Text>
             </Pressable>
           ) : null}
@@ -2827,47 +2814,6 @@ function TopReviewer({
         </Pressable>
       </View>
     </LinearGradient>
-  );
-}
-
-function ForYouCard({
-  image,
-  onOpen,
-  place,
-  reason,
-  width,
-}: {
-  image: ImageSourcePropType;
-  onOpen: () => void;
-  place: Place;
-  reason: string;
-  width: number;
-}) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <Pressable onPress={onOpen} style={[styles.forYouCard, { width }]}>
-      <Image source={image} style={styles.coverImage} />
-      <LinearGradient
-        colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.reasonChip}>
-        <Text style={styles.reasonText}>{reason}</Text>
-      </View>
-      <View style={styles.forYouCopy}>
-        <Text numberOfLines={2} style={styles.forYouTitle}>
-          {place.name}
-        </Text>
-        <Text style={styles.forYouMeta}>
-          {place.category} · {place.distance}
-        </Text>
-        <View style={styles.inlineMeta}>
-          <RatingPill value={place.rating} />
-          <Text style={styles.imageMetaText}>{place.reviews}</Text>
-        </View>
-      </View>
-    </Pressable>
   );
 }
 

@@ -1,3 +1,4 @@
+import { loadDishCatalog } from '../taste-match/catalog';
 import {
   addCommentInputSchema,
   createReviewInputSchema,
@@ -690,6 +691,11 @@ type StoredDishReview = {
   thumbnailUrl?: unknown;
   rating?: unknown;
   title?: unknown;
+  canonicalDishId?: unknown;
+  canonicalDishConfirmed?: unknown;
+  canonicalDishName?: unknown;
+  taxonomyVersion?: unknown;
+  ratedAt?: unknown;
 };
 
 async function attachDishPhotoUrls(
@@ -975,6 +981,8 @@ export const getOwnVenueReview = onCall(callableOptions, async (request) => {
 export const addReviewVisit = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(addReviewVisitInputSchema, request.data);
+  const dishCatalog = await loadDishCatalog(db);
+  input.dishReviews = dishCatalog.confirm(input.dishReviews);
   input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   const visitId = idempotentDocumentId(
@@ -1113,6 +1121,8 @@ export const addReviewVisit = onCall(callableOptions, async (request) => {
 export const createReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createReviewInputSchema, request.data);
+  const dishCatalog = await loadDishCatalog(db);
+  input.dishReviews = dishCatalog.confirm(input.dishReviews);
   const dishTitles = input.dishReviews.map((dish) =>
     dish.title.trim().normalize('NFKC').toLowerCase(),
   );
@@ -1223,7 +1233,10 @@ export const createReview = onCall(callableOptions, async (request) => {
       text: input.text,
       tags: input.tags,
       tag: input.tags[0] ?? null,
-      dishReviews: input.dishReviews,
+      dishReviews: input.dishReviews.map((dish) => ({
+        ...dish,
+        ratedAt: new Date().toISOString(),
+      })),
       dishNames: input.dishReviews.map((dish) => dish.title),
       status: 'published',
       commentCount: 0,
@@ -1252,6 +1265,8 @@ export const createReview = onCall(callableOptions, async (request) => {
 export const editReview = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(editReviewInputSchema, request.data);
+  const dishCatalog = await loadDishCatalog(db);
+  input.dishReviews = dishCatalog.confirm(input.dishReviews);
   input.reviewId = await resolveMergedReviewId(input.reviewId);
   const reviewRef = db.collection('reviews').doc(input.reviewId);
   if (
@@ -1315,8 +1330,31 @@ export const editReview = onCall(callableOptions, async (request) => {
           : [],
       ),
     );
-    const dishReviews = input.dishReviews.map((dish) => ({
+    const restoredCanonicalDishes = input.dishReviews.map((dish) => {
+      const previous = previousDishes.find(
+        (p) => p.id === dish.id && p.title === dish.title,
+      );
+      return !dish.canonicalDishId &&
+        previous?.canonicalDishConfirmed === true &&
+        typeof previous.canonicalDishId === 'string'
+        ? {
+            ...dish,
+            canonicalDishId: previous.canonicalDishId,
+            canonicalDishConfirmed: true,
+          }
+        : dish;
+    });
+    const confirmedDishes = dishCatalog.confirm(restoredCanonicalDishes);
+    const dishReviews = confirmedDishes.map((dish) => ({
       ...dish,
+      ratedAt:
+        previousDishes.find((previous) => previous.id === dish.id)?.rating ===
+        dish.rating
+          ? ((
+              previousDishes.find((previous) => previous.id === dish.id) as
+                { ratedAt?: string } | undefined
+            )?.ratedAt ?? timestampToIso(review.get('createdAt')))
+          : new Date().toISOString(),
       ...(dish.photoPath && photoUrlByPath.get(dish.photoPath)
         ? { photoUrl: photoUrlByPath.get(dish.photoPath) }
         : {}),

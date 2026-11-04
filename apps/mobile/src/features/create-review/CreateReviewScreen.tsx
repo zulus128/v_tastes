@@ -1,3 +1,4 @@
+import { CanonicalDishPicker } from '../taste-match/CanonicalDishPicker';
 import { DishPhoto } from '../reviews/DishReviewSheet';
 import type { ReviewTag, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
@@ -70,6 +71,11 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useBottomSheetMotion } from '../../ui/useBottomSheetMotion';
 import { PatternBackgroundLift } from '../../ui/components';
 import { useDiscoverVenues, usePlace, useVenueSearch } from '../discover/api';
+import { useDeviceLocation } from '../discover/deviceLocation';
+import {
+  formatDistanceKm,
+  withDeviceDistance,
+} from '../discover/venueDistance';
 import { useTastesApi } from '../../session/SessionProvider';
 import {
   type DishReviewDraft,
@@ -573,6 +579,13 @@ export function CreateReviewScreen({
                           rating: dish.rating,
                           photoUri: '',
                           previousPhotoUri: dish.photoUrl ?? dish.thumbnailUrl,
+                          ...(dish.canonicalDishId
+                            ? {
+                                canonicalDishId: dish.canonicalDishId,
+                                canonicalDishConfirmed:
+                                  dish.canonicalDishConfirmed === true,
+                              }
+                            : {}),
                           previousPhotoPath:
                             dish.photoPath ?? dish.thumbnailPath,
                         })
@@ -1799,6 +1812,7 @@ export function PlaceSelector({
   const api = useTastesApi();
   const query = useDiscoverVenues(userId);
   const searchQuery = useVenueSearch(search);
+  const deviceLocation = useDeviceLocation();
   const venues = query.data?.pages.flatMap((page) => page.items) ?? [];
   const localFiltered = venues.filter((venue) => {
     const needle = search.trim().toLowerCase();
@@ -1809,10 +1823,11 @@ export function PlaceSelector({
         .includes(needle)
     );
   });
-  const searchResults =
+  const searchResults = (
     search.trim().length >= 2
       ? (searchQuery.data?.items ?? localFiltered)
-      : localFiltered;
+      : localFiltered
+  ).map((venue) => withDeviceDistance(venue, deviceLocation));
   const usingSearch = search.trim().length >= 2;
   const isPending = query.isPending || (usingSearch && searchQuery.isPending);
   const isError = query.isError || (usingSearch && searchQuery.isError);
@@ -2145,7 +2160,7 @@ export function PlaceSelector({
                         venue.priceLevel ? '$'.repeat(venue.priceLevel) : null,
                         venue.distanceKm == null
                           ? null
-                          : `${venue.distanceKm.toFixed(1)} km`,
+                          : formatDistanceKm(venue.distanceKm),
                       ]
                         .filter((detail): detail is string => Boolean(detail))
                         .map((detail) => (
@@ -2367,6 +2382,22 @@ function DishEditor({
                 placeholderTextColor={colors.placeholder}
                 style={styles.input}
                 value={draft.title}
+              />
+              <CanonicalDishPicker
+                title={draft.title}
+                {...(draft.canonicalDishId
+                  ? { selectedId: draft.canonicalDishId }
+                  : {})}
+                onSelect={(canonicalDishId) =>
+                  setDraft((current) =>
+                    current
+                      ? updateDishReviewDraft(current, {
+                          canonicalDishId,
+                          canonicalDishConfirmed: true,
+                        })
+                      : current,
+                  )
+                }
               />
             </View>
           </ScrollView>

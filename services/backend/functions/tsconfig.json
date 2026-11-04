@@ -6,7 +6,8 @@
     "moduleResolution": "Node16",
     "outDir": "lib",
     "rootDir": "src",
-    "sourceMap": true
+    "sourceMap": true,
+    "allowJs": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/modules/taste-match/reference/**/*.js"]
 }

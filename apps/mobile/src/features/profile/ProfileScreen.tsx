@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type {
   FeedItem,
@@ -214,6 +215,9 @@ function UserBlockedIcon({ color }: { color: string }) {
 
 export function ProfileScreen({
   appliedFilters,
+  onClearSavedFilters,
+  onOpenSavedFilters,
+  savedFilters = [],
   currentUserId,
   fallbackName,
   initialFollowing = false,
@@ -231,6 +235,9 @@ export function ProfileScreen({
   targetUserId,
 }: {
   appliedFilters: string[];
+  onClearSavedFilters?: () => void;
+  onOpenSavedFilters?: () => void;
+  savedFilters?: string[];
   currentUserId: string;
   fallbackName: string;
   initialFollowing?: boolean;
@@ -253,6 +260,7 @@ export function ProfileScreen({
   const actionDangerColor = '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
+  const queryClient = useQueryClient();
   const visualAudit = useIsVisualAudit();
   const followMutation = useToggleFollow(currentUserId);
   const {
@@ -554,6 +562,7 @@ export function ProfileScreen({
     setBlockPending(true);
     try {
       await api.setUserBlocked({ targetUserId, blocked: nextBlocked });
+      await queryClient.resetQueries({ queryKey: ['taste-recommendations'] });
       setBlocked(nextBlocked);
       if (nextBlocked) setFollowing(false);
       setBlockConfirmation(null);
@@ -1143,9 +1152,9 @@ export function ProfileScreen({
           {own ? (
             <View style={styles.wishlistPane}>
               <FavouritesPane
-                appliedFilters={appliedFilters}
-                onClearFilters={onClearFilters}
-                onOpenFilters={onOpenFilters}
+                appliedFilters={savedFilters}
+                onClearFilters={onClearSavedFilters}
+                onOpenFilters={onOpenSavedFilters}
                 onOpenPlace={onOpenPlace}
                 onPrefetchPlaces={onPrefetchPlaces}
                 userId={currentUserId}

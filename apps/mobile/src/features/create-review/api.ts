@@ -11,6 +11,8 @@ export interface DishReviewDraft {
   previousPhotoPath?: string;
   rating: number;
   title: string;
+  canonicalDishId?: string;
+  canonicalDishConfirmed?: boolean;
 }
 
 export interface CreateReviewDraft {
@@ -95,6 +97,9 @@ export function useCreateReview(userId: string) {
         queryClient.invalidateQueries({ queryKey: ['leaderboard', userId] }),
         queryClient.invalidateQueries({ queryKey: ['place', draft.venueId] }),
         queryClient.invalidateQueries({ queryKey: ['discover'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['taste-recommendations', userId],
+        }),
         queryClient.invalidateQueries({
           queryKey: ['own-venue-review', userId],
         }),

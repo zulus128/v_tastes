@@ -1,3 +1,8 @@
+import RecommendationStar from '../../../assets/home/recommendation-star.svg';
+import { useTasteRecommendations } from '../taste-match/api';
+import { useDeviceLocation } from '../discover/deviceLocation';
+import { TasteRecommendationCard } from '../taste-match/TasteRecommendationCard';
+import { tasteFeedInsertions } from '../taste-match/feedInsertions';
 import { ReviewTextPreview } from '../reviews/ReviewTextPreview';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -5,7 +10,6 @@ import {
   Alert,
   Animated,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -27,10 +31,6 @@ import HeartBoldIcon from '../../../assets/comments/heart-bold.svg';
 import HeartIcon from '../../../assets/comments/heart-outline.svg';
 import ShareIcon from '../../../assets/comments/square-share-line-broken.svg';
 import TopRatedDishesIcon from '../../../assets/place/top-rated-dishes.svg';
-import RecommendationPlus from '../../../assets/home/recommendation-plus.svg';
-import RecommendationPlusRing from '../../../assets/home/recommendation-plus-ring.svg';
-import RecommendationStar from '../../../assets/home/recommendation-star.svg';
-import restaurantImage from '../../../assets/discover/restaurant.png';
 import ReviewStarFilled from '../../../assets/home/review-star-filled.svg';
 import ReviewStarOutline from '../../../assets/home/review-star-outline.svg';
 import { reviewDishLabel } from '../reviews/DishListContent';
@@ -64,7 +64,6 @@ import {
   HomeFeedLoadingState,
   HomeFeedOfflineState,
 } from './HomeFeedStates';
-import { useDiscoverFeed } from '../discover/api';
 import {
   useAuthenticatedUserId,
   useSession,
@@ -72,23 +71,6 @@ import {
 import { useProfile } from '../profile/api';
 import { UserAvatar } from '../profile/avatar';
 import { useUnreadNotificationCount } from '../notifications/api';
-
-const cuisineFlags: Record<string, string> = {
-  french: '🇫🇷',
-  italian: '🇮🇹',
-  japanese: '🇯🇵',
-  korean: '🇰🇷',
-  mexican: '🇲🇽',
-  spanish: '🇪🇸',
-  thai: '🇹🇭',
-  turkish: '🇹🇷',
-  vietnamese: '🇻🇳',
-};
-
-function categoryLabel(category: string) {
-  const flag = cuisineFlags[category.toLowerCase()];
-  return flag ? `${category} ${flag}` : category;
-}
 
 const reportReasons = [
   'Spam',
@@ -550,15 +532,8 @@ export function HomeFeedScreen({
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
-  const recommendationProfileSignature = [
-    profile?.city ?? '',
-    ...(profile?.favoriteCuisines ?? []),
-    profile?.favoriteDish ?? '',
-  ].join('|');
-  const recommendationQuery = useDiscoverFeed(
-    userId,
-    recommendationProfileSignature,
-  );
+  const recommendationLocation = useDeviceLocation();
+  const recommendationQuery = useTasteRecommendations(recommendationLocation);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
   const { data: unreadNotificationCount = 0 } = useUnreadNotificationCount();
@@ -570,7 +545,6 @@ export function HomeFeedScreen({
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<Set<string>>(
     new Set(),
   );
-  const [recommendationMenu, setRecommendationMenu] = useState(false);
   const [dismissedRecommendationIds, setDismissedRecommendationIds] = useState<
     Set<string>
   >(new Set());
@@ -586,6 +560,27 @@ export function HomeFeedScreen({
   const visibleItems = items.filter(
     (item) => !blockedAuthorIds.has(item.authorId),
   );
+  const recommendationInsertions = tasteFeedInsertions(
+    visibleItems,
+    (recommendationQuery.data?.recommendations ?? []).filter(
+      (card) => !dismissedRecommendationIds.has(card.id),
+    ),
+  );
+  const renderRecommendation = (index: number) => {
+    const card = recommendationInsertions.get(index);
+    return card ? (
+      <TasteRecommendationCard
+        card={card}
+        onOpenPlace={() => onOpenPlace(card.venue.id)}
+        onOpenReview={() => onOpenComments(card.reviewId)}
+        onDismiss={() =>
+          setDismissedRecommendationIds((current) =>
+            new Set(current).add(card.id),
+          )
+        }
+      />
+    ) : null;
+  };
   const hasNewPosts = Boolean(
     items[0]?.id &&
     latestFeedQuery.data?.id &&
@@ -597,7 +592,7 @@ export function HomeFeedScreen({
     .join('|');
   const leadVenueSignature = [
     ...visibleItems.slice(0, 2).map((item) => item.venueId),
-    recommendationQuery.data?.forYou[0]?.id,
+    recommendationQuery.data?.recommendations[0]?.venue.id,
   ]
     .filter((venueId): venueId is string => Boolean(venueId))
     .join('|');
@@ -835,142 +830,7 @@ export function HomeFeedScreen({
           ListHeaderComponent={
             <View style={styles.feedLead}>
               {visibleItems.slice(0, 2).map(renderFeedCard)}
-              {typeof recommendationQuery.data?.forYou[0]?.matchPercent ===
-                'number' &&
-              !dismissedRecommendationIds.has(
-                recommendationQuery.data?.forYou[0]?.id ?? '',
-              )
-                ? (() => {
-                    const rec = recommendationQuery.data!.forYou[0]!;
-                    const priceDots = rec.priceLevel
-                      ? '$'.repeat(rec.priceLevel)
-                      : null;
-                    const distanceLabel =
-                      rec.distanceKm != null
-                        ? rec.distanceKm < 1
-                          ? `${Math.round(rec.distanceKm * 1000)} m`
-                          : `${rec.distanceKm.toFixed(1)} km`
-                        : null;
-                    return (
-                      <Pressable
-                        onLongPress={() => setRecommendationMenu(true)}
-                        onPress={() => onOpenPlace(rec.id)}
-                        style={styles.recommendation}
-                      >
-                        <View style={styles.recommendationHeader}>
-                          <View style={styles.recommendedBadge}>
-                            <Text style={styles.recommendedBadgeText}>
-                              Recommended
-                            </Text>
-                          </View>
-                          <Text
-                            numberOfLines={1}
-                            style={styles.recommendationMatch}
-                          >
-                            <Text style={styles.recommendationMatchScore}>
-                              {rec.matchPercent}%{' '}
-                            </Text>
-                            match based on your saved tastes
-                          </Text>
-                        </View>
-
-                        <View style={styles.recommendationBody}>
-                          <View style={styles.recommendationRow}>
-                            <Image
-                              source={
-                                rec.imageUrl
-                                  ? { uri: rec.imageUrl }
-                                  : restaurantImage
-                              }
-                              style={styles.recommendationImage}
-                            />
-                            <View style={styles.recommendationInfo}>
-                              <Text
-                                numberOfLines={1}
-                                style={styles.recommendationTitle}
-                              >
-                                {rec.name}
-                              </Text>
-                              {rec.address ? (
-                                <Text
-                                  numberOfLines={1}
-                                  style={styles.recommendationAddress}
-                                >
-                                  {rec.address}
-                                </Text>
-                              ) : null}
-                              {rec.rating != null ? (
-                                <View style={styles.recommendationRatingRow}>
-                                  <View style={styles.recommendationRatingPill}>
-                                    <RecommendationStar
-                                      height={responsiveSize(14)}
-                                      width={responsiveSize(14)}
-                                    />
-                                    <Text
-                                      style={styles.recommendationRatingValue}
-                                    >
-                                      {rec.rating.toFixed(1)}
-                                    </Text>
-                                  </View>
-                                  {rec.reviewCount != null ? (
-                                    <Text
-                                      numberOfLines={1}
-                                      style={styles.recommendationReviewCount}
-                                    >
-                                      {rec.reviewCount} reviews
-                                    </Text>
-                                  ) : null}
-                                </View>
-                              ) : null}
-                            </View>
-                          </View>
-
-                          <View
-                            style={styles.recommendationAddIcon}
-                            pointerEvents="none"
-                          >
-                            <RecommendationPlusRing
-                              height={responsiveSize(18)}
-                              width={responsiveSize(18)}
-                              style={styles.recommendationPlusRing}
-                            />
-                            <RecommendationPlus
-                              height={responsiveSize(7)}
-                              width={responsiveSize(7)}
-                              style={styles.recommendationPlus}
-                            />
-                          </View>
-
-                          {rec.category || priceDots || distanceLabel ? (
-                            <View style={styles.recommendationTags}>
-                              {rec.category ? (
-                                <View style={styles.recTag}>
-                                  <Text style={styles.recTagText}>
-                                    {categoryLabel(rec.category)}
-                                  </Text>
-                                </View>
-                              ) : null}
-                              {priceDots ? (
-                                <View style={styles.recTag}>
-                                  <Text style={styles.recTagText}>
-                                    {priceDots}
-                                  </Text>
-                                </View>
-                              ) : null}
-                              {distanceLabel ? (
-                                <View style={styles.recTag}>
-                                  <Text style={styles.recTagText}>
-                                    {distanceLabel.replace('.', ',')}
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    );
-                  })()
-                : null}
+              {renderRecommendation(1)}
             </View>
           }
           ListFooterComponent={
@@ -986,11 +846,19 @@ export function HomeFeedScreen({
           refreshControl={
             <RefreshControl
               refreshing={query.isRefetching && !query.isFetchingNextPage}
-              onRefresh={() => void query.refetch()}
+              onRefresh={() => {
+                void query.refetch();
+                void recommendationQuery.refetch();
+              }}
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item }) => renderFeedCard(item)}
+          renderItem={({ item, index }) => (
+            <View>
+              {renderFeedCard(item)}
+              {renderRecommendation(index + 2)}
+            </View>
+          )}
           showsVerticalScrollIndicator={false}
           style={styles.list}
         />
@@ -1018,34 +886,6 @@ export function HomeFeedScreen({
             },
           ]}
           onCancel={() => setMenuReviewId(null)}
-        />
-      ) : null}
-      {recommendationMenu ? (
-        <ActionSheet
-          actions={[
-            {
-              label: 'Why am I seeing this?',
-              onPress: () => {
-                setRecommendationMenu(false);
-                showToast('Based on your tastes, ratings and saves');
-              },
-            },
-            {
-              label: 'Not interested',
-              onPress: () => {
-                const recommendationId =
-                  recommendationQuery.data?.forYou[0]?.id;
-                if (recommendationId) {
-                  setDismissedRecommendationIds((current) =>
-                    new Set(current).add(recommendationId),
-                  );
-                }
-                setRecommendationMenu(false);
-                showToast('Recommendation hidden');
-              },
-            },
-          ]}
-          onCancel={() => setRecommendationMenu(false)}
         />
       ) : null}
       {reportReviewId ? (

@@ -6,6 +6,11 @@ import {
   type CompleteOnboardingInput,
 } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
+import { readDeviceLocation } from '../discover/deviceLocation';
+import {
+  formatDistanceKm,
+  withDeviceDistance,
+} from '../discover/venueDistance';
 import * as Contacts from 'expo-contacts/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1122,9 +1127,11 @@ export function PostSignupOnboardingFlow({
 
     setPlaceLoading(true);
     setPlaceError(null);
-    const request = api
-      .getVenues({ limit: 8 })
-      .then((response) => {
+    const request = Promise.all([
+      api.getVenues({ limit: 8 }),
+      readDeviceLocation(),
+    ])
+      .then(([response, deviceLocation]) => {
         const mapped = response.data.items.map(
           (venue, index): PlaceCandidate => ({
             id: venue.id,
@@ -1138,7 +1145,12 @@ export function PostSignupOnboardingFlow({
             popular: venue.discoverTags?.includes('trending') ?? false,
             category: venue.category ?? 'Restaurant',
             price: '$'.repeat(venue.priceLevel ?? 2),
-            distance: `${(venue.distanceKm ?? 0).toFixed(1)} km`,
+            distance: (() => {
+              const { distanceKm } = withDeviceDistance(venue, deviceLocation);
+              return distanceKm == null
+                ? venue.city
+                : formatDistanceKm(distanceKm);
+            })(),
           }),
         );
         setAvailablePlaces(mapped);

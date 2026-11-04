@@ -3,6 +3,8 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { TasteRecommendationsResult } from '@tastes/contracts';
+import { refreshTasteReviewProjection } from '../../functions/src/modules/taste-match/projection';
 
 const PROJECT_ID = process.env.TEST_PROJECT_ID ?? 'demo-tastes';
 const FUNCTIONS_HOST = process.env.TEST_FUNCTIONS_HOST ?? '127.0.0.1:5001';
@@ -723,9 +725,10 @@ describe('authenticated session and paginated reads', () => {
       .get();
     expect(reviewDocument.get('tags')).toEqual(['casual', 'date-night']);
     expect(reviewDocument.get('dishNames')).toEqual(['Soup dumplings']);
-    expect(reviewDocument.get('dishReviews')).toEqual(
+    expect(reviewDocument.get('dishReviews')).toMatchObject(
       reviewCommand.dishReviews,
     );
+    expect(typeof reviewDocument.get('dishReviews')[0].ratedAt).toBe('string');
     expect(reviewDocument.get('xpBefore')).toBe(0);
     expect(reviewDocument.get('xpAfter')).toBe(50);
     expect(
@@ -3707,4 +3710,288 @@ it('gates weekly ranking activation by admin role/history, applies exclusions an
   expect((await db.doc(`users/${author.id}`).get()).get('status')).toBe(
     'active',
   );
+}, 25_000);
+
+it('serves real cross-venue taste matches, rechecks hidden/deleted evidence and excludes reverse blocks', async () => {
+  const { db, first, author } = await createSocialFixture();
+  const now = Date.now(),
+    anchors = [
+      'cacio-e-pepe',
+      'margherita-pizza',
+      'patatas-bravas',
+      'mushroom-risotto',
+      'tiramisu',
+    ];
+  const names = [
+    'Cacio e pepe',
+    'Margherita pizza',
+    'Patatas bravas',
+    'Mushroom risotto',
+    'Tiramisu',
+  ];
+  await Promise.all(
+    ['own-taste-place', 'peer-anchor-place', 'recommend-place'].map((id) =>
+      db.doc(`venues/${id}`).set({
+        status: 'active',
+        name: id,
+        city: 'Istanbul',
+        latitude: 41,
+        longitude: 29,
+      }),
+    ),
+  );
+  await db
+    .doc('users/taste-peer')
+    .set({ status: 'active', displayName: 'Taste peer' });
+  const review = (
+    uid: string,
+    venueId: string,
+    dishes: { id: string; title: string; rating: number }[],
+  ) => ({
+    authorId: uid,
+    authorDisplayName: uid,
+    venueId,
+    venueCity: 'Istanbul',
+    status: 'published',
+    rating: 4.5,
+    text: 'Real source review',
+    createdAt: Timestamp.fromMillis(now - 1000),
+    dishReviews: dishes,
+  });
+  const anchorDishes = anchors.map((id, i) => ({
+    id,
+    title: names[i]!,
+    rating: i === 3 ? 2 : 4.5,
+  }));
+  await db
+    .doc('reviews/taste-own')
+    .set(review(author.id, 'own-taste-place', anchorDishes));
+  await db
+    .doc('reviews/taste-peer-anchor')
+    .set(review('taste-peer', 'peer-anchor-place', anchorDishes));
+  await db
+    .doc('reviews/taste-offering')
+    .set(
+      review('taste-peer', 'recommend-place', [
+        { id: 'pesto', title: 'Pasta al pesto', rating: 5 },
+      ]),
+    );
+  for (const id of ['taste-own', 'taste-peer-anchor', 'taste-offering'])
+    await refreshTasteReviewProjection(db, id);
+  const result = await callFunction<TasteRecommendationsResult>(
+    'getTasteRecommendations',
+    {},
+    first.token,
+  );
+  expect(result.state).toBe('personalized');
+  expect(result.distinctRatedDishes).toBe(5);
+  expect(result.recommendations[0]).toMatchObject({
+    canonicalDishId: 'pesto-pasta',
+    venue: { id: 'recommend-place' },
+    tier: 'taste_match',
+    reviewId: 'taste-offering',
+  });
+  const json = JSON.stringify(result);
+  expect(json).not.toMatch(
+    /internalState|rankScore|ingredients|traitPreferences/,
+  );
+  await db
+    .doc('_communityOverrides/review:taste-offering')
+    .set({ targetType: 'review', targetId: 'taste-offering', excluded: true });
+  expect(
+    (
+      await callFunction<TasteRecommendationsResult>(
+        'getTasteRecommendations',
+        {},
+        first.token,
+      )
+    ).recommendations,
+  ).toEqual([]);
+  await db.doc('_communityOverrides/review:taste-offering').delete();
+  await db.doc('users/taste-peer').update({ source: 'seed' });
+  expect(
+    (
+      await callFunction<TasteRecommendationsResult>(
+        'getTasteRecommendations',
+        {},
+        first.token,
+      )
+    ).recommendations,
+  ).toEqual([]);
+  await db.doc('users/taste-peer').update({ source: FieldValue.delete() });
+  // Leave the retrieval index stale deliberately: source revalidation is the privacy boundary.
+  await db.doc('reviews/taste-offering').update({ status: 'hidden' });
+  expect(
+    (
+      await callFunction<TasteRecommendationsResult>(
+        'getTasteRecommendations',
+        {},
+        first.token,
+      )
+    ).recommendations,
+  ).toEqual([]);
+  await db.doc('reviews/taste-offering').update({
+    status: 'published',
+    dishReviews: [{ id: 'pesto', title: 'Pasta al pesto', rating: 0.5 }],
+  });
+  expect(
+    (
+      await callFunction<TasteRecommendationsResult>(
+        'getTasteRecommendations',
+        {},
+        first.token,
+      )
+    ).recommendations,
+  ).toEqual([]);
+  await db.doc('reviews/taste-offering').update({
+    dishReviews: [{ id: 'pesto', title: 'Pasta al pesto', rating: 5 }],
+  });
+  await db
+    .doc(`users/taste-peer/blocked/${author.id}`)
+    .set({ userId: author.id });
+  const blocked = await callFunction<TasteRecommendationsResult>(
+    'getTasteRecommendations',
+    {},
+    first.token,
+  );
+  expect(blocked.matchedUserCount).toBe(0);
+  expect(blocked.recommendations).toEqual([]);
+  await db.doc(`users/taste-peer/blocked/${author.id}`).delete();
+  await db.doc('venues/recommend-place').update({ status: 'hidden' });
+  expect(
+    (
+      await callFunction<TasteRecommendationsResult>(
+        'getTasteRecommendations',
+        {},
+        first.token,
+      )
+    ).recommendations,
+  ).toEqual([]);
+  await expect(
+    callFunction('getTasteRecommendations', {}),
+  ).rejects.toMatchObject({ status: 'UNAUTHENTICATED' });
+}, 30_000);
+
+it('validates canonical selection at the real review write boundary without altering old-client writes', async () => {
+  const { db, first } = await createSocialFixture();
+  await db.doc('venues/canonical-place').set({
+    status: 'active',
+    name: 'Canonical Place',
+    city: 'Istanbul',
+    rating: 0,
+    reviewCount: 0,
+  });
+  const base = {
+    venueId: 'canonical-place',
+    rating: 4.5,
+    text: 'A proper dish review',
+    dishReviews: [
+      {
+        id: 'fish',
+        title: 'fish with lemon',
+        rating: 0.5,
+        canonicalDishId: 'lemon-sea-bass',
+      },
+    ],
+  };
+  await expect(
+    callFunction(
+      'createReview',
+      { ...base, idempotencyKey: 'unconfirmed-canonical-0001' },
+      first.token,
+    ),
+  ).rejects.toMatchObject({ status: 'INVALID_ARGUMENT' });
+  const created = await callFunction<{ id: string }>(
+    'createReview',
+    {
+      ...base,
+      idempotencyKey: 'confirmed-canonical-00001',
+      dishReviews: [{ ...base.dishReviews[0], canonicalDishConfirmed: true }],
+    },
+    first.token,
+  );
+  expect(
+    (await db.doc(`reviews/${created.id}`).get()).get('dishReviews')[0],
+  ).toMatchObject({
+    title: 'fish with lemon',
+    canonicalDishId: 'lemon-sea-bass',
+    rating: 0.5,
+  });
+  await callFunction(
+    'editReview',
+    {
+      reviewId: created.id,
+      rating: 4.5,
+      text: 'Updated text only',
+      dishReviews: [{ id: 'fish', title: 'fish with lemon', rating: 0.5 }],
+    },
+    first.token,
+  );
+  expect(
+    (await db.doc(`reviews/${created.id}`).get()).get('dishReviews')[0]
+      .canonicalDishId,
+  ).toBe('lemon-sea-bass');
+  await callFunction(
+    'addReviewVisit',
+    {
+      reviewId: created.id,
+      idempotencyKey: 'canonical-revisit-000001',
+      rating: 4.5,
+      text: 'Returned for the same dish',
+      dishReviews: [
+        { id: 'different-local-id', title: 'Sea bass with lemon', rating: 4.5 },
+      ],
+    },
+    first.token,
+  );
+  const current = await db.doc(`reviews/${created.id}`).get();
+  expect(current.get('dishReviews')).toHaveLength(1);
+  expect(current.get('dishReviews')[0].history).toHaveLength(2);
+  expect(
+    (await db.doc('venues/canonical-place').get()).get('reviewCount'),
+  ).toBe(1);
+}, 25_000);
+
+it('restricts canonical approvals to admins, rejects alias conflicts and makes approved names usable', async () => {
+  const { db, first } = await createSocialFixture();
+  const input = {
+    id: 'test-dish',
+    name: 'Test dish',
+    aliases: ['exact test alias'],
+    status: 'active',
+    reason: 'Verified exact recipe identity',
+  };
+  await expect(
+    callFunction('upsertCanonicalDish', input, first.token),
+  ).rejects.toMatchObject({ status: 'PERMISSION_DENIED' });
+  await expect(
+    callFunction('getAdminDishCatalog', {}, first.token),
+  ).rejects.toMatchObject({ status: 'PERMISSION_DENIED' });
+  const custom = await getAuth().createCustomToken('dish-admin', {
+    role: 'admin',
+  });
+  const signed = (await fetch(
+    `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: custom, returnSecureToken: true }),
+    },
+  ).then((r) => r.json())) as { idToken: string };
+  await callFunction('upsertCanonicalDish', input, signed.idToken);
+  expect(
+    await callFunction(
+      'getCanonicalDishes',
+      { query: 'exact test alias' },
+      first.token,
+    ),
+  ).toMatchObject({ exactId: 'test-dish' });
+  await expect(
+    callFunction(
+      'upsertCanonicalDish',
+      { ...input, id: 'other-test-dish', name: 'Different dish' },
+      signed.idToken,
+    ),
+  ).rejects.toMatchObject({ status: 'INVALID_ARGUMENT' });
+  expect((await db.collection('_tasteCatalogAudit').get()).size).toBe(1);
 }, 25_000);

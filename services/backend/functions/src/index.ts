@@ -142,3 +142,12 @@ export {
 export { refreshDiscoverySignals } from './modules/discover/schedules';
 
 export { reconcileReviewCounters } from './modules/reviews/aggregate-schedules';
+
+export {
+  getCanonicalDishes,
+  getTasteRecommendations,
+  upsertCanonicalDish,
+  getAdminDishCatalog,
+} from './modules/taste-match/functions';
+export { indexTasteReview } from './modules/taste-match/projection';
+export { maintainTasteEvidence } from './modules/taste-match/maintenance';

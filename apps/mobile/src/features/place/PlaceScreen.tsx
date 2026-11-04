@@ -1,4 +1,10 @@
 import type { PlaceReview, PlaceReviewSort } from '@tastes/contracts';
+import { useDeviceLocation } from '../discover/deviceLocation';
+import {
+  formatDistanceKm,
+  isDistanceLabel,
+  withDeviceDistance,
+} from '../discover/venueDistance';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import {
   useCallback,
@@ -135,6 +141,7 @@ export function PlaceScreen({
   const reviewsListRef = useRef<FlatList<PlaceReview>>(null);
   const scrollToDishReviewsRef = useRef(false);
   const details = usePlace(venueId);
+  const deviceLocation = useDeviceLocation();
   const reviews = usePlaceReviews(venueId, sort, reviewScope);
   const savedVenue = useSavedVenue(userId, venueId);
   const unsave = useUnsaveVenue(userId);
@@ -206,17 +213,19 @@ export function PlaceScreen({
     : categoryChip;
   const priceChip =
     place.venue.priceLevel == null ? null : '$'.repeat(place.venue.priceLevel);
+  const { distanceKm } = withDeviceDistance(place.venue, deviceLocation);
   const detailChips = place.chips
     .filter(
       (value) =>
         !(
           categoryChip &&
           (value === categoryChip || value.startsWith(categoryChip))
-        ) && !/^\$+$/.test(value),
+        ) &&
+        !/^\$+$/.test(value) &&
+        !isDistanceLabel(value),
     )
-    .slice(0, 2);
-  if (detailChips.length === 0)
-    detailChips.push((place.venue.distanceKm ?? 0).toFixed(1) + ' km');
+    .slice(0, distanceKm == null ? 2 : 1);
+  if (distanceKm != null) detailChips.push(formatDistanceKm(distanceKm));
   const hero = (
     <View style={styles.hero}>
       <PlacePhotoPager

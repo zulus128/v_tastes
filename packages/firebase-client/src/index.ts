@@ -1,4 +1,10 @@
 import type {
+  GetCanonicalDishesInput,
+  CanonicalDishesResult,
+  GetTasteRecommendationsInput,
+  TasteRecommendationsResult,
+} from '@tastes/contracts';
+import type {
   AddCommentInput,
   AskTastesAiInput,
   AppNotification,
@@ -216,6 +222,10 @@ export const callableOperationNames = [
   'setVenueStatus',
   'setVenueFlags',
   'mergeVenues',
+  'getCanonicalDishes',
+  'getTasteRecommendations',
+  'upsertCanonicalDish',
+  'getAdminDishCatalog',
 ] as const;
 
 export type CallableOperationName = (typeof callableOperationNames)[number];
@@ -491,6 +501,16 @@ export function createTastesApi(
     getLeaderboard: (input: GetLeaderboardInput) =>
       invoke<GetLeaderboardInput, Page<LeaderboardEntry>>(
         'getLeaderboard',
+        input,
+      ),
+    getCanonicalDishes: (input: GetCanonicalDishesInput = {}) =>
+      invoke<GetCanonicalDishesInput, CanonicalDishesResult>(
+        'getCanonicalDishes',
+        input,
+      ),
+    getTasteRecommendations: (input: GetTasteRecommendationsInput = {}) =>
+      invoke<GetTasteRecommendationsInput, TasteRecommendationsResult>(
+        'getTasteRecommendations',
         input,
       ),
     getDiscoverFeed: (input: GetDiscoverFeedInput = {}) =>

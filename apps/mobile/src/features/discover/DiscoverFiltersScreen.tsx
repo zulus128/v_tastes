@@ -13,7 +13,9 @@ import { type ThemeColors, useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useAuthenticatedUserId } from '../../session/SessionProvider';
 import { useDiscoverVenues } from './api';
-import { matchesPlaceFilters } from './placeFilters';
+import { useDeviceLocation } from './deviceLocation';
+import { matchesPlaceFilters, type FilterablePlace } from './placeFilters';
+import { withDeviceDistance } from './venueDistance';
 import {
   moveRatingThumb,
   nearestRatingThumb,
@@ -36,6 +38,14 @@ const CUISINES = [
 ] as const;
 const BUDGETS = ['$ 🍞', '$$ 🍝', '$$$ 🥂'] as const;
 const DISTANCES = ['1 km', '3 km', '5 km', 'Any'] as const;
+
+export type PlaceFilterScope = 'discover' | 'saved' | 'reviews';
+
+const FILTER_TITLES: Record<PlaceFilterScope, string> = {
+  discover: 'Filter',
+  saved: 'Filter saved places',
+  reviews: 'Filter reviews',
+};
 const RATING_STEPS = [0, 1, 2, 3, 4, 5] as const;
 
 function encoded(prefix: string, value: string) {
@@ -87,10 +97,15 @@ export function DiscoverFiltersScreen({
   initialValues,
   onApply,
   onBack,
+  previewPlaces,
+  scope = 'discover',
 }: {
   initialValues: string[];
   onApply: (values: string[]) => void;
   onBack: () => void;
+  /** The places these filters apply to, when they are not the Discover list. */
+  previewPlaces?: FilterablePlace[];
+  scope?: PlaceFilterScope;
 }) {
   useEffect(() => {
     Keyboard.dismiss();
@@ -130,9 +145,13 @@ export function DiscoverFiltersScreen({
     ),
   );
 
+  const countsDiscoverVenues = scope === 'discover';
+  const deviceLocation = useDeviceLocation();
+
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+    if (countsDiscoverVenues && hasNextPage && !isFetchingNextPage)
+      void fetchNextPage();
+  }, [countsDiscoverVenues, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   function toggle(value: string) {
     setSelected((current) => {
@@ -165,10 +184,19 @@ export function DiscoverFiltersScreen({
   }
 
   const previewValues = valuesForSelection();
-  const resultCount =
-    venuesQuery.data?.pages
-      .flatMap((page) => page.items)
-      .filter((venue) => matchesPlaceFilters(venue, previewValues)).length ?? 0;
+  const candidates: FilterablePlace[] =
+    previewPlaces ??
+    venuesQuery.data?.pages.flatMap((page) => page.items) ??
+    [];
+  const resultCount = candidates
+    .map((place) => withDeviceDistance(place, deviceLocation))
+    .filter((place) => matchesPlaceFilters(place, previewValues)).length;
+  const applyLabel =
+    scope === 'reviews'
+      ? 'Show reviews'
+      : scope === 'discover' && venuesQuery.isPending
+        ? 'Show places'
+        : `Show ${resultCount} ${resultCount === 1 ? 'place' : 'places'}`;
 
   return (
     <View style={styles.screen}>
@@ -186,7 +214,7 @@ export function DiscoverFiltersScreen({
         >
           <BackIcon color={colors.text} />
         </Pressable>
-        <Text style={styles.title}>Filter</Text>
+        <Text style={styles.title}>{FILTER_TITLES[scope]}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -307,11 +335,7 @@ export function DiscoverFiltersScreen({
         </Pressable>
         <Pressable onPress={apply} style={styles.applyButton}>
           <CheckIcon />
-          <Text style={styles.applyText}>
-            {venuesQuery.isPending
-              ? 'Show places'
-              : `Show ${resultCount} places`}
-          </Text>
+          <Text style={styles.applyText}>{applyLabel}</Text>
         </Pressable>
       </View>
     </View>
