@@ -19,7 +19,8 @@
     "users:migrate-private": "node lib/scripts/migrate-private-users.js",
     "staff:set-role": "node lib/scripts/set-staff-role.js",
     "reviews:merge-history": "node lib/scripts/merge-historical-review-visits.js",
-    "discover:shadow": "node lib/scripts/calculate-discovery-shadow.js"
+    "discover:shadow": "node lib/scripts/calculate-discovery-shadow.js",
+    "reviews:normalize-ratings": "node lib/scripts/normalize-review-ratings.js"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",

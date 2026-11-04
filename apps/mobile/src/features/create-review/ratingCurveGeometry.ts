@@ -27,7 +27,7 @@ export function reviewHeroMinimumHeight(
   return Math.max(baseHeight, minimumStraightBottom + ratingAreaHeight);
 }
 
-const minimumRating = 1;
+const minimumRating = 0.5;
 const maximumRating = 5;
 const ratingStep = 0.5;
 const dishRatingCanvasWidth = 402;
@@ -106,11 +106,23 @@ export function concentricRatingLayout(
   };
 }
 
+// Keep the established three-star centre and upper arc positions while extending
+// the lower half to the founder-approved half-star minimum.
+function progressForRating(rating: number) {
+  const value = clamp(rating, minimumRating, maximumRating);
+  return value <= 3
+    ? ((value - minimumRating) / (3 - minimumRating)) * 0.5
+    : 0.5 + ((value - 3) / 2) * 0.5;
+}
+function ratingForProgress(progress: number) {
+  return progress <= 0.5
+    ? minimumRating + (progress / 0.5) * (3 - minimumRating)
+    : 3 + ((progress - 0.5) / 0.5) * 2;
+}
+
 /** Returns the exact point on the rating arc for a potentially fractional rating. */
 export function ratingCurvePoint(rating: number, geometry = defaultRatingArc) {
-  const progress =
-    (clamp(rating, minimumRating, maximumRating) - minimumRating) /
-    (maximumRating - minimumRating);
+  const progress = progressForRating(rating);
   const angle =
     geometry.leftAngle + (geometry.rightAngle - geometry.leftAngle) * progress;
   return {
@@ -138,7 +150,7 @@ export function ratingForCurvePoint(
     .sort((left, right) => left.distance - right.distance)[0].projected;
   const progress =
     (geometry.leftAngle - angle) / (geometry.leftAngle - geometry.rightAngle);
-  return minimumRating + progress * (maximumRating - minimumRating);
+  return ratingForProgress(progress);
 }
 
 /** Converts a curve-local horizontal position into a continuous rating. */
@@ -151,7 +163,7 @@ export function ratingForCurveX(x: number, geometry = defaultRatingArc) {
   );
   const progress =
     (geometry.leftAngle - angle) / (geometry.leftAngle - geometry.rightAngle);
-  return minimumRating + progress * (maximumRating - minimumRating);
+  return ratingForProgress(progress);
 }
 
 /** Returns whether a touch is close enough to the visible arc to begin dragging. */

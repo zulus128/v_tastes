@@ -142,7 +142,7 @@ export const venueSchema = z.object({
 export const reviewVisitSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
-  rating: z.number().min(1).max(5),
+  rating: z.number().min(0.5).max(5),
   text: z.string(),
 });
 const dishRatingHistorySchema = z.object({
@@ -163,7 +163,7 @@ export const reviewSchema = z.object({
   venueName: z.string().min(1),
   venueCity: z.string().min(1).optional(),
   cuisine: z.string().min(1).optional(),
-  rating: z.number().min(1).max(5),
+  rating: z.number().min(0.5).max(5),
   text: z.string().min(1).max(2_000),
   tags: z
     .array(
@@ -229,6 +229,13 @@ export const reviewTagSchema = z.enum([
   'children',
 ]);
 
+// Normalize older clients' decimal ratings while persisting half-star values.
+export const individualRatingInputSchema = z
+  .number()
+  .min(0.5)
+  .max(5)
+  .transform((value) => Math.round(value * 2) / 2);
+
 export const dishReviewInputSchema = z.object({
   id: z
     .string()
@@ -241,7 +248,7 @@ export const dishReviewInputSchema = z.object({
     .trim()
     .min(1, 'Enter the dish name.')
     .max(120, 'The dish name must be at most 120 characters long.'),
-  rating: z.number().min(0.5).max(5),
+  rating: individualRatingInputSchema,
   photoPath: z
     .string()
     .trim()
@@ -265,7 +272,7 @@ export const dishReviewInputSchema = z.object({
 export const createReviewInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   venueId: z.string().min(1),
-  rating: z.number().min(1).max(5),
+  rating: individualRatingInputSchema,
   text: z.string().trim().min(1).max(2_000),
   tags: z.array(reviewTagSchema).max(4).default([]),
   dishReviews: z.array(dishReviewInputSchema).max(5).default([]),
