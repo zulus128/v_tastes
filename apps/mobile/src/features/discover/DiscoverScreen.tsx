@@ -1,3 +1,5 @@
+import { useTasteRecommendations } from '../taste-match/api';
+import { TasteForYou } from '../taste-match/TasteForYou';
 import type { DiscoverFeed, DiscoverPerson, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import { useFocusEffect } from '@react-navigation/native';
@@ -261,14 +263,6 @@ function joinedLabel(iso: string): string {
   if (days <= 0) return 'joined Today';
   if (days === 1) return 'joined 1d ago';
   return `joined ${days}d ago`;
-}
-
-function forYouReason(venue: Venue, index: number): string {
-  if (venue.recommendationReason) return venue.recommendationReason;
-  if (!venue.category) return 'Popular near you';
-  return index % 2 === 0
-    ? `Because you ❤️ ${venue.category}`
-    : `Popular ${venue.category} pick`;
 }
 
 function venueToPlace(venue: Venue): Place {
@@ -649,6 +643,8 @@ function TrendingFeed({
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
+  const tasteQuery = useTasteRecommendations();
+  const tasteCardCount = tasteQuery.data?.recommendations.length ?? 0;
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width: viewportWidth } = useWindowDimensions();
@@ -677,7 +673,7 @@ function TrendingFeed({
         contentWidth,
         layoutScale,
         240,
-        feed.forYou.length,
+        tasteCardCount,
       ),
       gemCardWidth: wrapWidth(280, 2),
       gridCardWidth: wrapWidth(179, 4),
@@ -690,7 +686,7 @@ function TrendingFeed({
         feed.trending.length,
       ),
     };
-  }, [contentWidth, feed.forYou.length, feed.trending.length, layoutScale]);
+  }, [contentWidth, tasteCardCount, feed.trending.length, layoutScale]);
   const [reactedReviews, setReactedReviews] = useState<Set<string>>(new Set());
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(
     {},
@@ -724,7 +720,10 @@ function TrendingFeed({
       refreshControl={
         <RefreshControl
           colors={[colors.primary]}
-          onRefresh={onRefresh}
+          onRefresh={() => {
+            onRefresh();
+            void tasteQuery.refetch();
+          }}
           refreshing={refreshing}
           tintColor={colors.primary}
         />
@@ -791,30 +790,12 @@ function TrendingFeed({
         </>
       ) : null}
 
-      {feed.forYou.length > 0 ? (
-        <>
-          <SectionLabel
-            title="For you"
-            subtitle="Picked from your tastes & saves"
-          />
-          <ScrollView
-            contentContainerStyle={styles.horizontalContent}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {feed.forYou.map((venue, index) => (
-              <ForYouCard
-                image={venueImage(venue.imageUrl)}
-                key={venue.id}
-                onOpen={() => onOpenPlace(venue.id)}
-                place={venueToPlace(venue)}
-                reason={forYouReason(venue, index)}
-                width={forYouCardWidth}
-              />
-            ))}
-          </ScrollView>
-        </>
-      ) : null}
+      <TasteForYou
+        onOpenPlace={onOpenPlace}
+        onOpenReview={onOpenComments}
+        width={forYouCardWidth}
+        data={tasteQuery.data}
+      />
 
       {feed.newSpots.length > 0 ? (
         <>
@@ -2827,47 +2808,6 @@ function TopReviewer({
         </Pressable>
       </View>
     </LinearGradient>
-  );
-}
-
-function ForYouCard({
-  image,
-  onOpen,
-  place,
-  reason,
-  width,
-}: {
-  image: ImageSourcePropType;
-  onOpen: () => void;
-  place: Place;
-  reason: string;
-  width: number;
-}) {
-  const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <Pressable onPress={onOpen} style={[styles.forYouCard, { width }]}>
-      <Image source={image} style={styles.coverImage} />
-      <LinearGradient
-        colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.94)']}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.reasonChip}>
-        <Text style={styles.reasonText}>{reason}</Text>
-      </View>
-      <View style={styles.forYouCopy}>
-        <Text numberOfLines={2} style={styles.forYouTitle}>
-          {place.name}
-        </Text>
-        <Text style={styles.forYouMeta}>
-          {place.category} · {place.distance}
-        </Text>
-        <View style={styles.inlineMeta}>
-          <RatingPill value={place.rating} />
-          <Text style={styles.imageMetaText}>{place.reviews}</Text>
-        </View>
-      </View>
-    </Pressable>
   );
 }
 

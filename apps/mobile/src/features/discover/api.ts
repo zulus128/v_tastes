@@ -201,6 +201,9 @@ export function useToggleFollow(userId: string) {
         void offerPushNotificationsAfterEngagement(api, 'follow');
       await Promise.all([
         queryClient.invalidateQueries({
+          queryKey: ['taste-recommendations', userId],
+        }),
+        queryClient.invalidateQueries({
           queryKey: discoverFeedQueryKey(userId),
         }),
         queryClient.invalidateQueries({

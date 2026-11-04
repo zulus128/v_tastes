@@ -1,5 +1,11 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import type { Ref } from 'react';
+import {
+  act,
+  fireEvent,
+  render as nativeRender,
+  screen,
+} from '@testing-library/react-native';
+import type { Ref, ReactElement, PropsWithChildren } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   Animated,
   Dimensions,
@@ -9,6 +15,54 @@ import {
 } from 'react-native';
 import { DiscoverScreen } from '../src/features/discover/DiscoverScreen';
 import { responsiveSize } from '../src/ui/responsive';
+
+const mockQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+});
+function TestQueryProvider({ children }: PropsWithChildren) {
+  return (
+    <QueryClientProvider client={mockQueryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+const render = (ui: ReactElement) =>
+  nativeRender(ui, { wrapper: TestQueryProvider });
+jest.mock('../src/infrastructure/storageImage', () => ({
+  resolveStorageImageUrl: jest.fn(),
+}));
+jest.mock('../src/features/taste-match/api', () => ({
+  useTasteRecommendations: () => ({
+    data: {
+      state: 'personalized',
+      distinctRatedDishes: 5,
+      requiredDishCount: 5,
+      matchedUserCount: 1,
+      recommendations: Array.from(
+        { length: mockCarouselCount },
+        (_, index) => ({
+          id: `taste-${index}`,
+          canonicalDishId: `dish-${index}`,
+          canonicalDishName: `Recommended dish ${index}`,
+          venue: {
+            id: `for-you-${index}`,
+            name: `For you place ${index}`,
+            city: 'Istanbul',
+            status: 'active',
+          },
+          dishRating: 4.5,
+          tier: 'taste_match',
+          confidence: 'limited',
+          supporterCount: 1,
+          reviewerCount: 1,
+          headline: 'A person with similar dish ratings recommended this dish.',
+          connection: null,
+          reviewId: `evidence-${index}`,
+        }),
+      ),
+    },
+  }),
+}));
 
 const mockInsets = { top: 0, right: 47, bottom: 21, left: 47 };
 let mockCarouselCount = 0;
@@ -313,7 +367,6 @@ describe('Discover responsive content', () => {
 
       const carousels = [
         { title: 'Trending place 0', designWidth: 200, designHeight: 200 },
-        { title: 'For you place 0', designWidth: 240, designHeight: 280 },
       ];
       carousels.forEach(({ title, designWidth, designHeight }) => {
         const card = screen.getByText(title).parent!.parent!;
@@ -332,6 +385,14 @@ describe('Discover responsive content', () => {
         expect(cardStyle.height).toBe(responsiveSize(designHeight));
       });
 
+      const tasteWidth = StyleSheet.flatten(
+        screen.getAllByTestId('taste-recommendation-card')[0]!.props.style,
+      ).width;
+      expect(
+        tasteWidth * count +
+          responsiveSize(10) * (count - 1) +
+          responsiveSize(16) * 2,
+      ).toBeCloseTo(1376 - mockInsets.left - mockInsets.right);
       await act(() => resize(402, 874));
 
       carousels.forEach(({ title, designWidth, designHeight }) => {
@@ -363,7 +424,7 @@ describe('Discover responsive content', () => {
     ).toBe(responsiveSize(200));
     expect(
       StyleSheet.flatten(
-        screen.getByText('For you place 0').parent!.parent!.props.style,
+        screen.getAllByTestId('taste-recommendation-card')[0]!.props.style,
       ).width,
     ).toBe(responsiveSize(240));
   });

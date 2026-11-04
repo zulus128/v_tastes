@@ -20,7 +20,11 @@ export function appendReviewVisit(input: {
     if (seen.has(key)) throw new Error('Choose each dish only once per visit.');
     seen.add(key);
     const index = dishes.findIndex(
-      (dish) => dish.id === change.id || dishKey(dish.title) === key,
+      (dish) =>
+        dish.id === change.id ||
+        dishKey(dish.title) === key ||
+        (Boolean(change.canonicalDishId) &&
+          dish.canonicalDishId === change.canonicalDishId),
     );
     const previous = index >= 0 ? dishes[index] : undefined;
     const history = previous?.history ?? [];

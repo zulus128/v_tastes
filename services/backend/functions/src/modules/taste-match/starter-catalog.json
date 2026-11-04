@@ -1,0 +1,72 @@
+[
+  {
+    "id": "cacio-e-pepe",
+    "name": "Cacio e pepe",
+    "aliases": ["pici cacio e pepe", "cacio & pepe"]
+  },
+  {
+    "id": "margherita-pizza",
+    "name": "Margherita pizza",
+    "aliases": ["pizza margherita"]
+  },
+  {
+    "id": "patatas-bravas",
+    "name": "Patatas bravas",
+    "aliases": ["papas bravas"]
+  },
+  {
+    "id": "mushroom-risotto",
+    "name": "Mushroom risotto",
+    "aliases": ["risotto ai funghi"]
+  },
+  {
+    "id": "tiramisu",
+    "name": "Tiramisu",
+    "aliases": ["tiramisù"]
+  },
+  {
+    "id": "pesto-pasta",
+    "name": "Pesto pasta",
+    "aliases": ["pasta al pesto", "trofie al pesto"]
+  },
+  {
+    "id": "carbonara",
+    "name": "Carbonara",
+    "aliases": ["spaghetti alla carbonara", "pasta carbonara"]
+  },
+  {
+    "id": "vegan-carbonara",
+    "name": "Vegan carbonara",
+    "aliases": ["plant based carbonara"]
+  },
+  {
+    "id": "burrata",
+    "name": "Burrata",
+    "aliases": []
+  },
+  {
+    "id": "lemon-sea-bass",
+    "name": "Sea bass with lemon",
+    "aliases": ["seabass with lemon", "branzino al limone"]
+  },
+  {
+    "id": "grilled-sea-bass",
+    "name": "Grilled sea bass",
+    "aliases": ["grilled seabass"]
+  },
+  {
+    "id": "lobster-roll",
+    "name": "Lobster roll",
+    "aliases": []
+  },
+  {
+    "id": "xiao-long-bao",
+    "name": "Xiao long bao",
+    "aliases": ["xiaolongbao"]
+  },
+  {
+    "id": "beef-ragu",
+    "name": "Beef ragu pasta",
+    "aliases": ["pappardelle with beef ragu"]
+  }
+]

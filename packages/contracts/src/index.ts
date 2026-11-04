@@ -1,3 +1,5 @@
+import { canonicalDishSelectionSchema } from './taste-match';
+export * from './taste-match';
 import { z } from 'zod';
 import {
   notificationCategoryPreferencesSchema,
@@ -206,6 +208,10 @@ export const reviewSchema = z.object({
           .min(1)
           .max(128)
           .regex(/^[a-zA-Z0-9._:-]+$/),
+        ...canonicalDishSelectionSchema.shape,
+        canonicalDishName: z.string().optional(),
+        taxonomyVersion: z.string().optional(),
+        ratedAt: z.string().optional(),
         title: z.string().trim().min(1).max(120),
         rating: z.number().min(0.5).max(5),
         photoPath: z.string().trim().min(1).max(512).optional(),
@@ -251,6 +257,7 @@ export const individualRatingInputSchema = z
   .transform((value) => Math.round(value * 2) / 2);
 
 export const dishReviewInputSchema = z.object({
+  ...canonicalDishSelectionSchema.shape,
   id: z
     .string()
     .trim()

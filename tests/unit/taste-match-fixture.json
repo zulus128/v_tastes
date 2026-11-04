@@ -1,0 +1,553 @@
+{
+  "taxonomy": {
+    "version": "demo-taxonomy-v1",
+    "dishes": [
+      {
+        "id": "cacio-e-pepe",
+        "name": "Cacio e pepe",
+        "aliases": ["pici cacio e pepe", "cacio & pepe"]
+      },
+      {
+        "id": "margherita-pizza",
+        "name": "Margherita pizza",
+        "aliases": ["pizza margherita"]
+      },
+      {
+        "id": "patatas-bravas",
+        "name": "Patatas bravas",
+        "aliases": ["papas bravas"]
+      },
+      {
+        "id": "mushroom-risotto",
+        "name": "Mushroom risotto",
+        "aliases": ["risotto ai funghi"]
+      },
+      {
+        "id": "tiramisu",
+        "name": "Tiramisu",
+        "aliases": ["tiramisù"]
+      },
+      {
+        "id": "pesto-pasta",
+        "name": "Pesto pasta",
+        "aliases": ["pasta al pesto", "trofie al pesto"]
+      },
+      {
+        "id": "carbonara",
+        "name": "Carbonara",
+        "aliases": ["spaghetti alla carbonara", "pasta carbonara"]
+      },
+      {
+        "id": "vegan-carbonara",
+        "name": "Vegan carbonara",
+        "aliases": ["plant based carbonara"]
+      },
+      {
+        "id": "burrata",
+        "name": "Burrata",
+        "aliases": []
+      },
+      {
+        "id": "lemon-sea-bass",
+        "name": "Sea bass with lemon",
+        "aliases": ["seabass with lemon", "branzino al limone"]
+      },
+      {
+        "id": "grilled-sea-bass",
+        "name": "Grilled sea bass",
+        "aliases": ["grilled seabass"]
+      },
+      {
+        "id": "lobster-roll",
+        "name": "Lobster roll",
+        "aliases": []
+      },
+      {
+        "id": "xiao-long-bao",
+        "name": "Xiao long bao",
+        "aliases": ["xiaolongbao"]
+      },
+      {
+        "id": "beef-ragu",
+        "name": "Beef ragu pasta",
+        "aliases": ["pappardelle with beef ragu"]
+      }
+    ]
+  },
+  "users": [
+    {
+      "id": "winston",
+      "displayName": "Winston"
+    },
+    {
+      "id": "sofia",
+      "displayName": "Sofia"
+    },
+    {
+      "id": "marco",
+      "displayName": "Marco"
+    },
+    {
+      "id": "amara",
+      "displayName": "Amara"
+    },
+    {
+      "id": "leo",
+      "displayName": "Leo"
+    },
+    {
+      "id": "new-with-friends",
+      "displayName": "New user with friends"
+    },
+    {
+      "id": "brand-new",
+      "displayName": "Brand new user"
+    },
+    {
+      "id": "local-0",
+      "displayName": "Local reviewer 1"
+    },
+    {
+      "id": "local-1",
+      "displayName": "Local reviewer 2"
+    },
+    {
+      "id": "local-2",
+      "displayName": "Local reviewer 3"
+    },
+    {
+      "id": "local-3",
+      "displayName": "Local reviewer 4"
+    }
+  ],
+  "venues": [
+    {
+      "id": "first-table",
+      "name": "First Table",
+      "city": "Rome",
+      "location": {
+        "lat": 41.895,
+        "lng": 12.472
+      }
+    },
+    {
+      "id": "via-sole",
+      "name": "Via Sole",
+      "city": "Milan",
+      "location": {
+        "lat": 45.466,
+        "lng": 9.19
+      }
+    },
+    {
+      "id": "garden-kitchen",
+      "name": "Garden Kitchen",
+      "city": "London",
+      "location": {
+        "lat": 51.513,
+        "lng": -0.13
+      }
+    },
+    {
+      "id": "casa-verde",
+      "name": "Casa Verde",
+      "city": "Rome",
+      "location": {
+        "lat": 41.889,
+        "lng": 12.473
+      }
+    },
+    {
+      "id": "osteria-luna",
+      "name": "Osteria Luna",
+      "city": "Rome",
+      "location": {
+        "lat": 41.899,
+        "lng": 12.48
+      }
+    },
+    {
+      "id": "courtyard",
+      "name": "The Courtyard",
+      "city": "Rome",
+      "location": {
+        "lat": 41.892,
+        "lng": 12.474
+      }
+    },
+    {
+      "id": "far-away",
+      "name": "Faraway Table",
+      "city": "Milan",
+      "location": {
+        "lat": 45.47,
+        "lng": 9.19
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "fromUserId": "winston",
+      "toUserId": "sofia",
+      "type": "friend"
+    },
+    {
+      "fromUserId": "winston",
+      "toUserId": "marco",
+      "type": "follow"
+    },
+    {
+      "fromUserId": "new-with-friends",
+      "toUserId": "sofia",
+      "type": "follow"
+    }
+  ],
+  "ratings": [
+    {
+      "id": "rating-1",
+      "userId": "winston",
+      "canonicalDishId": "cacio-e-pepe",
+      "venueId": "first-table",
+      "rating": 4.7,
+      "ratedAt": 1792886400000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-2",
+      "userId": "winston",
+      "canonicalDishId": "margherita-pizza",
+      "venueId": "first-table",
+      "rating": 4.5,
+      "ratedAt": 1792800000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-3",
+      "userId": "winston",
+      "canonicalDishId": "patatas-bravas",
+      "venueId": "first-table",
+      "rating": 4.3,
+      "ratedAt": 1792713600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-4",
+      "userId": "winston",
+      "canonicalDishId": "mushroom-risotto",
+      "venueId": "first-table",
+      "rating": 2.2,
+      "ratedAt": 1792627200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-5",
+      "userId": "winston",
+      "canonicalDishId": "tiramisu",
+      "venueId": "first-table",
+      "rating": 4.6,
+      "ratedAt": 1792540800000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-6",
+      "userId": "sofia",
+      "canonicalDishId": "cacio-e-pepe",
+      "venueId": "via-sole",
+      "rating": 4.6,
+      "ratedAt": 1793059200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-7",
+      "userId": "sofia",
+      "canonicalDishId": "margherita-pizza",
+      "venueId": "via-sole",
+      "rating": 4.7,
+      "ratedAt": 1792972800000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-8",
+      "userId": "sofia",
+      "canonicalDishId": "patatas-bravas",
+      "venueId": "via-sole",
+      "rating": 4.3,
+      "ratedAt": 1792886400000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-9",
+      "userId": "sofia",
+      "canonicalDishId": "mushroom-risotto",
+      "venueId": "via-sole",
+      "rating": 2.4,
+      "ratedAt": 1792800000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-10",
+      "userId": "sofia",
+      "canonicalDishId": "tiramisu",
+      "venueId": "via-sole",
+      "rating": 4.5,
+      "ratedAt": 1792713600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-11",
+      "userId": "marco",
+      "canonicalDishId": "cacio-e-pepe",
+      "venueId": "garden-kitchen",
+      "rating": 4.5,
+      "ratedAt": 1793059200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-12",
+      "userId": "marco",
+      "canonicalDishId": "margherita-pizza",
+      "venueId": "garden-kitchen",
+      "rating": 4.6,
+      "ratedAt": 1792972800000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-13",
+      "userId": "marco",
+      "canonicalDishId": "patatas-bravas",
+      "venueId": "garden-kitchen",
+      "rating": 4.5,
+      "ratedAt": 1792886400000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-14",
+      "userId": "marco",
+      "canonicalDishId": "mushroom-risotto",
+      "venueId": "garden-kitchen",
+      "rating": 2.1,
+      "ratedAt": 1792800000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-15",
+      "userId": "marco",
+      "canonicalDishId": "tiramisu",
+      "venueId": "garden-kitchen",
+      "rating": 4.7,
+      "ratedAt": 1792713600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-16",
+      "userId": "amara",
+      "canonicalDishId": "cacio-e-pepe",
+      "venueId": "via-sole",
+      "rating": 4.7,
+      "ratedAt": 1793059200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-17",
+      "userId": "amara",
+      "canonicalDishId": "margherita-pizza",
+      "venueId": "via-sole",
+      "rating": 4.5,
+      "ratedAt": 1792972800000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-18",
+      "userId": "amara",
+      "canonicalDishId": "patatas-bravas",
+      "venueId": "via-sole",
+      "rating": 4.4,
+      "ratedAt": 1792886400000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-19",
+      "userId": "amara",
+      "canonicalDishId": "mushroom-risotto",
+      "venueId": "via-sole",
+      "rating": 2.3,
+      "ratedAt": 1792800000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-20",
+      "userId": "amara",
+      "canonicalDishId": "tiramisu",
+      "venueId": "via-sole",
+      "rating": 4.8,
+      "ratedAt": 1792713600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-21",
+      "userId": "leo",
+      "canonicalDishId": "cacio-e-pepe",
+      "venueId": "via-sole",
+      "rating": 1.5,
+      "ratedAt": 1793059200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-22",
+      "userId": "leo",
+      "canonicalDishId": "margherita-pizza",
+      "venueId": "via-sole",
+      "rating": 2,
+      "ratedAt": 1792972800000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-23",
+      "userId": "leo",
+      "canonicalDishId": "patatas-bravas",
+      "venueId": "via-sole",
+      "rating": 1.7,
+      "ratedAt": 1792886400000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-24",
+      "userId": "leo",
+      "canonicalDishId": "mushroom-risotto",
+      "venueId": "via-sole",
+      "rating": 5,
+      "ratedAt": 1792800000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-25",
+      "userId": "leo",
+      "canonicalDishId": "tiramisu",
+      "venueId": "via-sole",
+      "rating": 2,
+      "ratedAt": 1792713600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-26",
+      "userId": "sofia",
+      "canonicalDishId": "pesto-pasta",
+      "venueId": "casa-verde",
+      "rating": 4.9,
+      "ratedAt": 1793577600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-27",
+      "userId": "marco",
+      "canonicalDishId": "pesto-pasta",
+      "venueId": "casa-verde",
+      "rating": 4.7,
+      "ratedAt": 1793577600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-28",
+      "userId": "amara",
+      "canonicalDishId": "pesto-pasta",
+      "venueId": "casa-verde",
+      "rating": 4.8,
+      "ratedAt": 1793577600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-29",
+      "userId": "sofia",
+      "canonicalDishId": "carbonara",
+      "venueId": "osteria-luna",
+      "rating": 4.8,
+      "ratedAt": 1793491200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-30",
+      "userId": "marco",
+      "canonicalDishId": "carbonara",
+      "venueId": "osteria-luna",
+      "rating": 4.6,
+      "ratedAt": 1793491200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-31",
+      "userId": "amara",
+      "canonicalDishId": "carbonara",
+      "venueId": "osteria-luna",
+      "rating": 4.9,
+      "ratedAt": 1793491200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-32",
+      "userId": "sofia",
+      "canonicalDishId": "lemon-sea-bass",
+      "venueId": "casa-verde",
+      "rating": 4.6,
+      "ratedAt": 1793664000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-33",
+      "userId": "sofia",
+      "canonicalDishId": "lobster-roll",
+      "venueId": "far-away",
+      "rating": 5,
+      "ratedAt": 1793664000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-34",
+      "userId": "local-0",
+      "canonicalDishId": "burrata",
+      "venueId": "courtyard",
+      "rating": 4.3,
+      "ratedAt": 1793664000000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-35",
+      "userId": "local-1",
+      "canonicalDishId": "burrata",
+      "venueId": "courtyard",
+      "rating": 4.3999999999999995,
+      "ratedAt": 1793577600000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-36",
+      "userId": "local-2",
+      "canonicalDishId": "burrata",
+      "venueId": "courtyard",
+      "rating": 4.5,
+      "ratedAt": 1793491200000,
+      "visibility": "public"
+    },
+    {
+      "id": "rating-37",
+      "userId": "local-3",
+      "canonicalDishId": "burrata",
+      "venueId": "courtyard",
+      "rating": 4.6,
+      "ratedAt": 1793404800000,
+      "visibility": "public"
+    }
+  ],
+  "externalPlaces": [
+    {
+      "placeId": "FICTIONAL_GOOGLE_PLACE",
+      "name": "Demo external restaurant",
+      "city": "Rome",
+      "location": {
+        "lat": 41.892,
+        "lng": 12.477
+      },
+      "rating": 4.4,
+      "attributions": ["Demo only; not Google data"]
+    }
+  ]
+}

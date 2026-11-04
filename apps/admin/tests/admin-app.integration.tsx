@@ -45,6 +45,7 @@ vi.mock('../infrastructure/firebase', () => ({
 }));
 
 import { AdminApp } from '../components/AdminApp';
+import { DishCatalogControls } from '../components/DishCatalogControls';
 import { CommunityControls } from '../components/CommunityControls';
 
 const overview = {
@@ -113,7 +114,9 @@ describe('AdminApp authentication boundary', () => {
       email: 'admin@tastes.com',
       getIdTokenResult: async () => ({ claims: { role: 'admin' } }),
     };
-    mocks.callAdmin.mockResolvedValue(overview);
+    mocks.callAdmin.mockImplementation(async (name: string) =>
+      name === 'getAdminDishCatalog' ? { dishes: [], pending: [] } : overview,
+    );
 
     render(<AdminApp />);
 
@@ -135,7 +138,9 @@ describe('AdminApp authentication boundary', () => {
       email: 'admin@tastes.com',
       getIdTokenResult: () => tokenResult,
     };
-    mocks.callAdmin.mockResolvedValue(overview);
+    mocks.callAdmin.mockImplementation(async (name: string) =>
+      name === 'getAdminDishCatalog' ? { dishes: [], pending: [] } : overview,
+    );
 
     render(<AdminApp />);
     expect(
@@ -244,6 +249,49 @@ describe('AdminApp authentication boundary', () => {
           reason: 'Editorial review',
         },
       ),
+    );
+  });
+});
+
+describe('canonical catalogue controls', () => {
+  afterEach(() => cleanup());
+  it('requires a reason and submits only the explicitly approved identity and aliases', async () => {
+    mocks.callAdmin.mockReset();
+    mocks.callAdmin.mockImplementation(async (operation: string) =>
+      operation === 'getAdminDishCatalog'
+        ? {
+            dishes: [],
+            pending: [{ id: 'pending', rawName: 'Pasta al pesto' }],
+          }
+        : { id: 'pesto-pasta' },
+    );
+    render(<DishCatalogControls />);
+    await screen.findByText('Pasta al pesto');
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare for review' }));
+    fireEvent.change(screen.getByLabelText('Stable dish ID'), {
+      target: { value: 'pesto-pasta' },
+    });
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Approve dish and aliases',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText('Reason for approval'), {
+      target: { value: 'Confirmed exact approved alias' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Approve dish and aliases' }),
+    );
+    await waitFor(() =>
+      expect(mocks.callAdmin).toHaveBeenCalledWith('upsertCanonicalDish', {
+        id: 'pesto-pasta',
+        name: 'Pasta al pesto',
+        aliases: ['Pasta al pesto'],
+        status: 'active',
+        reason: 'Confirmed exact approved alias',
+      }),
     );
   });
 });

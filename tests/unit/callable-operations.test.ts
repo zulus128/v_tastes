@@ -11,6 +11,8 @@ const nonCallableExports = new Set([
   'refreshLeaderboardStandings',
   'refreshDiscoverySignals',
   'reconcileReviewCounters',
+  'indexTasteReview',
+  'maintainTasteEvidence',
   'reinstateExpiredSuspensions',
   'resetMonthlyXp',
   'sendMonthlyRecapNotifications',

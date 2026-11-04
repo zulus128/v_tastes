@@ -1,3 +1,4 @@
+import { CanonicalDishPicker } from '../taste-match/CanonicalDishPicker';
 import { DishPhoto } from '../reviews/DishReviewSheet';
 import type { ReviewTag, Venue } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
@@ -573,6 +574,13 @@ export function CreateReviewScreen({
                           rating: dish.rating,
                           photoUri: '',
                           previousPhotoUri: dish.photoUrl ?? dish.thumbnailUrl,
+                          ...(dish.canonicalDishId
+                            ? {
+                                canonicalDishId: dish.canonicalDishId,
+                                canonicalDishConfirmed:
+                                  dish.canonicalDishConfirmed === true,
+                              }
+                            : {}),
                           previousPhotoPath:
                             dish.photoPath ?? dish.thumbnailPath,
                         })
@@ -2367,6 +2375,22 @@ function DishEditor({
                 placeholderTextColor={colors.placeholder}
                 style={styles.input}
                 value={draft.title}
+              />
+              <CanonicalDishPicker
+                title={draft.title}
+                {...(draft.canonicalDishId
+                  ? { selectedId: draft.canonicalDishId }
+                  : {})}
+                onSelect={(canonicalDishId) =>
+                  setDraft((current) =>
+                    current
+                      ? updateDishReviewDraft(current, {
+                          canonicalDishId,
+                          canonicalDishConfirmed: true,
+                        })
+                      : current,
+                  )
+                }
               />
             </View>
           </ScrollView>
