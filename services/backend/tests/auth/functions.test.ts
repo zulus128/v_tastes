@@ -1680,6 +1680,8 @@ describe('messaging callables', () => {
           latitude: 41.015,
           longitude: 28.98,
           rating: 4.8,
+          reviewCount: 58,
+          imageUrl: 'https://example.com/venue.jpg',
           priceLevel: 3,
           placeTags: ['romantic', 'date-night'],
         }),
@@ -1812,7 +1814,12 @@ describe('messaging callables', () => {
     });
     await catalogBatch.commit();
     const answer = await callFunction<{
-      places: Array<{ id: string; distanceKm: number | null }>;
+      places: Array<{
+        id: string;
+        distanceKm: number | null;
+        reviewCount: number;
+        imageUrl: string | null;
+      }>;
     }>(
       'askTastesAi',
       {
@@ -1823,7 +1830,11 @@ describe('messaging callables', () => {
       },
       user.token,
     );
-    expect(answer.places[0]).toMatchObject({ id: 'nearby-sushi' });
+    expect(answer.places[0]).toMatchObject({
+      id: 'nearby-sushi',
+      reviewCount: 58,
+      imageUrl: 'https://example.com/venue.jpg',
+    });
     expect(answer.places.some((place) => place.id === 'far-sushi')).toBe(false);
     expect(
       answer.places.some((place) => place.id === 'unknown-coordinates'),

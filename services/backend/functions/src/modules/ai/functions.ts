@@ -143,6 +143,14 @@ export const askTastesAi = onCall(
           name: String(document.get('name') ?? 'Local restaurant'),
           description: `${category} in ${city}, rated ${rating.toFixed(1)} by the Tastes community${distance === null ? '' : ` · ${distance.toFixed(1)} km away`}.`,
           rating,
+          reviewCount: Math.max(
+            0,
+            Math.trunc(Number(document.get('reviewCount') ?? 0)),
+          ),
+          imageUrl:
+            typeof document.get('imageUrl') === 'string'
+              ? String(document.get('imageUrl'))
+              : null,
           price: '$'.repeat(priceLevel),
           cuisine: category,
           distanceKm: distance === null ? null : Number(distance.toFixed(1)),

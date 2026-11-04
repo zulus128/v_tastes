@@ -904,6 +904,8 @@ export interface TastesAiPlace {
   price: string;
   cuisine: string;
   distanceKm: number | null;
+  reviewCount?: number;
+  imageUrl?: string | null;
 }
 
 export interface TastesAiAnswer {
