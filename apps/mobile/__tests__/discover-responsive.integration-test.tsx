@@ -105,13 +105,13 @@ jest.mock('../src/features/discover/api', () => ({
   }),
   useVenueSearch: () => ({ data: { items: [] } }),
   useDiscoverPeople: () => ({ data: { people: [] } }),
+  usePeopleSearch: () => ({ data: undefined }),
 }));
 
 const props = {
   appliedFilters: [],
   userId: 'user',
   onOpenAI: jest.fn(),
-  onClearFilters: jest.fn(),
   onOpenFilters: jest.fn(),
   onOpenComments: jest.fn(),
   onOpenPlace: jest.fn(),
@@ -192,6 +192,19 @@ describe('Discover responsive content', () => {
         2 * rowStyle.paddingHorizontal,
     ).toBeCloseTo(contentWidth);
     expect(lastCardStyle.width).toBe(cardStyle.width);
+  });
+
+  it('keeps the section on return and resets it only on tab bar entry', async () => {
+    const view = await render(<DiscoverScreen {...props} />);
+
+    await fireEvent.press(screen.getByText('People'));
+    expect(screen.getByPlaceholderText('Search people')).toBeTruthy();
+
+    await view.rerender(<DiscoverScreen {...props} />);
+    expect(screen.getByPlaceholderText('Search people')).toBeTruthy();
+
+    await view.rerender(<DiscoverScreen {...props} entrySignal={1} />);
+    expect(screen.queryByPlaceholderText('Search people')).toBeNull();
   });
 
   it('shows the Figma Popular tag on every place result card', async () => {

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { TastesAiAnswer, TastesAiPlace } from '@tastes/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import { readDeviceLocation } from '../discover/deviceLocation';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -149,6 +150,11 @@ export function TastesAIScreen({
     longitude: number;
   } | null>(null);
   const [lastPrompt, setLastPrompt] = useState('');
+  // Permission already granted to the app applies here without another step.
+  const deviceLocationRequest = useRef<ReturnType<
+    typeof readDeviceLocation
+  > | null>(null);
+  deviceLocationRequest.current ??= readDeviceLocation();
   const latestPlaceSignature =
     conversation?.turns
       .slice(-1)[0]
@@ -198,6 +204,9 @@ export function TastesAIScreen({
     const currentRequest = ++requestId.current;
     const activeConversation = conversation;
     try {
+      // A manually chosen city takes precedence over the device position.
+      const nearby =
+        coordinates ?? (city ? null : await deviceLocationRequest.current);
       const answer = await api
         .askTastesAi({
           prompt,
@@ -205,7 +214,7 @@ export function TastesAIScreen({
             activeConversation?.turns.slice(-10).map((turn) => turn.prompt) ??
             [],
           ...(city ? { location: city } : {}),
-          ...(coordinates ?? {}),
+          ...(nearby ?? {}),
         })
         .then((response) => response.data);
       const remainingPreviewDelay =

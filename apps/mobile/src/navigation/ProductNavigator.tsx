@@ -36,7 +36,11 @@ import {
   PlaceSelector,
 } from '../features/create-review/CreateReviewScreen';
 import { DiscoverScreen } from '../features/discover/DiscoverScreen';
-import { DiscoverFiltersScreen } from '../features/discover/DiscoverFiltersScreen';
+import {
+  DiscoverFiltersScreen,
+  type PlaceFilterScope,
+} from '../features/discover/DiscoverFiltersScreen';
+import { SavedPlacesFiltersScreen } from '../features/favourites/SavedPlacesFiltersScreen';
 import { PlaceScreen } from '../features/place/PlaceScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { ProfileSettingsSheet } from '../features/profile/ProfileSettingsSheet';
@@ -85,7 +89,7 @@ export type RootStackParamList = {
   Requests: undefined;
   NewGroup: undefined;
   GroupDetails: { groupId: string; admin?: boolean };
-  DiscoverFilters: undefined;
+  DiscoverFilters: { scope?: PlaceFilterScope } | undefined;
 };
 
 export type MainTabParamList = {
@@ -198,13 +202,19 @@ function tabOptions(
 function MainTabs({
   discoverFilters,
   initialTab,
-  onClearDiscoverFilters,
+  onClearReviewFilters,
+  onClearSavedFilters,
+  reviewFilters,
+  savedFilters,
   user,
   rootNavigation,
 }: {
   discoverFilters: string[];
   initialTab?: keyof MainTabParamList;
-  onClearDiscoverFilters: () => void;
+  onClearReviewFilters: () => void;
+  onClearSavedFilters: () => void;
+  reviewFilters: string[];
+  savedFilters: string[];
   user: User;
   rootNavigation: RootNavigation;
 }) {
@@ -213,6 +223,7 @@ function MainTabs({
   const unreadMessages = useUnreadConversationCount(user.uid);
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [discoverEntrySignal, setDiscoverEntrySignal] = useState(0);
   const [placeSelectorVisible, setPlaceSelectorVisible] = useState(false);
   const [openingConversationFor, setOpeningConversationFor] = useState<
     string | null
@@ -304,13 +315,28 @@ function MainTabs({
             />
           )}
         </Tabs.Screen>
-        <Tabs.Screen name="Discover" options={{ tabBarHideOnKeyboard: false }}>
+        <Tabs.Screen
+          listeners={{
+            tabPress: () => setDiscoverEntrySignal((value) => value + 1),
+          }}
+          name="Discover"
+          options={{ tabBarHideOnKeyboard: false }}
+        >
           {({ navigation }) => (
             <DiscoverScreen
               appliedFilters={discoverFilters}
-              onClearFilters={onClearDiscoverFilters}
+              entrySignal={discoverEntrySignal}
+              onClearSavedFilters={onClearSavedFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
-              onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
+              onOpenFilters={() =>
+                rootNavigation.navigate('DiscoverFilters', {
+                  scope: 'discover',
+                })
+              }
+              onOpenSavedFilters={() =>
+                rootNavigation.navigate('DiscoverFilters', { scope: 'saved' })
+              }
+              savedFilters={savedFilters}
               onOpenComments={openComments}
               onOpenPlace={openPlace}
               onOpenProfile={(person: DiscoverPerson) =>
@@ -388,7 +414,8 @@ function MainTabs({
             const targetUserId = route.params?.userId ?? user.uid;
             return (
               <ProfileScreen
-                appliedFilters={discoverFilters}
+                appliedFilters={reviewFilters}
+                savedFilters={savedFilters}
                 currentUserId={user.uid}
                 fallbackName={user.displayName ?? 'Your profile'}
                 initialFollowing={route.params?.initialFollowing}
@@ -413,9 +440,17 @@ function MainTabs({
                   else navigation.navigate('Discover');
                 }}
                 onMessage={(targetId) => void openConversation(targetId)}
-                onClearFilters={onClearDiscoverFilters}
+                onClearFilters={onClearReviewFilters}
+                onClearSavedFilters={onClearSavedFilters}
                 onOpenComments={openComments}
-                onOpenFilters={() => rootNavigation.navigate('DiscoverFilters')}
+                onOpenFilters={() =>
+                  rootNavigation.navigate('DiscoverFilters', {
+                    scope: 'reviews',
+                  })
+                }
+                onOpenSavedFilters={() =>
+                  rootNavigation.navigate('DiscoverFilters', { scope: 'saved' })
+                }
                 onOpenPlace={openPlace}
                 onOpenProfile={(profileUserId, profileFollowing) =>
                   navigation.navigate('Profile', {
@@ -477,7 +512,15 @@ export function ProductNavigator({
   const { colors, isDark } = useAppTheme();
   const queryClient = useQueryClient();
   const { api } = useSession();
+  // Each surface keeps its own filters: narrowing saved places or a profile's
+  // reviews must not change what Discover shows.
   const [discoverFilters, setDiscoverFilters] = useState<string[]>(
+    visualAuditRoute?.filters ?? [],
+  );
+  const [savedFilters, setSavedFilters] = useState<string[]>(
+    visualAuditRoute?.filters ?? [],
+  );
+  const [reviewFilters, setReviewFilters] = useState<string[]>(
     visualAuditRoute?.filters ?? [],
   );
   const warmComments = (reviewId: string) =>
@@ -531,7 +574,10 @@ export function ProductNavigator({
             <MainTabs
               discoverFilters={discoverFilters}
               initialTab={visualAuditRoute?.tab}
-              onClearDiscoverFilters={() => setDiscoverFilters([])}
+              onClearReviewFilters={() => setReviewFilters([])}
+              onClearSavedFilters={() => setSavedFilters([])}
+              reviewFilters={reviewFilters}
+              savedFilters={savedFilters}
               user={user}
               rootNavigation={navigation}
             />
@@ -822,16 +868,38 @@ export function ProductNavigator({
           name="DiscoverFilters"
           options={{ gestureEnabled: false }}
         >
-          {({ navigation }) => (
-            <DiscoverFiltersScreen
-              initialValues={discoverFilters}
-              onApply={(values) => {
-                setDiscoverFilters(values);
-                navigation.goBack();
-              }}
-              onBack={navigation.goBack}
-            />
-          )}
+          {({ navigation, route }) => {
+            const scope = route.params?.scope ?? 'discover';
+            const filters = {
+              discover: discoverFilters,
+              reviews: reviewFilters,
+              saved: savedFilters,
+            };
+            const setFilters = {
+              discover: setDiscoverFilters,
+              reviews: setReviewFilters,
+              saved: setSavedFilters,
+            };
+            const onApply = (values: string[]) => {
+              setFilters[scope](values);
+              navigation.goBack();
+            };
+            return scope === 'saved' ? (
+              <SavedPlacesFiltersScreen
+                initialValues={filters.saved}
+                onApply={onApply}
+                onBack={navigation.goBack}
+                userId={user.uid}
+              />
+            ) : (
+              <DiscoverFiltersScreen
+                initialValues={filters[scope]}
+                onApply={onApply}
+                onBack={navigation.goBack}
+                scope={scope}
+              />
+            );
+          }}
         </RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>

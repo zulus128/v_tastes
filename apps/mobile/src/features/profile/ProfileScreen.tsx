@@ -214,6 +214,9 @@ function UserBlockedIcon({ color }: { color: string }) {
 
 export function ProfileScreen({
   appliedFilters,
+  onClearSavedFilters,
+  onOpenSavedFilters,
+  savedFilters = [],
   currentUserId,
   fallbackName,
   initialFollowing = false,
@@ -231,6 +234,9 @@ export function ProfileScreen({
   targetUserId,
 }: {
   appliedFilters: string[];
+  onClearSavedFilters?: () => void;
+  onOpenSavedFilters?: () => void;
+  savedFilters?: string[];
   currentUserId: string;
   fallbackName: string;
   initialFollowing?: boolean;
@@ -1143,9 +1149,9 @@ export function ProfileScreen({
           {own ? (
             <View style={styles.wishlistPane}>
               <FavouritesPane
-                appliedFilters={appliedFilters}
-                onClearFilters={onClearFilters}
-                onOpenFilters={onOpenFilters}
+                appliedFilters={savedFilters}
+                onClearFilters={onClearSavedFilters}
+                onOpenFilters={onOpenSavedFilters}
                 onOpenPlace={onOpenPlace}
                 onPrefetchPlaces={onPrefetchPlaces}
                 userId={currentUserId}

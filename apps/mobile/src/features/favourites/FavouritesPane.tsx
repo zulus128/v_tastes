@@ -20,6 +20,11 @@ import FolderActiveIcon from '../../../assets/favourites/folder-active.svg';
 import FolderIcon from '../../../assets/favourites/folder.svg';
 import SearchIcon from '../../../assets/favourites/search.svg';
 import SearchTuneIcon from '../../../assets/profile/search-tune.svg';
+import { useDeviceLocation } from '../discover/deviceLocation';
+import {
+  formatDistanceKm,
+  withDeviceDistance,
+} from '../discover/venueDistance';
 import AddFolderCircle from '../../../assets/create-review/select-place-circle.svg';
 import AddFolderPlus from '../../../assets/create-review/select-place-plus.svg';
 import restaurantImage from '../../../assets/discover/restaurant.png';
@@ -76,7 +81,10 @@ export function FavouritesPane({
   const [folderMenu, setFolderMenu] = useState<FavouriteFolder | null>(null);
 
   const folders = favourites.data?.folders ?? [];
-  const allPlaces = favourites.data?.places ?? [];
+  const deviceLocation = useDeviceLocation();
+  const allPlaces = (favourites.data?.places ?? []).map((place) =>
+    withDeviceDistance(place, deviceLocation),
+  );
   const normalizedQuery = query.trim().toLocaleLowerCase('en-US');
   const places = allPlaces.filter((place) => {
     const inFolder =
@@ -149,28 +157,40 @@ export function FavouritesPane({
             style={styles.searchInput}
             value={query}
           />
-          <Pressable
-            accessibilityLabel="Filter saved places"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={onOpenFilters}
-          >
-            <SearchTuneIcon
-              color={colors.textMuted}
-              height={responsiveSize(24)}
-              width={responsiveSize(24)}
-            />
-          </Pressable>
         </View>
       </View>
 
-      {appliedFilters.length > 0 ? (
-        <View style={styles.filterSummary} testID="wishlist-filter-summary">
-          <Text style={styles.filterSummaryText}>
-            Filtering saved places · {appliedFilters.length}{' '}
-            {appliedFilters.length === 1 ? 'filter' : 'filters'}
+      <View
+        style={[
+          styles.filterBar,
+          appliedFilters.length > 0 && styles.filterSummary,
+        ]}
+        testID={
+          appliedFilters.length > 0 ? 'wishlist-filter-summary' : undefined
+        }
+      >
+        <Pressable
+          accessibilityLabel="Filter saved places"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onOpenFilters}
+          style={styles.filterBarButton}
+        >
+          <SearchTuneIcon
+            color={colors.textMuted}
+            height={responsiveSize(20)}
+            width={responsiveSize(20)}
+          />
+          <Text numberOfLines={1} style={styles.filterSummaryText}>
+            {appliedFilters.length > 0
+              ? `Filter saved places · ${appliedFilters.length} ${
+                  appliedFilters.length === 1 ? 'filter' : 'filters'
+                }`
+              : 'Filter saved places'}
           </Text>
-          {onClearFilters ? (
+        </Pressable>
+        {appliedFilters.length > 0 ? (
+          onClearFilters ? (
             <Pressable
               accessibilityLabel="Reset saved place filters"
               accessibilityRole="button"
@@ -179,9 +199,9 @@ export function FavouritesPane({
             >
               <Text style={styles.filterSummaryClear}>Reset</Text>
             </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+          ) : null
+        ) : null}
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.folderChips}
@@ -685,7 +705,7 @@ function FavouriteCard({
   index: number;
   onOpen: () => void;
   onUnsave: () => void;
-  place: FavouritePlace;
+  place: Omit<FavouritePlace, 'distanceKm'> & { distanceKm?: number };
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
@@ -728,9 +748,11 @@ function FavouriteCard({
         <Text style={styles.metaPill}>
           {'$'.repeat(Math.max(1, place.priceLevel))}
         </Text>
-        <Text style={styles.metaPill}>
-          {place.distanceKm.toFixed(1).replace('.', ',')} km
-        </Text>
+        {place.distanceKm == null ? null : (
+          <Text style={styles.metaPill}>
+            {formatDistanceKm(place.distanceKm)}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -931,7 +953,7 @@ function createStyles(colors: ThemeColors) {
       fontSize: 16,
       paddingVertical: 0,
     },
-    filterSummary: {
+    filterBar: {
       minHeight: 38,
       marginHorizontal: 16,
       marginTop: 10,
@@ -939,6 +961,17 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: 'transparent',
+      borderRadius: 8,
+    },
+    filterBarButton: {
+      flexShrink: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    filterSummary: {
       borderWidth: 1,
       borderColor: isDark ? '#762827' : '#E7B3B1',
       borderRadius: 8,

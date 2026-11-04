@@ -960,7 +960,7 @@ export function HomeFeedScreen({
                               {distanceLabel ? (
                                 <View style={styles.recTag}>
                                   <Text style={styles.recTagText}>
-                                    {distanceLabel.replace('.', ',')}
+                                    {distanceLabel}
                                   </Text>
                                 </View>
                               ) : null}
