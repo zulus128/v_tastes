@@ -223,6 +223,7 @@ export function useHideReview() {
   >({
     mutationFn: async (reviewId: string) => {
       const response = await api.hideReview({ reviewId });
+      await queryClient.resetQueries({ queryKey: ['taste-recommendations'] });
       return response.data.id;
     },
     onMutate: async (reviewId) => {

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage } from '@tastes/firebase-client';
 import type {
   FeedItem,
@@ -259,6 +260,7 @@ export function ProfileScreen({
   const actionDangerColor = '#A00E0B';
   const own = currentUserId === targetUserId;
   const api = useTastesApi();
+  const queryClient = useQueryClient();
   const visualAudit = useIsVisualAudit();
   const followMutation = useToggleFollow(currentUserId);
   const {
@@ -560,6 +562,7 @@ export function ProfileScreen({
     setBlockPending(true);
     try {
       await api.setUserBlocked({ targetUserId, blocked: nextBlocked });
+      await queryClient.resetQueries({ queryKey: ['taste-recommendations'] });
       setBlocked(nextBlocked);
       if (nextBlocked) setFollowing(false);
       setBlockConfirmation(null);

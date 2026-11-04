@@ -1,5 +1,6 @@
 import RecommendationStar from '../../../assets/home/recommendation-star.svg';
 import { useTasteRecommendations } from '../taste-match/api';
+import { useDeviceLocation } from '../discover/deviceLocation';
 import { TasteRecommendationCard } from '../taste-match/TasteRecommendationCard';
 import { tasteFeedInsertions } from '../taste-match/feedInsertions';
 import { ReviewTextPreview } from '../reviews/ReviewTextPreview';
@@ -531,7 +532,8 @@ export function HomeFeedScreen({
   const [scope, setScope] = useState<'friends' | 'local'>('friends');
   const query = useFeed(scope);
   const latestFeedQuery = useLatestFeedItem(scope);
-  const recommendationQuery = useTasteRecommendations();
+  const recommendationLocation = useDeviceLocation();
+  const recommendationQuery = useTasteRecommendations(recommendationLocation);
   const reactionMutation = useReactToReview();
   const reportMutation = useReportReview();
   const { data: unreadNotificationCount = 0 } = useUnreadNotificationCount();

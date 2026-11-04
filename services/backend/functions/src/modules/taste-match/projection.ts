@@ -165,6 +165,7 @@ export const indexTasteReview = onDocumentWritten(
       after = event.data?.after;
     const relevant = [
       'status',
+      'source',
       'visibility',
       'authorId',
       'venueId',

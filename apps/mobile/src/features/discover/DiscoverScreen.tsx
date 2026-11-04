@@ -475,6 +475,7 @@ export function DiscoverScreen({
         ) : (
           <TrendingFeed
             feed={feedQuery.data}
+            location={discoveryLocation}
             followPending={toggleFollow.isPending}
             followPendingId={followPendingId}
             onSave={setSaveTarget}
@@ -611,6 +612,7 @@ function carouselCardWidth(
 
 function TrendingFeed({
   feed,
+  location,
   followPending,
   followPendingId,
   onSave,
@@ -624,6 +626,7 @@ function TrendingFeed({
   savedVenueIds,
 }: {
   feed: DiscoverFeed;
+  location?: { latitude: number; longitude: number };
   followPending: boolean;
   followPendingId: string | null;
   onSave: (place: SaveablePlace) => void;
@@ -637,7 +640,7 @@ function TrendingFeed({
   savedVenueIds: Set<string>;
 }) {
   const { colors } = useAppTheme();
-  const tasteQuery = useTasteRecommendations();
+  const tasteQuery = useTasteRecommendations(location);
   const tasteCardCount = tasteQuery.data?.recommendations.length ?? 0;
   const api = useTastesApi();
   const styles = useMemo(() => createStyles(colors), [colors]);
