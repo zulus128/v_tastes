@@ -4065,7 +4065,14 @@ describe('taste catalogue index maintenance', () => {
     await rebuildTasteEvidence(db, 1);
     await rebuildTasteEvidence(db, 1);
     const earlier = db.doc('_tasteReviewEvidence/a-before-approval');
-    expect((await earlier.get()).exists).toBe(false);
+    // A delayed review trigger may already have refreshed this row. Remove the
+    // derived index only; catalogue revision must still force a complete pass.
+    await earlier.delete();
+    expect(
+      (await db.doc('_tasteMaintenance/backfill').get()).get(
+        'completedCatalogRevision',
+      ),
+    ).toBe(0);
     expect((await maintainTasteEvidenceIfNeeded(db)).processed).toBe(2);
     expect((await earlier.get()).get('canonicalDishIds')).toEqual([
       'later-approved-dish',
