@@ -135,3 +135,5 @@ export {
   createVenue,
   updateVenue,
 } from './modules/admin/functions';
+
+export { refreshDiscoverySignals } from './modules/discover/schedules';

@@ -9,6 +9,7 @@ const nonCallableExports = new Set([
   'processReviewEffects',
   'pushUserNotification',
   'refreshLeaderboardStandings',
+  'refreshDiscoverySignals',
   'reinstateExpiredSuspensions',
   'resetMonthlyXp',
   'sendMonthlyRecapNotifications',

@@ -2911,3 +2911,96 @@ it(
     }
   },
 );
+
+it(
+  'scopes curated discovery before ranking and distinguishes verified new spots',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await createSocialFixture();
+    const base = {
+      city: 'Istanbul',
+      name: 'Local cafe',
+      status: 'active',
+      address: 'Local street 1',
+      category: 'Cafe',
+      rating: 4,
+      reviewCount: 3,
+      discoverTags: ['trending', 'new'],
+      createdAt: Timestamp.now(),
+    };
+    for (let i = 0; i < 4; i += 1)
+      await fixture.db
+        .collection('venues')
+        .doc(`foreign-${i}`)
+        .set({ ...base, city: 'London', rating: 5 });
+    await fixture.db.collection('venues').doc('local-curated').set(base);
+    await fixture.db
+      .collection('venues')
+      .doc('just-opened')
+      .set({
+        ...base,
+        verifiedOpeningDate: new Date(
+          Date.now() - 10 * 86_400_000,
+        ).toISOString(),
+        rating: 3,
+      });
+    await fixture.db
+      .collection('venues')
+      .doc('new-on-tastes')
+      .set({
+        ...base,
+        firstPublishedAt: Timestamp.fromMillis(Date.now() - 2 * 86_400_000),
+        rating: 2,
+      });
+    await fixture.db
+      .collection('venues')
+      .doc('expired-new')
+      .set({
+        ...base,
+        firstPublishedAt: Timestamp.fromMillis(Date.now() - 60 * 86_400_000),
+      });
+    const feed = await callFunction<{
+      hero: { id: string; city: string };
+      heroIsHot: boolean;
+      trending: Array<{ city: string }>;
+      newSpots: Array<{ id: string }>;
+      newSpotLabels: Record<string, string>;
+    }>('getDiscoverFeed', {}, fixture.first.token);
+    expect(feed.hero.city).toBe('Istanbul');
+    expect(feed.heroIsHot).toBe(false);
+    expect(feed.trending.every((venue) => venue.city === 'Istanbul')).toBe(
+      true,
+    );
+    expect(feed.newSpots.map((venue) => venue.id)).toEqual([
+      'new-on-tastes',
+      'just-opened',
+      'local-curated',
+    ]);
+    expect(feed.newSpotLabels).toMatchObject({
+      'just-opened': 'Just opened',
+      'new-on-tastes': 'New on Tastes',
+      'local-curated': 'Editor’s pick',
+    });
+    expect(feed.newSpotLabels['expired-new']).toBeUndefined();
+    await expect(
+      callFunction(
+        'getDiscoverFeed',
+        { latitude: 91, longitude: 0 },
+        fixture.first.token,
+      ),
+    ).rejects.toMatchObject({ status: 'INVALID_ARGUMENT' });
+    await fixture.db
+      .collection('users')
+      .doc(fixture.author.id)
+      .update({ city: 'Monaco' });
+    expect(
+      (
+        await callFunction<{ hero: null }>(
+          'getDiscoverFeed',
+          {},
+          fixture.first.token,
+        )
+      ).hero,
+    ).toBeNull();
+  },
+);

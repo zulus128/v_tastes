@@ -153,4 +153,54 @@ describe('AdminApp authentication boundary', () => {
       await screen.findByRole('heading', { name: 'Overview' }),
     ).toBeDefined();
   });
+  it('saves verified opening dates and discovery exclusions from the venue form', async () => {
+    mocks.authUser = {
+      email: 'admin@tastes.com',
+      getIdTokenResult: async () => ({ claims: { role: 'admin' } }),
+    };
+    mocks.callAdmin.mockImplementation(async (name: string) =>
+      name === 'searchAdminVenues'
+        ? []
+        : name === 'upsertVenue'
+          ? { id: 'new-venue' }
+          : overview,
+    );
+    render(<AdminApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Venues' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add venue' }));
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'New cafe' },
+    });
+    fireEvent.change(screen.getByLabelText('Category'), {
+      target: { value: 'Cafe' },
+    });
+    fireEvent.change(screen.getByLabelText('City'), {
+      target: { value: 'Monaco' },
+    });
+    fireEvent.change(screen.getByLabelText('Address'), {
+      target: { value: '1 Avenue Test' },
+    });
+    fireEvent.change(screen.getByLabelText('Verified opening date'), {
+      target: { value: '2026-10-15' },
+    });
+    fireEvent.change(screen.getByLabelText('First published on Tastes'), {
+      target: { value: '2026-11-02' },
+    });
+    fireEvent.change(screen.getByLabelText('Automatic HOT badge'), {
+      target: { value: 'exclude' },
+    });
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Save venue' }).closest('form')!,
+    );
+    await waitFor(() =>
+      expect(mocks.callAdmin).toHaveBeenCalledWith(
+        'upsertVenue',
+        expect.objectContaining({
+          verifiedOpeningDate: '2026-10-15',
+          firstPublishedAt: '2026-11-02',
+          discoverOverrides: { hot: 'exclude', trending: 'auto' },
+        }),
+      ),
+    );
+  });
 });

@@ -1208,8 +1208,29 @@ export interface DiscoverReview {
   createdAt: string;
 }
 
+export const getDiscoverFeedInputSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (input) =>
+      (input.latitude === undefined) === (input.longitude === undefined),
+    {
+      message: 'Provide both location coordinates.',
+    },
+  );
+export type GetDiscoverFeedInput = z.infer<typeof getDiscoverFeedInputSchema>;
+
 export interface DiscoverFeed {
   hero: Venue | null;
+  heroIsHot?: boolean;
+  areaLabel?: string;
+  trendingSubtitle?: string;
+  newSpotLabels?: Record<
+    string,
+    'Just opened' | 'New on Tastes' | 'Editor’s pick'
+  >;
   trending: Venue[];
   newSpots: Venue[];
   mostReviewed: Venue[];

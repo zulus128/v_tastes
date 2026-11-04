@@ -99,6 +99,9 @@ interface AdminVenue {
   status: 'active' | 'hidden' | 'pending' | 'merged' | 'removed';
   featured: boolean;
   hotSpot: boolean;
+  verifiedOpeningDate?: string | null;
+  firstPublishedAt?: string | null;
+  discoverOverrides?: { hot: 'auto' | 'exclude'; trending: 'auto' | 'exclude' };
   reviewCount: number;
   imageUrl: string | null;
   photoUrls: string[];
@@ -827,6 +830,10 @@ function VenueForm({
     placeTags: venue?.placeTags.join(', ') ?? '',
     featured: venue?.featured ?? false,
     hotSpot: venue?.hotSpot ?? false,
+    verifiedOpeningDate: venue?.verifiedOpeningDate ?? '',
+    firstPublishedAt: venue?.firstPublishedAt ?? '',
+    hotOverride: venue?.discoverOverrides?.hot ?? 'auto',
+    trendingOverride: venue?.discoverOverrides?.trending ?? 'auto',
   });
   const [discoverTags, setDiscoverTags] = useState<DiscoverTag[]>(
     venue?.discoverTags ?? [],
@@ -1021,6 +1028,12 @@ function VenueForm({
         popularDishes,
         featured: values.featured,
         hotSpot: values.hotSpot,
+        verifiedOpeningDate: optionalText(values.verifiedOpeningDate),
+        firstPublishedAt: optionalText(values.firstPublishedAt),
+        discoverOverrides: {
+          hot: values.hotOverride,
+          trending: values.trendingOverride,
+        },
       });
       const removedImages = initialImages.filter(
         (url) => !images.includes(url),
@@ -1197,6 +1210,65 @@ function VenueForm({
                   <option value="pending">Pending</option>
                   <option value="hidden">Hidden</option>
                   {venue ? <option value="removed">Removed</option> : null}
+                </select>
+              </label>
+              <label>
+                Verified opening date
+                <input
+                  type="date"
+                  value={values.verifiedOpeningDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      verifiedOpeningDate: event.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                First published on Tastes
+                <input
+                  type="date"
+                  value={values.firstPublishedAt}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      firstPublishedAt: event.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Automatic HOT badge
+                <select
+                  value={values.hotOverride}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      hotOverride: event.target.value as 'auto' | 'exclude',
+                    })
+                  }
+                >
+                  <option value="auto">Automatic</option>
+                  <option value="exclude">Exclude this venue</option>
+                </select>
+              </label>
+              <label>
+                Trending selection
+                <select
+                  value={values.trendingOverride}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      trendingOverride: event.target.value as
+                        'auto' | 'exclude',
+                    })
+                  }
+                >
+                  <option value="auto">Automatic</option>
+                  <option value="exclude">Exclude this venue</option>
                 </select>
               </label>
               <label className="wide">
