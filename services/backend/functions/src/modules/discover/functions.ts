@@ -1,3 +1,6 @@
+import { signalTime } from './community-policy';
+import { communitySelection } from './community-selection';
+import { resolveVenue } from '../../shared/venue-alias';
 import {
   getPlaceInputSchema,
   getDiscoverFeedInputSchema,
@@ -190,20 +193,16 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     following,
     signalSnapshot,
     discoveryConfig,
+    community,
   ] = await Promise.all([
     db.collection('venues').where('status', '==', 'active').get(),
     db
       .collection('reviews')
       .where('status', '==', 'published')
       .orderBy('reactionCount', 'desc')
-      .limit(3)
+      .limit(12)
       .get(),
-    db
-      .collection('users')
-      .where('status', '==', 'active')
-      .orderBy('reviewCount', 'desc')
-      .limit(10)
-      .get(),
+    db.collection('users').where('status', '==', 'active').get(),
     db
       .collection('reviews')
       .where('authorId', '==', uid)
@@ -214,6 +213,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     userRef.collection('following').limit(50).get(),
     db.collection('_discoverySignals').get(),
     db.collection('configuration').doc('discovery').get(),
+    communitySelection(),
   ]);
   const mostReviewedCandidates = activeVenueSnapshot.docs.map((document) => {
     const venue = toVenue(document);
@@ -521,14 +521,82 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
       recommendationReason,
     }));
 
+  const activeAuthors = new Set(topReviewerSnapshot.docs.map((doc) => doc.id));
+  const activePlaces = new Set(activeVenueSnapshot.docs.map((doc) => doc.id));
+  const eligibleReview = (doc: QueryDocumentSnapshot) =>
+    doc.get('status') === 'published' &&
+    activeAuthors.has(String(doc.get('authorId'))) &&
+    activePlaces.has(String(doc.get('venueId'))) &&
+    !community.excluded.has(`review:${doc.id}`) &&
+    !community.excluded.has(`user:${doc.get('authorId')}`);
+  const reviewCandidates = reviewsSnapshot.docs.filter(eligibleReview);
+  let page = reviewsSnapshot;
+  while (reviewCandidates.length < 3 && page.size === 12) {
+    page = await db
+      .collection('reviews')
+      .where('status', '==', 'published')
+      .orderBy('reactionCount', 'desc')
+      .startAfter(page.docs.at(-1)!)
+      .limit(12)
+      .get();
+    reviewCandidates.push(...page.docs.filter(eligibleReview));
+  }
+  const scoredIds = community.enabled
+    ? [...community.reviews]
+        .filter(([, score]) => Number(score.score) > 0)
+        .map(([id]) => id)
+    : [];
+  const scoredReviews: QueryDocumentSnapshot[] = [];
+  for (let offset = 0; offset < scoredIds.length; offset += 100) {
+    const batch = await db.getAll(
+      ...scoredIds
+        .slice(offset, offset + 100)
+        .map((id) => db.collection('reviews').doc(id)),
+    );
+    scoredReviews.push(
+      ...batch
+        .filter((doc) => doc.exists)
+        .map((doc) => doc as QueryDocumentSnapshot)
+        .filter(eligibleReview),
+    );
+  }
+  const automaticReviews = community.enabled
+    ? scoredReviews
+        .sort((a, b) => {
+          const left = community.reviews.get(a.id)!;
+          const right = community.reviews.get(b.id)!;
+          return (
+            Number(
+              !!userCity &&
+                String(b.get('venueCity') ?? '')
+                  .trim()
+                  .toLocaleLowerCase() === userCity,
+            ) -
+              Number(
+                !!userCity &&
+                  String(a.get('venueCity') ?? '')
+                    .trim()
+                    .toLocaleLowerCase() === userCity,
+              ) ||
+            Number(right.score) - Number(left.score) ||
+            Number(right.recentEngagement) - Number(left.recentEngagement) ||
+            Number(right.publishedAt) - Number(left.publishedAt) ||
+            a.id.localeCompare(b.id)
+          );
+        })
+        .slice(0, 3)
+    : [];
+  const selectedReviews = automaticReviews.length
+    ? automaticReviews
+    : reviewCandidates.slice(0, 3);
   const reviewVenueIds = [
     ...new Set(
-      reviewsSnapshot.docs.map((document) => String(document.get('venueId'))),
+      selectedReviews.map((document) => String(document.get('venueId'))),
     ),
   ];
   const reviewAuthorIds = [
     ...new Set(
-      reviewsSnapshot.docs.map((document) => String(document.get('authorId'))),
+      selectedReviews.map((document) => String(document.get('authorId'))),
     ),
   ];
   const [reviewVenueDocs, reviewAuthorDocs] =
@@ -567,41 +635,46 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
         : null,
     ]),
   );
-  const popularReviews: DiscoverReview[] = reviewsSnapshot.docs.map(
-    (document) => ({
-      id: document.id,
-      authorId: String(document.get('authorId')),
-      authorDisplayName: String(document.get('authorDisplayName')),
-      authorPhotoUrl:
-        photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
-      venueId: String(document.get('venueId')),
-      venueName: String(document.get('venueName')),
-      venueCity:
-        venueDetailsById.get(String(document.get('venueId')))?.city ??
-        String(document.get('venueCity') ?? ''),
-      venueCategory:
-        venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
-      cuisine: String(
-        document.get('cuisine') ??
-          venueDetailsById.get(String(document.get('venueId')))?.category ??
-          '',
-      ),
-      venueImageUrl:
-        venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
-      rating: Number(document.get('rating')),
-      text: String(document.get('text')),
-      reactionCount: Number(document.get('reactionCount') ?? 0),
-      commentCount: Number(document.get('commentCount') ?? 0),
-      tags: Array.isArray(document.get('tags'))
-        ? (document.get('tags') as DiscoverReview['tags'])
-        : [],
-      createdAt: timestampToIso(document.get('createdAt')),
-    }),
-  );
+  const popularReviews: DiscoverReview[] = selectedReviews.map((document) => ({
+    id: document.id,
+    authorId: String(document.get('authorId')),
+    authorDisplayName: String(document.get('authorDisplayName')),
+    authorPhotoUrl:
+      photoUrlByAuthorId.get(String(document.get('authorId'))) ?? null,
+    venueId: String(document.get('venueId')),
+    venueName: String(document.get('venueName')),
+    venueCity:
+      venueDetailsById.get(String(document.get('venueId')))?.city ??
+      String(document.get('venueCity') ?? ''),
+    venueCategory:
+      venueDetailsById.get(String(document.get('venueId')))?.category ?? '',
+    cuisine: String(
+      document.get('cuisine') ??
+        venueDetailsById.get(String(document.get('venueId')))?.category ??
+        '',
+    ),
+    venueImageUrl:
+      venueDetailsById.get(String(document.get('venueId')))?.imageUrl ?? null,
+    rating: Number(document.get('rating')),
+    text: String(document.get('text')),
+    reactionCount: Number(document.get('reactionCount') ?? 0),
+    commentCount: Number(document.get('commentCount') ?? 0),
+    tags: Array.isArray(document.get('tags'))
+      ? (document.get('tags') as DiscoverReview['tags'])
+      : [],
+    createdAt: timestampToIso(document.get('createdAt')),
+  }));
 
-  const topReviewerDoc = topReviewerSnapshot.docs.find(
-    (document) => document.id !== uid,
-  );
+  const topReviewerDoc = [...topReviewerSnapshot.docs]
+    .sort(
+      (a, b) =>
+        Number(b.get('reviewCount') ?? 0) - Number(a.get('reviewCount') ?? 0) ||
+        a.id.localeCompare(b.id),
+    )
+    .find(
+      (document) =>
+        document.id !== uid && !community.excluded.has(`user:${document.id}`),
+    );
   let topReviewer: DiscoverPerson | null = null;
   if (topReviewerDoc) {
     const followingDoc = await db
@@ -628,6 +701,7 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
     mostReviewed,
     forYou,
     hiddenGems,
+    popularReviewsAreAutomatic: automaticReviews.length > 0,
     popularReviews,
     topReviewer,
   };
@@ -636,9 +710,10 @@ export const getDiscoverFeed = onCall(callableOptions, async (request) => {
 
 export const getDiscoverPeople = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
-  const [users, viewer] = await Promise.all([
+  const [users, viewer, community] = await Promise.all([
     db.collection('users').where('status', '==', 'active').get(),
     db.collection('users').doc(uid).get(),
+    communitySelection(),
   ]);
   const cityKey = (value: unknown) =>
     String(value ?? '')
@@ -649,6 +724,7 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
   const candidates = users.docs.filter(
     (document) =>
       document.id !== uid &&
+      !community.excluded.has(`user:${document.id}`) &&
       document.get('isTestAccount') !== true &&
       document.get('suspicious') !== true &&
       !['seed', 'test', 'stress-image-scroll'].includes(
@@ -657,6 +733,12 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
   );
   const select = (field: 'followerCount' | 'createdAt') =>
     [...candidates]
+      .filter(
+        (doc) =>
+          field !== 'createdAt' ||
+          (signalTime(doc.get('createdAt')) >= Date.now() - 30 * 86_400_000 &&
+            signalTime(doc.get('createdAt')) <= Date.now()),
+      )
       .sort((a, b) => {
         const local = (document: QueryDocumentSnapshot) =>
           !!viewerCity && cityKey(document.get('city')) === viewerCity;
@@ -678,7 +760,29 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
       })
       .slice(0, 6);
   // Until shadow results are validated, these are follow suggestions, not seeded weekly growth.
-  const trendingDocs = select('followerCount');
+  const automatic = community.enabled
+    ? candidates
+        .filter(
+          (doc) =>
+            Number(community.people.get(doc.id)?.uniqueFollowers7d ?? 0) > 0 &&
+            Number(doc.get('reviewCount') ?? 0) > 0,
+        )
+        .sort((a, b) => {
+          const left = community.people.get(a.id)!;
+          const right = community.people.get(b.id)!;
+          return (
+            Number(!!viewerCity && cityKey(b.get('city')) === viewerCity) -
+              Number(!!viewerCity && cityKey(a.get('city')) === viewerCity) ||
+            Number(right.uniqueFollowers7d) - Number(left.uniqueFollowers7d) ||
+            Number(right.reviewEngagement) - Number(left.reviewEngagement) ||
+            Number(b.get('followerCount') ?? 0) -
+              Number(a.get('followerCount') ?? 0) ||
+            a.id.localeCompare(b.id)
+          );
+        })
+        .slice(0, 6)
+    : [];
+  const trendingDocs = automatic.length ? automatic : select('followerCount');
   const freshDocs = select('createdAt');
   const suggestedDocs = select('followerCount');
   const candidateIds = [
@@ -707,6 +811,7 @@ export const getDiscoverPeople = onCall(callableOptions, async (request) => {
     );
 
   const result: DiscoverPeopleResult = {
+    trendingIsAutomatic: automatic.length > 0,
     trending: toPeople(trendingDocs),
     new: toPeople(freshDocs),
     suggested: toPeople(suggestedDocs),
@@ -837,10 +942,7 @@ export const getVenues = onCall(callableOptions, async (request) => {
 export const getPlace = onCall(callableOptions, async (request) => {
   requireUserId(request);
   const { venueId } = parseInput(getPlaceInputSchema, request.data);
-  const document = await db.collection('venues').doc(venueId).get();
-  if (!document.exists || document.get('status') !== 'active') {
-    throw new HttpsError('not-found', 'The place was not found.');
-  }
+  const document = await resolveVenue(venueId);
   const openingHours = Array.isArray(document.get('openingHours'))
     ? (document.get('openingHours') as unknown[]).flatMap((value) => {
         if (!value || typeof value !== 'object') return [];
@@ -883,12 +985,10 @@ export const getPlace = onCall(callableOptions, async (request) => {
 export const getPlaceReviews = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(getPlaceReviewsInputSchema, request.data);
-  const { venueId, sort, scope } = input;
+  const { sort, scope } = input;
   const cursor = decodeCursor(input.cursor);
-  const venue = await db.collection('venues').doc(venueId).get();
-  if (!venue.exists || venue.get('status') !== 'active') {
-    throw new HttpsError('not-found', 'The place was not found.');
-  }
+  const venue = await resolveVenue(input.venueId);
+  const venueId = venue.id;
   const ordering = {
     highest: { field: 'rating', direction: 'desc' },
     lowest: { field: 'rating', direction: 'asc' },

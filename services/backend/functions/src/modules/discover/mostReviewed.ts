@@ -1,12 +1,22 @@
 import type { Venue } from '@tastes/contracts';
 
-// T-012: lifetime Tastes review count, no manual tag gate. Ties break on
-// rating confidence (higher rating at equal volume) and then venue ID so
-// equal-count ordering is stable between requests.
+// Shrink sparse ratings toward a neutral prior of 3 stars / 10 reviews.
+// This is a ranking heuristic, not a statistical probability.
+export function ratingConfidence(
+  venue: Pick<Venue, 'rating' | 'reviewCount'>,
+): number {
+  const count = Math.max(0, venue.reviewCount ?? 0);
+  if (!count) return 0;
+  return (
+    (Math.max(0.5, Math.min(5, venue.rating ?? 3)) * count + 30) / (count + 10)
+  );
+}
+
+// T-012: lifetime Tastes count, then volume-adjusted rating and stable ID.
 export function compareMostReviewed(left: Venue, right: Venue): number {
   return (
     (right.reviewCount ?? 0) - (left.reviewCount ?? 0) ||
-    (right.rating ?? 0) - (left.rating ?? 0) ||
+    ratingConfidence(right) - ratingConfidence(left) ||
     left.id.localeCompare(right.id)
   );
 }

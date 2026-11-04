@@ -10,6 +10,7 @@ const nonCallableExports = new Set([
   'pushUserNotification',
   'refreshLeaderboardStandings',
   'refreshDiscoverySignals',
+  'reconcileReviewCounters',
   'reinstateExpiredSuspensions',
   'resetMonthlyXp',
   'sendMonthlyRecapNotifications',

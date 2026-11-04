@@ -3277,3 +3277,434 @@ it(
     ).toEqual([4.5, 0.5]);
   },
 );
+
+describe('atomic venue merges and aggregate reconciliation', () => {
+  it('combines visits and engagement, counts only published reviews and safely retries', async () => {
+    const db = getFirestore();
+    const { mergeVenueRecords } =
+      await import('../../functions/src/modules/admin/merge-venues');
+    const { idempotentDocumentId } =
+      await import('../../functions/src/shared/mutations');
+    await Promise.all([
+      db.doc('venues/merge-source').set({
+        name: 'Duplicate',
+        city: 'London',
+        status: 'active',
+        reviewCount: 91,
+        rating: 1,
+      }),
+      db.doc('venues/merge-target').set({
+        name: 'Correct place',
+        city: 'Monaco',
+        status: 'active',
+        reviewCount: 92,
+        rating: 1,
+      }),
+      db
+        .doc('users/merge-author')
+        .set({ status: 'active', reviewCount: 2, xp: 900, monthlyXp: 100 }),
+    ]);
+    const review = (
+      authorId: string,
+      venueId: string,
+      rating: number,
+      days: number,
+      status = 'published',
+    ) => ({
+      authorId,
+      venueId,
+      rating,
+      text: 'Visit details',
+      dishReviews: [{ id: 'soup', title: 'Soup', rating }],
+      status,
+      createdAt: Timestamp.fromMillis(Date.now() - days * 86_400_000),
+      reactionCount: 0,
+      commentCount: 0,
+    });
+    await Promise.all([
+      db.doc('reviews/merge-old').set({
+        ...review('merge-author', 'merge-source', 2, 3),
+        reactionCount: 1,
+      }),
+      db.doc('reviews/merge-new').set({
+        ...review('merge-author', 'merge-target', 4.5, 1),
+        reactionCount: 2,
+      }),
+      db.doc('reviews/merge-other').set(review('other', 'merge-source', 5, 2)),
+      db
+        .doc('reviews/merge-deleted')
+        .set(review('removed', 'merge-source', 1, 1, 'deleted')),
+      db
+        .doc('reviews/merge-hidden')
+        .set(review('moderated', 'merge-source', 1.5, 1, 'hidden')),
+      db
+        .doc('reviews/merge-old/reactions/liker')
+        .set({ userId: 'liker', createdAt: Timestamp.fromMillis(10) }),
+      db
+        .doc('reviews/merge-new/reactions/liker')
+        .set({ userId: 'liker', createdAt: Timestamp.fromMillis(20) }),
+      db
+        .doc('reviews/merge-new/reactions/second')
+        .set({ userId: 'second', createdAt: Timestamp.now() }),
+      db.doc('reviews/merge-old/comments/first').set({
+        status: 'published',
+        text: 'First comment',
+        createdAt: Timestamp.now(),
+      }),
+      db.doc('reviews/merge-new/comments/reply').set({
+        status: 'published',
+        text: 'Reply',
+        reviewId: 'merge-new',
+        createdAt: Timestamp.now(),
+      }),
+      db
+        .doc('reviews/merge-new/comments/reply/reactions/liker')
+        .set({ userId: 'liker', createdAt: Timestamp.now() }),
+    ]);
+    await db
+      .doc('users/merge-author')
+      .update({ 'tastePreferences.favoriteVenueId': 'merge-source' });
+    await db.doc('users/merge-author/savedVenues/merge-source').set({
+      venueId: 'merge-source',
+      folderIds: ['first-folder'],
+      createdAt: Timestamp.now(),
+    });
+    await db.doc('users/merge-author/savedVenues/merge-target').set({
+      venueId: 'merge-target',
+      folderIds: ['second-folder'],
+      createdAt: Timestamp.now(),
+    });
+    const concurrent = await Promise.all([
+      mergeVenueRecords(db, 'merge-source', 'merge-target', 'admin'),
+      mergeVenueRecords(db, 'merge-source', 'merge-target', 'admin'),
+    ]);
+    expect(concurrent).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          movedReviews: 4,
+          mergedReviews: 1,
+          alreadyMerged: false,
+        }),
+        expect.objectContaining({ movedReviews: 0, alreadyMerged: true }),
+      ]),
+    );
+    expect((await db.doc('venues/merge-target').get()).data()).toMatchObject({
+      reviewCount: 2,
+      rating: 4.75,
+    });
+    expect((await db.doc('venues/merge-source').get()).data()).toMatchObject({
+      status: 'merged',
+      reviewCount: 0,
+      rating: 0,
+    });
+    const canonical = await db.doc('reviews/merge-old').get();
+    expect(canonical.data()).toMatchObject({
+      venueCity: 'Monaco',
+      venueName: 'Correct place',
+      venueId: 'merge-target',
+      rating: 4.5,
+      visitCount: 2,
+      reactionCount: 2,
+      commentCount: 2,
+    });
+    expect(
+      (await db.doc('reviews/merge-new').get()).get('mergedIntoReviewId'),
+    ).toBe('merge-old');
+    expect(
+      (await db.doc('reviews/merge-old/comments/reply/reactions/liker').get())
+        .exists,
+    ).toBe(true);
+    expect(
+      (await db.doc('reviews/merge-old/comments/reply').get()).get('reviewId'),
+    ).toBe('merge-old');
+    expect(
+      (await db.doc('reviews/merge-old/reactions/liker').get())
+        .get('createdAt')
+        .toMillis(),
+    ).toBe(10);
+    expect((await db.doc('users/merge-author').get()).data()).toMatchObject({
+      reviewCount: 1,
+      xp: 900,
+    });
+    expect(
+      (
+        await db
+          .collection('reviewOwnership')
+          .doc(
+            idempotentDocumentId(
+              'merge-author',
+              'review-owner',
+              'merge-target',
+            ),
+          )
+          .get()
+      ).get('reviewId'),
+    ).toBe('merge-old');
+    expect(
+      await mergeVenueRecords(db, 'merge-source', 'merge-target', 'admin'),
+    ).toMatchObject({ alreadyMerged: true, movedReviews: 0 });
+    expect(
+      (await db.doc('users/merge-author/savedVenues/merge-target').get()).get(
+        'folderIds',
+      ),
+    ).toEqual(expect.arrayContaining(['first-folder', 'second-folder']));
+    expect(
+      (await db.doc('users/merge-author/savedVenues/merge-source').get())
+        .exists,
+    ).toBe(false);
+    expect(
+      (await db.doc('users/merge-author').get()).get(
+        'tastePreferences.favoriteVenueId',
+      ),
+    ).toBe('merge-target');
+    expect(
+      (
+        await db
+          .doc(
+            '_venueMergeArchives/merge-source:merge-target/savedVenues/merge-author',
+          )
+          .get()
+      ).exists,
+    ).toBe(true);
+    const { resolveVenue } =
+      await import('../../functions/src/shared/venue-alias');
+    expect((await resolveVenue('merge-source')).id).toBe('merge-target');
+  }, 20_000);
+
+  it('fails before any writes for self-merges and conflicts involving hidden reviews', async () => {
+    const db = getFirestore();
+    const { mergeVenueRecords } =
+      await import('../../functions/src/modules/admin/merge-venues');
+    await db
+      .doc('venues/safe-source')
+      .set({ name: 'Source', status: 'active' });
+    await db
+      .doc('venues/safe-target')
+      .set({ name: 'Target', status: 'active' });
+    for (const [id, venueId, status] of [
+      ['first', 'safe-source', 'published'],
+      ['second', 'safe-target', 'hidden'],
+    ])
+      await db
+        .doc(`reviews/${id}`)
+        .set({ authorId: 'same', venueId, status, rating: 4 });
+    await expect(
+      mergeVenueRecords(db, 'safe-source', 'safe-source', 'admin'),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+    await expect(
+      mergeVenueRecords(db, 'safe-source', 'safe-target', 'admin'),
+    ).rejects.toMatchObject({ code: 'failed-precondition' });
+    expect((await db.doc('venues/safe-source').get()).get('status')).toBe(
+      'active',
+    );
+    expect((await db.doc('reviews/first').get()).get('venueId')).toBe(
+      'safe-source',
+    );
+    await db.doc('reviews/second').update({ status: 'published' });
+    await db
+      .doc('reports/merge-pending')
+      .set({ targetType: 'review', targetId: 'first', status: 'pending' });
+    await expect(
+      mergeVenueRecords(db, 'safe-source', 'safe-target', 'admin'),
+    ).rejects.toMatchObject({ code: 'failed-precondition' });
+    expect((await db.doc('reviews/first').get()).get('venueId')).toBe(
+      'safe-source',
+    );
+  });
+
+  it('repairs venue averages and user counts once, excludes hidden/deleted reviews and keeps an audit', async () => {
+    const db = getFirestore();
+    const { reconcileReviewAggregates } =
+      await import('../../functions/src/shared/review-aggregates');
+    await db.doc('venues/count-place').set({ reviewCount: 88, rating: 1 });
+    await db.doc('users/count-author').set({ reviewCount: 99, xp: 123 });
+    for (const [id, rating, status] of [
+      ['a', 4, 'published'],
+      ['b', 5, 'published'],
+      ['c', 1, 'deleted'],
+      ['d', 1, 'hidden'],
+    ] as const)
+      await db.doc(`reviews/${id}`).set({
+        authorId: 'count-author',
+        venueId: 'count-place',
+        status,
+        rating,
+      });
+    expect((await reconcileReviewAggregates(db)).repairs).toHaveLength(2);
+    expect((await db.doc('users/count-author').get()).get('reviewCount')).toBe(
+      99,
+    );
+    expect((await reconcileReviewAggregates(db, true)).repairs).toHaveLength(2);
+    expect((await db.doc('venues/count-place').get()).data()).toMatchObject({
+      reviewCount: 2,
+      rating: 4.5,
+    });
+    expect((await db.doc('users/count-author').get()).data()).toMatchObject({
+      reviewCount: 2,
+      xp: 123,
+    });
+    expect((await reconcileReviewAggregates(db, true)).repairs).toHaveLength(0);
+    expect((await db.collection('_reviewAggregateRepairs').get()).size).toBe(2);
+  });
+});
+
+it('gates weekly ranking activation by admin role/history, applies exclusions and uses validated scores', async () => {
+  const { db, first, author } = await createSocialFixture();
+  const custom = await getAuth().createCustomToken('qa-community-admin', {
+    role: 'admin',
+  });
+  const auth = (await fetch(
+    `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: custom, returnSecureToken: true }),
+    },
+  ).then((response) => response.json())) as { idToken: string };
+  await expect(
+    callFunction(
+      'setCommunityDiscoveryMode',
+      { mode: 'enabled', reason: 'QA approval' },
+      first.token,
+    ),
+  ).rejects.toMatchObject({ status: 'PERMISSION_DENIED' });
+  await expect(
+    callFunction(
+      'setCommunityDiscoveryMode',
+      { mode: 'enabled', reason: 'QA approval' },
+      auth.idToken,
+    ),
+  ).rejects.toMatchObject({ status: 'FAILED_PRECONDITION' });
+  const now = Date.now();
+  const fresh = {
+    algorithmVersion: 1,
+    calculatedAt: Timestamp.fromMillis(now),
+  };
+  await db
+    .collection('_communitySignalRuns')
+    .doc('qa-valid-observation')
+    .set({
+      ...fresh,
+      eventCount: 12,
+      firstObservedEventAt: Timestamp.fromMillis(now - 8 * 86_400_000),
+    });
+  for (const [id, followers, weekly] of [
+    ['weekly-winner', 2, 5],
+    ['lifetime-winner', 900, 1],
+  ] as const) {
+    await db.doc(`users/${id}`).set({
+      status: 'active',
+      displayName: id,
+      username: id,
+      city: 'Istanbul',
+      createdAt: Timestamp.fromMillis(now - 40 * 86_400_000),
+      reviewCount: 1,
+      followerCount: followers,
+    });
+    await db.doc(`_communityPeopleSignals/${id}`).set({
+      ...fresh,
+      userId: id,
+      uniqueFollowers7d: weekly,
+      reviewEngagement: 1,
+    });
+    await db.doc(`reviews/review-${id}`).set({
+      status: 'published',
+      authorId: id,
+      authorDisplayName: id,
+      venueId: 'weekly-place',
+      venueName: 'Place',
+      venueCity: 'Istanbul',
+      rating: 4.5,
+      text: 'Enough detailed food review text to qualify for the recent ranking.',
+      createdAt: Timestamp.fromMillis(now - 86_400_000),
+      reactionCount: followers,
+    });
+    await db.doc(`_communityReviewSignals/review-${id}`).set({
+      ...fresh,
+      score: weekly,
+      recentEngagement: weekly,
+      publishedAt: now - 86_400_000,
+    });
+  }
+  await db.doc('venues/weekly-place').set({
+    status: 'active',
+    name: 'Place',
+    city: 'Istanbul',
+    reviewCount: 2,
+    rating: 4.5,
+  });
+  await callFunction(
+    'setCommunityDiscoveryMode',
+    { mode: 'enabled', reason: 'QA validated synthetic history' },
+    auth.idToken,
+  );
+  const people = await callFunction<{
+    trendingIsAutomatic: boolean;
+    trending: { userId: string }[];
+  }>('getDiscoverPeople', {}, first.token);
+  expect(people.trendingIsAutomatic).toBe(true);
+  expect(people.trending[0]?.userId).toBe('weekly-winner');
+  const newlyJoined = await callFunction<{ new: { userId: string }[] }>(
+    'getDiscoverPeople',
+    {},
+    first.token,
+  );
+  expect(
+    newlyJoined.new.some((person) =>
+      ['weekly-winner', 'lifetime-winner'].includes(person.userId),
+    ),
+  ).toBe(false);
+
+  const feed = await callFunction<{
+    popularReviewsAreAutomatic: boolean;
+    popularReviews: { id: string }[];
+  }>('getDiscoverFeed', {}, first.token);
+  expect(feed.popularReviewsAreAutomatic).toBe(true);
+  expect(feed.popularReviews[0]?.id).toBe('review-weekly-winner');
+  await callFunction(
+    'setCommunityDiscoveryOverride',
+    {
+      targetType: 'user',
+      targetId: 'weekly-winner',
+      excluded: true,
+      reason: 'QA editorial exclusion',
+    },
+    auth.idToken,
+  );
+  const excluded = await callFunction<{ trending: { userId: string }[] }>(
+    'getDiscoverPeople',
+    {},
+    first.token,
+  );
+  expect(
+    excluded.trending.some((person) => person.userId === 'weekly-winner'),
+  ).toBe(false);
+  const excludedReviews = await callFunction<{
+    popularReviews: { id: string }[];
+  }>('getDiscoverFeed', {}, first.token);
+  expect(
+    excludedReviews.popularReviews.some(
+      (review) => review.id === 'review-weekly-winner',
+    ),
+  ).toBe(false);
+  expect((await db.doc('users/weekly-winner').get()).get('status')).toBe(
+    'active',
+  );
+  expect(
+    (await db.doc('reviews/review-weekly-winner').get()).get('status'),
+  ).toBe('published');
+  await db
+    .doc('_communitySignalRuns/qa-valid-observation')
+    .update({ calculatedAt: Timestamp.fromMillis(now - 3 * 60 * 60_000) });
+  const fallback = await callFunction<{
+    trendingIsAutomatic: boolean;
+    trending: { userId: string }[];
+  }>('getDiscoverPeople', {}, first.token);
+  expect(fallback.trendingIsAutomatic).toBe(false);
+  expect(
+    fallback.trending.some((person) => person.userId === 'weekly-winner'),
+  ).toBe(false);
+  expect((await db.doc(`users/${author.id}`).get()).get('status')).toBe(
+    'active',
+  );
+}, 25_000);

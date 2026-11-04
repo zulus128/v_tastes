@@ -162,3 +162,21 @@ Client writes are denied for the initial collections. Mutations are performed by
 ## Planned collections
 
 `reports`, `auditLogs`, immutable leaderboard snapshots, and private user settings will be introduced with their corresponding modules rather than pre-created without tested rules.
+
+### Venue merges and review aggregate maintenance
+
+Venue merges are a single bounded transaction, not a sequence of partial batches. Published reviews by the same author become one visit history with archived review aliases; comments, comment reactions, unique likers and legacy untracked like totals are preserved. Hidden-review conflicts and pending review reports require a staff decision before histories can be combined. Deleted and hidden reviews do not contribute to the destination's count or average. Claims are moved to the destination, saved-place folders are unioned, Favourite Place follows the destination, and old Place links resolve through merge aliases. Original saved-place records are retained privately under `_venueMergeArchives/{source}:{target}/savedVenues/{user}`. A retry to the same destination is a no-op; self-merges and merges into inactive places fail.
+
+The callable supports at most 200 source/destination review records, 450 total writes and a conservative payload budget. Larger merges fail before any writes and require a separate migration. Merging does not award or remove historical XP.
+
+`reconcileReviewCounters` runs daily at 03:20 UTC. Each venue/user is checked transactionally against its current published reviews; only mismatches are updated. Each repair retains previous and new values in private `_reviewAggregateRepairs`, with run summaries in `_aggregateReconciliationRuns`. `pnpm --filter @tastes/functions reviews:reconcile-aggregates` is read-only by default; `--apply` performs the same audited repairs. `ratingConfidence` is a ranking heuristic that shrinks an average toward 3 stars with a prior weight of 10 reviews, not a probability estimate.
+
+### Validated community ranking rollout
+
+`configuration/communityDiscovery` controls the live T-009/T-013 ranking separately from venue HOT/Trending. The default remains shadow mode. Activation requires an admin, a reason, a fresh calculation (at most two hours old), algorithm version 1 and at least seven days between the first observed event and validation. The Admin Overview exposes this state and the explicit activation/rollback actions. No elapsed-time timer activates rankings automatically.
+
+Once validated, People uses unique valid followers over seven days (engagement and total followers as tie-breakers), and reviews use the calculated recent-engagement scores, preferring the viewer's city. Current profile/review/venue availability is checked before selection. Stale or empty scores fall back to ordinary suggestions / lifetime Most liked reviews; mobile labels distinguish those modes. Review fallback scans bounded pages until enough eligible records are found rather than loading the entire review collection.
+
+Admin-only `setCommunityDiscoveryOverride` stores exclusions in `_communityOverrides/{user|review}:{id}` with a reason and audit event. Both automatic rankings and current fallback suggestions honor exclusions before applying result limits. Exclusions affect promotion, not publication or account access. Text/photo moderation remains manual. `getCommunityDiscoverySettings`, `setCommunityDiscoveryMode` and the override callable are protected by admin claims; moderator/mobile accounts cannot change activation or editorial exclusions.
+
+The People tab’s New on Tastes list includes only accounts created within the last 30 days; older profiles are not backfilled with a NEW label.

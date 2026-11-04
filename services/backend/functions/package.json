@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "node lib/scripts/seed.js",
     "comments:recount-seed": "node lib/scripts/recount-seed-comment-counts.js",
+    "reviews:reconcile-aggregates": "node lib/scripts/reconcile-review-aggregates.js",
     "users:reconcile-review-counts": "node lib/scripts/reconcile-user-review-counts.js",
     "seed:backfill-dish-photos": "node lib/scripts/backfill-seed-dish-photos.js",
     "search:backfill": "node lib/scripts/backfill-user-search.js",

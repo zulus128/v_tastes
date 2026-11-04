@@ -860,8 +860,16 @@ function TrendingFeed({
       {feed.popularReviews.length > 0 ? (
         <>
           <SectionLabel
-            title="Most liked reviews"
-            subtitle="Community favourites"
+            title={
+              feed.popularReviewsAreAutomatic
+                ? 'Popular reviews'
+                : 'Most liked reviews'
+            }
+            subtitle={
+              feed.popularReviewsAreAutomatic
+                ? 'Recent likes and comments'
+                : 'Community favourites'
+            }
           />
           <View style={styles.reviewList}>
             {feed.popularReviews.map((review) => (
@@ -2189,8 +2197,16 @@ function PeopleFeed({
             <>
               <PeopleSectionHeader
                 onSeeMore={() => setSeeMore(true)}
-                subtitle="People worth following"
-                title="Tastemakers to follow"
+                subtitle={
+                  peopleQuery.data?.trendingIsAutomatic
+                    ? 'Gaining followers this week'
+                    : 'People worth following'
+                }
+                title={
+                  peopleQuery.data?.trendingIsAutomatic
+                    ? 'Trending tastemakers'
+                    : 'Tastemakers to follow'
+                }
               />
               <ScrollView
                 contentContainerStyle={styles.peopleCarousel}
@@ -2289,7 +2305,9 @@ function PeopleFeed({
               <Text style={styles.back}>‹</Text>
             </Pressable>
             <Text style={[styles.stateTitle, { flex: 1 }]}>
-              Tastemakers to follow
+              {peopleQuery.data?.trendingIsAutomatic
+                ? 'Trending tastemakers'
+                : 'Tastemakers to follow'}
             </Text>
             <View style={styles.headerAction} />
           </View>
