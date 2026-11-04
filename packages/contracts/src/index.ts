@@ -1172,6 +1172,8 @@ export interface FavouritePlace {
   imageUrl: string | null;
   priceLevel: number;
   distanceKm: number;
+  latitude?: number;
+  longitude?: number;
   rating: number;
   reviewCount: number;
 }

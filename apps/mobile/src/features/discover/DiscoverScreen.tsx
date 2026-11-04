@@ -96,7 +96,13 @@ import {
 } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
+import { readDeviceLocation } from './deviceLocation';
 import { matchesPlaceFilters } from './placeFilters';
+import {
+  formatDistanceKm,
+  withDeviceDistance,
+  type Coordinates,
+} from './venueDistance';
 import { UserAvatar } from '../profile/avatar';
 
 type DiscoverTab = 'trending' | 'places' | 'people';
@@ -237,7 +243,7 @@ function venueImage(imageUrl?: string | null): ImageSourcePropType {
 }
 
 function formatDistance(km?: number): string {
-  return `${(km ?? 0).toFixed(1).replace('.', ',')} km`;
+  return formatDistanceKm(km ?? 0);
 }
 
 function formatCount(value: number): string {
@@ -282,7 +288,10 @@ function venueToPlace(venue: Venue): Place {
 
 export function DiscoverScreen({
   appliedFilters,
-  onClearFilters,
+  entrySignal = 0,
+  onClearSavedFilters,
+  onOpenSavedFilters,
+  savedFilters = [],
   onOpenAI,
   onOpenFilters,
   onOpenComments,
@@ -293,7 +302,11 @@ export function DiscoverScreen({
   userId,
 }: {
   appliedFilters: string[];
-  onClearFilters: () => void;
+  /** Changes each time the user enters Discover from the tab bar. */
+  entrySignal?: number;
+  onClearSavedFilters?: () => void;
+  onOpenSavedFilters?: () => void;
+  savedFilters?: string[];
   onOpenAI: () => void;
   onOpenFilters: () => void;
   onOpenComments: (reviewId: string) => void;
@@ -322,12 +335,13 @@ export function DiscoverScreen({
   };
   const [tab, setTab] = useState<DiscoverTab>('places');
   const [favouritesOpen, setFavouritesOpen] = useState(false);
-  useFocusEffect(
-    useCallback(() => {
-      setTab('places');
-      setFavouritesOpen(false);
-    }, []),
-  );
+  // Entering from the tab bar starts on Places; returning from a place, review
+  // or profile keeps the section the user was browsing.
+  useEffect(() => {
+    if (entrySignal === 0) return;
+    setTab('places');
+    setFavouritesOpen(false);
+  }, [entrySignal]);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(
@@ -340,29 +354,8 @@ export function DiscoverScreen({
     useCallback(() => {
       let active = true;
       void (async () => {
-        const permission = await Location.getForegroundPermissionsAsync();
-        if (permission.status !== 'granted') {
-          if (active) setDiscoveryLocation(undefined);
-          return;
-        }
-        if (!active) return;
-        const position =
-          (await Location.getLastKnownPositionAsync({
-            maxAge: 120_000,
-            requiredAccuracy: 1000,
-          })) ??
-          (await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          }));
-        if (active)
-          setDiscoveryLocation(
-            position
-              ? {
-                  latitude: position.coords.latitude,
-                  longitude: position.coords.longitude,
-                }
-              : undefined,
-          );
+        const position = await readDeviceLocation();
+        if (active) setDiscoveryLocation(position);
       })().catch(() => {
         if (active) setDiscoveryLocation(undefined);
       });
@@ -498,10 +491,10 @@ export function DiscoverScreen({
       ) : null}
       {tab === 'places' && favouritesOpen ? (
         <FavouritesPane
-          appliedFilters={appliedFilters}
+          appliedFilters={savedFilters}
           onBack={() => setFavouritesOpen(false)}
-          onClearFilters={onClearFilters}
-          onOpenFilters={onOpenFilters}
+          onClearFilters={onClearSavedFilters}
+          onOpenFilters={onOpenSavedFilters}
           onOpenPlace={onOpenPlace}
           onPrefetchPlaces={onPrefetchPlaces}
           userId={userId}
@@ -510,6 +503,7 @@ export function DiscoverScreen({
       {tab === 'places' && !favouritesOpen ? (
         <PlacesMap
           appliedFilters={appliedFilters}
+          deviceLocation={discoveryLocation}
           headerHeight={headerHeight}
           onOpenFavourites={() => setFavouritesOpen(true)}
           onOpenFilters={onOpenFilters}
@@ -950,6 +944,7 @@ function TrendingFeed({
 
 function PlacesMap({
   appliedFilters,
+  deviceLocation,
   headerHeight,
   onOpenFavourites,
   onOpenFilters,
@@ -960,6 +955,7 @@ function PlacesMap({
   userId,
 }: {
   appliedFilters: string[];
+  deviceLocation?: Coordinates;
   headerHeight: number;
   onOpenFavourites: () => void;
   onOpenFilters: () => void;
@@ -1034,9 +1030,15 @@ function PlacesMap({
   const venueSearchQuery = useVenueSearch(search);
   const peopleQuery = useDiscoverPeople(userId);
   const mapFeedQuery = useDiscoverFeed(userId);
-  const venues = venuesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const venues = (
+    venuesQuery.data?.pages.flatMap((page) => page.items) ?? []
+  ).map((venue) => withDeviceDistance(venue, deviceLocation));
   const searchResults =
-    search.trim().length >= 2 ? (venueSearchQuery.data?.items ?? []) : [];
+    search.trim().length >= 2
+      ? (venueSearchQuery.data?.items ?? []).map((venue) =>
+          withDeviceDistance(venue, deviceLocation),
+        )
+      : [];
   const searchableVenues =
     searchResults.length > 0
       ? [
@@ -1690,7 +1692,8 @@ function PlacesMap({
               style={[styles.filterChip, styles.filterChipActive]}
             >
               <Text style={[styles.filterText, styles.filterTextActive]}>
-                {appliedFilters.length} filters
+                {appliedFilters.length}{' '}
+                {appliedFilters.length === 1 ? 'filter' : 'filters'}
               </Text>
             </Pressable>
           ) : null}

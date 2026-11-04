@@ -158,4 +158,5 @@ it('hides the wishlist filter summary when no filters are active', async () => {
   );
 
   expect(screen.queryByTestId('wishlist-filter-summary')).toBeNull();
+  expect(screen.getByText('Filter saved places')).toBeTruthy();
 });
