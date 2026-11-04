@@ -36,6 +36,7 @@ import {
   unregisterPushNotifications,
 } from '../infrastructure/pushNotifications';
 import { queryClient, queryPersister } from '../infrastructure/query';
+import { runSessionBootstrap } from './session-bootstrap';
 import {
   authenticatedPhase,
   shouldClearSessionAfterTokenRefresh,
@@ -512,70 +513,73 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const loadStatus = useCallback(
     async (user: User) => {
       try {
-        // Fetch the authenticated bootstrap status before App Check. Builds
-        // that predate the native App Check module must still be able to learn
-        // that an App Store update is required and render the update prompt.
-        const result = await api.getSessionStatus();
-        const minimumBuild = Math.max(
-          0,
-          Number(result.data.minimumSupportedIosBuild ?? 0),
-        );
-        setMinimumSupportedIosBuild(minimumBuild);
-        const installedBuild = Number(Application.nativeBuildVersion ?? 0);
-        const unsupportedIosBuild =
-          Platform.OS === 'ios' &&
-          Number.isFinite(installedBuild) &&
-          installedBuild > 0 &&
-          installedBuild < minimumBuild;
+        await runSessionBootstrap(async () => {
+          if (auth.currentUser?.uid !== user.uid) return;
+          // Fetch the authenticated bootstrap status before App Check. Builds
+          // that predate the native App Check module must still be able to learn
+          // that an App Store update is required and render the update prompt.
+          const result = await api.getSessionStatus();
+          const minimumBuild = Math.max(
+            0,
+            Number(result.data.minimumSupportedIosBuild ?? 0),
+          );
+          setMinimumSupportedIosBuild(minimumBuild);
+          const installedBuild = Number(Application.nativeBuildVersion ?? 0);
+          const unsupportedIosBuild =
+            Platform.OS === 'ios' &&
+            Number.isFinite(installedBuild) &&
+            installedBuild > 0 &&
+            installedBuild < minimumBuild;
 
-        if (!unsupportedIosBuild) {
-          await configureAppCheck();
-        }
-        if (unsupportedIosBuild) {
+          if (!unsupportedIosBuild) {
+            await configureAppCheck();
+          }
+          if (unsupportedIosBuild) {
+            setState({
+              status: authenticatedPhase(result.data.onboardingComplete),
+              user,
+            });
+            return;
+          }
+          if (result.data.profileExists) {
+            void syncPushNotifications(api, {
+              requestPermission: result.data.onboardingComplete,
+            }).catch((error) => {
+              captureException(error, {
+                source: 'push',
+                operation: 'registerPushToken',
+              });
+            });
+          }
+          if (result.data.profileExists && !result.data.onboardingComplete) {
+            const legacyComplete = await AsyncStorage.getItem(
+              `tastes:post-signup-onboarding:${user.uid}`,
+            );
+            if (legacyComplete === 'complete') {
+              await api.completeOnboarding({
+                version: 1,
+                invitedContactCount: 0,
+                appearance: 'system',
+              });
+              await AsyncStorage.removeItem(
+                `tastes:post-signup-onboarding:${user.uid}`,
+              );
+              setState({ status: 'authenticated', user });
+              return;
+            }
+          }
           setState({
             status: authenticatedPhase(result.data.onboardingComplete),
             user,
           });
-          return;
-        }
-        if (result.data.profileExists) {
-          void syncPushNotifications(api, {
-            requestPermission: result.data.onboardingComplete,
-          }).catch((error) => {
-            captureException(error, {
-              source: 'push',
-              operation: 'registerPushToken',
-            });
-          });
-        }
-        if (result.data.profileExists && !result.data.onboardingComplete) {
-          const legacyComplete = await AsyncStorage.getItem(
-            `tastes:post-signup-onboarding:${user.uid}`,
-          );
-          if (legacyComplete === 'complete') {
-            await api.completeOnboarding({
-              version: 1,
-              invitedContactCount: 0,
-              appearance: 'system',
-            });
-            await AsyncStorage.removeItem(
-              `tastes:post-signup-onboarding:${user.uid}`,
-            );
-            setState({ status: 'authenticated', user });
-            return;
-          }
-        }
-        setState({
-          status: authenticatedPhase(result.data.onboardingComplete),
-          user,
-        });
+        }, handleUnauthenticated);
       } catch (error) {
-        if (auth.currentUser) {
+        if (auth.currentUser?.uid === user.uid) {
           setState({ status: 'error', user, error: normalizeApiError(error) });
         }
       }
     },
-    [api],
+    [api, handleUnauthenticated],
   );
 
   useEffect(
