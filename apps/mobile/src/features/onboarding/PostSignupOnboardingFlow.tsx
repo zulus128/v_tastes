@@ -1,6 +1,8 @@
 import {
   checkUsernameAvailabilityInputSchema,
   createUserProfileInputSchema,
+  countryFlagEmoji,
+  resolveCityCountryCode,
   type CompleteOnboardingInput,
 } from '@tastes/contracts';
 import { apiErrorMessage } from '@tastes/firebase-client';
@@ -1018,6 +1020,7 @@ export function PostSignupOnboardingFlow({
   >(visualAudit ? 'available' : 'idle');
   const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
+  const [cityCountryCode, setCityCountryCode] = useState<string | null>('MC');
   const [bio, setBio] = useState('');
   const [birthDay, setBirthDay] = useState(15);
   const [birthMonth, setBirthMonth] = useState(3);
@@ -1246,7 +1249,7 @@ export function PostSignupOnboardingFlow({
     const input = {
       displayName: displayName.trim(),
       username: username.trim(),
-      ...(city ? { city } : {}),
+      ...(city ? { city, countryCode: cityCountryCode } : {}),
       bio: bio.trim(),
       ...(birthDate ? { birthDate } : {}),
     };
@@ -1308,6 +1311,7 @@ export function PostSignupOnboardingFlow({
     if (visualAudit) {
       setCity('Monaco');
       setCityFlag(flagMonaco);
+      setCityCountryCode('MC');
       enterPlaces();
       return;
     }
@@ -1334,12 +1338,15 @@ export function PostSignupOnboardingFlow({
       const resolvedCity = address?.city?.trim();
       if (resolvedCity) {
         const canonicalCity = canonicalCityName(resolvedCity);
+        const countryCode = resolveCityCountryCode(
+          canonicalCity,
+          address.isoCountryCode,
+        );
         setCity(canonicalCity);
-        await api.updateProfileSettings({ city: canonicalCity });
-      }
-      if (address?.isoCountryCode) {
-        const flag = countryFlags[address.isoCountryCode.toUpperCase()];
-        if (flag) setCityFlag(flag);
+        setCityCountryCode(countryCode);
+        if (countryCode && countryFlags[countryCode])
+          setCityFlag(countryFlags[countryCode]!);
+        await api.updateProfileSettings({ city: canonicalCity, countryCode });
       }
     } catch {
       // Permission is enough to continue; city can still be selected manually.
@@ -1493,6 +1500,7 @@ export function PostSignupOnboardingFlow({
           onSelect={(name, flag) => {
             setCity(name);
             setCityFlag(flag);
+            setCityCountryCode(resolveCityCountryCode(name));
             back();
           }}
         />
@@ -1612,8 +1620,14 @@ export function PostSignupOnboardingFlow({
                     >
                       {city || 'Select your city'}
                     </Text>
-                    {city ? (
+                    {city &&
+                    cityCountryCode &&
+                    countryFlags[cityCountryCode] ? (
                       <Image source={cityFlag} style={styles.locationFlag} />
+                    ) : city && countryFlagEmoji(cityCountryCode) ? (
+                      <Text style={styles.locationFlagEmoji}>
+                        {countryFlagEmoji(cityCountryCode)}
+                      </Text>
                     ) : null}
                     <Image
                       source={chevronRight}
@@ -3058,6 +3072,7 @@ const createStyles = (
     locationValue: { color: colors.textMuted, fontSize: 15 },
     locationSelection: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     locationFlag: { width: 18, height: 18 },
+    locationFlagEmoji: { fontSize: 18, lineHeight: 22 },
     locationChevron: { width: 8, height: 16, marginLeft: 2 },
     modalBackdrop: {
       flex: 1,

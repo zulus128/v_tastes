@@ -2791,7 +2791,7 @@ function TopReviewer({
         </View>
       </View>
       <Text style={styles.reviewerMeta}>
-        {person.favoriteCuisines.join(' · ') || 'Local tastemaker'} ·{' '}
+        {person.favoriteCuisines.join(' · ') || 'Tastemaker'} ·{' '}
         {person.reviewCount} reviews
       </Text>
       <View style={styles.reviewerButtons}>

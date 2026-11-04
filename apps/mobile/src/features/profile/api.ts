@@ -21,6 +21,7 @@ import { firestore } from '../../infrastructure/firebase';
 export type ProfileData = {
   bio: string;
   city: string | null;
+  countryCode?: string | null;
   displayName: string;
   favoriteCuisines: string[];
   favoriteDish: string | null;
@@ -47,6 +48,8 @@ function profileFromDocument(
   return {
     bio: typeof data?.bio === 'string' ? data.bio : '',
     city: typeof data?.city === 'string' ? data.city : null,
+    countryCode:
+      typeof data?.countryCode === 'string' ? data.countryCode : null,
     displayName:
       typeof data?.displayName === 'string' ? data.displayName : fallbackName,
     favoriteCuisines: cuisines,

@@ -24,9 +24,6 @@ import bottomGlow from '../../../assets/ai/bottom-glow.png';
 import SendIcon from '../../../assets/ai/send.svg';
 import AiMouthOutline from '../../../assets/create-review/success-mouth-outline.svg';
 import AiMouthPink from '../../../assets/create-review/success-mouth-pink.svg';
-import cafeImage from '../../../assets/discover/cafe.png';
-import loungeImage from '../../../assets/discover/lounge.png';
-import restaurantImage from '../../../assets/discover/restaurant.png';
 import BookmarkIcon from '../../../assets/favourites/bookmark.svg';
 import OfflineIcon from '../../../assets/figma-icons/home-offline.svg';
 import LocationOffIcon from '../../../assets/leaderboard/xp-location.svg';
@@ -57,7 +54,6 @@ type LegacyAiExchange = AiTurn;
 
 const HISTORY_KEY = '@tastes/ai-history';
 const THINKING_PREVIEW_DELAY_MS = __DEV__ ? 5_000 : 0;
-const PLACE_IMAGES = [cafeImage, loungeImage, restaurantImage] as const;
 const QUICK_PROMPTS = [
   { label: '⭐ Top rated', prompt: 'Show me the top-rated restaurants nearby' },
   { label: '🍔 Fast food', prompt: 'Find good fast food nearby' },
@@ -396,9 +392,7 @@ export function TastesAIScreen({
               />
             </View>
             <Text style={styles.heroCopy}>
-              {
-                'Find the best restaurants near you\nwith AI recommendations based on\n'
-              }
+              {'Automated place suggestions using\ncommunity ratings and\n'}
               <Text style={styles.accent}>your taste</Text>
             </Text>
           </View>
@@ -598,10 +592,9 @@ function ChatTurn({
               </View>
             </View>
             <View style={styles.placeList}>
-              {turn.answer.places.map((place, index) => (
+              {turn.answer.places.map((place) => (
                 <PlaceCard
                   key={place.id}
-                  index={index}
                   onOpen={() => onOpenPlace(place.id)}
                   onSave={() =>
                     onSavePlace({ venueId: place.id, name: place.name })
@@ -689,26 +682,24 @@ function Thinking({
 }
 
 function PlaceCard({
-  index,
   onOpen,
   onSave,
   place,
   styles,
 }: {
-  index: number;
   onOpen: () => void;
   onSave: () => void;
   place: TastesAiPlace;
   styles: ReturnType<typeof createStyles>;
 }) {
   const { isDark } = useAppTheme();
-  const reviewCount = 35 + index * 18;
   return (
     <Pressable onPress={onOpen} style={styles.placeCard}>
-      <Image
-        source={PLACE_IMAGES[index % PLACE_IMAGES.length]}
-        style={styles.placeImage}
-      />
+      {place.imageUrl ? (
+        <Image source={{ uri: place.imageUrl }} style={styles.placeImage} />
+      ) : (
+        <View style={[styles.placeImage, styles.placeImagePlaceholder]} />
+      )}
       <View style={styles.placeCopy}>
         <Text numberOfLines={1} style={styles.placeName}>
           {place.name}
@@ -722,7 +713,12 @@ function PlaceCard({
               ★ {place.rating.toFixed(1)}
             </Text>
           </View>
-          <Text style={styles.reviewCount}>{reviewCount} reviews</Text>
+          {typeof place.reviewCount === 'number' ? (
+            <Text style={styles.reviewCount}>
+              {place.reviewCount}{' '}
+              {place.reviewCount === 1 ? 'review' : 'reviews'}
+            </Text>
+          ) : null}
         </View>
       </View>
       <Pressable
@@ -1309,6 +1305,7 @@ function createStyles(colors: ThemeColors) {
       height: isDark ? 112 : 122,
       borderRadius: 12,
     },
+    placeImagePlaceholder: { backgroundColor: colors.border },
     bookmark: {
       position: 'absolute',
       top: 12,
