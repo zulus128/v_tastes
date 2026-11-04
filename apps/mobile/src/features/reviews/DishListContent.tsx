@@ -1,5 +1,5 @@
 import type { Review } from '@tastes/contracts';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAppTheme } from '../../ui/ThemeProvider';
 import { responsiveSize } from '../../ui/responsive';
@@ -31,10 +31,12 @@ export function DishListContent({
   dishes,
   visits = [],
   onOpen,
+  renderPhoto,
 }: {
   dishes: Dish[];
   visits?: Visit[];
   onOpen: (index: number) => void;
+  renderPhoto?: (dish: Dish) => ReactNode;
 }) {
   const { colors } = useAppTheme();
   const [query, setQuery] = useState('');
@@ -44,14 +46,26 @@ export function DishListContent({
   const dateLabel = (visit: Visit, chips = false) => {
     const date = new Date(visit.createdAt);
     const sameMonth =
+      visits.filter((other) => {
+        const otherDate = new Date(other.createdAt);
+        return (
+          otherDate.getFullYear() === date.getFullYear() &&
+          otherDate.getMonth() === date.getMonth()
+        );
+      }).length > 1;
+    const sameDay =
       visits.filter(
-        (other) => other.createdAt.slice(0, 7) === visit.createdAt.slice(0, 7),
+        (other) =>
+          new Date(other.createdAt).toDateString() === date.toDateString(),
       ).length > 1;
-    return date.toLocaleDateString('en-US', {
+    const label = date.toLocaleDateString('en-US', {
       month: 'short',
       year: 'numeric',
       ...(!chips || sameMonth ? { day: 'numeric' as const } : {}),
     });
+    return chips && sameDay
+      ? `${label} · Visit ${visits.findIndex((other) => other.id === visit.id) + 1}`
+      : label;
   };
   const groups =
     filter !== 'all'
@@ -164,6 +178,16 @@ export function DishListContent({
                   dish,
                   index,
                   rating: filter !== 'all' ? history!.rating : dish.rating,
+                  photo:
+                    filter !== 'all'
+                      ? {
+                          ...dish,
+                          photoPath: history?.photoPath,
+                          photoUrl: history?.photoUrl,
+                          thumbnailPath: history?.thumbnailPath,
+                          thumbnailUrl: history?.thumbnailUrl,
+                        }
+                      : dish,
                 },
               ];
             })
@@ -189,7 +213,7 @@ export function DishListContent({
                   · {dateLabel(visit)}
                 </Text>
               ) : null}
-              {rows.map(({ dish, index, rating }) => {
+              {rows.map(({ dish, index, rating, photo }) => {
                 const tag =
                   filter === 'all' && visits.length > 1
                     ? dishVisitTag(dish, latest)
@@ -205,26 +229,49 @@ export function DishListContent({
                       borderBottomWidth: 1,
                       borderColor: colors.border,
                       paddingVertical: responsiveSize(10),
-                      gap: 6,
+                      gap: responsiveSize(12),
+                      flexDirection: 'row',
+                      alignItems: 'center',
                     }}
                   >
-                    <Text
+                    <View
                       style={{
-                        color: colors.text,
-                        fontSize: responsiveSize(16),
+                        width: responsiveSize(44),
+                        height: responsiveSize(44),
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        backgroundColor: colors.border,
                       }}
                     >
-                      {dish.title}
-                    </Text>
-                    {tag ? (
-                      <Text style={{ color: colors.primary }}>{tag}</Text>
-                    ) : null}
-                    <Text style={{ color: colors.text }}>
+                      {renderPhoto?.(photo)}
+                    </View>
+                    <View style={{ flex: 1, gap: responsiveSize(4) }}>
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: responsiveSize(16),
+                        }}
+                      >
+                        {dish.title}
+                      </Text>
+                      {tag ? (
+                        <Text style={{ color: colors.primary }}>{tag}</Text>
+                      ) : null}
+                    </View>
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        backgroundColor: colors.primary,
+                        borderRadius: responsiveSize(12),
+                        paddingHorizontal: responsiveSize(10),
+                        paddingVertical: responsiveSize(4),
+                      }}
+                    >
                       {previous != null ? (
                         <Text
                           style={{
                             textDecorationLine: 'line-through',
-                            color: colors.textSecondary,
+                            color: '#FFFFFF',
                           }}
                         >
                           {previous.toFixed(1)}{' '}
