@@ -345,7 +345,10 @@ export async function tasteRecommendations(
         confidence: card.confidence,
         supporterCount: card.supporterCount,
         reviewerCount: card.reviewerCount,
-        headline: card.explanation.headline,
+        headline: card.explanation.headline.replace(
+          ' and 1 others in ',
+          ' and 1 other person in ',
+        ),
         connection: card.explanation.connection,
         reviewId: review.id,
       },
