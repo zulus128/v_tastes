@@ -1187,15 +1187,15 @@ export function ProfileSettingsSheet({
                 <View style={styles.headerButton} />
               </View>
               <View style={styles.accountSecurityContent}>
-                <Text style={styles.notificationLabel}>Public profile</Text>
-                <Text style={styles.notificationLabel}>
+                <Text style={styles.privacyText}>Public profile</Text>
+                <Text style={styles.privacyText}>
                   Profiles and cities are visible to other members during the
                   pilot. Saved places are only visible to you.
                 </Text>
-                <Text style={styles.notificationLabel}>
+                <Text style={styles.privacyText}>
                   Messages are available between people who follow one another.
                 </Text>
-                <Text style={styles.notificationLabel}>
+                <Text style={styles.privacyText}>
                   Private accounts and additional privacy controls are not
                   available yet.
                 </Text>
@@ -1699,6 +1699,12 @@ function createStyles(
       justifyContent: 'center',
     },
     appearanceContent: { paddingTop: 24, paddingHorizontal: 16 },
+    privacyText: {
+      color: colors.text,
+      fontSize: 16,
+      lineHeight: 22,
+      letterSpacing: -0.41,
+    },
     accountSecurityContent: {
       paddingTop: 20,
       paddingHorizontal: 16,
