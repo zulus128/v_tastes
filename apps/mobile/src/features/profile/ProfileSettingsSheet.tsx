@@ -1189,8 +1189,8 @@ export function ProfileSettingsSheet({
               <View style={styles.accountSecurityContent}>
                 <Text style={styles.notificationLabel}>Public profile</Text>
                 <Text style={styles.notificationLabel}>
-                  Profiles, cities and wishlists are visible to other members
-                  during the pilot.
+                  Profiles and cities are visible to other members during the
+                  pilot. Saved places are only visible to you.
                 </Text>
                 <Text style={styles.notificationLabel}>
                   Messages are available between people who follow one another.

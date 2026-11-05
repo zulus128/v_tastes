@@ -38,6 +38,6 @@ Engineering days, excluding client waiting time and testing/validation that Vadi
 
 ## Other QA observations
 
-- Privacy switches previously saved only on the device. They must not imply protection that the server does not enforce. The follow-up replaces them with a read-only description of public profiles and mutual-follow messaging; full private accounts remain pending the client's scope clarification.
+- Privacy switches previously saved only on the device. They must not imply protection that the server does not enforce. The follow-up replaces them with a read-only description of public profiles, owner-only wishlists and mutual-follow messaging; full private accounts remain pending the client's scope clarification.
 - A highlight can legitimately have no value when a review has no applicable cuisine/tag. Its count describes matching reviews, not all reviews. The remote profile-summary function also required deployment of its current implementation.
 - Monte Carlo search was not requested in the cited requirement (which names Menton and Roquebrune); it is not treated as an unimplemented agreed item.
