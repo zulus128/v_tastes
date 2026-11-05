@@ -237,8 +237,9 @@ it('opens the Figma account security and privacy destinations', async () => {
   await fireEvent.press(screen.getByLabelText('Edit Privacy'));
   expect(dismiss).toHaveBeenCalled();
   expect(screen.getByTestId('privacy-settings-pane')).toBeTruthy();
-  expect(screen.getByText('Private account')).toBeTruthy();
-  expect(screen.getByText('Blocked accounts')).toBeTruthy();
+  expect(screen.getByText('Public profile')).toBeTruthy();
+  expect(screen.queryByText('Private account')).toBeNull();
+  expect(screen.queryByText('Blocked accounts')).toBeNull();
 });
 
 it('dismisses the keyboard before notifications and while scrolling them', async () => {

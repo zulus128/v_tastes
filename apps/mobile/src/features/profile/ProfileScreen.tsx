@@ -383,7 +383,9 @@ export function ProfileScreen({
           return;
         }
         setBlocked(result.data.blocked);
-        setFollowing(result.data.viewerFollowing);
+        if (typeof result.data.viewerFollowing === 'boolean') {
+          setFollowing(result.data.viewerFollowing);
+        }
       })
       .catch(() => {
         if (active) {

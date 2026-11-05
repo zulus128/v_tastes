@@ -1,8 +1,16 @@
 /// <reference types="jest" />
 
+import mockSafeAreaContext from 'react-native-safe-area-context/jest/mock';
 import type { PlaceReview } from '@tastes/contracts';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import { ReviewCard } from '../src/features/place/PlaceScreen';
+
+jest.mock('react-native-safe-area-context', () => mockSafeAreaContext);
 
 jest.mock('@tastes/firebase-client', () => ({ apiErrorMessage: String }));
 jest.mock('../src/features/favourites/FavouritesPane', () => ({
@@ -93,4 +101,41 @@ it('opens the review author profile from the venue review card', async () => {
 
   fireEvent.press(screen.getByLabelText('Open Current User profile'));
   expect(onOpenProfile).toHaveBeenCalledWith('current-user');
+});
+
+it('opens the shared dish list and dish review from a Place review', async () => {
+  await render(
+    <ReviewCard
+      fallbackPhotoUrls={[]}
+      item={{
+        ...review,
+        dishReviews: [{ id: 'dish-1', title: 'Pasta', rating: 4 }],
+      }}
+      onComments={jest.fn()}
+      onOpenProfile={jest.fn()}
+      onReact={jest.fn()}
+      onShare={jest.fn()}
+      reacted={false}
+      reactingId={null}
+      reviewIndex={0}
+      styles={{} as never}
+      venueName="Kadikoy Noodle House"
+    />,
+  );
+  await fireEvent.press(screen.getByLabelText('Open dish reviews'));
+  expect(
+    within(screen.getByTestId('dish-review-sheet')).getByText('Dishes (1)'),
+  ).toBeOnTheScreen();
+  // The selected list item uses the same viewer as the photo carousel.
+  await fireEvent.press(
+    within(screen.getByTestId('dish-review-sheet')).getByLabelText(
+      'Open dish review for Pasta',
+    ),
+  );
+  expect(screen.getByText('Dish Review')).toBeOnTheScreen();
+  expect(
+    within(screen.getByTestId('dish-review-sheet')).getByLabelText(
+      'No dish photo',
+    ),
+  ).toBeOnTheScreen();
 });

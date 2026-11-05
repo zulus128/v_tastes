@@ -276,6 +276,8 @@ export function FavouritesPane({
       {favourites.isSuccess && places.length === 0 ? (
         <EmptyState
           folderName={selectedFolder?.name}
+          filtered={appliedFilters.length > 0}
+          onResetFilters={onClearFilters}
           onBrowsePlaces={onBack}
           query={normalizedQuery}
           styles={styles}
@@ -653,26 +655,34 @@ function FolderChip({
 }
 
 function EmptyState({
+  filtered = false,
+  onResetFilters,
   folderName,
   onBrowsePlaces,
   query,
   styles,
 }: {
+  filtered?: boolean;
+  onResetFilters?: () => void;
   folderName?: string;
   onBrowsePlaces?: () => void;
   query: string;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const title = query
-    ? 'No places found'
-    : folderName
-      ? `Nothing in ${folderName} yet`
-      : 'Nothing saved yet';
-  const body = query
-    ? 'Try a different search.'
-    : folderName
-      ? 'Save a place to this folder from any place page.'
-      : 'Tap the bookmark on any place to save it here.';
+  const title = filtered
+    ? 'No matching saved places'
+    : query
+      ? 'No places found'
+      : folderName
+        ? `Nothing in ${folderName} yet`
+        : 'Nothing saved yet';
+  const body = filtered
+    ? 'Try changing your filters or reset them to see your saved places.'
+    : query
+      ? 'Try a different search.'
+      : folderName
+        ? 'Save a place to this folder from any place page.'
+        : 'Tap the bookmark on any place to save it here.';
   return (
     <View style={styles.emptyState}>
       <EmptyIcon
@@ -682,7 +692,16 @@ function EmptyState({
       />
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateBody}>{body}</Text>
-      {!query && onBrowsePlaces ? (
+      {filtered && onResetFilters ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onResetFilters}
+          style={styles.browsePlacesButton}
+        >
+          <Text style={styles.browsePlacesText}>Reset filters</Text>
+        </Pressable>
+      ) : null}
+      {!filtered && !query && onBrowsePlaces ? (
         <Pressable
           accessibilityRole="button"
           onPress={onBrowsePlaces}

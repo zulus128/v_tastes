@@ -1076,6 +1076,10 @@ export const getPlaceReviews = onCall(callableOptions, async (request) => {
         dishReviews: Array.isArray(document.get('dishReviews'))
           ? (document.get('dishReviews') as PlaceReview['dishReviews'])
           : [],
+        visitCount: Number(document.get('visitCount') ?? 1),
+        visits: Array.isArray(document.get('visits'))
+          ? (document.get('visits') as PlaceReview['visits'])
+          : [],
       };
     });
   const last = pageDocs.at(-1);

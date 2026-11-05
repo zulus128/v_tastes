@@ -1,3 +1,5 @@
+import { DishPhoto, DishReviewSheet } from '../reviews/DishReviewSheet';
+import { reviewDishLabel } from '../reviews/DishListContent';
 import type { PlaceReview, PlaceReviewSort } from '@tastes/contracts';
 import { useDeviceLocation } from '../discover/deviceLocation';
 import {
@@ -63,8 +65,6 @@ import { responsiveSize, responsiveStyleSheet } from '../../ui/responsive';
 import { useTastesApi } from '../../session/SessionProvider';
 import { createIdempotencyKey } from '../../infrastructure/idempotency';
 import { formatDisplayDate } from '../../infrastructure/date';
-import { captureException } from '../../infrastructure/observability';
-import { resolveStorageImageUrl } from '../../infrastructure/storageImage';
 import { UserAvatar } from '../profile/avatar';
 import { ReviewCityBadge, ReviewMetaRow } from '../reviews/ReviewMetadata';
 import { PlacePhotoPager } from './PlacePhotoPager';
@@ -879,119 +879,6 @@ function RatingStars({
   );
 }
 
-function ReviewPhoto({
-  photoUrl,
-  path,
-  rating,
-  styles,
-  title,
-}: {
-  photoUrl?: string;
-  path?: string | null;
-  rating: number;
-  styles: ReturnType<typeof createStyles>;
-  title: string;
-}) {
-  const fallbackUri = photoUrl;
-  const normalizedPath = path?.trim().replace(/^\/+|\/+$/g, '') ?? '';
-  const [uri, setUri] = useState<string | null>(fallbackUri ?? null);
-  const [failed, setFailed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setFailed(false);
-    setUri(fallbackUri ?? null);
-    if (!normalizedPath) {
-      setUri(fallbackUri ?? null);
-      setFailed(!fallbackUri);
-      return () => {
-        active = false;
-      };
-    }
-    let download: Promise<string>;
-    try {
-      download = resolveStorageImageUrl(normalizedPath);
-    } catch (error) {
-      captureException(error, {
-        operation: 'load-place-review-photo',
-        path: normalizedPath,
-      });
-      setUri(fallbackUri ?? null);
-      setFailed(!fallbackUri);
-      return () => {
-        active = false;
-      };
-    }
-    void download
-      .then((value) => {
-        if (active) setUri(value);
-      })
-      .catch((error) => {
-        captureException(error, {
-          operation: 'load-place-review-photo',
-          path: normalizedPath,
-        });
-        if (active) {
-          setUri(fallbackUri ?? null);
-          setFailed(!fallbackUri);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [fallbackUri, normalizedPath]);
-
-  return (
-    <Pressable
-      accessibilityLabel={uri ? `Enlarge ${title} photo` : undefined}
-      disabled={!uri}
-      onPress={() => setExpanded(true)}
-      style={styles.reviewPhoto}
-    >
-      {uri ? (
-        <Image
-          onError={() => {
-            if (fallbackUri && uri !== fallbackUri) setUri(fallbackUri);
-            else {
-              setUri(null);
-              setFailed(true);
-            }
-          }}
-          source={{ uri }}
-          style={styles.reviewPhotoImage}
-        />
-      ) : (
-        <View style={styles.reviewPhotoPlaceholder}>
-          {failed ? (
-            <Text style={styles.reviewPhotoError}>Photo unavailable</Text>
-          ) : (
-            <ActivityIndicator
-              color={styles.primaryBadge.backgroundColor as string}
-            />
-          )}
-        </View>
-      )}
-      <LinearGradient
-        colors={['#161616', 'rgba(22,22,22,0)']}
-        locations={[0.0167, 0.3067]}
-        pointerEvents="none"
-        style={styles.reviewPhotoGradient}
-      />
-      <Text numberOfLines={1} style={styles.reviewPhotoTitle}>
-        {title}
-      </Text>
-      <Text style={styles.reviewPhotoRating}>★ {rating.toFixed(1)}</Text>
-      <FullscreenPhoto
-        close={() => setExpanded(false)}
-        styles={styles}
-        url={uri}
-        visible={expanded}
-      />
-    </Pressable>
-  );
-}
-
 export function ReviewCard({
   item: review,
   onComments,
@@ -1019,6 +906,9 @@ export function ReviewCard({
 }) {
   const { colors } = useAppTheme();
   const displayDishes = review.dishReviews;
+  const [selectedDishIndex, setSelectedDishIndex] = useState<number | null>(
+    null,
+  );
   return (
     <View style={[styles.review, styles.reviewListCard]}>
       <Pressable
@@ -1059,15 +949,30 @@ export function ReviewCard({
             showsHorizontalScrollIndicator={false}
             testID={`place-review-dishes-${review.id}`}
           >
-            {displayDishes.map((dish) => (
-              <ReviewPhoto
-                photoUrl={dish.photoUrl}
+            {displayDishes.map((dish, index) => (
+              <Pressable
+                accessibilityLabel={`Open dish review for ${dish.title}`}
                 key={dish.id}
-                path={dish.photoPath}
-                rating={dish.rating}
-                styles={styles}
-                title={dish.title}
-              />
+                onPress={() => setSelectedDishIndex(index)}
+                style={styles.reviewPhoto}
+              >
+                <DishPhoto
+                  photoPath={dish.thumbnailPath ?? dish.photoPath}
+                  photoUrl={dish.thumbnailUrl ?? dish.photoUrl}
+                />
+                <LinearGradient
+                  colors={['#161616', 'rgba(22,22,22,0)']}
+                  locations={[0.0167, 0.3067]}
+                  pointerEvents="none"
+                  style={styles.reviewPhotoGradient}
+                />
+                <Text numberOfLines={1} style={styles.reviewPhotoTitle}>
+                  {dish.title}
+                </Text>
+                <Text style={styles.reviewPhotoRating}>
+                  ★ {dish.rating.toFixed(1)}
+                </Text>
+              </Pressable>
             ))}
           </ScrollView>
         ) : null}
@@ -1125,19 +1030,30 @@ export function ReviewCard({
             </Pressable>
           </View>
           {displayDishes.length > 0 ? (
-            <View style={styles.dishCountTag}>
+            <Pressable
+              accessibilityLabel="Open dish reviews"
+              onPress={() => setSelectedDishIndex(-1)}
+              style={styles.dishCountTag}
+            >
               <TopRatedDishesIcon
                 color={colors.primary}
                 height={responsiveSize(14)}
                 width={responsiveSize(14)}
               />
               <Text style={styles.dishCountText}>
-                Dishes ({displayDishes.length})
+                {reviewDishLabel(review)}
               </Text>
-            </View>
+            </Pressable>
           ) : null}
         </View>
       </View>
+      <DishReviewSheet
+        dishes={displayDishes}
+        visits={review.visits}
+        index={selectedDishIndex}
+        onClose={() => setSelectedDishIndex(null)}
+        onIndexChange={setSelectedDishIndex}
+      />
     </View>
   );
 }
