@@ -717,7 +717,7 @@ describe('onboarding in resizable windows', () => {
     expect(
       StyleSheet.flatten(
         screen.getByText(
-          'Write your first 3 reviews to unlock personalized recommendations',
+          'Rate 5 different dishes to build your taste profile and unlock personalized recommendations',
         ).props.style,
       ),
     ).toMatchObject({ color: '#677083' });
@@ -833,8 +833,8 @@ describe('onboarding in resizable windows', () => {
     ['place', 'See what’s good near you'],
     ['style', 'Choose your favourite place'],
     ['contactsPermission', 'Pick your look'],
-    ['contacts', 'Find your people'],
-    ['invite', 'Find your people'],
+    ['contacts', 'Invite your friends'],
+    ['invite', 'Pick your look'],
   ] as const)(
     'navigates back from the directly opened %s post-signup screen',
     async (initialScreen, expectedTitle) => {
@@ -883,7 +883,7 @@ describe('onboarding in resizable windows', () => {
       );
 
       await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-      expect(await screen.findByText('Find your people')).toBeOnTheScreen();
+      expect(await screen.findByText('Invite your friends')).toBeOnTheScreen();
     },
   );
 
@@ -960,13 +960,17 @@ describe('onboarding in resizable windows', () => {
       0,
     );
     expect(invitations).not.toContainElement(
-      screen.getByRole('button', { name: 'Continue' }),
+      screen.getByRole('button', { name: 'Allow Contacts' }),
     );
     expect(screen.getByLabelText('Step 6 of 6')).toBeOnTheScreen();
     expect(screen.queryByText('1 of 3 friends invited')).not.toBeOnTheScreen();
     expect(screen.getByText('Invite from your contacts')).toBeOnTheScreen();
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Allow Contacts' }),
+    );
+    expect(await screen.findByText('Friends from contacts')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(await screen.findByText('You’re ready!')).toBeOnTheScreen();
     expect(screen.queryByText('Stay in the loop')).not.toBeOnTheScreen();
   });

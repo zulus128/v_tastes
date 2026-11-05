@@ -224,6 +224,9 @@ function MainTabs({
   const { api, logout, deleteAccount } = useSession();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [discoverEntrySignal, setDiscoverEntrySignal] = useState(0);
+  const [discoverEntryTab, setDiscoverEntryTab] = useState<'places' | 'people'>(
+    'places',
+  );
   const [placeSelectorVisible, setPlaceSelectorVisible] = useState(false);
   const [openingConversationFor, setOpeningConversationFor] = useState<
     string | null
@@ -300,7 +303,11 @@ function MainTabs({
         <Tabs.Screen name="Home">
           {({ navigation }) => (
             <HomeFeedScreen
-              onExplore={() => navigation.navigate('Discover')}
+              onExplore={() => {
+                setDiscoverEntryTab('people');
+                setDiscoverEntrySignal((value) => value + 1);
+                navigation.navigate('Discover');
+              }}
               onOpenComments={openComments}
               onOpenLeaderboard={() => rootNavigation.navigate('Leaderboard')}
               onOpenNotifications={() =>
@@ -317,7 +324,10 @@ function MainTabs({
         </Tabs.Screen>
         <Tabs.Screen
           listeners={{
-            tabPress: () => setDiscoverEntrySignal((value) => value + 1),
+            tabPress: () => {
+              setDiscoverEntryTab('places');
+              setDiscoverEntrySignal((value) => value + 1);
+            },
           }}
           name="Discover"
           options={{ tabBarHideOnKeyboard: false }}
@@ -326,6 +336,7 @@ function MainTabs({
             <DiscoverScreen
               appliedFilters={discoverFilters}
               entrySignal={discoverEntrySignal}
+              entryTab={discoverEntryTab}
               onClearSavedFilters={onClearSavedFilters}
               onOpenAI={() => rootNavigation.navigate('TastesAI')}
               onOpenFilters={() =>

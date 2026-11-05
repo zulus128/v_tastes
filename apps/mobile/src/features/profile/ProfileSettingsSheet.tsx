@@ -1,5 +1,4 @@
 import { apiErrorMessage } from '@tastes/firebase-client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   defaultNotificationPreferences,
   notificationCategoryLabels,
@@ -91,20 +90,6 @@ const appearanceOptions: readonly {
   { label: 'Dark', description: 'Always use the dark theme', value: 'dark' },
 ];
 
-type PrivacyPreferences = {
-  privateAccount: boolean;
-  showWishlist: boolean;
-  showCity: boolean;
-  allowMessagesFromEveryone: boolean;
-};
-
-const defaultPrivacyPreferences: PrivacyPreferences = {
-  privateAccount: true,
-  showWishlist: true,
-  showCity: true,
-  allowMessagesFromEveryone: false,
-};
-
 export function ProfileSettingsSheet({
   fallbackName,
   onClose,
@@ -160,8 +145,6 @@ export function ProfileSettingsSheet({
   const confirmPasswordInputRef = useRef<TextInput>(null);
   const placeSearchInputRef = useRef<TextInput>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [privacyPreferences, setPrivacyPreferences] =
-    useState<PrivacyPreferences>(defaultPrivacyPreferences);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationPreferences>(
     defaultNotificationPreferences,
@@ -220,21 +203,6 @@ export function ProfileSettingsSheet({
     setPlaceOpen(false);
     setPasswordEditorOpen(false);
   }, [visible]);
-
-  useEffect(() => {
-    if (!visible) return;
-    void AsyncStorage.getItem(`@tastes/privacy/${userId}`).then((stored) => {
-      if (!stored) return;
-      try {
-        setPrivacyPreferences({
-          ...defaultPrivacyPreferences,
-          ...(JSON.parse(stored) as Partial<PrivacyPreferences>),
-        });
-      } catch {
-        setPrivacyPreferences(defaultPrivacyPreferences);
-      }
-    });
-  }, [userId, visible]);
 
   useEffect(() => {
     if (!visible || !profile?.favoriteVenueId) {
@@ -510,22 +478,6 @@ export function ProfileSettingsSheet({
     saveNotifications({
       ...notifications,
       categories: { ...notifications.categories, [category]: value },
-    });
-  }
-
-  function savePrivacyPreference(
-    key: keyof PrivacyPreferences,
-    value: boolean,
-  ) {
-    setPrivacyPreferences((current) => {
-      const next = { ...current, [key]: value };
-      void AsyncStorage.setItem(
-        `@tastes/privacy/${userId}`,
-        JSON.stringify(next),
-      ).catch(() =>
-        Alert.alert('Could not save privacy settings', 'Please try again.'),
-      );
-      return next;
     });
   }
 
@@ -1235,49 +1187,18 @@ export function ProfileSettingsSheet({
                 <View style={styles.headerButton} />
               </View>
               <View style={styles.accountSecurityContent}>
-                <NotificationSetting
-                  label="Private account"
-                  onChange={(value) =>
-                    savePrivacyPreference('privateAccount', value)
-                  }
-                  styles={styles}
-                  value={privacyPreferences.privateAccount}
-                />
-                <NotificationSetting
-                  label="Show my wishlist on my profile"
-                  onChange={(value) =>
-                    savePrivacyPreference('showWishlist', value)
-                  }
-                  styles={styles}
-                  value={privacyPreferences.showWishlist}
-                />
-                <NotificationSetting
-                  label="Show my city"
-                  onChange={(value) => savePrivacyPreference('showCity', value)}
-                  styles={styles}
-                  value={privacyPreferences.showCity}
-                />
-                <NotificationSetting
-                  label="Allow messages from everyone"
-                  onChange={(value) =>
-                    savePrivacyPreference('allowMessagesFromEveryone', value)
-                  }
-                  styles={styles}
-                  value={privacyPreferences.allowMessagesFromEveryone}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() =>
-                    Alert.alert(
-                      'Blocked accounts',
-                      'You have no blocked accounts.',
-                    )
-                  }
-                  style={styles.securityRow}
-                >
-                  <Text style={styles.notificationLabel}>Blocked accounts</Text>
-                  <Text style={styles.chevron}>›</Text>
-                </Pressable>
+                <Text style={styles.notificationLabel}>Public profile</Text>
+                <Text style={styles.notificationLabel}>
+                  Profiles and cities are visible to other members during the
+                  pilot. Saved places are only visible to you.
+                </Text>
+                <Text style={styles.notificationLabel}>
+                  Messages are available between people who follow one another.
+                </Text>
+                <Text style={styles.notificationLabel}>
+                  Private accounts and additional privacy controls are not
+                  available yet.
+                </Text>
               </View>
             </ImageBackground>
           </Animated.View>

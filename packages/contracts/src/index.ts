@@ -1290,6 +1290,8 @@ export interface PlaceDetails {
 }
 
 export interface PlaceReview {
+  visits?: Review['visits'];
+  visitCount?: number;
   id: string;
   authorId: string;
   authorDisplayName: string;

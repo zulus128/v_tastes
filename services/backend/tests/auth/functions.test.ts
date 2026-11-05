@@ -755,6 +755,30 @@ describe('authenticated session and paginated reads', () => {
     const { first, second, db, author, reader, reviewCommand, firstReview } =
       await createReviewFixture();
 
+    await expect(
+      callFunction(
+        'addComment',
+        {
+          idempotencyKey: 'comment-screened-001',
+          reviewId: firstReview.id,
+          text: 'FUCK!',
+        },
+        second.token,
+      ),
+    ).rejects.toMatchObject({
+      status: 'INVALID_ARGUMENT',
+      details: { reason: 'blocked-comment-term' },
+    });
+    expect(
+      (
+        await db
+          .collection('reviews')
+          .doc(firstReview.id)
+          .collection('comments')
+          .get()
+      ).size,
+    ).toBe(0);
+
     const commentCommand = {
       idempotencyKey: 'comment-command-001',
       reviewId: firstReview.id,

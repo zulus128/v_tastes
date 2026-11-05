@@ -1,15 +1,11 @@
+/** Venue photos are not evidence of a dish photo. Keep old callers safe. */
 export function selectSeedDishPhotoUrl(
-  imageUrl: unknown,
-  photoUrls: unknown,
-  index: number,
-): string | undefined {
-  const gallery = Array.isArray(photoUrls)
-    ? photoUrls.filter(
-        (url): url is string => typeof url === 'string' && url.length > 0,
-      )
-    : [];
-  return (
-    (gallery.length > 0 ? gallery[index % gallery.length] : undefined) ??
-    (typeof imageUrl === 'string' && imageUrl.length > 0 ? imageUrl : undefined)
-  );
+  _imageUrl: unknown,
+  _photoUrls: unknown,
+  _index: number,
+): undefined {
+  void _imageUrl;
+  void _photoUrls;
+  void _index;
+  return undefined;
 }

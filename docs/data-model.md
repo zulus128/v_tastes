@@ -39,15 +39,15 @@ dish by its ID or by its trimmed, NFKC-normalized, case-insensitive title. It
 updates that dish rather than adding another row. Visit snapshots retain what
 was rated on that visit.
 
-Dish identity is currently scoped to a review. Two authors writing “Tuna Tartare”
-do not establish a shared canonical dish record. Venue `popularDishes` metadata
-is also separate from these user-authored dish histories; no Maps photo import
-creates or replaces a user's dish record.
-
-A future canonical dish catalog should use venue-scoped dish IDs, preserve the
-original author titles and visit histories, and keep proposed matches reviewable
-before merging aliases. Name similarity alone should not silently merge dishes
-from different venues or different menu items. This catalog is not implemented.
+Dish history IDs remain scoped to a review, while optional `canonicalDishId`
+references link ratings across authors to the shared `dishCatalog`. The catalog
+contains approved global dish identities and exact aliases; venue-specific dish
+records and `popularDishes` metadata remain separate. Original author titles and
+visit histories are preserved. Broad or ambiguous names are not silently merged:
+authors can explicitly choose a suggested canonical dish, and staff can review
+catalog entries and aliases in Admin. No Maps photo import creates or replaces a
+user-authored dish record. See `services/backend/functions/src/modules/taste-match/REFERENCE.md`
+for the matching rules and provenance.
 
 Historical duplicate reviews approved for consolidation retain archived source
 documents with `mergedIntoReviewId`. Callable review operations resolve those

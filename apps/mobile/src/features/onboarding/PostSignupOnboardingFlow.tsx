@@ -145,8 +145,8 @@ const previousPostSignupScreen: Partial<
   place: 'location',
   style: 'place',
   contactsPermission: 'style',
-  contacts: 'contactsPermission',
-  invite: 'contactsPermission',
+  contacts: 'invite',
+  invite: 'style',
   ready: 'invite',
 };
 
@@ -2188,7 +2188,7 @@ export function PostSignupOnboardingFlow({
   if (screen === 'style') {
     return (
       <PatternScreen>
-        <Header onBack={back} onSkip={() => navigate('contactsPermission')} />
+        <Header onBack={back} onSkip={() => navigate('invite')} />
         <StepHeader
           landscape={landscape}
           step={5}
@@ -2297,7 +2297,7 @@ export function PostSignupOnboardingFlow({
         </View>
         <PrimaryButton
           label="Continue"
-          onPress={() => navigate('contactsPermission')}
+          onPress={() => navigate('invite')}
           style={styles.bottomButton}
         />
       </PatternScreen>
@@ -2323,7 +2323,7 @@ export function PostSignupOnboardingFlow({
   if (screen === 'contacts') {
     return (
       <PatternScreen>
-        <Header onBack={back} onSkip={() => navigate('invite')} />
+        <Header onBack={back} onSkip={() => navigate('ready')} />
         <StepProgress overlay step={6} />
         <View style={styles.listPage}>
           <Text style={styles.listTitle}>Friends from contacts</Text>
@@ -2384,7 +2384,7 @@ export function PostSignupOnboardingFlow({
         </View>
         <PrimaryButton
           label="Done"
-          onPress={() => navigate('invite')}
+          onPress={() => navigate('ready')}
           style={styles.bottomButton}
         />
       </PatternScreen>
@@ -2451,8 +2451,8 @@ export function PostSignupOnboardingFlow({
           </View>
         </ScrollView>
         <PrimaryButton
-          label="Continue"
-          onPress={() => navigate('ready')}
+          label="Allow Contacts"
+          onPress={requestContacts}
           style={styles.bottomButton}
         />
       </PatternScreen>
@@ -2515,8 +2515,8 @@ export function PostSignupOnboardingFlow({
             >
               <Text style={styles.readyTitle}>You’re ready!</Text>
               <Text style={styles.readySubtitle}>
-                Write your first 3 reviews to unlock personalized
-                recommendations
+                Rate 5 different dishes to build your taste profile and unlock
+                personalized recommendations
               </Text>
             </View>
             <PrimaryButton

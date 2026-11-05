@@ -1,4 +1,5 @@
 import { loadDishCatalog } from '../taste-match/catalog';
+import { containsBlockedCommentTerm } from '../../shared/comment-screening';
 import {
   addCommentInputSchema,
   createReviewInputSchema,
@@ -1687,6 +1688,18 @@ export const reportContent = onCall(callableOptions, async (request) => {
 export const addComment = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(addCommentInputSchema, request.data);
+  const screening = await db.doc('configuration/commentScreening').get();
+  const configured = screening.get('blockedTerms');
+  const blockedTerms = Array.isArray(configured)
+    ? configured.filter((term): term is string => typeof term === 'string')
+    : [];
+  if (containsBlockedCommentTerm(input.text, blockedTerms)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Please remove inappropriate language before posting your comment.',
+      { reason: 'blocked-comment-term' },
+    );
+  }
   const requestedReviewId = input.reviewId;
   input.reviewId = await resolveMergedReviewId(input.reviewId);
   const userRef = db.collection('users').doc(uid);

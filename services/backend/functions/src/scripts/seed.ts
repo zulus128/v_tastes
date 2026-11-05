@@ -48,7 +48,6 @@ import {
   applyUserReviewCounts,
   findUserReviewCountMismatches,
 } from '../shared/review-counts';
-import { selectSeedDishPhotoUrl } from './seed-dish-photos';
 
 if (getApps().length === 0) {
   initializeApp({
@@ -84,18 +83,6 @@ function seedDownloadToken(path: string): string {
 
 function stableSeedKey(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 16);
-}
-
-function seedDishPhotoUrl(
-  imageUrl: unknown,
-  photoUrls: unknown,
-  index: number,
-): string {
-  const selected = selectSeedDishPhotoUrl(imageUrl, photoUrls, index);
-  if (!selected) {
-    throw new Error('A seeded dish requires a venue image.');
-  }
-  return selected;
 }
 
 function directConversationId(
@@ -731,11 +718,6 @@ async function main() {
               id: `seed-${stableSeedKey(`${venue.id}:${dish.name}`)}-${index + 1}`,
               title: dish.name,
               rating: dish.rating,
-              photoUrl: seedDishPhotoUrl(
-                venue.imageUrl,
-                'photoUrls' in venue ? venue.photoUrls : undefined,
-                index,
-              ),
             }))
           : [];
       return db
@@ -822,11 +804,6 @@ async function main() {
         id: `seed-${stableSeedKey(`${venueSnapshot.id}:${dish.name}`)}-${index + 1}`,
         title: dish.name,
         rating: dish.rating,
-        photoUrl: seedDishPhotoUrl(
-          venueSnapshot.get('imageUrl'),
-          venueSnapshot.get('photoUrls'),
-          index,
-        ),
       }));
       return db
         .collection('reviews')
@@ -1074,11 +1051,6 @@ async function main() {
                               ? 'Tiramisu'
                               : 'Birria tacos',
                         rating: review.rating,
-                        photoUrl: seedDishPhotoUrl(
-                          venue.imageUrl,
-                          'photoUrls' in venue ? venue.photoUrls : undefined,
-                          index,
-                        ),
                       },
                     ]
                   : [],

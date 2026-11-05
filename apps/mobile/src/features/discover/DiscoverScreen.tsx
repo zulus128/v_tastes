@@ -281,7 +281,7 @@ function venueToPlace(venue: Venue): Place {
     distance:
       venue.distanceKm != null ? formatDistance(venue.distanceKm) : venue.city,
     rating: (venue.rating ?? 0).toFixed(1),
-    reviews: `${venue.reviewCount ?? 0} reviews`,
+    reviews: `${venue.reviewCount ?? 0} ${(venue.reviewCount ?? 0) === 1 ? 'review' : 'reviews'}`,
     image: venueImage(venue.imageUrl),
   };
 }
@@ -289,6 +289,7 @@ function venueToPlace(venue: Venue): Place {
 export function DiscoverScreen({
   appliedFilters,
   entrySignal = 0,
+  entryTab = 'places',
   onClearSavedFilters,
   onOpenSavedFilters,
   savedFilters = [],
@@ -304,6 +305,7 @@ export function DiscoverScreen({
   appliedFilters: string[];
   /** Changes each time the user enters Discover from the tab bar. */
   entrySignal?: number;
+  entryTab?: 'places' | 'people';
   onClearSavedFilters?: () => void;
   onOpenSavedFilters?: () => void;
   savedFilters?: string[];
@@ -339,9 +341,9 @@ export function DiscoverScreen({
   // or profile keeps the section the user was browsing.
   useEffect(() => {
     if (entrySignal === 0) return;
-    setTab('places');
+    setTab(entryTab);
     setFavouritesOpen(false);
-  }, [entrySignal]);
+  }, [entrySignal, entryTab]);
   const [saveTarget, setSaveTarget] = useState<SaveablePlace | null>(null);
   const favourites = useFavourites(userId);
   const savedVenueIds = new Set(
