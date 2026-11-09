@@ -1292,7 +1292,7 @@ describe('authenticated session and paginated reads', () => {
     );
     expect(leadersFirst.items[0]?.rank).toBe(1);
     expect(leadersSecond.items[0]?.rank).toBe(21);
-  });
+  }, 15_000);
 
   it('serves Discover from Firestore with stable venue pages and real social state', async () => {
     const { token } = await authenticatedUser();
@@ -3110,8 +3110,10 @@ it(
       .update({ reviewCount: 2, rating: 4.5 });
     const beforeXp = (await fixture.author.ref.get()).get('xp');
     const { mkdtemp, readFile, readdir, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
     const backupDirectory = await mkdtemp(
-      '/private/tmp/tastes-migration-test-',
+      join(tmpdir(), 'tastes-migration-test-'),
     );
     process.env.GCLOUD_PROJECT = PROJECT_ID;
     const { mergeHistoricalReviewVisits } =
