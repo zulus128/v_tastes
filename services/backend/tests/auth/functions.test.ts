@@ -149,6 +149,10 @@ beforeEach(async () => {
     fetch(FIRESTORE_EMULATOR_URL, { method: 'DELETE' }),
     fetch(AUTH_EMULATOR_URL, { method: 'DELETE' }),
   ]);
+  await getFirestore()
+    .collection('_migrations')
+    .doc('usernameClaims')
+    .set({ complete: true });
 });
 
 async function createSocialFixture() {
@@ -485,6 +489,39 @@ describe('authenticated session and paginated reads', () => {
     ).resolves.toEqual({ onboardingVersion: 1 });
   }, 15_000);
 
+  it('blocks unclaimed usernames until the claim migration is complete', async () => {
+    const { token } = await authenticatedUser();
+    const db = getFirestore();
+    await db.collection('_migrations').doc('usernameClaims').delete();
+    await db.collection('users').doc('legacy-owner').set({
+      username: 'Unique.Name',
+      displayName: 'Legacy Owner',
+      status: 'active',
+      createdAt: Timestamp.now(),
+    });
+
+    await expectReason(
+      callFunction(
+        'checkUsernameAvailability',
+        { username: 'unique.name' },
+        token,
+      ),
+      'username-migration-incomplete',
+    );
+    await expectReason(
+      callFunction(
+        'createUserProfile',
+        {
+          displayName: 'Second User',
+          username: 'unique.name',
+          city: 'Istanbul',
+        },
+        token,
+      ),
+      'username-migration-incomplete',
+    );
+  }, 15_000);
+
   it('uses the server profile as the onboarding source of truth', async () => {
     const { token } = await authenticatedUser();
 
@@ -598,18 +635,10 @@ describe('authenticated session and paginated reads', () => {
       },
       first.token,
     );
-    const usernameClaimRef = db
+    const usernameClaim = await db
       .collection('_usernames')
-      .doc('handle:unique.name');
-    const usernameClaim = await usernameClaimRef.get();
-    await usernameClaimRef.delete();
-    await expect(
-      callFunction<{ available: boolean }>(
-        'checkUsernameAvailability',
-        { username: 'unique.name' },
-        second.token,
-      ),
-    ).resolves.toEqual({ available: false });
+      .doc('handle:unique.name')
+      .get();
     await expect(
       callFunction(
         'createUserProfile',

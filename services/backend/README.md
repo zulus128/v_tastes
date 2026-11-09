@@ -30,6 +30,23 @@ The `Deploy production` GitHub Actions workflow runs after a successful CI run
 on `main` and can also be started manually. Configure the protected
 `production` environment with `FIREBASE_SERVICE_ACCOUNT`.
 
+### Username-claim migration
+
+Deploy the Functions release containing the username migration gate before
+enabling new username writes, then run the claim migration against the remote
+database:
+
+```bash
+pnpm build
+FIRESTORE_DATABASE_ID=tastes-eu pnpm --filter @tastes/functions users:migrate-private -- --apply
+```
+
+The script normalizes legacy usernames, creates `_usernames` claims, and sets
+`_migrations/usernameClaims.complete` only when every claim is unambiguous.
+Until that marker is true, new or changed usernames fail closed with
+`username-migration-incomplete`; existing claimed usernames continue to work.
+Resolve any reported collisions and rerun the migration before opening signup.
+
 Before the first email- and SMS-enabled deploy, create these Firebase Functions
 secrets:
 

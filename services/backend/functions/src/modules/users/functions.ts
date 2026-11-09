@@ -36,6 +36,20 @@ const CURRENT_ONBOARDING_VERSION = 1;
 const MAX_PROFILE_PHOTO_BYTES = 750 * 1024;
 // Raise this alongside an iOS release when older builds need to be nudged to update.
 const MINIMUM_SUPPORTED_IOS_BUILD = 49;
+const usernameClaimsMigrationRef = db
+  .collection('_migrations')
+  .doc('usernameClaims');
+
+function requireCompletedUsernameClaimsMigration(
+  migration: DocumentSnapshot | null,
+) {
+  if (migration?.get('complete') === true) return;
+  throw new HttpsError(
+    'failed-precondition',
+    'Username maintenance is in progress. Try again shortly.',
+    { reason: 'username-migration-incomplete' },
+  );
+}
 
 async function validatedProfileImageUrl(path: string, uid: string) {
   if (!path.startsWith(`profile-images/${uid}/`)) {
@@ -81,17 +95,13 @@ export const checkUsernameAvailability = onCall(
       request.data,
     );
     const username = normalizeUsername(input.username);
-    const [claim, legacyOwners] = await Promise.all([
+    const [claim, migration] = await Promise.all([
       usernameReference(username).get(),
-      db.collection('users').where('username', '==', username).limit(2).get(),
+      usernameClaimsMigrationRef.get(),
     ]);
+    if (!claim.exists) requireCompletedUsernameClaimsMigration(migration);
     const claimedByOtherUser = claim.exists && claim.get('uid') !== uid;
-    const legacyOwnerExists = legacyOwners.docs.some(
-      (document) =>
-        document.id !== uid &&
-        normalizeUsername(String(document.get('username') ?? '')) === username,
-    );
-    return { available: !claimedByOtherUser && !legacyOwnerExists };
+    return { available: !claimedByOtherUser };
   },
 );
 
@@ -380,13 +390,10 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
     const usernameClaim = nextUsernameRef
       ? await transaction.get(nextUsernameRef)
       : null;
-    // During the one-time claim migration, legacy profiles may not yet have a
-    // `_usernames` record. Keep this bounded exact-field check until it is complete.
-    const legacyUsernameOwners = nextUsername
-      ? await transaction.get(
-          db.collection('users').where('username', '==', nextUsername).limit(2),
-        )
-      : null;
+    const usernameMigration =
+      nextUsername && !usernameClaim?.exists
+        ? await transaction.get(usernameClaimsMigrationRef)
+        : null;
     const previousUsernameClaim =
       previousUsernameRef && previousUsernameRef.path !== nextUsernameRef?.path
         ? await transaction.get(previousUsernameRef)
@@ -398,20 +405,8 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
         { reason: 'username-taken' },
       );
     }
-    if (
-      legacyUsernameOwners?.docs.some(
-        (document) =>
-          document.id !== uid &&
-          normalizeUsername(String(document.get('username') ?? '')) ===
-            nextUsername,
-      )
-    ) {
-      throw new HttpsError(
-        'already-exists',
-        'This username is already taken.',
-        { reason: 'username-taken' },
-      );
-    }
+    if (nextUsername && !usernameClaim?.exists)
+      requireCompletedUsernameClaimsMigration(usernameMigration);
     const now = FieldValue.serverTimestamp();
 
     transaction.set(
@@ -596,17 +591,10 @@ export const updateProfileSettings = onCall(
       const usernameClaim = nextUsernameRef
         ? await transaction.get(nextUsernameRef)
         : null;
-      // Avoid the broad prefix-token query here: a transaction locks every
-      // document it reads. The claim remains authoritative; this exact lookup is
-      // only a bounded safeguard for profiles awaiting claim migration.
-      const legacyUsernameOwners = nextUsername
-        ? await transaction.get(
-            db
-              .collection('users')
-              .where('username', '==', nextUsername)
-              .limit(2),
-          )
-        : null;
+      const usernameMigration =
+        nextUsername && !usernameClaim?.exists
+          ? await transaction.get(usernameClaimsMigrationRef)
+          : null;
       const previousUsernameClaim =
         previousUsernameRef &&
         previousUsernameRef.path !== nextUsernameRef?.path
@@ -619,20 +607,8 @@ export const updateProfileSettings = onCall(
           { reason: 'username-taken' },
         );
       }
-      if (
-        legacyUsernameOwners?.docs.some(
-          (document) =>
-            document.id !== uid &&
-            normalizeUsername(String(document.get('username') ?? '')) ===
-              nextUsername,
-        )
-      ) {
-        throw new HttpsError(
-          'already-exists',
-          'This username is already taken.',
-          { reason: 'username-taken' },
-        );
-      }
+      if (nextUsername && !usernameClaim?.exists)
+        requireCompletedUsernameClaimsMigration(usernameMigration);
       const now = FieldValue.serverTimestamp();
       transaction.update(userRef, {
         ...(input.displayName ? { displayName: input.displayName } : {}),

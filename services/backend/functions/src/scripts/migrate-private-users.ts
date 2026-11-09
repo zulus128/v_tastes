@@ -4,9 +4,16 @@ import { normalizeUsername, usernameClaimId } from '../shared/user-data';
 
 if (getApps().length === 0) initializeApp({ credential: applicationDefault() });
 
-const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID ??
+const firestoreDatabaseId =
+  process.env.FIRESTORE_DATABASE_ID ??
   (process.env.FIRESTORE_EMULATOR_HOST ? '(default)' : 'tastes-eu');
-const db = firestoreDatabaseId === '(default)' ? getFirestore() : getFirestore(firestoreDatabaseId);
+const db =
+  firestoreDatabaseId === '(default)'
+    ? getFirestore()
+    : getFirestore(firestoreDatabaseId);
+const usernameClaimsMigrationRef = db
+  .collection('_migrations')
+  .doc('usernameClaims');
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const profiles = await db.collection('users').get();
@@ -14,6 +21,7 @@ async function main(): Promise<void> {
   const collidingUsernames = new Set<string>();
   const collisions: string[] = [];
   let piiProfiles = 0;
+  let unresolvedClaims = 0;
 
   for (const profile of profiles.docs) {
     const username = profile.get('username')
@@ -24,20 +32,34 @@ async function main(): Promise<void> {
       if (owner && owner !== profile.id) {
         collisions.push(`${username}: ${owner}, ${profile.id}`);
         collidingUsernames.add(username);
-      }
-      else usernameOwners.set(username, profile.id);
+      } else usernameOwners.set(username, profile.id);
     }
     if (profile.get('email') || profile.get('phoneNumber')) piiProfiles += 1;
   }
 
-  process.stdout.write(`Scanned ${profiles.size} profiles; ${piiProfiles} contain PII; ${collisions.length} username collisions.\n`);
+  process.stdout.write(
+    `Scanned ${profiles.size} profiles; ${piiProfiles} contain PII; ${collisions.length} username collisions.\n`,
+  );
   if (collisions.length > 0) {
-    process.stdout.write(`Skipping username claims for duplicate handles while migrating PII:\n${collisions.join('\n')}\n`);
+    process.stdout.write(
+      `Skipping username claims for duplicate handles while migrating PII:\n${collisions.join('\n')}\n`,
+    );
   }
   if (!apply) {
-    process.stdout.write('Dry run only. Re-run with --apply to migrate PII and create username claims.\n');
+    process.stdout.write(
+      'Dry run only. Re-run with --apply to migrate PII and create username claims.\n',
+    );
     return;
   }
+  await usernameClaimsMigrationRef.set(
+    {
+      complete: false,
+      profileCount: profiles.size,
+      startedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
   for (const scannedProfile of profiles.docs) {
     // The initial scan is only for validation/progress. Re-read each profile
     // in a transaction so a concurrent username change cannot overwrite a
@@ -47,29 +69,76 @@ async function main(): Promise<void> {
       if (!profile.exists) return;
       const email = profile.get('email') ?? null;
       const phoneNumber = profile.get('phoneNumber') ?? null;
-      const username = profile.get('username') ? normalizeUsername(String(profile.get('username'))) : null;
-      const claimRef = username ? db.collection('_usernames').doc(usernameClaimId(username)) : null;
+      const username = profile.get('username')
+        ? normalizeUsername(String(profile.get('username')))
+        : null;
+      const claimRef = username
+        ? db.collection('_usernames').doc(usernameClaimId(username))
+        : null;
       // Firestore transactions require every read to finish before the first
       // write. Read the claim now, even when the profile also has PII to move.
       const claim = claimRef ? await transaction.get(claimRef) : null;
       if (email || phoneNumber) {
-        transaction.set(db.collection('_userPrivate').doc(profile.id), {
-          uid: profile.id, email, phoneNumber, updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-        transaction.update(profile.ref, { email: FieldValue.delete(), phoneNumber: FieldValue.delete() });
+        transaction.set(
+          db.collection('_userPrivate').doc(profile.id),
+          {
+            uid: profile.id,
+            email,
+            phoneNumber,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.update(profile.ref, {
+          email: FieldValue.delete(),
+          phoneNumber: FieldValue.delete(),
+        });
       }
       // PII is migrated regardless of an old username collision. Leave only
       // the ambiguous claim for manual resolution instead of exposing every
       // legacy profile's contact data until that work is complete.
-      if (!username || !claimRef || collidingUsernames.has(username)) return;
+      if (!username || !claimRef) return;
+      if (collidingUsernames.has(username)) {
+        unresolvedClaims += 1;
+        return;
+      }
       // A live profile mutation owns a conflicting claim. Never replace it;
       // the migration can be safely re-run for this legacy profile later.
-      if (claim?.exists && claim.get('uid') !== profile.id) return;
-      transaction.set(claimRef, { uid: profile.id, username, updatedAt: FieldValue.serverTimestamp() });
-      if (profile.get('username') !== username) transaction.update(profile.ref, { username });
+      if (claim?.exists && claim.get('uid') !== profile.id) {
+        unresolvedClaims += 1;
+        return;
+      }
+      transaction.set(claimRef, {
+        uid: profile.id,
+        username,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      if (profile.get('username') !== username)
+        transaction.update(profile.ref, { username });
     });
   }
-  process.stdout.write(`Migrated ${profiles.size} profiles.\n`);
+  const complete = collisions.length === 0 && unresolvedClaims === 0;
+  await usernameClaimsMigrationRef.set(
+    {
+      complete,
+      profileCount: profiles.size,
+      collisionCount: collisions.length,
+      unresolvedClaimCount: unresolvedClaims,
+      completedAt: complete
+        ? FieldValue.serverTimestamp()
+        : FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+  process.stdout.write(
+    `Migrated ${profiles.size} profiles; username claims complete: ${complete}.\n`,
+  );
+  if (!complete) {
+    throw new Error(
+      'Username claims remain unresolved. Resolve collisions and re-run the migration.',
+    );
+  }
 }
 
 void main().catch((error: unknown) => {
