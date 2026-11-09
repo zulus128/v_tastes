@@ -64,6 +64,7 @@ beforeEach(async () => {
       reaction: 'like',
     });
     await setDoc(doc(db, 'users', 'user-a'), { displayName: 'User A' });
+    await setDoc(doc(db, 'users', 'user-b'), { displayName: 'User B' });
     await setDoc(doc(db, 'users', 'user-a', 'following', 'user-b'), {
       userId: 'user-b',
     });
@@ -163,6 +164,19 @@ describe('Firestore security rules', () => {
     );
 
     expect(reviews.docs.map((review) => review.id)).toEqual(['published']);
+  });
+
+  it('lets the blocker reopen a profile to unblock while hiding it from the blocked user', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'users', 'user-a', 'blocked', 'user-b'), {
+        userId: 'user-b',
+      });
+    });
+    const blockerDb = testEnvironment.authenticatedContext('user-a').firestore();
+    const blockedDb = testEnvironment.authenticatedContext('user-b').firestore();
+
+    await assertSucceeds(getDoc(doc(blockerDb, 'users', 'user-b')));
+    await assertFails(getDoc(doc(blockedDb, 'users', 'user-a')));
   });
 
   it('allows moderators and admins to read hidden venues and reviews', async () => {

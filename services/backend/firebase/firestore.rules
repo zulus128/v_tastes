@@ -23,8 +23,18 @@ service cloud.firestore {
         );
     }
 
+    function isBlockedBy(otherUid) {
+      return signedIn()
+        && otherUid != request.auth.uid
+        && exists(
+          /databases/$(database)/documents/users/$(otherUid)/blocked/$(request.auth.uid)
+        );
+    }
+
     match /users/{uid} {
-      allow read: if signedIn() && !isBlockedPair(uid);
+      // Keep profiles hidden from users who were blocked, while still letting
+      // blockers reopen the profile to undo their own block.
+      allow read: if signedIn() && !isBlockedBy(uid);
       allow write: if false;
 
       match /folders/{folderId} {

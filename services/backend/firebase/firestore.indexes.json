@@ -547,6 +547,13 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "blocked",
+      "fieldPath": "userId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
       "collectionGroup": "comments",
       "fieldPath": "replyDeletionPending",
       "indexes": [
