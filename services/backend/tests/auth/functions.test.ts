@@ -111,9 +111,9 @@ async function authenticatedUser() {
   );
   const result = (await response.json()) as {
     idToken: string;
-    localId: string;
   };
-  return { token: result.idToken, uid: result.localId, phoneNumber };
+  const authUser = await getAuth().getUserByPhoneNumber(phoneNumber);
+  return { token: result.idToken, uid: authUser.uid, phoneNumber };
 }
 
 async function expectReason(
@@ -444,6 +444,47 @@ describe('authenticated session and paginated reads', () => {
     });
   }, 15_000);
 
+  it('requires legacy profiles to add a private birth date before onboarding completion', async () => {
+    const { token, uid } = await authenticatedUser();
+    await getFirestore().collection('users').doc(uid).set({
+      uid,
+      displayName: 'Legacy User',
+      status: 'active',
+      createdAt: Timestamp.now(),
+    });
+
+    await expectReason(
+      callFunction(
+        'createUserProfile',
+        { displayName: 'Legacy User', city: 'Istanbul' },
+        token,
+        { profileDefaults: false },
+      ),
+      'birth-date-required',
+    );
+    await expectReason(
+      callFunction(
+        'completeOnboarding',
+        { version: 1, invitedContactCount: 0, appearance: 'system' },
+        token,
+      ),
+      'birth-date-required',
+    );
+
+    await callFunction(
+      'createUserProfile',
+      { displayName: 'Legacy User', city: 'Istanbul' },
+      token,
+    );
+    await expect(
+      callFunction(
+        'completeOnboarding',
+        { version: 1, invitedContactCount: 0, appearance: 'system' },
+        token,
+      ),
+    ).resolves.toEqual({ onboardingVersion: 1 });
+  }, 15_000);
+
   it('uses the server profile as the onboarding source of truth', async () => {
     const { token } = await authenticatedUser();
 
@@ -557,6 +598,18 @@ describe('authenticated session and paginated reads', () => {
       },
       first.token,
     );
+    const usernameClaimRef = db
+      .collection('_usernames')
+      .doc('handle:unique.name');
+    const usernameClaim = await usernameClaimRef.get();
+    await usernameClaimRef.delete();
+    await expect(
+      callFunction<{ available: boolean }>(
+        'checkUsernameAvailability',
+        { username: 'unique.name' },
+        second.token,
+      ),
+    ).resolves.toEqual({ available: false });
     await expect(
       callFunction(
         'createUserProfile',
@@ -568,10 +621,6 @@ describe('authenticated session and paginated reads', () => {
         second.token,
       ),
     ).rejects.toBeTruthy();
-    const usernameClaim = await db
-      .collection('_usernames')
-      .doc('handle:unique.name')
-      .get();
     const firstUid = String(usernameClaim.get('uid'));
     const firstRef = db.collection('users').doc(firstUid);
     await firstRef.update({ status: 'banned' });

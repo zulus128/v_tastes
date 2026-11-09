@@ -202,6 +202,18 @@ function isoBirthDate(day: number, month: number, year: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function truncateWithoutSplittingSurrogates(
+  value: string,
+  maxCodeUnits: number,
+): string {
+  let result = '';
+  for (const character of Array.from(value)) {
+    if (result.length + character.length > maxCodeUnits) break;
+    result += character;
+  }
+  return result;
+}
+
 function BirthdayColumn({
   formatValue = String,
   label,
@@ -1016,7 +1028,10 @@ export function PostSignupOnboardingFlow({
   const [displayName, setDisplayName] = useState(() =>
     visualAudit
       ? 'Alex Morgan'
-      : (auth.currentUser?.displayName?.trim().slice(0, 30) ?? ''),
+      : truncateWithoutSplittingSurrogates(
+          auth.currentUser?.displayName?.trim() ?? '',
+          30,
+        ),
   );
   const [username, setUsername] = useState(() =>
     visualAudit ? 'alex.morgan' : '',
@@ -1026,6 +1041,7 @@ export function PostSignupOnboardingFlow({
     'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error'
   >(visualAudit ? 'available' : 'idle');
   const [city, setCity] = useState(visualAudit ? 'Monaco' : '');
+  const cityRef = useRef(city);
   const [cityFlag, setCityFlag] = useState<ImageSourcePropType>(flagMonaco);
   const [cityCountryCode, setCityCountryCode] = useState<string | null>('MC');
   const [bio, setBio] = useState('');
@@ -1045,6 +1061,11 @@ export function PostSignupOnboardingFlow({
   const [placeError, setPlaceError] = useState<string | null>(null);
   const placeRequestRef = useRef<Promise<void> | null>(null);
   const placesLoadedRef = useRef(visualAudit);
+
+  function updateCity(nextCity: string) {
+    cityRef.current = nextCity;
+    setCity(nextCity);
+  }
   const [availablePlaces, setAvailablePlaces] = useState<PlaceCandidate[]>(
     () =>
       visualAudit
@@ -1323,7 +1344,7 @@ export function PostSignupOnboardingFlow({
 
   async function requestLocation() {
     if (visualAudit) {
-      setCity('Monaco');
+      updateCity('Monaco');
       setCityFlag(flagMonaco);
       setCityCountryCode('MC');
       enterPlaces();
@@ -1350,13 +1371,13 @@ export function PostSignupOnboardingFlow({
       });
       const [address] = await Location.reverseGeocodeAsync(position.coords);
       const resolvedCity = address?.city?.trim();
-      if (resolvedCity && city.trim().length === 0) {
+      if (resolvedCity && cityRef.current.trim().length === 0) {
         const canonicalCity = canonicalCityName(resolvedCity);
         const countryCode = resolveCityCountryCode(
           canonicalCity,
           address.isoCountryCode,
         );
-        setCity(canonicalCity);
+        updateCity(canonicalCity);
         setCityCountryCode(countryCode);
         if (countryCode && countryFlags[countryCode])
           setCityFlag(countryFlags[countryCode]!);
@@ -1512,7 +1533,7 @@ export function PostSignupOnboardingFlow({
         <Header onBack={back} />
         <CityPicker
           onSelect={(name, flag) => {
-            setCity(name);
+            updateCity(name);
             setCityFlag(flag);
             setCityCountryCode(resolveCityCountryCode(name));
             back();

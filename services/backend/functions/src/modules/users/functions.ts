@@ -83,10 +83,7 @@ export const checkUsernameAvailability = onCall(
     const username = normalizeUsername(input.username);
     const [claim, legacyOwners] = await Promise.all([
       usernameReference(username).get(),
-      db
-        .collection('users')
-        .where('searchTokens', 'array-contains', `p:${username}`)
-        .get(),
+      db.collection('users').where('username', '==', username).limit(2).get(),
     ]);
     const claimedByOtherUser = claim.exists && claim.get('uid') !== uid;
     const legacyOwnerExists = legacyOwners.docs.some(
@@ -131,11 +128,21 @@ export const completeOnboarding = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(completeOnboardingInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
-  const user = await userRef.get();
+  const [user, privateUser] = await Promise.all([
+    userRef.get(),
+    privateUserReference(uid).get(),
+  ]);
   if (!user.exists) {
     throw new HttpsError(
       'failed-precondition',
       'Create a user profile before completing onboarding.',
+    );
+  }
+  if (!privateUser.get('birthDate')) {
+    throw new HttpsError(
+      'failed-precondition',
+      'Add a birth date before completing onboarding.',
+      { reason: 'birth-date-required' },
     );
   }
 
@@ -325,6 +332,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
   const uid = requireUserId(request);
   const input = parseInput(createUserProfileInputSchema, request.data);
   const userRef = db.collection('users').doc(uid);
+  const privateUserRef = privateUserReference(uid);
   const authUser = await getAuth().getUser(uid);
   const signupNetworkHash = await networkFingerprint(request.rawRequest.ip);
   const [originalPhotoUrl, thumbnailPhotoUrl] = await Promise.all([
@@ -338,7 +346,8 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(userRef);
-    if (!existing.exists && !input.birthDate) {
+    const privateUser = await transaction.get(privateUserRef);
+    if (!input.birthDate && !privateUser.get('birthDate')) {
       throw new HttpsError(
         'invalid-argument',
         'A birth date is required when creating a profile.',
@@ -372,12 +381,10 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
       ? await transaction.get(nextUsernameRef)
       : null;
     // During the one-time claim migration, legacy profiles may not yet have a
-    // `_usernames` record. Keep the public-field check until it is complete.
+    // `_usernames` record. Keep this bounded exact-field check until it is complete.
     const legacyUsernameOwners = nextUsername
       ? await transaction.get(
-          db
-            .collection('users')
-            .where('searchTokens', 'array-contains', `p:${nextUsername}`),
+          db.collection('users').where('username', '==', nextUsername).limit(2),
         )
       : null;
     const previousUsernameClaim =
@@ -446,7 +453,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
       { merge: true },
     );
     transaction.set(
-      privateUserReference(uid),
+      privateUserRef,
       {
         uid,
         email: authUser.email?.toLocaleLowerCase() ?? null,
@@ -589,13 +596,15 @@ export const updateProfileSettings = onCall(
       const usernameClaim = nextUsernameRef
         ? await transaction.get(nextUsernameRef)
         : null;
-      // Legacy profiles created before username claims have normalized handles in
-      // searchTokens even if their stored username retained its original casing.
+      // Avoid the broad prefix-token query here: a transaction locks every
+      // document it reads. The claim remains authoritative; this exact lookup is
+      // only a bounded safeguard for profiles awaiting claim migration.
       const legacyUsernameOwners = nextUsername
         ? await transaction.get(
             db
               .collection('users')
-              .where('searchTokens', 'array-contains', `p:${nextUsername}`),
+              .where('username', '==', nextUsername)
+              .limit(2),
           )
         : null;
       const previousUsernameClaim =
