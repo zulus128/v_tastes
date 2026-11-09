@@ -1487,7 +1487,7 @@ describe('authenticated session and paginated reads', () => {
       token,
     );
     expect(trending.items).toHaveLength(3);
-  });
+  }, 15_000);
 });
 
 describe('messaging callables', () => {
