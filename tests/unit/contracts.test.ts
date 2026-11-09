@@ -203,11 +203,11 @@ describe('public API contracts', () => {
 
   it('requires profile birthdays to meet the rolling 16-year cutoff', () => {
     const cutoff = new Date();
-    cutoff.setHours(12, 0, 0, 0);
-    cutoff.setFullYear(cutoff.getFullYear() - 16);
+    cutoff.setUTCHours(12, 0, 0, 0);
+    cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 16);
     const eligible = cutoff.toISOString().slice(0, 10);
     const tooYoung = new Date(cutoff);
-    tooYoung.setDate(tooYoung.getDate() + 1);
+    tooYoung.setUTCDate(tooYoung.getUTCDate() + 1);
 
     expect(
       createUserProfileInputSchema.safeParse({

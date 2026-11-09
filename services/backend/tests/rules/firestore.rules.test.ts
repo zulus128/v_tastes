@@ -168,12 +168,19 @@ describe('Firestore security rules', () => {
 
   it('lets the blocker reopen a profile to unblock while hiding it from the blocked user', async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'users', 'user-a', 'blocked', 'user-b'), {
-        userId: 'user-b',
-      });
+      await setDoc(
+        doc(context.firestore(), 'users', 'user-a', 'blocked', 'user-b'),
+        {
+          userId: 'user-b',
+        },
+      );
     });
-    const blockerDb = testEnvironment.authenticatedContext('user-a').firestore();
-    const blockedDb = testEnvironment.authenticatedContext('user-b').firestore();
+    const blockerDb = testEnvironment
+      .authenticatedContext('user-a')
+      .firestore();
+    const blockedDb = testEnvironment
+      .authenticatedContext('user-b')
+      .firestore();
 
     await assertSucceeds(getDoc(doc(blockerDb, 'users', 'user-b')));
     await assertFails(getDoc(doc(blockedDb, 'users', 'user-a')));

@@ -75,14 +75,14 @@ export const createUserProfileInputSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid birth date.')
     .refine((value) => {
       const [year, month, day] = value.split('-').map(Number);
-      const birthDate = new Date(year!, month! - 1, day!);
+      const birthDate = new Date(Date.UTC(year!, month! - 1, day!));
       const cutoff = new Date();
-      cutoff.setHours(23, 59, 59, 999);
-      cutoff.setFullYear(cutoff.getFullYear() - 16);
+      cutoff.setUTCHours(23, 59, 59, 999);
+      cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 16);
       return (
-        birthDate.getFullYear() === year &&
-        birthDate.getMonth() === month! - 1 &&
-        birthDate.getDate() === day &&
+        birthDate.getUTCFullYear() === year &&
+        birthDate.getUTCMonth() === month! - 1 &&
+        birthDate.getUTCDate() === day &&
         birthDate <= cutoff
       );
     }, 'You must be at least 16 years old.')

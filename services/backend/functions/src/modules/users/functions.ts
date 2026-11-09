@@ -86,7 +86,6 @@ export const checkUsernameAvailability = onCall(
       db
         .collection('users')
         .where('searchTokens', 'array-contains', `p:${username}`)
-        .limit(2)
         .get(),
     ]);
     const claimedByOtherUser = claim.exists && claim.get('uid') !== uid;
@@ -339,6 +338,13 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
 
   await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(userRef);
+    if (!existing.exists && !input.birthDate) {
+      throw new HttpsError(
+        'invalid-argument',
+        'A birth date is required when creating a profile.',
+        { reason: 'birth-date-required' },
+      );
+    }
     if (
       existing.exists &&
       ['suspended', 'banned', 'deleted'].includes(
@@ -371,8 +377,7 @@ export const createUserProfile = onCall(callableOptions, async (request) => {
       ? await transaction.get(
           db
             .collection('users')
-            .where('searchTokens', 'array-contains', `p:${nextUsername}`)
-            .limit(2),
+            .where('searchTokens', 'array-contains', `p:${nextUsername}`),
         )
       : null;
     const previousUsernameClaim =
@@ -590,8 +595,7 @@ export const updateProfileSettings = onCall(
         ? await transaction.get(
             db
               .collection('users')
-              .where('searchTokens', 'array-contains', `p:${nextUsername}`)
-              .limit(2),
+              .where('searchTokens', 'array-contains', `p:${nextUsername}`),
           )
         : null;
       const previousUsernameClaim =

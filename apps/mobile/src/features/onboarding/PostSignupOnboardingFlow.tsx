@@ -1014,7 +1014,9 @@ export function PostSignupOnboardingFlow({
   );
   const [history, setHistory] = useState<PostSignupScreen[]>([]);
   const [displayName, setDisplayName] = useState(() =>
-    visualAudit ? 'Alex Morgan' : (auth.currentUser?.displayName?.trim() ?? ''),
+    visualAudit
+      ? 'Alex Morgan'
+      : (auth.currentUser?.displayName?.trim().slice(0, 30) ?? ''),
   );
   const [username, setUsername] = useState(() =>
     visualAudit ? 'alex.morgan' : '',
@@ -1348,7 +1350,7 @@ export function PostSignupOnboardingFlow({
       });
       const [address] = await Location.reverseGeocodeAsync(position.coords);
       const resolvedCity = address?.city?.trim();
-      if (resolvedCity) {
+      if (resolvedCity && city.trim().length === 0) {
         const canonicalCity = canonicalCityName(resolvedCity);
         const countryCode = resolveCityCountryCode(
           canonicalCity,
@@ -1366,7 +1368,7 @@ export function PostSignupOnboardingFlow({
   }
 
   function enterPlaces() {
-    navigate('place');
+    if (screen !== 'place') navigate('place');
     if (visualAudit) {
       setPlaceLoading(false);
       setPlaceError(null);
@@ -1758,16 +1760,18 @@ export function PostSignupOnboardingFlow({
   if (screen === 'birthday') {
     const maximumDay = daysInMonth(birthMonth, birthYear);
     const days = Array.from({ length: maximumDay }, (_, index) => index + 1);
-    const currentYear = new Date().getFullYear();
+    const currentYear = new Date().getUTCFullYear();
     const years = Array.from(
       { length: 101 },
       (_, index) => currentYear - 16 - index,
     ).reverse();
     const safeDay = Math.min(birthDay, maximumDay);
-    const selectedBirthDate = new Date(birthYear, birthMonth, safeDay);
+    const selectedBirthDate = new Date(
+      Date.UTC(birthYear, birthMonth, safeDay),
+    );
     const ageCutoff = new Date();
-    ageCutoff.setHours(23, 59, 59, 999);
-    ageCutoff.setFullYear(ageCutoff.getFullYear() - 16);
+    ageCutoff.setUTCHours(23, 59, 59, 999);
+    ageCutoff.setUTCFullYear(ageCutoff.getUTCFullYear() - 16);
     const birthdayEligible = selectedBirthDate <= ageCutoff;
     return (
       <PatternScreen>

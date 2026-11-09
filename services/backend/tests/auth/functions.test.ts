@@ -43,14 +43,22 @@ async function callFunction<T>(
   name: string,
   data: unknown,
   token?: string,
+  options?: { profileDefaults?: boolean },
 ): Promise<T> {
+  const requestData =
+    name === 'createUserProfile' &&
+    options?.profileDefaults !== false &&
+    typeof data === 'object' &&
+    data !== null
+      ? { birthDate: '1990-01-01', ...data }
+      : data;
   const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: requestData }),
   });
   const payload = (await response.json()) as {
     result?: T;
@@ -417,6 +425,25 @@ describe('phone OTP callables', () => {
 });
 
 describe('authenticated session and paginated reads', () => {
+  it('requires a birth date when creating a profile for the first time', async () => {
+    const { token } = await authenticatedUser();
+
+    await expect(
+      callFunction(
+        'createUserProfile',
+        {
+          displayName: 'Demo User',
+          username: 'demo.user',
+          city: 'Istanbul',
+        },
+        token,
+        { profileDefaults: false },
+      ),
+    ).rejects.toMatchObject({
+      details: { reason: 'birth-date-required' },
+    });
+  }, 15_000);
+
   it('uses the server profile as the onboarding source of truth', async () => {
     const { token } = await authenticatedUser();
 
